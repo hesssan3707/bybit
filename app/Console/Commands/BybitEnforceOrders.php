@@ -1,66 +1,75 @@
 <?php
 
-// app/Console/Commands/BybitEnforceOrders.php
 namespace App\Console\Commands;
 
 use App\Models\BybitOrders;
+use App\Services\BybitApiService;
 use Illuminate\Console\Command;
 
 class BybitEnforceOrders extends Command
 {
     protected $signature = 'bybit:enforce';
-    protected $description = 'لغو تمام سفارش‌های Bybit که در دیتابیس ما ثبت نشده‌اند';
+    protected $description = 'Cancels all Bybit orders that are not registered in our database.';
+
+    protected $bybitApiService;
+
+    public function __construct(BybitApiService $bybitApiService)
+    {
+        parent::__construct();
+        $this->bybitApiService = $bybitApiService;
+    }
 
     public function handle(): int
     {
-        require_once base_path('vendor/autoload.php');
+        $this->info('Starting to enforce Bybit orders...');
 
-        $exchange = new \ccxt\bybit([
-            'apiKey' => env('BYBIT_API_KEY'),
-            'secret' => env('BYBIT_API_SECRET'),
-            'enableRateLimit' => true,
-            'options' => [
-                'defaultType' => 'unified',
-                'recvWindow' => 5000,
-                'adjustForTimeDifference' => true
-            ]
-        ]);
-        if (env('BYBIT_TESTNET', false)) {
-            $exchange->set_sandbox_mode(true);
-        }
-
-        $symbol = 'ETH/USDT';
+        $symbol = 'ETHUSDT'; // V5 API uses ETHUSDT
 
         try {
-            // لیست سفارش‌های «باز» فعلی در Bybit
-            $openOrders = $exchange->fetchOpenOrders($symbol);
-            $openIds    = array_map(fn($o) => $o['id'] ?? null, $openOrders);
-            $openIds    = array_filter($openIds);
+            // Get the list of current 'open' orders from Bybit
+            $openOrdersResult = $this->bybitApiService->getOpenOrders($symbol);
+            $openOrders = $openOrdersResult['list'];
 
-            // لیست سفارش‌هایی که ما ساختیم
-            $ourIds = BybitOrders::whereIn('status',['pending','filled'])
+            $openIds = array_map(fn($o) => $o['orderId'] ?? null, $openOrders);
+            $openIds = array_filter($openIds);
+
+            if (empty($openIds)) {
+                $this->info('No open orders found on Bybit. Nothing to do.');
+                return self::SUCCESS;
+            }
+
+            // Get the list of orders we created and are tracking
+            $ourIds = BybitOrders::whereIn('status', ['pending', 'filled'])
                 ->pluck('order_id')
                 ->filter()
                 ->values()
                 ->toArray();
 
-            // هر چی در بایبیت هست ولی تو دیتابیس ما نیست
-            $foreign = array_values(array_diff($openIds, $ourIds));
+            // Find orders that are on Bybit but not in our database
+            $foreignIds = array_values(array_diff($openIds, $ourIds));
 
-            foreach ($foreign as $oid) {
+            if (empty($foreignIds)) {
+                $this->info('No foreign orders found to cancel.');
+                return self::SUCCESS;
+            }
+
+            $this->info("Found " . count($foreignIds) . " foreign orders to cancel.");
+
+            foreach ($foreignIds as $orderId) {
                 try {
-                    $exchange->cancelOrder($oid, $symbol);
-                    $this->info("Canceled foreign order: {$oid}");
+                    $this->bybitApiService->cancelOrder($orderId, $symbol);
+                    $this->info("Canceled foreign order: {$orderId}");
                 } catch (\Throwable $e) {
-                    $this->warn("Failed cancel foreign {$oid}: ".$e->getMessage());
+                    $this->warn("Failed to cancel foreign order {$orderId}: " . $e->getMessage());
                 }
             }
 
         } catch (\Throwable $e) {
-            $this->error("Enforce failed: ".$e->getMessage());
+            $this->error("Order enforcement failed: " . $e->getMessage());
             return self::FAILURE;
         }
 
+        $this->info('Successfully finished enforcing Bybit orders.');
         return self::SUCCESS;
     }
 }
