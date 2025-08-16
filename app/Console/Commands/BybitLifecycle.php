@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class BybitLifecycle extends Command
 {
     protected $signature = 'bybit:lifecycle';
-    protected $description = 'Manages expiration and places TP close orders for filled orders.';
+    protected $description = 'Manages order lifecycle by expiring open orders and syncing statuses.';
 
     protected $bybitApiService;
 
@@ -51,30 +51,14 @@ class BybitLifecycle extends Command
                         $this->info("Canceled expired order: {$dbOrder->order_id}");
                     }
                 }
-                // 2) If the order is filled, place the TP close order.
+                // 2) If the order is filled, just update our DB status. TP/SL are set on creation.
                 elseif ($bybitStatus === 'Filled') {
-                    $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
-                    $tpPrice = (float)$dbOrder->tp;
-
-                    $tpOrderParams = [
-                        'category' => 'linear',
-                        'symbol' => $symbol,
-                        'side' => $closeSide,
-                        'orderType' => 'Limit',
-                        'qty' => (string)$dbOrder->amount,
-                        'price' => (string)$tpPrice,
-                        'reduceOnly' => true,
-                        'timeInForce' => 'GTC',
-                    ];
-
-                    $this->bybitApiService->createOrder($tpOrderParams);
-
                     $dbOrder->status = 'filled';
                     $dbOrder->save();
-                    $this->info("Placed TP close order for filled order: {$dbOrder->order_id} at price {$tpPrice}");
+                    $this->info("Marked order {$dbOrder->order_id} as filled to match exchange status.");
                 }
                 // 3) If the order was canceled on the exchange, update our DB.
-                elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated'])) {
+                elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
                     $dbOrder->status = 'canceled';
                     $dbOrder->save();
                     $this->info("Marked order {$dbOrder->order_id} as canceled to match exchange status.");
