@@ -174,6 +174,14 @@
             @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
+        <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
+
+        <div class="form-group">
+            <label for="access_password">رمز عبور دسترسی:</label>
+            <input id="access_password" type="password" name="access_password" required>
+            @error('access_password') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
+
         <button type="submit">ارسال سفارش</button>
     </form>
 </div>

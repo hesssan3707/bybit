@@ -17,6 +17,7 @@ class BybitController extends Controller
 
     public function store(Request $request)
     {
+        // Add password to validation rules
         $validated = $request->validate([
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
@@ -24,7 +25,13 @@ class BybitController extends Controller
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
             'expire' => 'required|integer|min:1',
+            'access_password' => 'required|string',
         ]);
+
+        // Check the access password
+        if ($validated['access_password'] !== env('FORM_ACCESS_PASSWORD')) {
+            return back()->withErrors(['access_password' => 'رمز عبور دسترسی نامعتبر است.'])->withInput();
+        }
 
         try {
             // Business Logic
