@@ -2,119 +2,181 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>ثبت سفارش</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ثبت سفارش جدید</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        :root {
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --background-gradient-start: #f0f4f8;
+            --background-gradient-end: #d9e4ec;
+            --form-background: #ffffff;
+            --text-color: #333;
+            --label-color: #555;
+            --border-color: #ccc;
+            --error-bg: #f8d7da;
+            --error-text: #842029;
+            --success-bg: #d1e7dd;
+            --success-text: #0f5132;
+        }
         body {
-            font-family: 'Tahoma', sans-serif;
-            padding: 15px;
-            background: linear-gradient(135deg, #f0f4f8, #d9e4ec);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
             direction: rtl;
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: auto;
         }
         h2 {
             text-align: center;
-            color: #333;
-            margin-bottom: 15px;
+            margin-bottom: 25px;
         }
         form {
-            background: #fff;
-            padding: 20px;
+            background: var(--form-background);
+            padding: 30px;
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            max-width: 420px;
-            margin: auto;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
         }
         label {
             display: block;
-            margin-top: 12px;
-            font-weight: bold;
-            color: #555;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--label-color);
         }
         input {
             width: 100%;
-            padding: 10px;
-            margin-top: 6px;
-            border: 1px solid #ccc;
+            padding: 12px;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            font-size: 15px;
-            transition: 0.3s;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         input:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 6px rgba(0,123,255,0.3);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 8px rgba(0,123,255,0.25);
             outline: none;
         }
         button {
             width: 100%;
-            padding: 12px;
-            background: linear-gradient(90deg, #007bff, #0056b3);
+            padding: 14px;
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 18px;
+            font-weight: bold;
             margin-top: 20px;
             cursor: pointer;
-            transition: background 0.3s ease-in-out;
+            transition: opacity 0.3s;
         }
         button:hover {
-            background: linear-gradient(90deg, #0056b3, #003f7f);
+            opacity: 0.9;
         }
         .alert {
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
             border-radius: 8px;
             text-align: center;
+            font-size: 16px;
         }
-        .success {
-            background: #d1e7dd;
-            color: #0f5132;
+        .alert-success {
+            background-color: var(--success-bg);
+            color: var(--success-text);
         }
-        .error {
-            background: #f8d7da;
-            color: #842029;
+        .alert-danger {
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .invalid-feedback {
+            color: var(--error-text);
+            font-size: 14px;
+            margin-top: 5px;
+            display: block;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+            form {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
 
-<h2>ثبت سفارش جدید</h2>
+<div class="container">
+    <h2>ثبت سفارش جدید</h2>
 
-@if(session('success'))
-    <div class="alert success">{{ session('success') }}</div>
-@endif
+    @if(session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
 
-@if($errors->any())
-    <div class="alert error">
-        <ul style="margin:0; padding:0; list-style:none;">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+    @if($errors->has('msg'))
+        <div class="alert alert-danger">
+            {{ $errors->first('msg') }}
+        </div>
+    @endif
 
-<form action="{{ route('order.store') }}" method="POST">
-    @csrf
 
-    <label>Entry 1 (پایین‌ترین نقطه ورود):</label>
-    <input type="number" name="entry1" step="0.01" required>
+    <form action="{{ route('order.store') }}" method="POST">
+        @csrf
 
-    <label>Entry 2 (بالاترین نقطه ورود):</label>
-    <input type="number" name="entry2" step="0.01" required>
+        <div class="form-group">
+            <label for="entry1">Entry 1 (پایین‌ترین نقطه ورود):</label>
+            <input id="entry1" type="number" name="entry1" step="any" required value="{{ old('entry1') }}">
+            @error('entry1') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
 
-    <label>Take Profit (TP):</label>
-    <input type="number" name="tp" step="0.01" required>
+        <div class="form-group">
+            <label for="entry2">Entry 2 (بالاترین نقطه ورود):</label>
+            <input id="entry2" type="number" name="entry2" step="any" required value="{{ old('entry2') }}">
+            @error('entry2') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
 
-    <label>Stop Loss (SL):</label>
-    <input type="number" name="sl" step="0.01" required>
+        <div class="form-group">
+            <label for="tp">Take Profit (TP):</label>
+            <input id="tp" type="number" name="tp" step="any" required value="{{ old('tp') }}">
+            @error('tp') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
 
-    <input type="hidden" name="steps" value="4">
+        <div class="form-group">
+            <label for="sl">Stop Loss (SL):</label>
+            <input id="sl" type="number" name="sl" step="any" required value="{{ old('sl') }}">
+            @error('sl') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
 
-    <label>مدت انقضای سفارش (دقیقه):</label>
-    <input type="number" name="expire" min="1" value="10" required>
+        <div class="form-group">
+            <label for="steps">تعداد پله‌ها:</label>
+            <input id="steps" type="number" name="steps" min="1" value="{{ old('steps', 4) }}" required>
+            @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
 
-    <button type="submit">ارسال سفارش</button>
-</form>
+        <div class="form-group">
+            <label for="expire">مدت انقضای سفارش (دقیقه):</label>
+            <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', 10) }}" required>
+            @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
+
+        <button type="submit">ارسال سفارش</button>
+    </form>
+</div>
 
 </body>
 </html>

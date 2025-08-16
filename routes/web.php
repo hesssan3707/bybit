@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BybitController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -38,3 +39,4 @@ Route::get('/link', function() {
 Route::get('/set-order', function () {
     return view('set_order');
 });
+Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
