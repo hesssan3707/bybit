@@ -44,7 +44,14 @@ class BybitController extends Controller
             $avgEntry = ($entry1 + $entry2) / 2.0;
             $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
 
-            $capitalUSD = (float) env('TRADING_CAPITAL_USD', 1000);
+            // Fetch live wallet balance instead of using a static .env variable
+            $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
+            $usdtBalanceData = $balanceInfo['list'][0]['coin'][0] ?? null;
+            if (!$usdtBalanceData || $usdtBalanceData['coin'] !== 'USDT') {
+                throw new \Exception('Could not retrieve USDT wallet balance from Bybit.');
+            }
+            $capitalUSD = (float) $usdtBalanceData['walletBalance'];
+
             $maxLossUSD = $capitalUSD * 0.10;
             $slDistance = abs($avgEntry - (float) $validated['sl']);
 
@@ -75,6 +82,8 @@ class BybitController extends Controller
                     'qty' => (string)$amountPerStep,
                     'price' => (string)$price,
                     'timeInForce' => 'GTC',
+                    'stopLoss' => (string)$validated['sl'],
+                    'takeProfit' => (string)$validated['tp'],
                 ];
 
                 $responseData = $this->bybitApiService->createOrder($orderParams);
