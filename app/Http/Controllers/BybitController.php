@@ -25,6 +25,7 @@ class BybitController extends Controller
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
             'expire' => 'required|integer|min:1',
+            'risk_percentage' => 'required|numeric|min:0.1',
             'access_password' => 'required|string',
         ]);
 
@@ -52,7 +53,10 @@ class BybitController extends Controller
             }
             $capitalUSD = (float) $usdtBalanceData['walletBalance'];
 
-            $maxLossUSD = $capitalUSD * 0.10;
+            // Use the risk percentage from the form, capped at 10%
+            $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
+            $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
+
             $slDistance = abs($avgEntry - (float) $validated['sl']);
 
             if ($slDistance <= 0) {
@@ -82,8 +86,6 @@ class BybitController extends Controller
                     'qty' => (string)$amountPerStep,
                     'price' => (string)$price,
                     'timeInForce' => 'GTC',
-                    'stopLoss' => (string)$validated['sl'],
-                    'takeProfit' => (string)$validated['tp'],
                 ];
 
                 $responseData = $this->bybitApiService->createOrder($orderParams);

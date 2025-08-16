@@ -174,6 +174,12 @@
             @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
+        <div class="form-group">
+            <label for="risk_percentage">درصد ریسک (حداکثر ۱۰٪):</label>
+            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="10" step="0.1" value="{{ old('risk_percentage', 10) }}" required>
+            @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
+
         <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
 
         <div class="form-group">
