@@ -84,4 +84,14 @@ class BybitApiService
     {
         return $this->sendRequest('POST', '/v5/order/cancel', ['category' => 'linear', 'orderId' => $orderId, 'symbol' => $symbol]);
     }
+
+    public function getPositionInfo(string $symbol)
+    {
+        return $this->sendRequest('GET', '/v5/position/list', ['category' => 'linear', 'symbol' => $symbol]);
+    }
+
+    public function setTradingStop(array $params)
+    {
+        return $this->sendRequest('POST', '/v5/position/set-trading-stop', $params);
+    }
 }
