@@ -93,7 +93,7 @@
     </div>
 @endif
 
-<form action="{{ route('bybit.store') }}" method="POST">
+<form action="{{ route('order.store') }}" method="POST">
     @csrf
 
     <label>Entry 1 (پایین‌ترین نقطه ورود):</label>

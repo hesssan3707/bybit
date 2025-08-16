@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\BybitOrders;
 use Illuminate\Console\Command;
-use App\Models\BybitOrder;
 
 class CheckBybitOrders extends Command
 {
@@ -21,13 +21,19 @@ class CheckBybitOrders extends Command
         $exchange = new \ccxt\bybit([
             'apiKey' => $apiKey,
             'secret' => $apiSecret,
+            'enableRateLimit' => true,
+            'options' => [
+                'defaultType' => 'unified',
+                'recvWindow' => 5000,
+                'adjustForTimeDifference' => true
+            ]
         ]);
 
         if ($testnet) {
             $exchange->set_sandbox_mode(true);
         }
 
-        $orders = BybitOrder::where('status', 'pending')->get();
+        $orders = BybitOrders::where('status', 'pending')->get();
 
         foreach ($orders as $order) {
             $createdAt = $order->created_at->timestamp;

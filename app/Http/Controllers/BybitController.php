@@ -37,12 +37,26 @@ class BybitController extends Controller
         $testnet   = env('BYBIT_TESTNET', false);
 
         $exchange = new bybit([
-            'apiKey' => 'YOUR_API_KEY',
-            'secret' => 'YOUR_API_SECRET',
+            'apiKey' => $apiKey,
+            'secret' => $apiSecret,
             'enableRateLimit' => true,
+            'options' => [
+                'defaultType' => 'unified', // یا contract, spot, inverse
+                'recvWindow' => 5000,
+                'adjustForTimeDifference' => true
+            ]
         ]);
+        
         if ($testnet) {
             $exchange->set_sandbox_mode(true);
+        }
+        
+        try {
+            $balance = $exchange->fetch_balance();
+            // اگر به اینجا برسیم، یعنی ارتباط با بایبیت برقرار شده است
+            return back()->with('success', 'ارتباط با بایبیت با موفقیت برقرار شد. موجودی حساب دریافت شد.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['msg' => 'خطا در ارتباط با بایبیت: ' . $e->getMessage()]);
         }
 
         $symbol = 'ETH/USDT';
@@ -69,11 +83,17 @@ class BybitController extends Controller
         // چند ETH می‌توان خرید/فروخت
         $amount = $maxLossUSD / $slDistance; // چون فاصله * حجم = ضرر دلاری
 
-        // دقت بازار
-        $market         = $exchange->market($symbol);
-        $amountPrec     = $market['precision']['amount'] ?? 3;
-        $pricePrec      = $market['precision']['price'] ?? 2;
-        $amount         = round($amount, $amountPrec);
+        try {
+            // دقت بازار
+            $market = $exchange->market($symbol);
+            $amountPrec = $market['precision']['amount'] ?? 3;
+            $pricePrec = $market['precision']['price'] ?? 2;
+            $amount = round($amount, $amountPrec);
+            // dd($market);
+        } catch (\Exception $e) {
+            dd(44);
+            return back()->withErrors(['msg' => 'خطا در دریافت اطلاعات بازار: ' . $e->getMessage()]);
+        }
 
         // تقسیم بین پله‌ها
         $amountPerStep = round($amount / $steps, $amountPrec);
@@ -82,28 +102,32 @@ class BybitController extends Controller
         // ساخت سفارش‌ها
         // -------------------------------
         $stepSize = ($entry2 - $entry1) / max($steps - 1, 1);
-        foreach (range(0, $steps - 1) as $i) {
-            $price = round($entry1 + ($stepSize * $i), $pricePrec);
+        try {
+            foreach (range(0, $steps - 1) as $i) {
+                $price = round($entry1 + ($stepSize * $i), $pricePrec);
 
-            $order = $exchange->createOrder($symbol, 'limit', $side, $amountPerStep, $price, [
-                'timeInForce' => 'GTC',
-                'reduceOnly'  => false,
-            ]);
+                $order = $exchange->createOrder($symbol, 'limit', $side, $amountPerStep, $price, [
+                    'timeInForce' => 'GTC',
+                    'reduceOnly'  => false,
+                ]);
 
-            BybitOrders::create([
-                'order_id'       => $order['id'] ?? null,
-                'symbol'         => $symbol,
-                'entry_price'    => $price,
-                'tp'             => (float)$validated['tp'],
-                'sl'             => (float)$validated['sl'],
-                'steps'          => $steps,
-                'expire_minutes' => (int)$validated['expire'],
-                'status'         => 'pending',
-                'side'           => $side,
-                'amount'         => $amountPerStep,
-                'entry_low'      => $entry1,
-                'entry_high'     => $entry2,
-            ]);
+                BybitOrders::create([
+                    'order_id'       => $order['id'] ?? null,
+                    'symbol'         => $symbol,
+                    'entry_price'    => $price,
+                    'tp'             => (float)$validated['tp'],
+                    'sl'             => (float)$validated['sl'],
+                    'steps'          => $steps,
+                    'expire_minutes' => (int)$validated['expire'],
+                    'status'         => 'pending',
+                    'side'           => $side,
+                    'amount'         => $amountPerStep,
+                    'entry_low'      => $entry1,
+                    'entry_high'     => $entry2,
+                ]);
+            }
+        } catch (\Exception $e) {
+            return back()->withErrors(['msg' => 'خطا در ایجاد سفارش: ' . $e->getMessage()]);
         }
 
         return back()->with('success', 'سفارش‌ها ثبت شدند.');

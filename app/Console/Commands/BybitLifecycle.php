@@ -19,6 +19,11 @@ class BybitLifecycle extends Command
             'apiKey' => env('BYBIT_API_KEY'),
             'secret' => env('BYBIT_API_SECRET'),
             'enableRateLimit' => true,
+            'options' => [
+                'defaultType' => 'unified',
+                'recvWindow' => 5000,
+                'adjustForTimeDifference' => true
+            ]
         ]);
         if (env('BYBIT_TESTNET', false)) {
             $exchange->set_sandbox_mode(true);

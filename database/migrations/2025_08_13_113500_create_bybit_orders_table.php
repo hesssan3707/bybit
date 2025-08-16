@@ -17,6 +17,10 @@ class CreateBybitOrdersTable extends Migration
             $table->id();
             $table->string('order_id')->nullable();
             $table->string('symbol')->default('ETH/USDT');
+            $table->decimal('amount', 20, 10)->default(0.01);
+            $table->string('side')->default('buy');
+            $table->decimal('entry_low', 20, 10)->nullable();
+            $table->decimal('entry_high', 20, 10)->nullable();
             $table->decimal('entry_price', 20, 10);
             $table->decimal('tp', 20, 10);
             $table->decimal('sl', 20, 10);
@@ -24,6 +28,7 @@ class CreateBybitOrdersTable extends Migration
             $table->integer('leverage')->default(1);
             $table->integer('expire_minutes')->default(15);
             $table->string('status')->default('pending'); // pending, filled, canceled
+            $table->timestamp('closed_at')->nullable();
             $table->timestamps();
         });
     }
