@@ -123,7 +123,7 @@ class BybitController extends Controller
                     'qty' => (string)$amountPerStep,
                     'price' => (string)$price,
                     'timeInForce' => 'GTC',
-                    'stopLoss'  => (float)$validated['sl'],
+                    'stopLoss'  => (string)$validated['sl'],
                 ];
 
                 $responseData = $this->bybitApiService->createOrder($orderParams);
