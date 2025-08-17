@@ -12,10 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('bybit:enforce')->everyMinute();
-        $schedule->command('bybit:lifecycle')->everyMinute();
-        $schedule->command('bybit:sync-sl')->everyMinute();
-
+        //
     }
 
     /**

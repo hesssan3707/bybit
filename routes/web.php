@@ -36,7 +36,15 @@ Route::get('/link', function() {
     return 'DONE'; //Return anything
 });
 Route::get('/schedule', function() {
-    Artisan::call('schedule:run');
+    Artisan::call('bybit:lifecycle');
+    echo 'lifecycle done';
+    Artisan::call('bybit:enforce');
+    echo 'enforce done';
+    Artisan::call('bybit:sync-sl');
+    echo 'sync sl done';
+    sleep(25);
+    Artisan::call('bybit:lifecycle');
+    echo 'lifecycle 2 done';
     return 'DONE'; //Return anything
 });
 
