@@ -71,7 +71,7 @@
         }
         input[type=number] {
             direction: ltr;
-            text-align: right;
+            text-align: left;
         }
         button {
             width: 100%;
