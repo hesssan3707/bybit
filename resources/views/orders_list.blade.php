@@ -157,6 +157,7 @@
                     <th>جهت</th>
                     <th>قیمت ورود</th>
                     <th>مقدار</th>
+                    <th>TP / SL</th>
                     <th>وضعیت</th>
                     <th>تاریخ ثبت</th>
                     <th>عملیات</th>
@@ -168,6 +169,7 @@
                         <td data-label="جهت">{{ $order->side }}</td>
                         <td data-label="قیمت ورود">{{ number_format($order->entry_price, 2) }}</td>
                         <td data-label="مقدار">{{ number_format($order->amount, 2) }}</td>
+                        <td data-label="TP / SL">{{ number_format($order->tp, 2) }} / {{ number_format($order->sl, 2) }}</td>
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="تاریخ ثبت">{{ $order->created_at->format('Y-m-d H:i') }}</td>
                         <td data-label="عملیات">
@@ -180,7 +182,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
+                        <td colspan="7" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>
