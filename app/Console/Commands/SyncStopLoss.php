@@ -47,49 +47,47 @@ class SyncStopLoss extends Command
             }
 
             foreach ($filledOrders as $dbOrder) {
-                try {
-                    // Find the matching position from the API response
-                    // V5 API side values: 'Buy', 'Sell', 'None'
-                    $matchingPosition = null;
-                    foreach ($positions as $pos) {
-                        // Position side 'Buy' matches our 'buy' orders, 'Sell' matches 'sell'
-                        if (strtolower($pos['side']) === strtolower($dbOrder->side)) {
-                            $matchingPosition = $pos;
-                            break;
-                        }
-                    }
-
-                    if (!$matchingPosition) {
-                        Log::warning("Could not find matching Bybit position for our filled order ID: {$dbOrder->id}");
-                        continue;
-                    }
-
-                    $exchangeSl = (float)($matchingPosition['stopLoss'] ?? 0);
-                    $databaseSl = (float)$dbOrder->sl;
-
-                    // Compare SL, allowing for floating point inaccuracies
-                    if (abs($exchangeSl - $databaseSl) > 0.00001) {
-                        $this->warn("SL mismatch for {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
-
-                        $params = [
-                            'category' => 'linear',
-                            'symbol' => $symbol,
-                            'stopLoss' => (string)$databaseSl,
-                            // We must also provide the takeProfit, otherwise it will be removed.
-                            // Assuming TP from the first leg is the one we want to maintain.
-                            'takeProfit' => (string)$dbOrder->tp,
-                        ];
-
-                        $this->bybitApiService->setTradingStop($params);
-                        $this->info("Successfully reset SL for {$symbol} to {$databaseSl}.");
-                    } else {
-                        $this->info("SL for {$symbol} (Side: {$dbOrder->side}) is in sync.");
+                // Find the matching position from the API response
+                // V5 API side values: 'Buy', 'Sell', 'None'
+                $matchingPosition = null;
+                foreach ($positions as $pos) {
+                    // Position side 'Buy' matches our 'buy' orders, 'Sell' matches 'sell'
+                    if (strtolower($pos['side']) === strtolower($dbOrder->side)) {
+                        $matchingPosition = $pos;
+                        break;
                     }
                 }
-            } catch (\Throwable $e) {
-                $this->error("Failed to sync SL for symbol {$symbol}: " . $e->getMessage());
-                Log::error("Bybit SL Sync Error for {$symbol}: " . $e->getMessage(), ['exception' => $e]);
+
+                if (!$matchingPosition) {
+                    Log::warning("Could not find matching Bybit position for our filled order ID: {$dbOrder->id}");
+                    continue;
+                }
+
+                $exchangeSl = (float)($matchingPosition['stopLoss'] ?? 0);
+                $databaseSl = (float)$dbOrder->sl;
+
+                // Compare SL, allowing for floating point inaccuracies
+                if (abs($exchangeSl - $databaseSl) > 0.00001) {
+                    $this->warn("SL mismatch for {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
+
+                    $params = [
+                        'category' => 'linear',
+                        'symbol' => $symbol,
+                        'stopLoss' => (string)$databaseSl,
+                        // We must also provide the takeProfit, otherwise it will be removed.
+                        // Assuming TP from the first leg is the one we want to maintain.
+                        'takeProfit' => (string)$dbOrder->tp,
+                    ];
+
+                    $this->bybitApiService->setTradingStop($params);
+                    $this->info("Successfully reset SL for {$symbol} to {$databaseSl}.");
+                } else {
+                    $this->info("SL for {$symbol} (Side: {$dbOrder->side}) is in sync.");
+                }
             }
+        }catch (\Throwable $e) {
+            $this->error("Failed to sync SL for symbol {$symbol}: " . $e->getMessage());
+            Log::error("Bybit SL Sync Error for {$symbol}: " . $e->getMessage(), ['exception' => $e]);
         }
 
         $this->info('Finished Stop Loss synchronization.');
