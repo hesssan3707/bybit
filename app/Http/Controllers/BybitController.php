@@ -2,117 +2,133 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\BybitOrders;
-use Carbon\Carbon;
+use App\Services\BybitApiService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use ccxt\bybit;
 
 class BybitController extends Controller
 {
+    protected $bybitApiService;
+
+    public function __construct(BybitApiService $bybitApiService)
+    {
+        $this->bybitApiService = $bybitApiService;
+    }
+
+    public function index()
+    {
+        $orders = BybitOrders::latest()->paginate(20);
+        return view('orders_list', ['orders' => $orders]);
+    }
+
+    public function create()
+    {
+        $symbol = 'ETHUSDT';
+        $marketPrice = '0'; // Default value in case of an error
+        try {
+            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+            $marketPrice = (string)round($price);
+        } catch (\Exception $e) {
+            // Log the error or handle it as needed, but don't block the page from loading.
+            // For now, we'll just use the default price.
+            \Illuminate\Support\Facades\Log::error("Could not fetch Bybit market price: " . $e->getMessage());
+        }
+        return view('set_order', ['marketPrice' => $marketPrice]);
+    }
+
     public function store(Request $request)
     {
-        // بررسی محدودیت زمانی بعد از استاپ‌لاس خوردن
-        $lastStopLoss = BybitOrders::where('status', 'stopped') // اینو باید مطابق ساختار دیتابیس خودت بگذاری
-            ->orderBy('closed_at', 'desc')
-            ->first();
-
-        if ($lastStopLoss && Carbon::parse($lastStopLoss->closed_at)->gt(Carbon::now()->subHour())) {
-            return back()->withErrors(['msg' => 'به دلیل بسته شدن آخرین معامله با ضرر، تا 1 ساعت آینده امکان ثبت سفارش جدید وجود ندارد.']);
-        }
+        // Add password to validation rules
         $validated = $request->validate([
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
-            'steps'  => 'nullable|integer|min:1',
+            'steps'  => 'required|integer|min:1',
             'expire' => 'required|integer|min:1',
+            'risk_percentage' => 'required|numeric|min:0.1',
+            'access_password' => 'required|string',
         ]);
 
-        require_once base_path('vendor/autoload.php');
-
-        $apiKey    = env('BYBIT_API_KEY');
-        $apiSecret = env('BYBIT_API_SECRET');
-        $testnet   = env('BYBIT_TESTNET', false);
-
-        $exchange = new bybit([
-            'apiKey' => $apiKey,
-            'secret' => $apiSecret,
-            'enableRateLimit' => true,
-            'options' => [
-                'defaultType' => 'unified', // یا contract, spot, inverse
-                'recvWindow' => 5000,
-                'adjustForTimeDifference' => true
-            ]
-        ]);
-        
-        if ($testnet) {
-            $exchange->set_sandbox_mode(true);
+        // Check the access password
+        if ($validated['access_password'] !== env('FORM_ACCESS_PASSWORD')) {
+            return back()->withErrors(['access_password' => 'رمز عبور دسترسی نامعتبر است.'])->withInput();
         }
-        
-        try {
-            $balance = $exchange->fetch_balance();
-            // اگر به اینجا برسیم، یعنی ارتباط با بایبیت برقرار شده است
-            return back()->with('success', 'ارتباط با بایبیت با موفقیت برقرار شد. موجودی حساب دریافت شد.');
-        } catch (\Exception $e) {
-            return back()->withErrors(['msg' => 'خطا در ارتباط با بایبیت: ' . $e->getMessage()]);
-        }
-
-        $symbol = 'ETH/USDT';
-        $steps  = $validated['steps'] ?? 4;
-
-        $entry1 = (float) $validated['entry1'];
-        $entry2 = (float) $validated['entry2'];
-        if ($entry2 < $entry1) { [$entry1, $entry2] = [$entry2, $entry1]; }
-
-        $avgEntry = ($entry1 + $entry2) / 2.0;
-        $side = ($validated['sl'] > $avgEntry) ? 'sell' : 'buy';
-
-        // -------------------------------
-        // محاسبه حجم بر اساس ضرر 10٪ سرمایه
-        // -------------------------------
-        $capitalUSD = (float) env('TRADING_CAPITAL_USD', 1000); // سرمایه کل دلاری
-        $maxLossUSD = $capitalUSD * 0.10; // 10٪ سرمایه
-
-        $slDistance = abs($avgEntry - (float) $validated['sl']);
-        if ($slDistance <= 0) {
-            return back()->withErrors(['sl' => 'SL باید با نقطه ورود فاصله داشته باشد']);
-        }
-
-        // چند ETH می‌توان خرید/فروخت
-        $amount = $maxLossUSD / $slDistance; // چون فاصله * حجم = ضرر دلاری
 
         try {
-            // دقت بازار
-            $market = $exchange->market($symbol);
-            $amountPrec = $market['precision']['amount'] ?? 3;
-            $pricePrec = $market['precision']['price'] ?? 2;
+            // Business Logic
+            $symbol = 'ETHUSDT';
+            $entry1 = (float) $validated['entry1'];
+            $entry2 = (float) $validated['entry2'];
+            if ($entry2 < $entry1) { [$entry1, $entry2] = [$entry2, $entry1]; }
+
+            // Feature 3: If entry prices are the same, force steps to 1.
+            $steps = ($entry1 === $entry2) ? 1 : (int)$validated['steps'];
+
+            $avgEntry = ($entry1 + $entry2) / 2.0;
+            $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
+
+            // Feature 2: Validate entry price against market price
+            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+
+            if ($marketPrice > 0) {
+                if ($side === 'Buy' && $avgEntry > $marketPrice) {
+                    return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                }
+                if ($side === 'Sell' && $avgEntry < $marketPrice) {
+                    return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                }
+            }
+
+            // Fetch live wallet balance instead of using a static .env variable
+            $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
+            $usdtBalanceData = $balanceInfo['list'][0]['coin'][0] ?? null;
+            if (!$usdtBalanceData || $usdtBalanceData['coin'] !== 'USDT') {
+                throw new \Exception('Could not retrieve USDT wallet balance from Bybit.');
+            }
+            $capitalUSD = (float) $usdtBalanceData['walletBalance'];
+
+            // Use the risk percentage from the form, capped at 10%
+            $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
+            $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
+
+            $slDistance = abs($avgEntry - (float) $validated['sl']);
+
+            if ($slDistance <= 0) {
+                return back()->withErrors(['sl' => 'SL must be different from the entry price.'])->withInput();
+            }
+            $amount = $maxLossUSD / $slDistance;
+
+            // Get Market Precision via Service
+            $instrumentInfo = $this->bybitApiService->getInstrumentsInfo($symbol);
+            $instrumentData = $instrumentInfo['list'][0];
+            $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
+            $pricePrec = (int) $instrumentData['priceScale'];
             $amount = round($amount, $amountPrec);
-            // dd($market);
-        } catch (\Exception $e) {
-            dd(44);
-            return back()->withErrors(['msg' => 'خطا در دریافت اطلاعات بازار: ' . $e->getMessage()]);
-        }
 
-        // تقسیم بین پله‌ها
-        $amountPerStep = round($amount / $steps, $amountPrec);
+            // Create Orders via Service
+            $amountPerStep = round($amount / $steps, $amountPrec);
+            $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
 
-        // -------------------------------
-        // ساخت سفارش‌ها
-        // -------------------------------
-        $stepSize = ($entry2 - $entry1) / max($steps - 1, 1);
-        try {
             foreach (range(0, $steps - 1) as $i) {
                 $price = round($entry1 + ($stepSize * $i), $pricePrec);
 
-                $order = $exchange->createOrder($symbol, 'limit', $side, $amountPerStep, $price, [
+                $orderParams = [
+                    'category' => 'linear',
+                    'symbol' => $symbol,
+                    'side' => $side,
+                    'orderType' => 'Limit',
+                    'qty' => (string)$amountPerStep,
+                    'price' => (string)$price,
                     'timeInForce' => 'GTC',
-                    'reduceOnly'  => false,
-                ]);
+                ];
+
+                $responseData = $this->bybitApiService->createOrder($orderParams);
 
                 BybitOrders::create([
-                    'order_id'       => $order['id'] ?? null,
+                    'order_id'       => $responseData['orderId'] ?? null,
                     'symbol'         => $symbol,
                     'entry_price'    => $price,
                     'tp'             => (float)$validated['tp'],
@@ -120,17 +136,33 @@ class BybitController extends Controller
                     'steps'          => $steps,
                     'expire_minutes' => (int)$validated['expire'],
                     'status'         => 'pending',
-                    'side'           => $side,
+                    'side'           => strtolower($side),
                     'amount'         => $amountPerStep,
                     'entry_low'      => $entry1,
                     'entry_high'     => $entry2,
                 ]);
             }
         } catch (\Exception $e) {
-            return back()->withErrors(['msg' => 'خطا در ایجاد سفارش: ' . $e->getMessage()]);
+            return back()->withErrors(['msg' => 'An API error occurred: ' . $e->getMessage()])->withInput();
         }
 
-        return back()->with('success', 'سفارش‌ها ثبت شدند.');
+        return back()->with('success', "{$steps} order(s) successfully created using V5 API.");
     }
 
+    public function destroy(BybitOrders $bybitOrder)
+    {
+        try {
+            // Only try to cancel on the exchange if the order is in a state that might be active
+            if ($bybitOrder->status === 'pending' && $bybitOrder->order_id) {
+                $this->bybitApiService->cancelOrder($bybitOrder->order_id, $bybitOrder->symbol);
+            }
+        } catch (\Exception $e) {
+            // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
+            \Illuminate\Support\Facades\Log::warning("Could not cancel order {$bybitOrder->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
+        }
+
+        $bybitOrder->delete();
+
+        return redirect()->route('orders.index')->with('success', 'سفارش با موفقیت حذف شد.');
+    }
 }

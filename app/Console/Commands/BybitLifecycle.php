@@ -1,73 +1,102 @@
 <?php
 
-// app/Console/Commands/BybitLifecycle.php
 namespace App\Console\Commands;
 
 use App\Models\BybitOrders;
+use App\Services\BybitApiService;
 use Illuminate\Console\Command;
 
 class BybitLifecycle extends Command
 {
     protected $signature = 'bybit:lifecycle';
-    protected $description = 'اعمال انقضا و گذاشتن اردر کلوز TP برای سفارش‌های پر شده';
+    protected $description = 'Manages order lifecycle by expiring open orders and syncing statuses.';
+
+    protected $bybitApiService;
+
+    public function __construct(BybitApiService $bybitApiService)
+    {
+        parent::__construct();
+        $this->bybitApiService = $bybitApiService;
+    }
 
     public function handle(): int
     {
-        require_once base_path('vendor/autoload.php');
-
-        $exchange = new \ccxt\bybit([
-            'apiKey' => env('BYBIT_API_KEY'),
-            'secret' => env('BYBIT_API_SECRET'),
-            'enableRateLimit' => true,
-            'options' => [
-                'defaultType' => 'unified',
-                'recvWindow' => 5000,
-                'adjustForTimeDifference' => true
-            ]
-        ]);
-        if (env('BYBIT_TESTNET', false)) {
-            $exchange->set_sandbox_mode(true);
-        }
-
+        $this->info('Starting order lifecycle management...');
         $now = time();
 
-        // 1) اگر زمان انقضا گذشته و هنوز open است: لغو
-        $pendings = BybitOrders::where('status','pending')->get();
-        foreach ($pendings as $row) {
+        $pendingDbOrders = BybitOrders::where('status', 'pending')
+            ->where('symbol', 'ETHUSDT')
+            ->get();
+
+        $this->info("Found " . $pendingDbOrders->count() . " pending ETHUSDT orders in the database to check.");
+
+        foreach ($pendingDbOrders as $dbOrder) {
             try {
-                $o = $exchange->fetchOrder($row->order_id, $row->symbol);
-                if ($o && isset($o['status'])) {
-                    if ($o['status'] === 'open') {
-                        $expireAt = $row->created_at->timestamp + ($row->expire_minutes * 60);
-                        if ($now >= $expireAt) {
-                            $exchange->cancelOrder($row->order_id, $row->symbol);
-                            $row->status = 'canceled';
-                            $row->save();
-                            $this->info("Canceled expired order {$row->order_id}");
-                        }
-                    } elseif ($o['status'] === 'closed') {
-                        // 2) اگر پر شد، اردر کلوز در TP بگذار
-                        $closeSide = ($row->side === 'buy') ? 'sell' : 'buy';
-                        $tpPrice   = (float)$row->tp;
+                // V5 API uses orderId, not a combination of ID and symbol
+                $orderResult = $this->bybitApiService->getHistoryOrder($dbOrder->order_id);
+                $order = $orderResult['list'][0] ?? null;
 
-                        $exchange->createOrder($row->symbol, 'limit', $closeSide, (float)$row->amount, $tpPrice, [
-                            'reduceOnly'  => true,
-                            'timeInForce' => 'GTC',
-                        ]);
+                if (!$order) {
+                    $this->warn("Could not fetch order details for DB order ID {$dbOrder->id} (Bybit ID: {$dbOrder->order_id}).");
+                    continue;
+                }
 
-                        $row->status = 'filled';
-                        $row->save();
-                        $this->info("Placed TP close for {$row->order_id} at {$tpPrice}");
-                    } elseif ($o['status'] === 'canceled') {
-                        $row->status = 'canceled';
-                        $row->save();
+                $bybitStatus = $order['orderStatus'];
+                $symbol = $order['symbol'];
+
+                // 1) If the order is still open (V5 status 'New') and expired, cancel it.
+                if ($bybitStatus === 'New') {
+                    $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                    if ($now >= $expireAt) {
+                        $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'canceled';
+                        $dbOrder->save();
+                        $this->info("Canceled expired order: {$dbOrder->order_id}");
                     }
                 }
+                // 2) If the order is filled, place the TP close order if it hasn't been placed already.
+                elseif ($bybitStatus === 'Filled') {
+                    if ($dbOrder->tp_order_id) {
+                        // TP order already exists, but status was still pending. Just update status.
+                        $dbOrder->status = 'filled';
+                        $dbOrder->save();
+                        continue;
+                    }
+
+                    $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
+                    $tpPrice = (float)$dbOrder->tp;
+
+                    $tpOrderParams = [
+                        'category' => 'linear',
+                        'symbol' => $symbol,
+                        'side' => $closeSide,
+                        'orderType' => 'Limit',
+                        'qty' => (string)$dbOrder->amount,
+                        'price' => (string)$tpPrice,
+                        'reduceOnly' => true,
+                        'timeInForce' => 'GTC',
+                    ];
+
+                    $tpOrderResult = $this->bybitApiService->createOrder($tpOrderParams);
+
+                    $dbOrder->tp_order_id = $tpOrderResult['orderId'] ?? null;
+                    $dbOrder->status = 'filled';
+                    $dbOrder->save();
+                    $this->info("Placed TP close order {$dbOrder->tp_order_id} for filled order: {$dbOrder->order_id} at price {$tpPrice}");
+                }
+                // 3) If the order was canceled on the exchange, update our DB.
+                elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
+                    $dbOrder->status = 'canceled';
+                    $dbOrder->save();
+                    $this->info("Marked order {$dbOrder->order_id} as canceled to match exchange status.");
+                }
+
             } catch (\Throwable $e) {
-                $this->warn("Lifecycle check failed for {$row->order_id}: ".$e->getMessage());
+                $this->error("Lifecycle check failed for our order ID {$dbOrder->id} (Bybit ID {$dbOrder->order_id}): " . $e->getMessage());
             }
         }
 
+        $this->info('Finished order lifecycle management.');
         return self::SUCCESS;
     }
 }

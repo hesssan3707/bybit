@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BybitController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +36,7 @@ Route::get('/link', function() {
     return 'DONE'; //Return anything
 });
 
-Route::get('/set-order', function () {
-    return view('set_order');
-});
+Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
+Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
+Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
+Route::delete('/orders/{bybitOrder}', [BybitController::class, 'destroy'])->name('orders.destroy');
