@@ -76,7 +76,6 @@ class SyncStopLoss extends Command
                         'stopLoss' => (string)$databaseSl,
                         // We must also provide the takeProfit, otherwise it will be removed.
                         // Assuming TP from the first leg is the one we want to maintain.
-                        'takeProfit' => (string)$dbOrder->tp,
                     ];
 
                     $this->bybitApiService->setTradingStop($params);
