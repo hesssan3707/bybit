@@ -69,6 +69,10 @@
             box-shadow: 0 0 8px rgba(0,123,255,0.25);
             outline: none;
         }
+        input[type=number] {
+            direction: ltr;
+            text-align: right;
+        }
         button {
             width: 100%;
             padding: 14px;
@@ -122,6 +126,10 @@
 <body>
 
 <div class="container">
+    <div class="nav-links" style="text-align: center; margin-bottom: 20px;">
+        <a href="{{ route('orders.index') }}" style="text-decoration: none; background-color: #6c757d; color: white; padding: 10px 20px; border-radius: 8px; transition: background-color 0.3s;">مشاهده لیست سفارش‌ها</a>
+    </div>
+
     <h2>ثبت سفارش جدید</h2>
 
     @if(session('success'))

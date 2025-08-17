@@ -15,13 +15,20 @@ class BybitController extends Controller
         $this->bybitApiService = $bybitApiService;
     }
 
+    public function index()
+    {
+        $orders = BybitOrders::latest()->paginate(20);
+        return view('orders_list', ['orders' => $orders]);
+    }
+
     public function create()
     {
         $symbol = 'ETHUSDT';
         $marketPrice = '0'; // Default value in case of an error
         try {
             $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
-            $marketPrice = $tickerInfo['list'][0]['lastPrice'] ?? '0';
+            $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+            $marketPrice = (string)round($price);
         } catch (\Exception $e) {
             // Log the error or handle it as needed, but don't block the page from loading.
             // For now, we'll just use the default price.
@@ -140,5 +147,22 @@ class BybitController extends Controller
         }
 
         return back()->with('success', "{$steps} order(s) successfully created using V5 API.");
+    }
+
+    public function destroy(BybitOrders $bybitOrder)
+    {
+        try {
+            // Only try to cancel on the exchange if the order is in a state that might be active
+            if ($bybitOrder->status === 'pending' && $bybitOrder->order_id) {
+                $this->bybitApiService->cancelOrder($bybitOrder->order_id, $bybitOrder->symbol);
+            }
+        } catch (\Exception $e) {
+            // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
+            \Illuminate\Support\Facades\Log::warning("Could not cancel order {$bybitOrder->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
+        }
+
+        $bybitOrder->delete();
+
+        return redirect()->route('orders.index')->with('success', 'سفارش با موفقیت حذف شد.');
     }
 }
