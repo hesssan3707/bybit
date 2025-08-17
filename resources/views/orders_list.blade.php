@@ -17,6 +17,9 @@
             --danger-color: #dc3545;
             --danger-hover: #c82333;
         }
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
@@ -92,6 +95,12 @@
 
         /* Responsive Styles */
         @media screen and (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
             table {
                 border: 0;
             }
