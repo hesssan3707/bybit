@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>ثبت سفارش جدید</title>
@@ -38,11 +38,11 @@
         }
         h2 {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         form {
             background: var(--form-background);
-            padding: 30px;
+            padding: 20px;
             border-radius: 15px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
@@ -60,7 +60,7 @@
             padding: 12px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 14px;
             box-sizing: border-box;
             transition: border-color 0.3s, box-shadow 0.3s;
         }
@@ -81,7 +81,7 @@
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             margin-top: 20px;
             cursor: pointer;
