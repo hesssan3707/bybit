@@ -37,14 +37,14 @@ Route::get('/link', function() {
 });
 Route::get('/schedule', function() {
     Artisan::call('bybit:lifecycle');
-    echo 'lifecycle done';
+    echo 'lifecycle done -- ';
     Artisan::call('bybit:enforce');
-    echo 'enforce done';
+    echo 'enforce done -- ';
     Artisan::call('bybit:sync-sl');
-    echo 'sync sl done';
+    echo 'sync sl done -- ';
     sleep(25);
     Artisan::call('bybit:lifecycle');
-    echo 'lifecycle 2 done';
+    echo 'lifecycle 2 done -- ';
     return 'DONE'; //Return anything
 });
 
