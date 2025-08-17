@@ -103,4 +103,9 @@ class BybitApiService
         }
         return $this->sendRequest('GET', '/v5/account/wallet-balance', $params);
     }
+
+    public function getTickerInfo(string $symbol)
+    {
+        return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
+    }
 }

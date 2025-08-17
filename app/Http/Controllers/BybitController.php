@@ -15,6 +15,21 @@ class BybitController extends Controller
         $this->bybitApiService = $bybitApiService;
     }
 
+    public function create()
+    {
+        $symbol = 'ETHUSDT';
+        $marketPrice = '0'; // Default value in case of an error
+        try {
+            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $marketPrice = $tickerInfo['list'][0]['lastPrice'] ?? '0';
+        } catch (\Exception $e) {
+            // Log the error or handle it as needed, but don't block the page from loading.
+            // For now, we'll just use the default price.
+            \Illuminate\Support\Facades\Log::error("Could not fetch Bybit market price: " . $e->getMessage());
+        }
+        return view('set_order', ['marketPrice' => $marketPrice]);
+    }
+
     public function store(Request $request)
     {
         // Add password to validation rules
@@ -37,13 +52,28 @@ class BybitController extends Controller
         try {
             // Business Logic
             $symbol = 'ETHUSDT';
-            $steps  = $validated['steps'];
             $entry1 = (float) $validated['entry1'];
             $entry2 = (float) $validated['entry2'];
             if ($entry2 < $entry1) { [$entry1, $entry2] = [$entry2, $entry1]; }
 
+            // Feature 3: If entry prices are the same, force steps to 1.
+            $steps = ($entry1 === $entry2) ? 1 : (int)$validated['steps'];
+
             $avgEntry = ($entry1 + $entry2) / 2.0;
             $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
+
+            // Feature 2: Validate entry price against market price
+            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+
+            if ($marketPrice > 0) {
+                if ($side === 'Buy' && $avgEntry > $marketPrice) {
+                    return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                }
+                if ($side === 'Sell' && $avgEntry < $marketPrice) {
+                    return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                }
+            }
 
             // Fetch live wallet balance instead of using a static .env variable
             $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');

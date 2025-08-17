@@ -36,7 +36,5 @@ Route::get('/link', function() {
     return 'DONE'; //Return anything
 });
 
-Route::get('/set-order', function () {
-    return view('set_order');
-});
+Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
 Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
