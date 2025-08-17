@@ -47,11 +47,11 @@ class BybitController extends Controller
 
             // Fetch live wallet balance instead of using a static .env variable
             $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
-            $usdtBalanceData = $balanceInfo['list'][0]['coin'][0] ?? null;
-            if (!$usdtBalanceData || $usdtBalanceData['coin'] !== 'USDT') {
+            $usdtBalanceData = $balanceInfo['list'][0] ?? null;
+            if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
                 throw new \Exception('Could not retrieve USDT wallet balance from Bybit.');
             }
-            $capitalUSD = (float) $usdtBalanceData['walletBalance'];
+            $capitalUSD = min((float) $usdtBalanceData['totalWalletBalance'] , (float) $usdtBalanceData['totalEquity']);
 
             // Use the risk percentage from the form, capped at 10%
             $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
