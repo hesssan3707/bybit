@@ -30,7 +30,7 @@
             max-width: 1200px;
             margin: auto;
             background: var(--table-background);
-            padding: 30px;
+            padding: 20px;
             border-radius: 15px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
@@ -52,6 +52,9 @@
         }
         .nav-links a:hover {
             background-color: var(--primary-hover);
+        }
+        .table-responsive {
+            overflow-x: auto;
         }
         table {
             width: 100%;
@@ -86,6 +89,40 @@
             display: flex;
             justify-content: center;
         }
+
+        /* Responsive Styles */
+        @media screen and (max-width: 768px) {
+            table {
+                border: 0;
+            }
+            table thead {
+                display: none;
+            }
+            table tr {
+                display: block;
+                margin-bottom: 20px;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
+            table td {
+                display: flex;
+                justify-content: space-between;
+                text-align: right;
+                padding: 10px;
+                border: none;
+                border-bottom: 1px solid #eee;
+            }
+            table td:last-child {
+                border-bottom: 0;
+            }
+            table td::before {
+                content: attr(data-label);
+                font-weight: bold;
+                padding-left: 10px;
+                text-align: left;
+            }
+        }
     </style>
 </head>
 <body>
@@ -104,44 +141,42 @@
         <div class="alert alert-danger" style="background: #f8d7da; color: #842029; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">{{ session('error') }}</div>
     @endif
 
-    <table>
-        <thead>
-            <tr>
-                <th>شناسه سفارش</th>
-                <th>نماد</th>
-                <th>جهت</th>
-                <th>قیمت ورود</th>
-                <th>مقدار</th>
-                <th>وضعیت</th>
-                <th>تاریخ ثبت</th>
-                <th>عملیات</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($orders as $order)
+    <div class="table-responsive">
+        <table>
+            <thead>
                 <tr>
-                    <td>{{ $order->order_id ?? 'N/A' }}</td>
-                    <td>{{ $order->symbol }}</td>
-                    <td>{{ $order->side }}</td>
-                    <td>{{ $order->entry_price }}</td>
-                    <td>{{ $order->amount }}</td>
-                    <td>{{ $order->status }}</td>
-                    <td>{{ $order->created_at->format('Y-m-d H:i') }}</td>
-                    <td>
-                        <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش مطمئن هستید؟');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="delete-btn">حذف</button>
-                        </form>
-                    </td>
+                    <th>جهت</th>
+                    <th>قیمت ورود</th>
+                    <th>مقدار</th>
+                    <th>وضعیت</th>
+                    <th>تاریخ ثبت</th>
+                    <th>عملیات</th>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="8" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse ($orders as $order)
+                    <tr>
+                        <td data-label="جهت">{{ $order->side }}</td>
+                        <td data-label="قیمت ورود">{{ $order->entry_price }}</td>
+                        <td data-label="مقدار">{{ $order->amount }}</td>
+                        <td data-label="وضعیت">{{ $order->status }}</td>
+                        <td data-label="تاریخ ثبت">{{ $order->created_at->format('Y-m-d H:i') }}</td>
+                        <td data-label="عملیات">
+                            <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش مطمئن هستید؟');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="delete-btn">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
     <div class="pagination">
         {{ $orders->links() }}
