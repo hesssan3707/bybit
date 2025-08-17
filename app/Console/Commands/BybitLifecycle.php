@@ -24,8 +24,11 @@ class BybitLifecycle extends Command
         $this->info('Starting order lifecycle management...');
         $now = time();
 
-        $pendingDbOrders = BybitOrders::where('status', 'pending')->get();
-        $this->info("Found " . $pendingDbOrders->count() . " pending orders in the database to check.");
+        $pendingDbOrders = BybitOrders::where('status', 'pending')
+            ->where('symbol', 'ETHUSDT')
+            ->get();
+
+        $this->info("Found " . $pendingDbOrders->count() . " pending ETHUSDT orders in the database to check.");
 
         foreach ($pendingDbOrders as $dbOrder) {
             try {
@@ -51,11 +54,27 @@ class BybitLifecycle extends Command
                         $this->info("Canceled expired order: {$dbOrder->order_id}");
                     }
                 }
-                // 2) If the order is filled, just update our DB status. TP/SL are set on creation.
+                // 2) If the order is filled, place the TP close order.
                 elseif ($bybitStatus === 'Filled') {
+                    $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
+                    $tpPrice = (float)$dbOrder->tp;
+
+                    $tpOrderParams = [
+                        'category' => 'linear',
+                        'symbol' => $symbol,
+                        'side' => $closeSide,
+                        'orderType' => 'Limit',
+                        'qty' => (string)$dbOrder->amount,
+                        'price' => (string)$tpPrice,
+                        'reduceOnly' => true,
+                        'timeInForce' => 'GTC',
+                    ];
+
+                    $this->bybitApiService->createOrder($tpOrderParams);
+
                     $dbOrder->status = 'filled';
                     $dbOrder->save();
-                    $this->info("Marked order {$dbOrder->order_id} as filled to match exchange status.");
+                    $this->info("Placed TP close order for filled order: {$dbOrder->order_id} at price {$tpPrice}");
                 }
                 // 3) If the order was canceled on the exchange, update our DB.
                 elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
