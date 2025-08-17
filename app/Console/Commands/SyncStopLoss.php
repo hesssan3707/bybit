@@ -24,28 +24,30 @@ class SyncStopLoss extends Command
     {
         $this->info('Starting Stop Loss synchronization...');
 
+        $symbol = 'ETHUSDT';
+        $this->info("Starting Stop Loss synchronization for {$symbol}...");
+
         // Get all orders that should have an active position on the exchange
-        $filledOrders = BybitOrders::where('status', 'filled')->get();
+        $filledOrders = BybitOrders::where('status', 'filled')
+            ->where('symbol', $symbol)
+            ->get();
 
         if ($filledOrders->isEmpty()) {
-            $this->info('No filled orders found in the database. Nothing to sync.');
+            $this->info("No filled {$symbol} orders found in the database. Nothing to sync.");
             return self::SUCCESS;
         }
 
-        // Group orders by symbol to make fewer API calls
-        $groupedOrders = $filledOrders->groupBy('symbol');
+        try {
+            $positionInfoResult = $this->bybitApiService->getPositionInfo($symbol);
+            $positions = $positionInfoResult['list'] ?? [];
 
-        foreach ($groupedOrders as $symbol => $orders) {
-            try {
-                $positionInfoResult = $this->bybitApiService->getPositionInfo($symbol);
-                $positions = $positionInfoResult['list'] ?? [];
+            if (empty($positions)) {
+                $this->warn("No open positions found for symbol {$symbol} on Bybit.");
+                return self::SUCCESS;
+            }
 
-                if (empty($positions)) {
-                    $this->warn("No open positions found for symbol {$symbol} on Bybit.");
-                    continue;
-                }
-
-                foreach ($orders as $dbOrder) {
+            foreach ($filledOrders as $dbOrder) {
+                try {
                     // Find the matching position from the API response
                     // V5 API side values: 'Buy', 'Sell', 'None'
                     $matchingPosition = null;

@@ -24,8 +24,11 @@ class CheckBybitOrders extends Command
         $this->info('Checking for expired orders...');
         $now = time();
 
-        $pendingDbOrders = BybitOrders::where('status', 'pending')->get();
-        $this->info("Found " . $pendingDbOrders->count() . " pending orders to check for expiration.");
+        $pendingDbOrders = BybitOrders::where('status', 'pending')
+            ->where('symbol', 'ETHUSDT')
+            ->get();
+
+        $this->info("Found " . $pendingDbOrders->count() . " pending ETHUSDT orders to check for expiration.");
 
         foreach ($pendingDbOrders as $dbOrder) {
             $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
