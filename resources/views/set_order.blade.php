@@ -192,5 +192,23 @@
     </form>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const marketPrice = '{{ $marketPrice ?? '' }}';
+        if (marketPrice && marketPrice !== '0') {
+            const entry1Input = document.getElementById('entry1');
+            const entry2Input = document.getElementById('entry2');
+
+            // Only set the value if the fields are empty (e.g., on first load, not after a validation error)
+            if (entry1Input.value === '') {
+                entry1Input.value = marketPrice;
+            }
+            if (entry2Input.value === '') {
+                entry2Input.value = marketPrice;
+            }
+        }
+    });
+</script>
+
 </body>
 </html>
