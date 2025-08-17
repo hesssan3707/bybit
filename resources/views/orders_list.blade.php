@@ -166,8 +166,8 @@
                 @forelse ($orders as $order)
                     <tr>
                         <td data-label="جهت">{{ $order->side }}</td>
-                        <td data-label="قیمت ورود">{{ $order->entry_price }}</td>
-                        <td data-label="مقدار">{{ $order->amount }}</td>
+                        <td data-label="قیمت ورود">{{ number_format($order->entry_price, 2) }}</td>
+                        <td data-label="مقدار">{{ number_format($order->amount, 2) }}</td>
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="تاریخ ثبت">{{ $order->created_at->format('Y-m-d H:i') }}</td>
                         <td data-label="عملیات">
