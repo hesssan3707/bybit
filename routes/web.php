@@ -35,6 +35,10 @@ Route::get('/link', function() {
     Artisan::call('storage:link');
     return 'DONE'; //Return anything
 });
+Route::get('/schedule', function() {
+    Artisan::call('schedule:run');
+    return 'DONE'; //Return anything
+});
 
 Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
 Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
