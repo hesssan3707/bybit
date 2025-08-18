@@ -17,7 +17,15 @@ class BybitController extends Controller
 
     public function index()
     {
-        $orders = BybitOrders::latest()->paginate(20);
+        $threeDaysAgo = now()->subDays(3);
+
+        $orders = BybitOrders::where(function ($query) use ($threeDaysAgo) {
+            $query->whereIn('status', ['pending', 'filled'])
+                  ->orWhere('updated_at', '>=', $threeDaysAgo);
+        })
+        ->latest('updated_at')
+        ->paginate(50);
+
         return view('orders_list', ['orders' => $orders]);
     }
 
