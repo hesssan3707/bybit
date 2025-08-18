@@ -53,8 +53,11 @@ class BybitApiService
 
         $responseData = $response->json();
 
-        if ($response->failed() || $responseData['retCode'] !== 0) {
-            throw new \Exception($responseData['retMsg'] ?? 'Bybit API request failed.');
+        if ($response->failed() || ($responseData['retCode'] ?? 0) !== 0) {
+            $errorCode = $responseData['retCode'] ?? 'N/A';
+            $errorMsg = $responseData['retMsg'] ?? 'Unknown error';
+            $requestBody = json_encode($params);
+            throw new \Exception("Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}");
         }
 
         return $responseData['result'];
