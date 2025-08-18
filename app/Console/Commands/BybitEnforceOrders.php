@@ -50,8 +50,10 @@ class BybitEnforceOrders extends Command
                 // Check for external modifications (price change)
                 $bybitPrice = (float)($bybitOrder['price'] ?? 0);
                 $dbPrice = (float)$dbOrder->entry_price;
+                $bybitQty = (float)($bybitOrder['qty'] ?? 0);
+                $dbQty = (float)$dbOrder->amount;
 
-                if ($bybitPrice !== $dbPrice) {
+                if ($bybitPrice !== $dbPrice || $bybitQty !== $dbQty) {
                     try {
                         $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
                         $dbOrder->delete(); // Remove from our DB
