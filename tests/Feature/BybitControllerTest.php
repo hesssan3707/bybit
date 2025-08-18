@@ -117,4 +117,48 @@ class BybitControllerTest extends TestCase
         $response->assertSessionHasErrors('msg');
         $this->assertDatabaseCount('bybit_orders', 1); // Ensure no new order was created
     }
+
+    /**
+     * @test
+     */
+    public function it_prevents_deleting_a_recently_closed_order()
+    {
+        // Arrange
+        $order = BybitOrders::create([
+            'status' => 'closed',
+            'closed_at' => now()->subHours(12),
+            'entry_price' => 2500,
+            'tp' => 2600,
+            'sl' => 2400,
+        ]);
+
+        // Act
+        $response = $this->delete(route('orders.destroy', $order));
+
+        // Assert
+        $response->assertSessionHasErrors('msg');
+        $this->assertDatabaseHas('bybit_orders', ['id' => $order->id]);
+    }
+
+    /**
+     * @test
+     */
+    public function it_allows_deleting_an_old_closed_order()
+    {
+        // Arrange
+        $order = BybitOrders::create([
+            'status' => 'closed',
+            'closed_at' => now()->subHours(25),
+            'entry_price' => 2500,
+            'tp' => 2600,
+            'sl' => 2400,
+        ]);
+
+        // Act
+        $response = $this->delete(route('orders.destroy', $order));
+
+        // Assert
+        $response->assertSessionDoesntHaveErrors('msg');
+        $this->assertDatabaseMissing('bybit_orders', ['id' => $order->id]);
+    }
 }
