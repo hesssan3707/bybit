@@ -53,14 +53,30 @@ class BybitEnforceOrders extends Command
                 return self::SUCCESS;
             }
 
-            $this->info("Found " . count($foreignIds) . " foreign orders to cancel.");
+            $this->info("Found " . count($foreignIds) . " foreign orders. Checking which ones to cancel...");
+
+            // Create a map of orderId to order details for efficient lookup
+            $openOrdersMap = [];
+            foreach ($openOrders as $order) {
+                $openOrdersMap[$order['orderId']] = $order;
+            }
 
             foreach ($foreignIds as $orderId) {
                 try {
+                    $orderToCancel = $openOrdersMap[$orderId] ?? null;
+
+                    // If we have the order details, check if it's a 'reduceOnly' order.
+                    // We assume TP/SL orders are 'reduceOnly' and should not be canceled by this command.
+                    if ($orderToCancel && isset($orderToCancel['reduceOnly']) && $orderToCancel['reduceOnly'] === true) {
+                        $this->info("Skipping cancellation of reduce-only order: {$orderId}");
+                        continue;
+                    }
+
                     $this->bybitApiService->cancelOrder($orderId, $symbol);
                     $this->info("Canceled foreign order: {$orderId}");
+
                 } catch (\Throwable $e) {
-                    $this->warn("Failed to cancel foreign order {$orderId}: " . $e->getMessage());
+                    $this->warn("Failed to process foreign order {$orderId}: " . $e->getMessage());
                 }
             }
 
