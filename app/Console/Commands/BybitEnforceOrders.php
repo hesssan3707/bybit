@@ -33,19 +33,36 @@ class BybitEnforceOrders extends Command
             // Create a map for efficient lookups
             $bybitOpenOrdersMap = array_combine($bybitOpenOrderIds, $bybitOpenOrders);
 
-            // 2. Handle expired local 'pending' orders
-            $this->info('Checking for expired local orders...');
+            // 2. Handle local 'pending' orders (check for modifications, expiration)
+            $this->info('Checking local pending orders...');
             $ourPendingOrders = BybitOrders::where('status', 'pending')->get();
             $now = time();
 
             foreach ($ourPendingOrders as $dbOrder) {
-                // Check if the order still exists on Bybit before trying to cancel
-                if (!isset($bybitOpenOrdersMap[$dbOrder->order_id])) {
-                    // If our 'pending' order is not on Bybit's open list, it might have been filled or canceled.
-                    // The bybit:lifecycle command will handle this state change. We can skip it here.
+                $bybitOrder = $bybitOpenOrdersMap[$dbOrder->order_id] ?? null;
+
+                // If our 'pending' order is not on Bybit's open list, it might have been filled or canceled.
+                // The bybit:lifecycle command will handle this state change. We can skip it here.
+                if (!$bybitOrder) {
                     continue;
                 }
 
+                // Check for external modifications (price change)
+                $bybitPrice = (float)($bybitOrder['price'] ?? 0);
+                $dbPrice = (float)$dbOrder->entry_price;
+
+                if ($bybitPrice !== $dbPrice) {
+                    try {
+                        $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
+                        $dbOrder->delete(); // Remove from our DB
+                        $this->info("Canceled and removed modified order: {$dbOrder->order_id}");
+                        continue; // Move to the next order
+                    } catch (\Throwable $e) {
+                        $this->warn("Failed to cancel modified order {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                }
+
+                // Check for expiration
                 $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
                 if ($now >= $expireAt) {
                     try {
