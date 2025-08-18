@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class BybitEnforceOrders extends Command
 {
     protected $signature = 'bybit:enforce';
-    protected $description = 'Cancels all Bybit orders that are not registered in our database.';
+    protected $description = 'Cancels foreign orders and expired local pending orders.';
 
     protected $bybitApiService;
 
@@ -21,62 +21,70 @@ class BybitEnforceOrders extends Command
 
     public function handle(): int
     {
-        $this->info('Starting to enforce Bybit orders...');
-
-        $symbol = 'ETHUSDT'; // V5 API uses ETHUSDT
+        $this->info('Starting order enforcement...');
+        $symbol = 'ETHUSDT';
 
         try {
-            // Get the list of current 'open' orders from Bybit
+            // 1. Get all open orders from Bybit
             $openOrdersResult = $this->bybitApiService->getOpenOrders($symbol);
-            $openOrders = $openOrdersResult['list'];
+            $bybitOpenOrders = $openOrdersResult['list'];
+            $bybitOpenOrderIds = array_map(fn($o) => $o['orderId'], $bybitOpenOrders);
 
-            $openIds = array_map(fn($o) => $o['orderId'] ?? null, $openOrders);
-            $openIds = array_filter($openIds);
+            // Create a map for efficient lookups
+            $bybitOpenOrdersMap = array_combine($bybitOpenOrderIds, $bybitOpenOrders);
 
-            if (empty($openIds)) {
-                $this->info('No open orders found on Bybit. Nothing to do.');
-                return self::SUCCESS;
+            // 2. Handle expired local 'pending' orders
+            $this->info('Checking for expired local orders...');
+            $ourPendingOrders = BybitOrders::where('status', 'pending')->get();
+            $now = time();
+
+            foreach ($ourPendingOrders as $dbOrder) {
+                // Check if the order still exists on Bybit before trying to cancel
+                if (!isset($bybitOpenOrdersMap[$dbOrder->order_id])) {
+                    // If our 'pending' order is not on Bybit's open list, it might have been filled or canceled.
+                    // The bybit:lifecycle command will handle this state change. We can skip it here.
+                    continue;
+                }
+
+                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                if ($now >= $expireAt) {
+                    try {
+                        $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'canceled';
+                        $dbOrder->closed_at = now();
+                        $dbOrder->save();
+                        $this->info("Canceled expired local order: {$dbOrder->order_id}");
+                    } catch (\Throwable $e) {
+                        $this->warn("Failed to cancel expired local order {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                }
             }
 
-            // Get the list of orders we created and are tracking
-            $ourIds = BybitOrders::whereIn('status', ['pending', 'filled'])
+            // 3. Handle foreign orders (not in our DB)
+            $this->info('Checking for foreign orders to cancel...');
+            $ourTrackedIds = BybitOrders::whereIn('status', ['pending', 'filled'])
                 ->pluck('order_id')
                 ->filter()
-                ->values()
-                ->toArray();
+                ->all();
 
-            // Find orders that are on Bybit but not in our database
-            $foreignIds = array_values(array_diff($openIds, $ourIds));
+            $foreignOrderIds = array_diff($bybitOpenOrderIds, $ourTrackedIds);
 
-            if (empty($foreignIds)) {
+            if (empty($foreignOrderIds)) {
                 $this->info('No foreign orders found to cancel.');
-                return self::SUCCESS;
-            }
-
-            $this->info("Found " . count($foreignIds) . " foreign orders. Checking which ones to cancel...");
-
-            // Create a map of orderId to order details for efficient lookup
-            $openOrdersMap = [];
-            foreach ($openOrders as $order) {
-                $openOrdersMap[$order['orderId']] = $order;
-            }
-
-            foreach ($foreignIds as $orderId) {
-                try {
-                    $orderToCancel = $openOrdersMap[$orderId] ?? null;
-
-                    // If we have the order details, check if it's a 'reduceOnly' order.
-                    // We assume TP/SL orders are 'reduceOnly' and should not be canceled by this command.
-                    if ($orderToCancel && isset($orderToCancel['reduceOnly']) && $orderToCancel['reduceOnly'] === true) {
-                        $this->info("Skipping cancellation of reduce-only order: {$orderId}");
-                        continue;
+            } else {
+                $this->info("Found " . count($foreignOrderIds) . " foreign orders. Checking which ones to cancel...");
+                foreach ($foreignOrderIds as $orderId) {
+                    try {
+                        $orderToCancel = $bybitOpenOrdersMap[$orderId] ?? null;
+                        if ($orderToCancel && ($orderToCancel['reduceOnly'] ?? false) === true) {
+                            $this->info("Skipping cancellation of reduce-only foreign order: {$orderId}");
+                            continue;
+                        }
+                        $this->bybitApiService->cancelOrder($orderId, $symbol);
+                        $this->info("Canceled foreign order: {$orderId}");
+                    } catch (\Throwable $e) {
+                        $this->warn("Failed to process foreign order {$orderId}: " . $e->getMessage());
                     }
-
-                    $this->bybitApiService->cancelOrder($orderId, $symbol);
-                    $this->info("Canceled foreign order: {$orderId}");
-
-                } catch (\Throwable $e) {
-                    $this->warn("Failed to process foreign order {$orderId}: " . $e->getMessage());
                 }
             }
 
@@ -85,7 +93,7 @@ class BybitEnforceOrders extends Command
             return self::FAILURE;
         }
 
-        $this->info('Successfully finished enforcing Bybit orders.');
+        $this->info('Successfully finished order enforcement.');
         return self::SUCCESS;
     }
 }

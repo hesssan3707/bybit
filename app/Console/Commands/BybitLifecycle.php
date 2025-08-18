@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class BybitLifecycle extends Command
 {
     protected $signature = 'bybit:lifecycle';
-    protected $description = 'Manages order lifecycle by expiring open orders and syncing statuses.';
+    protected $description = 'Syncs local order statuses with the exchange.';
 
     protected $bybitApiService;
 
@@ -21,8 +21,7 @@ class BybitLifecycle extends Command
 
     public function handle(): int
     {
-        $this->info('Starting order lifecycle management...');
-        $now = time();
+        $this->info('Starting order status sync...');
 
         $ordersToCheck = BybitOrders::whereIn('status', ['pending', 'filled'])
             ->where('symbol', 'ETHUSDT')
@@ -32,31 +31,24 @@ class BybitLifecycle extends Command
 
         foreach ($ordersToCheck as $dbOrder) {
             try {
-                $symbol = $dbOrder->symbol; // Assuming symbol is stored like 'ETHUSDT'
+                $symbol = $dbOrder->symbol;
 
-                // Logic for 'pending' orders: Check if they are filled, canceled or expired.
+                // Logic for 'pending' orders: Check if they have been filled or externally canceled.
                 if ($dbOrder->status === 'pending') {
+                    // We use getHistoryOrder because we only care about final states (Filled, Cancelled).
+                    // Active 'New' orders are handled by the 'bybit:enforce' command for expiration checks.
                     $orderResult = $this->bybitApiService->getHistoryOrder($dbOrder->order_id);
                     $order = $orderResult['list'][0] ?? null;
 
                     if (!$order) {
-                        $this->warn("Could not fetch order details for DB order ID {$dbOrder->id} (Bybit ID: {$dbOrder->order_id}).");
+                        // This is expected if the order is still 'New' and not in history.
+                        // We can safely skip it, as it's not filled or canceled yet.
                         continue;
                     }
 
                     $bybitStatus = $order['orderStatus'];
 
-                    if ($bybitStatus === 'New') {
-                        $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
-                        if ($now >= $expireAt) {
-                            $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
-                            $dbOrder->status = 'canceled';
-                            $dbOrder->closed_at = now();
-                            $dbOrder->save();
-                            $this->info("Canceled expired order: {$dbOrder->order_id}");
-                        }
-                    } elseif ($bybitStatus === 'Filled') {
-                        // TP order is now placed via SyncStopLoss command, just update status
+                    if ($bybitStatus === 'Filled') {
                         $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
                         $tpPrice = (float)$dbOrder->tp;
                         $tpOrderParams = [
@@ -70,8 +62,7 @@ class BybitLifecycle extends Command
                             'timeInForce' => 'GTC',
                         ];
 
-                        $this->bybitApiService->createOrder($tpOrderParams);
-                        $dbOrder->status = 'filled';
+                        $this->bybitApiService->createOrder($tpOrderParams);                        $dbOrder->status = 'filled';
                         $dbOrder->save();
                         $this->info("Order {$dbOrder->order_id} is filled. Awaiting TP/SL execution.");
                     } elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
@@ -81,7 +72,7 @@ class BybitLifecycle extends Command
                         $this->info("Marked order {$dbOrder->order_id} as canceled to match exchange status.");
                     }
                 }
-                // Logic for 'filled' orders: Check if the position is closed.
+                // Logic for 'filled' orders: Check if the corresponding position has been closed.
                 elseif ($dbOrder->status === 'filled') {
                     $positionResult = $this->bybitApiService->getPositionInfo($symbol);
                     $position = $positionResult['list'][0] ?? null;
