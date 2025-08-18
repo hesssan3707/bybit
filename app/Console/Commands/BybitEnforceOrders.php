@@ -50,7 +50,7 @@ class BybitEnforceOrders extends Command
                 if ($now >= $expireAt) {
                     try {
                         $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'canceled';
+                        $dbOrder->status = 'expired';
                         $dbOrder->closed_at = now();
                         $dbOrder->save();
                         $this->info("Canceled expired local order: {$dbOrder->order_id}");
