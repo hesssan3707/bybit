@@ -70,12 +70,17 @@ class SyncStopLoss extends Command
                 if (abs($exchangeSl - $databaseSl) > 0.00001) {
                     $this->warn("SL mismatch for {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
 
+                    // To modify one side (e.g., SL), we must provide the existing values for the other side (TP)
+                    // and other relevant parameters to avoid them being reset or leading to an error.
                     $params = [
-                        'category' => 'linear',
-                        'symbol' => $symbol,
-                        'stopLoss' => (string)$databaseSl,
-                        // We must also provide the takeProfit, otherwise it will be removed.
-                        // Assuming TP from the first leg is the one we want to maintain.
+                        'category'    => 'linear',
+                        'symbol'      => $symbol,
+                        'stopLoss'    => (string)$databaseSl,
+                        'takeProfit'  => (string)($matchingPosition['takeProfit'] ?? '0'),
+                        'tpslMode'    => $matchingPosition['tpslMode'] ?? 'Full',
+                        'tpTriggerBy' => $matchingPosition['tpTriggerBy'] ?? 'LastPrice',
+                        'slTriggerBy' => $matchingPosition['slTriggerBy'] ?? 'LastPrice',
+                        'positionIdx' => $matchingPosition['positionIdx'] ?? 0,
                     ];
 
                     $this->bybitApiService->setTradingStop($params);
