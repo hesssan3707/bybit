@@ -80,6 +80,7 @@ class BybitLifecycle extends Command
 
         // --- New, more robust P&L processing ---
         $this->processClosedPositions('ETHUSDT');
+        return 1;
     }
 
     private function processClosedPositions(string $symbol)
