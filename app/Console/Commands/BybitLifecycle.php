@@ -124,6 +124,7 @@ class BybitLifecycle extends Command
         if ($pnlEventToAssign) {
             $orderToProcess->status = 'closed';
             $orderToProcess->pnl = $pnlEventToAssign['closedPnl'];
+            $orderToProcess->closure_price = $pnlEventToAssign['avgExitPrice'] ?? null;
             $orderToProcess->closing_order_id = $pnlEventToAssign['orderId']; // Mark PNL event as used
             $orderToProcess->closed_at = now();
             $orderToProcess->save();
