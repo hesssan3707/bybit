@@ -85,4 +85,36 @@ class BybitControllerTest extends TestCase
         // Assert
         $response->assertSessionDoesntHaveErrors('msg');
     }
+
+    /**
+     * @test
+     */
+    public function it_prevents_creating_an_order_if_another_order_is_already_active()
+    {
+        // Arrange
+        BybitOrders::create([
+            'status' => 'pending', // or 'filled'
+            'entry_price' => 2500,
+            'tp' => 2600,
+            'sl' => 2400,
+        ]);
+
+        $postData = [
+            'entry1' => 3000,
+            'entry2' => 3000,
+            'tp' => 3100,
+            'sl' => 2900,
+            'steps' => 1,
+            'expire' => 15,
+            'risk_percentage' => 1,
+            'access_password' => env('FORM_ACCESS_PASSWORD'),
+        ];
+
+        // Act
+        $response = $this->post(route('order.store'), $postData);
+
+        // Assert
+        $response->assertSessionHasErrors('msg');
+        $this->assertDatabaseCount('bybit_orders', 1); // Ensure no new order was created
+    }
 }
