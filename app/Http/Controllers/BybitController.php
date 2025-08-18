@@ -66,11 +66,6 @@ class BybitController extends Controller
         }
 
         try {
-            // Check for existing active orders
-            $activeOrder = BybitOrders::whereIn('status', ['pending', 'filled'])->first();
-            if ($activeOrder) {
-                return back()->withErrors(['msg' => 'An order is already active. Cannot create a new one.'])->withInput();
-            }
 
             // Check for recent loss
             $lastLoss = BybitOrders::where('status', 'closed')
