@@ -181,6 +181,11 @@ class BybitController extends Controller
 
     public function destroy(BybitOrders $bybitOrder)
     {
+        // Prevent deleting orders that were closed less than 24 hours ago
+        if ($bybitOrder->status === 'closed' && $bybitOrder->closed_at && now()->diffInHours($bybitOrder->closed_at) < 24) {
+            return redirect()->route('orders.index')->withErrors(['msg' => 'Cannot delete an order that was closed less than 24 hours ago.']);
+        }
+
         try {
             // Only try to cancel on the exchange if the order is in a state that might be active
             if ($bybitOrder->status === 'pending' && $bybitOrder->order_id) {
