@@ -87,18 +87,6 @@ class BybitLifecycle extends Command
     {
         $this->info("Processing P&L for symbol: {$symbol}");
 
-        // Find the oldest 'filled' order for this symbol that hasn't been processed yet.
-        $orderToProcess = BybitOrders::where('status', 'filled')
-            ->where('symbol', $symbol)
-            ->whereNull('pnl')
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        if (!$orderToProcess) {
-            $this->info("No 'filled' orders awaiting P&L processing for {$symbol}.");
-            return;
-        }
-
         // Check if the position is closed. If not, we can't process P&L yet.
         $positionResult = $this->bybitApiService->getPositionInfo($symbol);
         $position = collect($positionResult['list'] ?? [])->firstWhere('symbol', $symbol);
@@ -107,23 +95,59 @@ class BybitLifecycle extends Command
             return;
         }
 
-        // Get P&L events and find the one that matches our closing order ID.
+        // Get all local 'filled' orders that are waiting for P&L.
+        $filledOrders = BybitOrders::where('status', 'filled')
+            ->where('symbol', $symbol)
+            ->whereNull('pnl')
+            ->get();
+
+        if ($filledOrders->isEmpty()) {
+            $this->info("No 'filled' orders awaiting P&L processing for {$symbol}.");
+            return;
+        }
+
+        // Get P&L events that have not been assigned to one of our orders yet.
+        $usedClosingOrderIds = BybitOrders::whereNotNull('closing_order_id')->pluck('closing_order_id')->all();
         $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 200); // Get a larger batch for safety
-        $pnlEvents = collect($pnlResult['list'] ?? []);
+        $unprocessedPnlEvents = collect($pnlResult['list'] ?? [])->whereNotIn('orderId', $usedClosingOrderIds);
 
-        $pnlEventToAssign = $pnlEvents->firstWhere('orderId', $orderToProcess->closing_order_id);
+        if ($unprocessedPnlEvents->isEmpty()) {
+            $this->info("No new, unprocessed P&L events found for {$symbol}.");
+            return;
+        }
 
-        if ($pnlEventToAssign) {
-            $orderToProcess->status = 'closed';
-            $orderToProcess->pnl = $pnlEventToAssign['closedPnl'];
-            $orderToProcess->closure_price = $pnlEventToAssign['avgExitPrice'] ?? null;
-            // closing_order_id is already set, no need to change it.
-            $orderToProcess->closed_at = now();
-            $orderToProcess->save();
+        // Create a map of filled orders for efficient lookup
+        $filledOrdersMap = $filledOrders->keyBy(function ($order) {
+            return $order->order_id; // Key by original order ID
+        });
+        $filledOrdersTpMap = $filledOrders->whereNotNull('closing_order_id')->keyBy(function ($order) {
+            return $order->closing_order_id; // Key by TP order ID
+        });
 
-            $this->info("Assigned P&L of {$pnlEventToAssign['closedPnl']} to order ID {$orderToProcess->id} (Bybit Order ID: {$orderToProcess->order_id}).");
-        } else {
-            $this->info("No matching P&L event found for order ID {$orderToProcess->id} with closing order ID {$orderToProcess->closing_order_id}.");
+        foreach ($unprocessedPnlEvents as $pnlEvent) {
+            $pnlOrderId = $pnlEvent['orderId'];
+            $orderToUpdate = null;
+
+            // Check if the P&L event's orderId matches an original order ID (SL case)
+            if (isset($filledOrdersMap[$pnlOrderId])) {
+                $orderToUpdate = $filledOrdersMap[$pnlOrderId];
+            }
+            // Check if the P&L event's orderId matches a TP order ID
+            elseif (isset($filledOrdersTpMap[$pnlOrderId])) {
+                $orderToUpdate = $filledOrdersTpMap[$pnlOrderId];
+            }
+
+            if ($orderToUpdate) {
+                $orderToUpdate->status = 'closed';
+                $orderToUpdate->pnl = $pnlEvent['closedPnl'];
+                $orderToUpdate->closure_price = $pnlEvent['avgExitPrice'] ?? null;
+                // We need to overwrite the closing_order_id here to ensure it's the one from the PNL event
+                $orderToUpdate->closing_order_id = $pnlOrderId;
+                $orderToUpdate->closed_at = now();
+                $orderToUpdate->save();
+
+                $this->info("Assigned P&L of {$pnlEvent['closedPnl']} to order ID {$orderToUpdate->id} (Bybit Order ID: {$orderToUpdate->order_id}).");
+            }
         }
 
         $this->info('Finished order lifecycle management.');
