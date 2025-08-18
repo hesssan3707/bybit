@@ -62,7 +62,8 @@ class BybitLifecycle extends Command
                             'timeInForce' => 'GTC',
                         ];
 
-                        $this->bybitApiService->createOrder($tpOrderParams);                        $dbOrder->status = 'filled';
+                        $this->bybitApiService->createOrder($tpOrderParams);                        
+                        $dbOrder->status = 'filled';
                         $dbOrder->save();
                         $this->info("Order {$dbOrder->order_id} is filled. Awaiting TP/SL execution.");
                     } elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
