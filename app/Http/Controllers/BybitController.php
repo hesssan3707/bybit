@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BybitOrders;
 use App\Services\BybitApiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class BybitController extends Controller
 {
@@ -123,6 +124,8 @@ class BybitController extends Controller
             foreach (range(0, $steps - 1) as $i) {
                 $price = round($entry1 + ($stepSize * $i), $pricePrec);
 
+                $orderLinkId = (string) Str::uuid();
+
                 $orderParams = [
                     'category' => 'linear',
                     'symbol' => $symbol,
@@ -132,12 +135,14 @@ class BybitController extends Controller
                     'price' => (string)$price,
                     'timeInForce' => 'GTC',
                     'stopLoss'  => (string)$validated['sl'],
+                    'orderLinkId' => $orderLinkId,
                 ];
 
                 $responseData = $this->bybitApiService->createOrder($orderParams);
 
                 BybitOrders::create([
                     'order_id'       => $responseData['orderId'] ?? null,
+                    'order_link_id'  => $orderLinkId,
                     'symbol'         => $symbol,
                     'entry_price'    => $price,
                     'tp'             => (float)$validated['tp'],

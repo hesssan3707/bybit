@@ -16,6 +16,8 @@ class CreateBybitOrdersTable extends Migration
         Schema::create('bybit_orders', function (Blueprint $table) {
             $table->id();
             $table->string('order_id')->nullable();
+            $table->string('order_link_id')->nullable()->index();
+            $table->string('closing_order_id')->nullable();
             $table->string('symbol')->default('ETH/USDT');
             $table->decimal('amount', 20, 10)->default(0.01);
             $table->string('side')->default('buy');
