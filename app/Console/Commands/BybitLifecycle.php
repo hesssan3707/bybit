@@ -66,10 +66,14 @@ class BybitLifecycle extends Command
 
                     // If no position exists or its size is 0, it means it has been closed.
                     if (!$position || (float)$position['size'] === 0.0) {
+                        $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 1);
+                        $lastPnl = $pnlResult['list'][0]['closedPnl'] ?? null;
+
                         $dbOrder->status = 'closed';
+                        $dbOrder->pnl = $lastPnl;
                         $dbOrder->closed_at = now();
                         $dbOrder->save();
-                        $this->info("Position for order {$dbOrder->order_id} is closed. Marked as 'closed' in DB.");
+                        $this->info("Position for order {$dbOrder->order_id} is closed. P&L: {$lastPnl}. Marked as 'closed' in DB.");
                     }
                 }
             } catch (\Throwable $e) {

@@ -159,7 +159,7 @@
                     <th>مقدار</th>
                     <th>TP / SL</th>
                     <th>وضعیت</th>
-                    <th>تاریخ ثبت</th>
+                    <th>P&L</th>
                     <th>عملیات</th>
                 </tr>
             </thead>
@@ -171,7 +171,15 @@
                         <td data-label="مقدار">{{ number_format($order->amount, 2) }}</td>
                         <td data-label="TP / SL">{{ number_format($order->tp, 2) }} / {{ number_format($order->sl, 2) }}</td>
                         <td data-label="وضعیت">{{ $order->status }}</td>
-                        <td data-label="تاریخ ثبت">{{ $order->created_at->format('Y-m-d H:i') }}</td>
+                        <td data-label="P&L">
+                            @if($order->status === 'closed' && !is_null($order->pnl))
+                                <span style="color: {{ $order->pnl >= 0 ? 'green' : 'red' }};">
+                                    {{ number_format($order->pnl, 4) }}
+                                </span>
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td data-label="عملیات">
                             <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش مطمئن هستید؟');">
                                 @csrf
