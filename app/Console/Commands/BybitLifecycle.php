@@ -62,10 +62,11 @@ class BybitLifecycle extends Command
                             'timeInForce' => 'GTC',
                         ];
 
-                        $this->bybitApiService->createOrder($tpOrderParams);                        
+                        $tpOrderResult = $this->bybitApiService->createOrder($tpOrderParams);
                         $dbOrder->status = 'filled';
+                        $dbOrder->closing_order_id = $tpOrderResult['orderId'] ?? null;
                         $dbOrder->save();
-                        $this->info("Order {$dbOrder->order_id} is filled. Awaiting TP/SL execution.");
+                        $this->info("Order {$dbOrder->order_id} is filled. TP order created: {$dbOrder->closing_order_id}");
                     } elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
                         $dbOrder->status = 'canceled';
                         $dbOrder->closed_at = now();
@@ -106,30 +107,23 @@ class BybitLifecycle extends Command
             return;
         }
 
-        // Get P&L events that have not been assigned to one of our orders yet.
-        $usedClosingOrderIds = BybitOrders::whereNotNull('closing_order_id')->pluck('closing_order_id')->all();
-        $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 50); // Get a larger batch
-        $unprocessedPnlEvents = collect($pnlResult['list'] ?? [])->whereNotIn('orderId', $usedClosingOrderIds);
+        // Get P&L events and find the one that matches our closing order ID.
+        $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 200); // Get a larger batch for safety
+        $pnlEvents = collect($pnlResult['list'] ?? []);
 
-        if ($unprocessedPnlEvents->isEmpty()) {
-            $this->info("No new, unprocessed P&L events found for {$symbol}.");
-            return;
-        }
-
-        // Find the first unprocessed P&L event.
-        // We assume the oldest filled order corresponds to the oldest unprocessed P&L event.
-        // This is not foolproof but is the most reliable approach without full execution matching.
-        $pnlEventToAssign = $unprocessedPnlEvents->last(); // last() because the API returns newest first.
+        $pnlEventToAssign = $pnlEvents->firstWhere('orderId', $orderToProcess->closing_order_id);
 
         if ($pnlEventToAssign) {
             $orderToProcess->status = 'closed';
             $orderToProcess->pnl = $pnlEventToAssign['closedPnl'];
             $orderToProcess->closure_price = $pnlEventToAssign['avgExitPrice'] ?? null;
-            $orderToProcess->closing_order_id = $pnlEventToAssign['orderId']; // Mark PNL event as used
+            // closing_order_id is already set, no need to change it.
             $orderToProcess->closed_at = now();
             $orderToProcess->save();
 
             $this->info("Assigned P&L of {$pnlEventToAssign['closedPnl']} to order ID {$orderToProcess->id} (Bybit Order ID: {$orderToProcess->order_id}).");
+        } else {
+            $this->info("No matching P&L event found for order ID {$orderToProcess->id} with closing order ID {$orderToProcess->closing_order_id}.");
         }
 
         $this->info('Finished order lifecycle management.');
