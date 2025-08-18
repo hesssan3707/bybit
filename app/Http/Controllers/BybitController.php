@@ -66,6 +66,16 @@ class BybitController extends Controller
         }
 
         try {
+            // Check for recent loss
+            $lastLoss = BybitOrders::where('status', 'closed')
+                ->where('pnl', '<', 0)
+                ->latest('closed_at')
+                ->first();
+
+            if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
+                $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
+                return back()->withErrors(['msg' => "You cannot create a new order for {$remainingTime} minutes after a loss."])->withInput();
+            }
             // Business Logic
             $symbol = 'ETHUSDT';
             $entry1 = (float) $validated['entry1'];
