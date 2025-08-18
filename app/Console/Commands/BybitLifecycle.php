@@ -57,6 +57,20 @@ class BybitLifecycle extends Command
                         }
                     } elseif ($bybitStatus === 'Filled') {
                         // TP order is now placed via SyncStopLoss command, just update status
+                        $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
+                        $tpPrice = (float)$dbOrder->tp;
+                        $tpOrderParams = [
+                            'category' => 'linear',
+                            'symbol' => $symbol,
+                            'side' => $closeSide,
+                            'orderType' => 'Limit',
+                            'qty' => (string)$dbOrder->amount,
+                            'price' => (string)$tpPrice,
+                            'reduceOnly' => true,
+                            'timeInForce' => 'GTC',
+                        ];
+
+                        $this->bybitApiService->createOrder($tpOrderParams);
                         $dbOrder->status = 'filled';
                         $dbOrder->save();
                         $this->info("Order {$dbOrder->order_id} is filled. Awaiting TP/SL execution.");
