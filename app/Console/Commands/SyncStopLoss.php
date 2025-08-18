@@ -67,7 +67,7 @@ class SyncStopLoss extends Command
                 $databaseSl = (float)$dbOrder->sl;
 
                 // Compare SL, allowing for floating point inaccuracies
-                if (abs($exchangeSl - $databaseSl) > 0.00001) {
+                if (abs($exchangeSl - $databaseSl) > 0.001) {
                     $this->warn("SL mismatch for {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
 
                     // To modify one side (e.g., SL), we must provide the existing values for the other side (TP)
