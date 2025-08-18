@@ -27,7 +27,7 @@ class CreateBybitOrdersTable extends Migration
             $table->integer('steps')->default(1);
             $table->integer('leverage')->default(1);
             $table->integer('expire_minutes')->default(15);
-            $table->string('status')->default('pending'); // pending, filled, canceled
+            $table->string('status')->default('pending'); // pending, filled, canceled, closed
             $table->timestamp('closed_at')->nullable();
             $table->timestamps();
         });
