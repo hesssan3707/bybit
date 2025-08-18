@@ -11,8 +11,8 @@ class BybitOrders extends Model
     protected $table = "bybit_orders";
     protected $guarded = [];
     protected $fillable = [
-        'order_id','symbol','entry_price','tp','sl','steps',
+        'order_id','order_link_id','closing_order_id','symbol','entry_price','tp','sl','steps',
         'expire_minutes','status','closed_at','side','amount','entry_low','entry_high',
-        'closure_price'
+        'closure_price','pnl'
     ];
 }
