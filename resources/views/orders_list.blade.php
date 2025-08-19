@@ -153,6 +153,7 @@
 
     <div class="nav-links">
         <a href="{{ route('order.create') }}">ثبت سفارش جدید</a>
+        <a href="{{ route('pnl.history') }}" style="background-color: #17a2b8;">تاریخچه سود و زیان</a>
     </div>
 
     @if(session('success'))
@@ -175,7 +176,6 @@
                     <th>مقدار</th>
                     <th>SL / TP</th>
                     <th>وضعیت</th>
-                    <th>P&L</th>
                     <th>عملیات</th>
                 </tr>
             </thead>
@@ -187,15 +187,6 @@
                         <td data-label="مقدار">{{ number_format($order->amount, 2) }}</td>
                         <td data-label="SL / TP">{{ number_format($order->tp, 2) }} / {{ number_format($order->sl, 2) }}</td>
                         <td data-label="وضعیت">{{ $order->status }}</td>
-                        <td data-label="P&L">
-                            @if($order->status === 'closed' && !is_null($order->pnl))
-                                <span style="color: {{ $order->pnl >= 0 ? 'green' : 'red' }};">
-                                    {{ number_format($order->pnl, 4) }}
-                                </span>
-                            @else
-                                -
-                            @endif
-                        </td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
                                 <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to revoke this pending order?');">

@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\BybitOrders;
+use App\Models\ClosedPosition;
 use App\Services\BybitApiService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 
 class BybitLifecycle extends Command
 {
@@ -49,24 +51,9 @@ class BybitLifecycle extends Command
                     $bybitStatus = $order['orderStatus'];
 
                     if ($bybitStatus === 'Filled') {
-                        $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
-                        $tpPrice = (float)$dbOrder->tp;
-                        $tpOrderParams = [
-                            'category' => 'linear',
-                            'symbol' => $symbol,
-                            'side' => $closeSide,
-                            'orderType' => 'Limit',
-                            'qty' => (string)$dbOrder->amount,
-                            'price' => (string)$tpPrice,
-                            'reduceOnly' => true,
-                            'timeInForce' => 'GTC',
-                        ];
-
-                        $tpOrderResult = $this->bybitApiService->createOrder($tpOrderParams);
                         $dbOrder->status = 'filled';
-                        $dbOrder->closing_order_id = $tpOrderResult['orderId'] ?? null;
                         $dbOrder->save();
-                        $this->info("Order {$dbOrder->order_id} is filled. TP order created: {$dbOrder->closing_order_id}");
+                        $this->info("Order {$dbOrder->order_id} is now 'filled'.");
                     } elseif (in_array($bybitStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
                         $dbOrder->status = 'canceled';
                         $dbOrder->closed_at = now();
@@ -79,57 +66,61 @@ class BybitLifecycle extends Command
             }
         }
 
-        // --- New, more robust P&L processing ---
-        $this->processClosedPositions('ETHUSDT');
+        // --- Mark 'filled' orders as 'closed' if position is no longer open ---
+        $filledOrders = BybitOrders::where('status', 'filled')->get();
+        if ($filledOrders->isNotEmpty()) {
+            $positionResult = $this->bybitApiService->getPositionInfo('ETHUSDT');
+            $position = collect($positionResult['list'] ?? [])->firstWhere('symbol', 'ETHUSDT');
+            if (!$position || (float)$position['size'] == 0) {
+                foreach ($filledOrders as $order) {
+                    $order->status = 'closed';
+                    $order->closed_at = now();
+                    $order->save();
+                    $this->info("Marked order {$order->order_id} as closed as position is no longer active.");
+                }
+            }
+        }
+
+        // --- Sync P&L records ---
+        $this->syncPnlRecords('ETHUSDT');
     }
 
-    private function processClosedPositions(string $symbol)
+    private function syncPnlRecords(string $symbol)
     {
-        $this->info("Processing P&L for symbol: {$symbol}");
+        $this->info("Syncing P&L records for symbol: {$symbol}");
 
-        // Check if the position is closed. If not, we can't process P&L yet.
-        $positionResult = $this->bybitApiService->getPositionInfo($symbol);
-        $position = collect($positionResult['list'] ?? [])->firstWhere('symbol', $symbol);
-        if ($position && (float)$position['size'] > 0) {
-            $this->info("Position for {$symbol} is still open. Cannot process P&L yet.");
-            return;
-        }
-
-        // With the one-active-position rule, we can safely assume the first 'filled' order is the one that closed.
-        $orderToProcess = BybitOrders::where('status', 'filled')
-            ->where('symbol', $symbol)
-            ->whereNull('pnl')
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        if (!$orderToProcess) {
-            $this->info("No 'filled' orders awaiting P&L processing for {$symbol}.");
-            return;
-        }
-
-        // Get the latest P&L event that has not been assigned to one of our orders yet.
-        // This is reliable now because we only have one position at a time.
-        $usedClosingOrderIds = BybitOrders::whereNotNull('closing_order_id')->pluck('closing_order_id')->all();
         $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 50);
-        $pnlEventToAssign = collect($pnlResult['list'] ?? [])
-            ->whereNotIn('orderId', $usedClosingOrderIds)
-            ->first(); // Get the most recent one
+        $pnlEvents = $pnlResult['list'] ?? [];
 
-        if ($pnlEventToAssign) {
-            $orderToProcess->status = 'closed';
-            $orderToProcess->pnl = $pnlEventToAssign['closedPnl'];
-            $orderToProcess->closure_price = $pnlEventToAssign['avgExitPrice'] ?? null;
-            // Overwrite the closing_order_id with the one from the PNL event to ensure it's the correct one (TP or SL).
-            $orderToProcess->closing_order_id = $pnlEventToAssign['orderId'];
-            $orderToProcess->closed_at = now();
-            $orderToProcess->save();
-
-            $this->info("Assigned P&L of {$pnlEventToAssign['closedPnl']} to order ID {$orderToProcess->id} (Bybit Order ID: {$orderToProcess->order_id}).");
-        } else {
-            $this->info("No new, unprocessed P&L event found for order ID {$orderToProcess->id}.");
+        if (empty($pnlEvents)) {
+            $this->info('No P&L events found from API.');
+            return;
         }
 
-        $this->info('Finished order lifecycle management.');
-        return self::SUCCESS;
+        $existingPnlOrderIds = ClosedPosition::pluck('order_id')->all();
+        $newPnlEvents = collect($pnlEvents)->whereNotIn('order_id', $existingPnlOrderIds);
+
+        if ($newPnlEvents->isEmpty()) {
+            $this->info('No new P&L events to save.');
+            return;
+        }
+
+        foreach ($newPnlEvents->reverse() as $pnlEvent) { // reverse to process oldest first
+            ClosedPosition::create([
+                'symbol' => $pnlEvent['symbol'],
+                'side' => $pnlEvent['side'],
+                'order_type' => $pnlEvent['orderType'],
+                'leverage' => $pnlEvent['leverage'],
+                'qty' => $pnlEvent['qty'],
+                'avg_entry_price' => $pnlEvent['avgEntryPrice'],
+                'avg_exit_price' => $pnlEvent['avgExitPrice'],
+                'pnl' => $pnlEvent['closedPnl'],
+                'order_id' => $pnlEvent['orderId'],
+                'closed_at' => Carbon::createFromTimestampMs($pnlEvent['updatedTime']),
+            ]);
+            $this->info("Saved new P&L record for closing order ID: {$pnlEvent['orderId']}");
+        }
+
+        $this->info('Finished P&L sync.');
     }
 }
