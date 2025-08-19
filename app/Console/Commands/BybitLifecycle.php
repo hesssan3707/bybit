@@ -65,7 +65,6 @@ class BybitLifecycle extends Command
                 $this->error("Lifecycle check failed for order ID {$dbOrder->id} (Bybit ID {$dbOrder->order_id}): " . $e->getMessage());
             }
         }
-
         // --- Mark 'filled' orders as 'closed' if position is no longer open ---
         $filledOrders = BybitOrders::where('status', 'filled')->get();
         if ($filledOrders->isNotEmpty()) {
@@ -83,6 +82,7 @@ class BybitLifecycle extends Command
 
         // --- Sync P&L records ---
         $this->syncPnlRecords('ETHUSDT');
+        return 1;
     }
 
     private function syncPnlRecords(string $symbol)
