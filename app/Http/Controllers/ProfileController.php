@@ -20,12 +20,18 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
         $totalEquity = 'N/A';
+        $totalBalance = 'N/A';
 
         try {
             $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
             $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-            if ($usdtBalanceData && isset($usdtBalanceData['totalEquity'])) {
-                $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
+            if ($usdtBalanceData) {
+                if (isset($usdtBalanceData['totalEquity'])) {
+                    $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
+                }
+                if (isset($usdtBalanceData['totalWalletBalance'])) {
+                    $totalBalance = number_format((float)$usdtBalanceData['totalWalletBalance'], 2);
+                }
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Could not fetch Bybit wallet balance for profile: " . $e->getMessage());
@@ -34,6 +40,7 @@ class ProfileController extends Controller
         return view('profile.index', [
             'user' => $user,
             'totalEquity' => $totalEquity,
+            'totalBalance' => $totalBalance,
         ]);
     }
 }

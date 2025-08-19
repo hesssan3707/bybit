@@ -42,9 +42,8 @@
         <h2>Profile</h2>
         <div class="username">{{ $user->username }}</div>
         <div class="equity">
-            Total Account Equity
-            <br>
-            <strong>${{ $totalEquity }}</strong>
+            <p>Total Account Equity: <strong>${{ $totalEquity }}</strong></p>
+            <p>Total Wallet Balance: <strong>${{ $totalBalance }}</strong></p>
         </div>
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="text-decoration: none; background-color: var(--danger-color); color: white; padding: 10px 20px; border-radius: 8px;">
             Sign Out

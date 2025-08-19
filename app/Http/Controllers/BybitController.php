@@ -67,7 +67,7 @@ class BybitController extends Controller
 
             if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
                 $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
-                return back()->withErrors(['msg' => "You cannot create a new order for {$remainingTime} minutes after a loss."])->withInput();
+                return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید."])->withInput();
             }
 
             // Business Logic
@@ -99,7 +99,7 @@ class BybitController extends Controller
             $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
             $usdtBalanceData = $balanceInfo['list'][0] ?? null;
             if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
-                throw new \Exception('Could not retrieve USDT wallet balance from Bybit.');
+                throw new \Exception('امکان دریافت موجودی کیف پول از صرافی وجود ندارد.');
             }
             $capitalUSD = min((float) $usdtBalanceData['totalWalletBalance'] , (float) $usdtBalanceData['totalEquity']);
 
@@ -110,7 +110,7 @@ class BybitController extends Controller
             $slDistance = abs($avgEntry - (float) $validated['sl']);
 
             if ($slDistance <= 0) {
-                return back()->withErrors(['sl' => 'SL must be different from the entry price.'])->withInput();
+                return back()->withErrors(['sl' => 'حد ضرر باید متفاوت از قیمت ورود باشد.'])->withInput();
             }
             $amount = $maxLossUSD / $slDistance;
 
@@ -161,10 +161,10 @@ class BybitController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            return back()->withErrors(['msg' => 'An API error occurred: ' . $e->getMessage()])->withInput();
+            return back()->withErrors(['msg' => 'خطای API رخ داد: ' . $e->getMessage()])->withInput();
         }
 
-        return back()->with('success', "{$steps} order(s) successfully created using V5 API.");
+        return back()->with('success', "سفارش شما با موفقیت ثبت شد.");
     }
 
     public function destroy(Order $order)
@@ -187,11 +187,11 @@ class BybitController extends Controller
 
         if ($status === 'pending' || $status === 'expired') {
             $order->delete();
-            return redirect()->route('orders.index')->with('success', "The {$status} order has been removed.");
+            return redirect()->route('orders.index')->with('success', "سفارش {$status} با موفقیت حذف شد.");
         }
 
         // For any other status, do nothing.
-        return redirect()->route('orders.index')->withErrors(['msg' => 'This order cannot be removed.']);
+        return redirect()->route('orders.index')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
     }
 
     public function close(Request $request, Order $order)
@@ -201,7 +201,7 @@ class BybitController extends Controller
         ]);
 
         if ($order->status !== 'filled') {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'Only filled orders can be closed.']);
+            return redirect()->route('orders.index')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
         }
 
         try {
@@ -216,7 +216,7 @@ class BybitController extends Controller
             $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
             $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
             if ($marketPrice === 0) {
-                throw new \Exception('Could not fetch market price to set closing order.');
+                throw new \Exception('امکان دریافت قیمت لحظه‌ای بازار برای ثبت سفارش بسته شدن وجود ندارد.');
             }
 
             // 3. Calculate the new closing price
@@ -243,10 +243,10 @@ class BybitController extends Controller
 
             $this->bybitApiService->createOrder($newTpOrderParams);
 
-            return redirect()->route('orders.index')->with('success', "Manual closing order has been set at {$closePrice}.");
+            return redirect()->route('orders.index')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
 
         } catch (\Exception $e) {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'Failed to set new closing order: ' . $e->getMessage()]);
+            return redirect()->route('orders.index')->withErrors(['msg' => 'خطا در ثبت سفارش بسته شدن: ' . $e->getMessage()]);
         }
     }
 }

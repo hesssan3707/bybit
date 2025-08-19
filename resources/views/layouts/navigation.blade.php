@@ -77,6 +77,9 @@
         padding: 0;
         margin: 0;
     }
+    .mobile-footer-nav a.selected {
+        color: var(--primary-color); /* Highlight color for selected mobile icon */
+    }
     .mobile-footer-nav .icon {
         font-size: 24px;
         margin-bottom: 2px;
@@ -140,9 +143,19 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const currentPath = window.location.pathname;
-        const navLinks = document.querySelectorAll('.main-header .nav-links a');
-        navLinks.forEach(link => {
-            if (link.getAttribute('href').includes(currentPath)) {
+
+        // Web header
+        const webNavLinks = document.querySelectorAll('.main-header .nav-links a, .main-header .header-right a');
+        webNavLinks.forEach(link => {
+            if (link.getAttribute('href') === window.location.href) {
+                link.classList.add('selected');
+            }
+        });
+
+        // Mobile footer
+        const mobileNavLinks = document.querySelectorAll('.mobile-footer-nav a');
+        mobileNavLinks.forEach(link => {
+            if (link.getAttribute('href') === window.location.href) {
                 link.classList.add('selected');
             }
         });
