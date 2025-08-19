@@ -21,6 +21,8 @@
     .main-header .nav-links {
         display: flex;
         align-items: center;
+        flex-grow: 1;
+        justify-content: center;
     }
     .main-header .nav-links a, .main-header .nav-links form button {
         text-decoration: none;
@@ -35,11 +37,19 @@
         background-color: var(--primary-color);
         color: #fff;
     }
+    .main-header .nav-links form {
+        display: inline-block;
+        margin: 0;
+        padding: 0;
+    }
     .main-header .nav-links form button {
         border: none;
         background: none;
         cursor: pointer;
         font-size: inherit;
+        font-family: inherit;
+        padding: 5px 10px; /* Match link padding */
+        margin: 0;
     }
     .main-header .equity {
         font-weight: bold;
@@ -98,13 +108,13 @@
 <header class="main-header">
     <div class="logo">Trading Helper</div>
     <nav class="nav-links">
-        <a href="{{ route('orders.index') }}">Orders</a>
-        <a href="{{ route('pnl.history') }}">P&L History</a>
-        <a href="{{ route('order.create') }}">New Order</a>
+        <a href="{{ route('orders.index') }}">سفارش‌ها</a>
+        <a href="{{ route('pnl.history') }}">تاریخچه سود و زیان</a>
+        <a href="{{ route('order.create') }}">سفارش جدید</a>
         <div class="equity">Equity: ${{-- $totalEquity ?? 'N/A' --}}</div>
         <form action="{{ route('logout') }}" method="POST">
             @csrf
-            <button type="submit">Sign Out</button>
+            <button type="submit">خروج</button>
         </form>
     </nav>
 </header>
@@ -113,15 +123,15 @@
 <nav class="mobile-footer-nav">
     <a href="{{ route('orders.index') }}">
         <span class="icon">📊</span>
-        <span>Orders</span>
+        <span>سفارش‌ها</span>
     </a>
     <a href="{{ route('pnl.history') }}">
         <span class="icon">📜</span>
-        <span>P&L</span>
+        <span>سود و زیان</span>
     </a>
     <a href="{{ route('order.create') }}">
         <span class="icon">➕</span>
-        <span>New</span>
+        <span>جدید</span>
     </a>
     <a href="#">
         <span class="icon">💰</span>
@@ -131,7 +141,7 @@
         @csrf
         <button type="submit">
             <span class="icon">🚪</span>
-            <span>Sign Out</span>
+            <span>خروج</span>
         </button>
     </form>
 </nav>
