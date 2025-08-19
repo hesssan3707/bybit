@@ -100,7 +100,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" style="text-align: center;">No closed positions found.</td>
+                        <td colspan="7" style="text-align: center; direction: rtl;">هیچ پوزیشنی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>

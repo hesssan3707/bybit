@@ -98,14 +98,17 @@
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
+        @error('username')
+            <div class="form-group">
+                <span class="invalid-feedback" role="alert" style="text-align: center;">
+                    <strong>{{ $message }}</strong>
+                </span>
+            </div>
+        @enderror
+
         <div class="form-group">
             <label for="username">نام کاربری</label>
             <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus>
-            @error('username')
-                <span class="invalid-feedback" role="alert">
-                    <strong>{{ $message }}</strong>
-                </span>
-            @enderror
         </div>
 
         <div class="form-group">

@@ -156,7 +156,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
+                        <td colspan="6" style="text-align: center; direction: rtl;">هیچ سفارشی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>
