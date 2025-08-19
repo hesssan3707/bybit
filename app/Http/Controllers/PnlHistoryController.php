@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-use App\Models\ClosedPosition;
+use App\Models\Trade;
 
 class PnlHistoryController extends Controller
 {
     public function index()
     {
-        $closedPositions = ClosedPosition::latest('closed_at')->paginate(50);
+        $closedPositions = Trade::latest('closed_at')->paginate(50);
 
         return view('pnl_history', ['positions' => $closedPositions]);
     }
