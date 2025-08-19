@@ -70,6 +70,32 @@
     }
     .alert-success { background: #d1e7dd; color: #0f5132; }
     .alert-danger { background: #f8d7da; color: #842029; }
+
+    @media screen and (max-width: 768px) {
+        table thead { display: none; }
+        table tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        table td {
+            display: flex;
+            justify-content: space-between;
+            text-align: right;
+            padding: 10px 15px;
+            border: none;
+            border-bottom: 1px solid #eee;
+        }
+        table td:last-child { border-bottom: 0; }
+        table td::before {
+            content: attr(data-label);
+            font-weight: bold;
+            padding-left: 10px;
+            text-align: left;
+        }
+    }
 </style>
 @endpush
 

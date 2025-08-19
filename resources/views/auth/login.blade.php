@@ -93,13 +93,13 @@
 <body>
 
 <div class="container">
-    <h2>Login</h2>
+    <h2>ورود به سیستم</h2>
 
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
         <div class="form-group">
-            <label for="username">Username</label>
+            <label for="username">نام کاربری</label>
             <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus>
             @error('username')
                 <span class="invalid-feedback" role="alert">
@@ -109,7 +109,7 @@
         </div>
 
         <div class="form-group">
-            <label for="password">Password</label>
+            <label for="password">رمز عبور</label>
             <input id="password" type="password" name="password" required>
             @error('password')
                 <span class="invalid-feedback" role="alert">
@@ -118,14 +118,14 @@
             @enderror
         </div>
 
-        <div class="form-group">
-            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
-            <label for="remember">
-                Remember Me
+        <div class="form-group" style="display: flex; align-items: center;">
+            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }} style="width: auto; margin-left: 10px;">
+            <label for="remember" style="margin-bottom: 0;">
+                مرا به خاطر بسپار
             </label>
         </div>
 
-        <button type="submit">Login</button>
+        <button type="submit">ورود</button>
     </form>
 </div>
 
