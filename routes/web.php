@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BybitController;
+use App\Http\Controllers\PnlHistoryController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -56,3 +57,5 @@ Route::post('/set-order', [BybitController::class, 'store'])->name('order.store'
 Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
 Route::post('/orders/{bybitOrder}/close', [BybitController::class, 'close'])->name('orders.close');
 Route::delete('/orders/{bybitOrder}', [BybitController::class, 'destroy'])->name('orders.destroy');
+
+Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');

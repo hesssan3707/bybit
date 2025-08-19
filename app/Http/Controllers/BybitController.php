@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BybitOrders;
+use App\Models\ClosedPosition;
 use App\Services\BybitApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -19,18 +20,6 @@ class BybitController extends Controller
     public function index()
     {
         $threeDaysAgo = now()->subDays(3);
-        $totalEquity = 'N/A';
-
-        try {
-            $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
-            $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-            if ($usdtBalanceData && isset($usdtBalanceData['totalEquity'])) {
-                $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Could not fetch Bybit wallet balance: " . $e->getMessage());
-            // Equity will remain 'N/A'
-        }
 
         $orders = BybitOrders::where(function ($query) use ($threeDaysAgo) {
             $query->whereIn('status', ['pending', 'filled'])
@@ -39,10 +28,7 @@ class BybitController extends Controller
         ->latest('updated_at')
         ->paginate(50);
 
-        return view('orders_list', [
-            'orders' => $orders,
-            'totalEquity' => $totalEquity,
-        ]);
+        return view('orders_list', ['orders' => $orders]);
     }
 
     public function create()
@@ -81,10 +67,8 @@ class BybitController extends Controller
         }
 
         try {
-
             // Check for recent loss
-            $lastLoss = BybitOrders::where('status', 'closed')
-                ->where('pnl', '<', 0)
+            $lastLoss = ClosedPosition::where('pnl', '<', 0)
                 ->latest('closed_at')
                 ->first();
 
@@ -92,6 +76,7 @@ class BybitController extends Controller
                 $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
                 return back()->withErrors(['msg' => "You cannot create a new order for {$remainingTime} minutes after a loss."])->withInput();
             }
+
             // Business Logic
             $symbol = 'ETHUSDT';
             $entry1 = (float) $validated['entry1'];
@@ -191,96 +176,18 @@ class BybitController extends Controller
 
     public function destroy(BybitOrders $bybitOrder)
     {
-        $status = $bybitOrder->status;
-
-        // Logic for 'pending' orders (Revoke)
-        if ($status === 'pending') {
-            try {
-                if ($bybitOrder->order_id) {
-                    $this->bybitApiService->cancelOrder($bybitOrder->order_id, $bybitOrder->symbol);
-                }
-            } catch (\Exception $e) {
-                // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
-                \Illuminate\Support\Facades\Log::warning("Could not cancel order {$bybitOrder->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
-            }
-        }
-        // For 'expired' orders, we just delete them from the DB.
-        // For 'pending' orders, we also delete them after trying to cancel.
-
-        if ($status === 'pending' || $status === 'expired') {
-            $bybitOrder->delete();
-            return redirect()->route('orders.index')->with('success', "The {$status} order has been removed.");
-        }
-
-        // For any other status, do nothing.
-        return redirect()->route('orders.index')->withErrors(['msg' => 'This order cannot be removed.']);
-    }
-
-    public function close(Request $request, BybitOrders $bybitOrder)
-    {
-        $validated = $request->validate([
-            'price_distance' => 'required|numeric|min:0',
-        ]);
-
-        if ($bybitOrder->status !== 'filled') {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'Only filled orders can be closed.']);
-        }
-
         try {
-            $symbol = $bybitOrder->symbol;
-            $priceDistance = (float)$validated['price_distance'];
-
-            // 1. Cancel the existing TP order, if it exists
-            if ($bybitOrder->closing_order_id) {
-                try {
-                    $this->bybitApiService->cancelOrder($bybitOrder->closing_order_id, $symbol);
-                    \Illuminate\Support\Facades\Log::info("Canceled existing TP order {$bybitOrder->closing_order_id} to set a new manual close.");
-                } catch (\Exception $e) {
-                    // It might have already been filled or canceled, which is okay.
-                    \Illuminate\Support\Facades\Log::warning("Could not cancel existing TP order {$bybitOrder->closing_order_id}: " . $e->getMessage());
-                }
+            // Only try to cancel on the exchange if the order is in a state that might be active
+            if ($bybitOrder->status === 'pending' && $bybitOrder->order_id) {
+                $this->bybitApiService->cancelOrder($bybitOrder->order_id, $bybitOrder->symbol);
             }
-
-            // 2. Get current market price
-            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
-            $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
-            if ($marketPrice === 0) {
-                throw new \Exception('Could not fetch market price to set closing order.');
-            }
-
-            // 3. Calculate the new closing price
-            $instrumentInfo = $this->bybitApiService->getInstrumentsInfo($symbol);
-            $pricePrec = (int) $instrumentInfo['list'][0]['priceScale'];
-
-            $closePrice = ($bybitOrder->side === 'buy')
-                ? $marketPrice + $priceDistance
-                : $marketPrice - $priceDistance;
-            $closePrice = round($closePrice, $pricePrec);
-
-            // 4. Create the new closing order
-            $closeSide = ($bybitOrder->side === 'buy') ? 'Sell' : 'Buy';
-            $newTpOrderParams = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'side' => $closeSide,
-                'orderType' => 'Limit',
-                'qty' => (string)$bybitOrder->amount,
-                'price' => (string)$closePrice,
-                'reduceOnly' => true,
-                'timeInForce' => 'GTC',
-            ];
-
-            $tpOrderResult = $this->bybitApiService->createOrder($newTpOrderParams);
-            $newClosingOrderId = $tpOrderResult['orderId'] ?? null;
-
-            // 5. Update our database record with the new closing order ID
-            $bybitOrder->closing_order_id = $newClosingOrderId;
-            $bybitOrder->save();
-
-            return redirect()->route('orders.index')->with('success', "New closing order has been set at {$closePrice}.");
-
         } catch (\Exception $e) {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'Failed to set new closing order: ' . $e->getMessage()]);
+            // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
+            \Illuminate\Support\Facades\Log::warning("Could not cancel order {$bybitOrder->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
         }
+
+        $bybitOrder->delete();
+
+        return redirect()->route('orders.index')->with('success', 'سفارش با موفقیت حذف شد.');
     }
 }
