@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\BybitOrders;
+use App\Models\Order;
 use App\Services\BybitApiService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +28,7 @@ class SyncStopLoss extends Command
         $this->info("Starting Stop Loss synchronization for {$symbol}...");
 
         // Get all orders that should have an active position on the exchange
-        $filledOrders = BybitOrders::where('status', 'filled')
+        $filledOrders = Order::where('status', 'filled')
             ->where('symbol', $symbol)
             ->get();
 

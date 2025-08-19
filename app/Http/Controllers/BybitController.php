@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BybitOrders;
-use App\Models\ClosedPosition;
+use App\Models\Order;
+use App\Models\Trade;
 use App\Services\BybitApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -21,7 +21,7 @@ class BybitController extends Controller
     {
         $threeDaysAgo = now()->subDays(3);
 
-        $orders = BybitOrders::where(function ($query) use ($threeDaysAgo) {
+        $orders = Order::where(function ($query) use ($threeDaysAgo) {
             $query->whereIn('status', ['pending', 'filled'])
                   ->orWhere('updated_at', '>=', $threeDaysAgo);
         })
@@ -49,7 +49,6 @@ class BybitController extends Controller
 
     public function store(Request $request)
     {
-        // Add password to validation rules
         $validated = $request->validate([
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
@@ -58,17 +57,11 @@ class BybitController extends Controller
             'steps'  => 'required|integer|min:1',
             'expire' => 'required|integer|min:1',
             'risk_percentage' => 'required|numeric|min:0.1',
-            'access_password' => 'required|string',
         ]);
-
-        // Check the access password
-        if ($validated['access_password'] !== env('FORM_ACCESS_PASSWORD')) {
-            return back()->withErrors(['access_password' => 'رمز عبور دسترسی نامعتبر است.'])->withInput();
-        }
 
         try {
             // Check for recent loss
-            $lastLoss = ClosedPosition::where('pnl', '<', 0)
+            $lastLoss = Trade::where('pnl', '<', 0)
                 ->latest('closed_at')
                 ->first();
 
@@ -151,7 +144,7 @@ class BybitController extends Controller
 
                 $responseData = $this->bybitApiService->createOrder($orderParams);
 
-                BybitOrders::create([
+                Order::create([
                     'order_id'       => $responseData['orderId'] ?? null,
                     'order_link_id'  => $orderLinkId,
                     'symbol'         => $symbol,
@@ -174,20 +167,86 @@ class BybitController extends Controller
         return back()->with('success', "{$steps} order(s) successfully created using V5 API.");
     }
 
-    public function destroy(BybitOrders $bybitOrder)
+    public function destroy(Order $order)
     {
-        try {
-            // Only try to cancel on the exchange if the order is in a state that might be active
-            if ($bybitOrder->status === 'pending' && $bybitOrder->order_id) {
-                $this->bybitApiService->cancelOrder($bybitOrder->order_id, $bybitOrder->symbol);
+        $status = $order->status;
+
+        // Logic for 'pending' orders (Revoke)
+        if ($status === 'pending') {
+            try {
+                if ($order->order_id) {
+                    $this->bybitApiService->cancelOrder($order->order_id, $order->symbol);
+                }
+            } catch (\Exception $e) {
+                // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
+                \Illuminate\Support\Facades\Log::warning("Could not cancel order {$order->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
             }
-        } catch (\Exception $e) {
-            // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
-            \Illuminate\Support\Facades\Log::warning("Could not cancel order {$bybitOrder->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
+        }
+        // For 'expired' orders, we just delete them from the DB.
+        // For 'pending' orders, we also delete them after trying to cancel.
+
+        if ($status === 'pending' || $status === 'expired') {
+            $order->delete();
+            return redirect()->route('orders.index')->with('success', "The {$status} order has been removed.");
         }
 
-        $bybitOrder->delete();
+        // For any other status, do nothing.
+        return redirect()->route('orders.index')->withErrors(['msg' => 'This order cannot be removed.']);
+    }
 
-        return redirect()->route('orders.index')->with('success', 'سفارش با موفقیت حذف شد.');
+    public function close(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'price_distance' => 'required|numeric|min:0',
+        ]);
+
+        if ($order->status !== 'filled') {
+            return redirect()->route('orders.index')->withErrors(['msg' => 'Only filled orders can be closed.']);
+        }
+
+        try {
+            $symbol = $order->symbol;
+            $priceDistance = (float)$validated['price_distance'];
+
+            // 1. Cancel the existing TP order, if it exists
+            // Note: In the new architecture, we don't have a TP order to cancel.
+            // The user is manually closing the position.
+
+            // 2. Get current market price
+            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+            if ($marketPrice === 0) {
+                throw new \Exception('Could not fetch market price to set closing order.');
+            }
+
+            // 3. Calculate the new closing price
+            $instrumentInfo = $this->bybitApiService->getInstrumentsInfo($symbol);
+            $pricePrec = (int) $instrumentInfo['list'][0]['priceScale'];
+
+            $closePrice = ($order->side === 'buy')
+                ? $marketPrice + $priceDistance
+                : $marketPrice - $priceDistance;
+            $closePrice = round($closePrice, $pricePrec);
+
+            // 4. Create the new closing order
+            $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
+            $newTpOrderParams = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'side' => $closeSide,
+                'orderType' => 'Limit',
+                'qty' => (string)$order->amount,
+                'price' => (string)$closePrice,
+                'reduceOnly' => true,
+                'timeInForce' => 'GTC',
+            ];
+
+            $this->bybitApiService->createOrder($newTpOrderParams);
+
+            return redirect()->route('orders.index')->with('success', "Manual closing order has been set at {$closePrice}.");
+
+        } catch (\Exception $e) {
+            return redirect()->route('orders.index')->withErrors(['msg' => 'Failed to set new closing order: ' . $e->getMessage()]);
+        }
     }
 }

@@ -5,10 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class BybitOrders extends Model
+class Order extends Model
 {
     use HasFactory;
-    protected $table = "bybit_orders";
+    protected $table = "orders";
     protected $guarded = [];
     protected $fillable = [
         'order_id','symbol','entry_price','tp','sl','steps',
