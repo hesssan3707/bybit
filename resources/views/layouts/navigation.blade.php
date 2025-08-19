@@ -21,10 +21,13 @@
     .main-header .nav-links {
         display: flex;
         align-items: center;
-        flex-grow: 1;
-        justify-content: center;
+        margin: auto; /* This will center the nav */
     }
-    .main-header .nav-links a, .main-header .nav-links form button {
+    .main-header .header-right {
+        display: flex;
+        align-items: center;
+    }
+    .main-header a {
         text-decoration: none;
         color: #555;
         margin: 0 15px;
@@ -33,23 +36,9 @@
         transition: background-color 0.3s, color 0.3s;
         font-weight: 500;
     }
-    .main-header .nav-links a:hover, .main-header .nav-links form button:hover {
+    .main-header a:hover, .main-header a.selected {
         background-color: var(--primary-color);
         color: #fff;
-    }
-    .main-header .nav-links form {
-        display: inline-block;
-        margin: 0;
-        padding: 0;
-    }
-    .main-header .nav-links form button {
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: inherit;
-        font-family: inherit;
-        padding: 5px 10px; /* Match link padding */
-        margin: 0;
     }
     .main-header .equity {
         font-weight: bold;
@@ -106,17 +95,19 @@
 
 <!-- Web Header -->
 <header class="main-header">
-    <div class="logo">Trading Helper</div>
+    <div class="logo">Trader Assistant</div>
     <nav class="nav-links">
         <a href="{{ route('orders.index') }}">سفارش‌ها</a>
         <a href="{{ route('pnl.history') }}">تاریخچه سود و زیان</a>
         <a href="{{ route('order.create') }}">سفارش جدید</a>
-        <div class="equity">Equity: ${{-- $totalEquity ?? 'N/A' --}}</div>
-        <form action="{{ route('logout') }}" method="POST">
-            @csrf
-            <button type="submit">خروج</button>
-        </form>
     </nav>
+    <div class="header-right">
+        <a href="{{ route('profile.index') }}">پروفایل</a>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">خروج</a>
+        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+            @csrf
+        </form>
+    </div>
 </header>
 
 <!-- Mobile Sticky Footer -->
@@ -133,9 +124,9 @@
         <span class="icon">➕</span>
         <span>جدید</span>
     </a>
-    <a href="#">
-        <span class="icon">💰</span>
-        <span>${{-- $totalEquity ?? 'N/A' --}}</span>
+    <a href="{{ route('profile.index') }}">
+        <span class="icon">👤</span>
+        <span>پروفایل</span>
     </a>
     <form action="{{ route('logout') }}" method="POST">
         @csrf
@@ -145,3 +136,15 @@
         </button>
     </form>
 </nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.main-header .nav-links a');
+        navLinks.forEach(link => {
+            if (link.getAttribute('href').includes(currentPath)) {
+                link.classList.add('selected');
+            }
+        });
+    });
+</script>
