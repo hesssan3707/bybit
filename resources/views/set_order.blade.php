@@ -1,148 +1,95 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>ثبت سفارش جدید</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --primary-hover: #0056b3;
-            --background-gradient-start: #f0f4f8;
-            --background-gradient-end: #d9e4ec;
-            --form-background: #ffffff;
-            --text-color: #333;
-            --label-color: #555;
-            --border-color: #ccc;
-            --error-bg: #f8d7da;
-            --error-text: #842029;
-            --success-bg: #d1e7dd;
-            --success-text: #0f5132;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
-            direction: rtl;
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 500px;
-            margin: auto;
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        form {
-            background: var(--form-background);
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--label-color);
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 14px;
-            box-sizing: border-box;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        input:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 8px rgba(0,123,255,0.25);
-            outline: none;
-        }
-        input[type=number] {
-            direction: ltr;
-            text-align: left;
-            font-family: Arial, sans-serif;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 20px;
-            cursor: pointer;
-            transition: opacity 0.3s;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 16px;
-        }
-        .alert-success {
-            background-color: var(--success-bg);
-            color: var(--success-text);
-        }
-        .alert-danger {
-            background-color: var(--error-bg);
-            color: var(--error-text);
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .invalid-feedback {
-            color: var(--error-text);
-            font-size: 14px;
-            margin-top: 5px;
-            display: block;
-        }
-        @media (max-width: 600px) {
-            body {
-                padding: 15px;
-            }
-            form {
-                padding: 20px;
-            }
-        }
-    </style>
-</head>
-<body>
+@extends('layouts.app')
 
+@section('title', 'New Order')
+
+@push('styles')
+<style>
+    .container {
+        width: 100%;
+        max-width: 500px;
+        margin: auto;
+    }
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    form {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+    }
+    input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 8px rgba(0,123,255,0.25);
+        outline: none;
+    }
+    input[type=number] {
+        direction: ltr;
+        text-align: left;
+    }
+    button {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 20px;
+        cursor: pointer;
+        transition: opacity 0.3s;
+    }
+    button:hover {
+        opacity: 0.9;
+    }
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 16px;
+    }
+    .alert-success { background-color: #d1e7dd; color: #0f5132; }
+    .alert-danger { background-color: #f8d7da; color: #842029; }
+    .invalid-feedback { color: #842029; font-size: 14px; margin-top: 5px; display: block; }
+</style>
+@endpush
+
+@section('content')
 <div class="container">
-    <div class="nav-links" style="text-align: center; margin-bottom: 20px;">
-        <a href="{{ route('orders.index') }}" style="text-decoration: none; background-color: #6c757d; color: white; padding: 10px 20px; border-radius: 8px; transition: background-color 0.3s;">مشاهده لیست سفارش‌ها</a>
-    </div>
-
     <h2>ثبت سفارش جدید</h2>
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    @if($errors->has('msg'))
+    @if($errors->any())
         <div class="alert alert-danger">
-            {{ $errors->first('msg') }}
+            @foreach ($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
         </div>
     @endif
-
 
     <form action="{{ route('order.store') }}" method="POST">
         @csrf
@@ -195,7 +142,9 @@
         <button type="submit">ارسال سفارش</button>
     </form>
 </div>
+@endsection
 
+@push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const entry1Input = document.getElementById('entry1');
@@ -255,6 +204,4 @@
         }
     });
 </script>
-
-</body>
-</html>
+@endpush
