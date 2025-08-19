@@ -121,44 +121,36 @@ class BybitControllerTest extends TestCase
     /**
      * @test
      */
-    public function it_prevents_deleting_a_recently_closed_order()
+    public function it_revokes_a_pending_order()
     {
         // Arrange
-        $order = BybitOrders::create([
-            'status' => 'closed',
-            'closed_at' => now()->subHours(12),
-            'entry_price' => 2500,
-            'tp' => 2600,
-            'sl' => 2400,
-        ]);
+        $this->mock(BybitApiService::class, function ($mock) {
+            $mock->shouldReceive('cancelOrder')->once();
+        });
+        $order = BybitOrders::create(['status' => 'pending', 'order_id' => '123', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
 
         // Act
         $response = $this->delete(route('orders.destroy', $order));
 
         // Assert
-        $response->assertSessionHasErrors('msg');
-        $this->assertDatabaseHas('bybit_orders', ['id' => $order->id]);
+        $response->assertSessionHas('success');
+        $this->assertDatabaseMissing('bybit_orders', ['id' => $order->id]);
     }
 
     /**
      * @test
      */
-    public function it_allows_deleting_an_old_closed_order()
+    public function it_removes_an_expired_order()
     {
         // Arrange
-        $order = BybitOrders::create([
-            'status' => 'closed',
-            'closed_at' => now()->subHours(25),
-            'entry_price' => 2500,
-            'tp' => 2600,
-            'sl' => 2400,
-        ]);
+        $order = BybitOrders::create(['status' => 'expired', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
 
         // Act
         $response = $this->delete(route('orders.destroy', $order));
 
         // Assert
-        $response->assertSessionDoesntHaveErrors('msg');
+        $response->assertSessionHas('success');
         $this->assertDatabaseMissing('bybit_orders', ['id' => $order->id]);
     }
+
 }

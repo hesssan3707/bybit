@@ -54,4 +54,5 @@ Route::get('/schedule', function() {
 Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
 Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
 Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
+Route::post('/orders/{bybitOrder}/close', [BybitController::class, 'close'])->name('orders.close');
 Route::delete('/orders/{bybitOrder}', [BybitController::class, 'destroy'])->name('orders.destroy');

@@ -87,6 +87,18 @@
         .delete-btn:hover {
             background-color: var(--danger-hover);
         }
+        .close-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .close-btn:hover {
+            background-color: var(--primary-hover);
+        }
         .pagination {
             margin-top: 20px;
             display: flex;
@@ -150,6 +162,10 @@
         <div class="alert alert-danger" style="background: #f8d7da; color: #842029; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">{{ session('error') }}</div>
     @endif
 
+    <div class="equity-display" style="text-align: center; margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
+        Total Equity: ${{ $totalEquity ?? 'N/A' }}
+    </div>
+
     <div class="table-responsive">
         <table>
             <thead>
@@ -181,11 +197,24 @@
                             @endif
                         </td>
                         <td data-label="عملیات">
-                            <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش مطمئن هستید؟');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="delete-btn">حذف</button>
-                            </form>
+                            @if($order->status === 'pending')
+                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to revoke this pending order?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="delete-btn">Revoke</button>
+                                </form>
+                            @elseif($order->status === 'filled')
+                                <button type="button" class="close-btn" data-order-id="{{ $order->id }}" data-order-side="{{ $order->side }}">Close</button>
+                            @elseif($order->status === 'expired')
+                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this expired order?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="delete-btn">Remove</button>
+                                </form>
+                            @else
+                                {{-- No action for 'closed' or other statuses --}}
+                                -
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -201,6 +230,49 @@
         {{ $orders->links() }}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const closeButtons = document.querySelectorAll('.close-btn');
+
+    closeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            const orderSide = this.dataset.orderSide;
+            const promptMessage = `Enter price distance (X) for this ${orderSide.toUpperCase()} position. The new closing price will be Market Price ${orderSide === 'buy' ? '+' : '-'} X.`;
+
+            const priceDistance = prompt(promptMessage, '10');
+
+            if (priceDistance !== null && !isNaN(priceDistance) && parseFloat(priceDistance) >= 0) {
+                // Create a form dynamically
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/orders/${orderId}/close`; // URL to the close route
+
+                // Add CSRF token
+                const csrfToken = document.createElement('input');
+                csrfToken.type = 'hidden';
+                csrfToken.name = '_token';
+                csrfToken.value = '{{ csrf_token() }}';
+                form.appendChild(csrfToken);
+
+                // Add price distance
+                const distanceInput = document.createElement('input');
+                distanceInput.type = 'hidden';
+                distanceInput.name = 'price_distance';
+                distanceInput.value = priceDistance;
+                form.appendChild(distanceInput);
+
+                // Append the form to the body and submit
+                document.body.appendChild(form);
+                form.submit();
+            } else if (priceDistance !== null) {
+                alert('Please enter a valid, non-negative number.');
+            }
+        });
+    });
+});
+</script>
 
 </body>
 </html>
