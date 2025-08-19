@@ -154,7 +154,10 @@
         </div>
 
         <div class="form-group">
-            <label for="entry2">Entry 2 (بالاترین نقطه ورود):</label>
+            <label for="entry2">
+                Entry 2 (بالاترین نقطه ورود):
+                <span id="chain-icon" style="cursor: pointer; font-size: 20px;" title="Toggle Chained Prices">⛓️</span>
+            </label>
             <input id="entry2" type="number" name="entry2" step="any" required value="{{ old('entry2') }}">
             @error('entry2') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
@@ -203,17 +206,59 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const entry1Input = document.getElementById('entry1');
+        const entry2Input = document.getElementById('entry2');
+        const chainIcon = document.getElementById('chain-icon');
+        let isChained = true; // Chained by default
+
+        function updateChainIcon() {
+            if (isChained) {
+                chainIcon.textContent = '⛓️';
+                chainIcon.title = 'Prices are chained. Click to unchain.';
+            } else {
+                chainIcon.textContent = '🚫'; // Or any other "unchained" icon
+                chainIcon.title = 'Prices are unchained. Click to chain.';
+            }
+        }
+
+        // Initial state
+        updateChainIcon();
+        if (entry1Input.value !== entry2Input.value) {
+            isChained = false;
+            updateChainIcon();
+        }
+
+        // Event Listeners
+        entry1Input.addEventListener('input', function() {
+            if (isChained) {
+                entry2Input.value = this.value;
+            }
+        });
+
+        entry2Input.addEventListener('input', function() {
+            if (isChained && entry1Input.value !== this.value) {
+                isChained = false;
+                updateChainIcon();
+            }
+        });
+
+        chainIcon.addEventListener('click', function() {
+            isChained = !isChained;
+            if (isChained) {
+                entry2Input.value = entry1Input.value;
+            }
+            updateChainIcon();
+        });
+
+        // --- Existing market price logic ---
         const marketPrice = '{{ $marketPrice ?? '' }}';
         if (marketPrice && marketPrice !== '0') {
-            const entry1Input = document.getElementById('entry1');
-            const entry2Input = document.getElementById('entry2');
-
             // Only set the value if the fields are empty (e.g., on first load, not after a validation error)
             if (entry1Input.value === '') {
                 entry1Input.value = marketPrice;
-            }
-            if (entry2Input.value === '') {
-                entry2Input.value = marketPrice;
+                if (isChained) {
+                    entry2Input.value = marketPrice;
+                }
             }
         }
     });
