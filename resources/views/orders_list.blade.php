@@ -1,171 +1,92 @@
-<!DOCTYPE html>
-<html lang="fa">
-<head>
-    <meta charset="UTF-8">
-    <title>لیست سفارش‌ها</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --primary-hover: #0056b3;
-            --background-gradient-start: #f0f4f8;
-            --background-gradient-end: #d9e4ec;
-            --table-background: #ffffff;
-            --text-color: #333;
-            --border-color: #dee2e6;
-            --header-bg: #f8f9fa;
-            --danger-color: #dc3545;
-            --danger-hover: #c82333;
-        }
-        * {
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
-            direction: rtl;
-            color: var(--text-color);
-        }
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: auto;
-            background: var(--table-background);
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        .nav-links {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .nav-links a {
-            text-decoration: none;
-            background-color: var(--primary-color);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            transition: background-color 0.3s;
-        }
-        .nav-links a:hover {
-            background-color: var(--primary-hover);
-        }
-        .table-responsive {
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            padding: 12px 15px;
-            border: 1px solid var(--border-color);
-            text-align: right;
-        }
-        thead {
-            background-color: var(--header-bg);
-        }
-        tbody tr:nth-of-type(odd) {
-            background-color: #f9f9f9;
-        }
-        .delete-btn {
-            background-color: var(--danger-color);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .delete-btn:hover {
-            background-color: var(--danger-hover);
-        }
-        .close-btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .close-btn:hover {
-            background-color: var(--primary-hover);
-        }
-        .pagination {
-            margin-top: 20px;
-            display: flex;
-            justify-content: center;
-        }
+@extends('layouts.app')
 
-        /* Responsive Styles */
-        @media screen and (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 15px;
-            }
-            table {
-                border: 0;
-            }
-            table thead {
-                display: none;
-            }
-            table tr {
-                display: block;
-                margin-bottom: 20px;
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
-            table td {
-                display: flex;
-                justify-content: space-between;
-                text-align: right;
-                padding: 10px;
-                border: none;
-                border-bottom: 1px solid #eee;
-            }
-            table td:last-child {
-                border-bottom: 0;
-            }
-            table td::before {
-                content: attr(data-label);
-                font-weight: bold;
-                padding-left: 10px;
-                text-align: left;
-            }
-        }
-    </style>
-</head>
-<body>
+@section('title', 'Orders List')
 
+@push('styles')
+<style>
+    .container {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    h2 {
+        text-align: center;
+        margin-bottom: 25px;
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    th, td {
+        padding: 12px 15px;
+        border: 1px solid #dee2e6;
+        text-align: right;
+    }
+    thead {
+        background-color: #f8f9fa;
+    }
+    tbody tr:nth-of-type(odd) {
+        background-color: #f9f9f9;
+    }
+    .delete-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .delete-btn:hover {
+        background-color: #c82333;
+    }
+    .close-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .close-btn:hover {
+        background-color: var(--primary-hover);
+    }
+    .pagination {
+        margin-top: 20px;
+        display: flex;
+        justify-content: center;
+    }
+    .alert {
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .alert-success { background: #d1e7dd; color: #0f5132; }
+    .alert-danger { background: #f8d7da; color: #842029; }
+</style>
+@endpush
+
+@section('content')
 <div class="container">
     <h2>لیست سفارش‌های ثبت شده</h2>
 
-    <div class="nav-links">
-        <a href="{{ route('order.create') }}">ثبت سفارش جدید</a>
-        <a href="{{ route('pnl.history') }}" style="background-color: #17a2b8;">تاریخچه سود و زیان</a>
-    </div>
-
     @if(session('success'))
-        <div class="alert alert-success" style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">{{ session('success') }}</div>
+        <div class="alert alert-success">{{ session('success') }}</div>
     @endif
-    @if(session('error'))
-        <div class="alert alert-danger" style="background: #f8d7da; color: #842029; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">{{ session('error') }}</div>
+    @if($errors->any())
+        <div class="alert alert-danger">
+            @foreach ($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
+        </div>
     @endif
-
-    <div class="equity-display" style="text-align: center; margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
-        Total Equity: ${{ $totalEquity ?? 'N/A' }}
-    </div>
 
     <div class="table-responsive">
         <table>
@@ -203,14 +124,13 @@
                                     <button type="submit" class="delete-btn">Remove</button>
                                 </form>
                             @else
-                                {{-- No action for 'closed' or other statuses --}}
                                 -
                             @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
+                        <td colspan="6" style="text-align: center;">هیچ سفارشی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -221,7 +141,9 @@
         {{ $orders->links() }}
     </div>
 </div>
+@endsection
 
+@push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const closeButtons = document.querySelectorAll('.close-btn');
@@ -235,26 +157,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const priceDistance = prompt(promptMessage, '10');
 
             if (priceDistance !== null && !isNaN(priceDistance) && parseFloat(priceDistance) >= 0) {
-                // Create a form dynamically
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = `/orders/${orderId}/close`; // URL to the close route
+                form.action = `/orders/${orderId}/close`;
 
-                // Add CSRF token
                 const csrfToken = document.createElement('input');
                 csrfToken.type = 'hidden';
                 csrfToken.name = '_token';
                 csrfToken.value = '{{ csrf_token() }}';
                 form.appendChild(csrfToken);
 
-                // Add price distance
                 const distanceInput = document.createElement('input');
                 distanceInput.type = 'hidden';
                 distanceInput.name = 'price_distance';
                 distanceInput.value = priceDistance;
                 form.appendChild(distanceInput);
 
-                // Append the form to the body and submit
                 document.body.appendChild(form);
                 form.submit();
             } else if (priceDistance !== null) {
@@ -264,6 +182,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-</body>
-</html>
+@endpush
