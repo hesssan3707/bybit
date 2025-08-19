@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\BybitOrders;
+use App\Models\Order;
 use App\Services\BybitApiService;
 use Illuminate\Console\Command;
 
@@ -35,7 +35,7 @@ class BybitEnforceOrders extends Command
 
             // 2. Handle local 'pending' orders (check for modifications, expiration)
             $this->info('Checking local pending orders...');
-            $ourPendingOrders = BybitOrders::where('status', 'pending')->get();
+            $ourPendingOrders = Order::where('status', 'pending')->get();
             $now = time();
 
             foreach ($ourPendingOrders as $dbOrder) {
@@ -50,10 +50,8 @@ class BybitEnforceOrders extends Command
                 // Check for external modifications (price change)
                 $bybitPrice = (float)($bybitOrder['price'] ?? 0);
                 $dbPrice = (float)$dbOrder->entry_price;
-                $bybitQty = (float)($bybitOrder['qty'] ?? 0);
-                $dbQty = (float)$dbOrder->amount;
 
-                if ($bybitPrice !== $dbPrice || $bybitQty !== $dbQty) {
+                if ($bybitPrice !== $dbPrice) {
                     try {
                         $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
                         $dbOrder->delete(); // Remove from our DB
@@ -81,7 +79,7 @@ class BybitEnforceOrders extends Command
 
             // 3. Handle foreign orders (not in our DB)
             $this->info('Checking for foreign orders to cancel...');
-            $ourTrackedIds = BybitOrders::whereIn('status', ['pending', 'filled'])
+            $ourTrackedIds = Order::whereIn('status', ['pending', 'filled'])
                 ->pluck('order_id')
                 ->filter()
                 ->all();

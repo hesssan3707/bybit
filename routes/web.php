@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BybitController;
 use App\Http\Controllers\PnlHistoryController;
+use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -16,46 +17,36 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
-Route::get('/clear-cache', function() {
-    $exitCode = Artisan::call('cache:clear');
-    $exitCode = Artisan::call('config:cache');
-    return 'DONE'; //Return anything
-});
-Route::get('/migrate', function() {
-    Artisan::call('migrate');
-    return 'DONE'; //Return anything
-});
-Route::get('/seed', function() {
-    Artisan::call('db:seed');
-    return 'DONE'; //Return anything
-});
-Route::get('/link', function() {
-    Artisan::call('storage:link');
-    return 'DONE'; //Return anything
-});
-Route::get('/schedule', function() {
-    Artisan::call('bybit:lifecycle');
-    print_r(Artisan::output());
-    echo '<br> lifecycle 1 done  <br>';
-    Artisan::call('bybit:enforce');
-    print_r(Artisan::output());
-    echo '<br> enforce done <br>';
-    Artisan::call('bybit:sync-sl');
-    print_r(Artisan::output());
-    echo '<br> sync sl done <br> ';
-    // sleep(25);
-    // Artisan::call('bybit:lifecycle');
-    echo '<br> lifecycle 2 done <br> ';
-    return 'DONE'; //Return anything
+// Auth Routes
+Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('login', [LoginController::class, 'login']);
+Route::post('logout', [LoginController::class, 'logout'])->name('logout');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/', [BybitController::class, 'index']); // Redirect home to orders list
+    Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
+    Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
+    Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
+    Route::post('/orders/{order}/close', [BybitController::class, 'close'])->name('orders.close');
+    Route::delete('/orders/{order}', [BybitController::class, 'destroy'])->name('orders.destroy');
+    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
+
+    // Maintenance Routes (should also be protected)
+    Route::get('/schedule', function() {
+        Artisan::call('bybit:lifecycle');
+        print_r(Artisan::output());
+        echo '<br> lifecycle 1 done  <br>';
+        Artisan::call('bybit:enforce');
+        print_r(Artisan::output());
+        echo '<br> enforce done <br>';
+        Artisan::call('bybit:sync-sl');
+        print_r(Artisan::output());
+        echo '<br> sync sl done <br> ';
+        return 'DONE';
+    });
 });
 
-Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
-Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
-Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
-Route::post('/orders/{bybitOrder}/close', [BybitController::class, 'close'])->name('orders.close');
-Route::delete('/orders/{bybitOrder}', [BybitController::class, 'destroy'])->name('orders.destroy');
-
-Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
+// Non-protected utility routes if needed, but it's better to protect them.
+// For simplicity, we can leave these out for now or protect them as well.
+// Route::get('/clear-cache', ...);
+// Route::get('/migrate', ...);

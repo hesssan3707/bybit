@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\BybitOrders;
+use App\Models\Order;
+use App\Models\Trade;
+use App\Models\User;
 use App\Services\BybitApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Mockery;
 use Tests\TestCase;
 
@@ -12,19 +15,34 @@ class BybitControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->user = User::create([
+            'username' => 'testuser',
+            'password' => Hash::make('password'),
+        ]);
+    }
+
     /**
      * @test
      */
     public function it_prevents_creating_an_order_if_a_loss_occurred_within_the_last_hour()
     {
         // Arrange
-        BybitOrders::create([
-            'status' => 'closed',
+        Trade::create([
             'pnl' => -10,
             'closed_at' => now()->subMinutes(30),
-            'entry_price' => 2500,
-            'tp' => 2600,
-            'sl' => 2400,
+            'symbol' => 'ETHUSDT',
+            'side' => 'Buy',
+            'order_type' => 'Limit',
+            'leverage' => 1,
+            'qty' => 1,
+            'avg_entry_price' => 2500,
+            'avg_exit_price' => 2490,
+            'order_id' => '123',
         ]);
 
         $postData = [
@@ -35,15 +53,14 @@ class BybitControllerTest extends TestCase
             'steps' => 1,
             'expire' => 15,
             'risk_percentage' => 1,
-            'access_password' => env('FORM_ACCESS_PASSWORD'),
         ];
 
         // Act
-        $response = $this->post(route('order.store'), $postData);
+        $response = $this->actingAs($this->user)->post(route('order.store'), $postData);
 
         // Assert
         $response->assertSessionHasErrors('msg');
-        $this->assertDatabaseMissing('bybit_orders', ['entry_price' => 3000]);
+        $this->assertDatabaseMissing('orders', ['entry_price' => 3000]);
     }
 
     /**
@@ -59,13 +76,17 @@ class BybitControllerTest extends TestCase
             $mock->shouldReceive('createOrder')->andReturn(['orderId' => '12345']);
         });
 
-        BybitOrders::create([
-            'status' => 'closed',
+        Trade::create([
             'pnl' => -10,
             'closed_at' => now()->subMinutes(70),
-            'entry_price' => 2500,
-            'tp' => 2600,
-            'sl' => 2400,
+            'symbol' => 'ETHUSDT',
+            'side' => 'Buy',
+            'order_type' => 'Limit',
+            'leverage' => 1,
+            'qty' => 1,
+            'avg_entry_price' => 2500,
+            'avg_exit_price' => 2490,
+            'order_id' => '123',
         ]);
 
         $postData = [
@@ -76,11 +97,10 @@ class BybitControllerTest extends TestCase
             'steps' => 1,
             'expire' => 15,
             'risk_percentage' => 1,
-            'access_password' => env('FORM_ACCESS_PASSWORD'),
         ];
 
         // Act
-        $response = $this->post(route('order.store'), $postData);
+        $response = $this->actingAs($this->user)->post(route('order.store'), $postData);
 
         // Assert
         $response->assertSessionDoesntHaveErrors('msg');
@@ -92,7 +112,7 @@ class BybitControllerTest extends TestCase
     public function it_prevents_creating_an_order_if_another_order_is_already_active()
     {
         // Arrange
-        BybitOrders::create([
+        Order::create([
             'status' => 'pending', // or 'filled'
             'entry_price' => 2500,
             'tp' => 2600,
@@ -107,15 +127,14 @@ class BybitControllerTest extends TestCase
             'steps' => 1,
             'expire' => 15,
             'risk_percentage' => 1,
-            'access_password' => env('FORM_ACCESS_PASSWORD'),
         ];
 
         // Act
-        $response = $this->post(route('order.store'), $postData);
+        $response = $this->actingAs($this->user)->post(route('order.store'), $postData);
 
         // Assert
         $response->assertSessionHasErrors('msg');
-        $this->assertDatabaseCount('bybit_orders', 1); // Ensure no new order was created
+        $this->assertDatabaseCount('orders', 1); // Ensure no new order was created
     }
 
     /**
@@ -127,14 +146,14 @@ class BybitControllerTest extends TestCase
         $this->mock(BybitApiService::class, function ($mock) {
             $mock->shouldReceive('cancelOrder')->once();
         });
-        $order = BybitOrders::create(['status' => 'pending', 'order_id' => '123', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
+        $order = Order::create(['status' => 'pending', 'order_id' => '123', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
 
         // Act
-        $response = $this->delete(route('orders.destroy', $order));
+        $response = $this->actingAs($this->user)->delete(route('orders.destroy', $order));
 
         // Assert
         $response->assertSessionHas('success');
-        $this->assertDatabaseMissing('bybit_orders', ['id' => $order->id]);
+        $this->assertDatabaseMissing('orders', ['id' => $order->id]);
     }
 
     /**
@@ -143,14 +162,42 @@ class BybitControllerTest extends TestCase
     public function it_removes_an_expired_order()
     {
         // Arrange
-        $order = BybitOrders::create(['status' => 'expired', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
+        $order = Order::create(['status' => 'expired', 'entry_price' => 2500, 'tp' => 2600, 'sl' => 2400]);
 
         // Act
-        $response = $this->delete(route('orders.destroy', $order));
+        $response = $this->actingAs($this->user)->delete(route('orders.destroy', $order));
 
         // Assert
         $response->assertSessionHas('success');
-        $this->assertDatabaseMissing('bybit_orders', ['id' => $order->id]);
+        $this->assertDatabaseMissing('orders', ['id' => $order->id]);
     }
 
+    /**
+     * @test
+     */
+    public function it_closes_a_filled_order()
+    {
+        // Arrange
+        $this->mock(BybitApiService::class, function ($mock) {
+            $mock->shouldReceive('getTickerInfo')->andReturn(['list' => [['lastPrice' => '3000']]]);
+            $mock->shouldReceive('getInstrumentsInfo')->andReturn(['list' => [['priceScale' => '2']]]);
+            $mock->shouldReceive('createOrder')->once()->andReturn(['orderId' => '54321']);
+        });
+
+        $order = Order::create([
+            'status' => 'filled',
+            'side' => 'buy',
+            'amount' => 0.01,
+            'symbol' => 'ETHUSDT',
+            'entry_price' => 2500,
+            'tp' => 2600,
+            'sl' => 2400,
+        ]);
+
+        // Act
+        $response = $this->actingAs($this->user)->post(route('orders.close', $order), ['price_distance' => 15]);
+
+        // Assert
+        $response->assertSessionHas('success');
+    }
 }

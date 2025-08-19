@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ClosedPosition extends Model
+class Trade extends Model
 {
     use HasFactory;
 
-    protected $table = 'closed_positions';
+    protected $table = 'trades';
 
     protected $fillable = [
         'symbol',

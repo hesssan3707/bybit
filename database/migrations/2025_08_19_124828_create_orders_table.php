@@ -4,20 +4,17 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateBybitOrdersTable extends Migration
+return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
-        Schema::create('bybit_orders', function (Blueprint $table) {
+        Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->string('order_id')->nullable();
             $table->string('order_link_id')->nullable()->index();
-            $table->string('closing_order_id')->nullable();
             $table->string('symbol')->default('ETH/USDT');
             $table->decimal('amount', 20, 10)->default(0.01);
             $table->string('side')->default('buy');
@@ -29,8 +26,7 @@ class CreateBybitOrdersTable extends Migration
             $table->integer('steps')->default(1);
             $table->integer('leverage')->default(1);
             $table->integer('expire_minutes')->default(15);
-            $table->string('status')->default('pending'); // pending, filled, canceled, closed
-            $table->decimal('pnl', 20, 10)->nullable();
+            $table->string('status')->default('pending'); // pending, filled, canceled, closed, expired
             $table->timestamp('closed_at')->nullable();
             $table->timestamps();
         });
@@ -38,11 +34,9 @@ class CreateBybitOrdersTable extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
-        Schema::dropIfExists('bybit_orders');
+        Schema::dropIfExists('orders');
     }
-}
+};

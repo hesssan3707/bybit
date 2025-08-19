@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\BybitOrders;
-use App\Models\ClosedPosition;
+use App\Models\Order;
+use App\Models\Trade;
 use App\Services\BybitApiService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -25,7 +25,7 @@ class BybitLifecycle extends Command
     {
         $this->info('Starting order status sync...');
 
-        $ordersToCheck = BybitOrders::whereIn('status', ['pending', 'filled'])
+        $ordersToCheck = Order::whereIn('status', ['pending', 'filled'])
             ->where('symbol', 'ETHUSDT')
             ->get();
 
@@ -65,6 +65,7 @@ class BybitLifecycle extends Command
                 $this->error("Lifecycle check failed for order ID {$dbOrder->id} (Bybit ID {$dbOrder->order_id}): " . $e->getMessage());
             }
         }
+
         // --- Mark 'filled' orders as 'closed' if position is no longer open ---
         $filledOrders = BybitOrders::where('status', 'filled')->get();
         if ($filledOrders->isNotEmpty()) {
@@ -82,7 +83,6 @@ class BybitLifecycle extends Command
 
         // --- Sync P&L records ---
         $this->syncPnlRecords('ETHUSDT');
-        return 1;
     }
 
     private function syncPnlRecords(string $symbol)
@@ -97,7 +97,7 @@ class BybitLifecycle extends Command
             return;
         }
 
-        $existingPnlOrderIds = ClosedPosition::pluck('order_id')->all();
+        $existingPnlOrderIds = Trade::pluck('order_id')->all();
         $newPnlEvents = collect($pnlEvents)->whereNotIn('order_id', $existingPnlOrderIds);
 
         if ($newPnlEvents->isEmpty()) {
@@ -106,7 +106,7 @@ class BybitLifecycle extends Command
         }
 
         foreach ($newPnlEvents->reverse() as $pnlEvent) { // reverse to process oldest first
-            ClosedPosition::create([
+            Trade::create([
                 'symbol' => $pnlEvent['symbol'],
                 'side' => $pnlEvent['side'],
                 'order_type' => $pnlEvent['orderType'],
