@@ -38,6 +38,31 @@
         display: flex;
         justify-content: center;
     }
+    @media screen and (max-width: 768px) {
+        table thead { display: none; }
+        table tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        table td {
+            display: flex;
+            justify-content: space-between;
+            text-align: right;
+            padding: 10px 15px;
+            border: none;
+            border-bottom: 1px solid #eee;
+        }
+        table td:last-child { border-bottom: 0; }
+        table td::before {
+            content: attr(data-label);
+            font-weight: bold;
+            padding-left: 10px;
+            text-align: left;
+        }
+    }
 </style>
 @endpush
 
@@ -49,29 +74,29 @@
         <table>
             <thead>
                 <tr>
-                    <th>Symbol</th>
-                    <th>Side</th>
-                    <th>Qty</th>
-                    <th>Avg. Entry Price</th>
-                    <th>Avg. Exit Price</th>
-                    <th>P&L</th>
-                    <th>Closed At</th>
+                    <th>نماد</th>
+                    <th>جهت</th>
+                    <th>مقدار</th>
+                    <th>میانگین قیمت ورود</th>
+                    <th>میانگین قیمت خروج</th>
+                    <th>سود و زیان</th>
+                    <th>زمان بسته شدن</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($positions as $position)
                     <tr>
-                        <td>{{ $position->symbol }}</td>
-                        <td>{{ $position->side }}</td>
-                        <td>{{ rtrim(rtrim(number_format($position->qty, 8), '0'), '.') }}</td>
-                        <td>{{ rtrim(rtrim(number_format($position->avg_entry_price, 4), '0'), '.') }}</td>
-                        <td>{{ rtrim(rtrim(number_format($position->avg_exit_price, 4), '0'), '.') }}</td>
-                        <td>
+                        <td data-label="نماد">{{ $position->symbol }}</td>
+                        <td data-label="جهت">{{ $position->side }}</td>
+                        <td data-label="مقدار">{{ rtrim(rtrim(number_format($position->qty, 8), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($position->avg_entry_price, 4), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($position->avg_exit_price, 4), '0'), '.') }}</td>
+                        <td data-label="سود و زیان">
                             <span style="color: {{ $position->pnl >= 0 ? 'green' : 'red' }};">
                                 {{ rtrim(rtrim(number_format($position->pnl, 4), '0'), '.') }}
                             </span>
                         </td>
-                        <td>{{ \Carbon\Carbon::parse($position->closed_at)->format('Y-m-d H:i:s') }}</td>
+                        <td data-label="زمان بسته شدن">{{ \Carbon\Carbon::parse($position->closed_at)->format('Y-m-d H:i:s') }}</td>
                     </tr>
                 @empty
                     <tr>

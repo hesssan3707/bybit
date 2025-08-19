@@ -26,7 +26,7 @@ class BybitController extends Controller
                   ->orWhere('updated_at', '>=', $threeDaysAgo);
         })
         ->latest('updated_at')
-        ->paginate(50);
+        ->paginate(20);
 
         return view('orders_list', ['orders' => $orders]);
     }

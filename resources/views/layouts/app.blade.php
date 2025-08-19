@@ -29,7 +29,7 @@
         /* Mobile-specific padding for bottom nav */
         @media screen and (max-width: 768px) {
             body {
-                padding-bottom: 80px;
+                padding: 20px 10px 80px 10px; /* Remove top padding, adjust others */
             }
         }
     </style>
