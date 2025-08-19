@@ -136,18 +136,18 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
-                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to revoke this pending order?');">
+                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از لغو این سفارش مطمئن هستید؟');">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="delete-btn">Revoke</button>
+                                    <button type="submit" class="delete-btn">لغو کردن</button>
                                 </form>
                             @elseif($order->status === 'filled')
-                                <button type="button" class="close-btn" data-order-id="{{ $order->id }}" data-order-side="{{ $order->side }}">Close</button>
+                                <button type="button" class="close-btn" data-order-id="{{ $order->id }}" data-order-side="{{ $order->side }}">بستن</button>
                             @elseif($order->status === 'expired')
-                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this expired order?');">
+                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش منقضی شده مطمئن هستید؟');">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="delete-btn">Remove</button>
+                                    <button type="submit" class="delete-btn">حذف</button>
                                 </form>
                             @else
                                 -
