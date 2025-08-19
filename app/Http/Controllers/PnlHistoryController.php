@@ -10,7 +10,8 @@ class PnlHistoryController extends Controller
 {
     public function index()
     {
-        $closedPositions = ClosedPosition::latest('closed_at')->paginate(20);
-        return view('pnl_history', ['positions' => $closedPositions]);
+        $trades = Trade::latest('closed_at')->paginate(20);
+
+        return view('pnl_history', ['positions' => $trades]);
     }
 }
