@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Profile')
+@section('title', 'پروفایل')
 
 @push('styles')
 <style>
@@ -39,14 +39,14 @@
 @section('content')
 <div class="container">
     <div class="profile-card">
-        <h2>Profile</h2>
+        <h2>پروفایل کاربری</h2>
         <div class="username">{{ $user->username }}</div>
         <div class="equity">
-            <p>Total Account Equity: <strong>${{ $totalEquity }}</strong></p>
-            <p>Total Wallet Balance: <strong>${{ $totalBalance }}</strong></p>
+            <p>موجودی کل حساب: <strong>${{ $totalEquity }}</strong></p>
+            <p>موجودی کیف پول: <strong>${{ $totalBalance }}</strong></p>
         </div>
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="text-decoration: none; background-color: var(--danger-color); color: white; padding: 10px 20px; border-radius: 8px;">
-            Sign Out
+            خروج از حساب
         </a>
     </div>
 </div>

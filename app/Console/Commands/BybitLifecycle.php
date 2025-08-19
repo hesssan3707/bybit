@@ -67,7 +67,7 @@ class BybitLifecycle extends Command
         }
 
         // --- Mark 'filled' orders as 'closed' if position is no longer open ---
-        $filledOrders = BybitOrders::where('status', 'filled')->get();
+        $filledOrders = Order::where('status', 'filled')->get();
         if ($filledOrders->isNotEmpty()) {
             $positionResult = $this->bybitApiService->getPositionInfo('ETHUSDT');
             $position = collect($positionResult['list'] ?? [])->firstWhere('symbol', 'ETHUSDT');
