@@ -51,21 +51,22 @@ Route::get('/schedule', function() {
 
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.
-Route::get('/re-cache', function() {
-    Artisan::call('config:clear');
-    Artisan::call('cache:clear');
-    Artisan::call('route:clear');
-    Artisan::call('view:clear');
+// Route::get('/re-cache', function() {
+//     Artisan::call('config:clear');
+//     Artisan::call('cache:clear');
+//     // Artisan::call('route:clear');
+//     // Artisan::call('view:clear');
 
-    Artisan::call('config:cache');
-    Artisan::call('route:cache');
-    Artisan::call('view:cache');
-    Artisan::call('event:cache');
+//     Artisan::call('config:cache');
+//     // Artisan::call('route:cache');
+//     // Artisan::call('view:cache');
+//     // Artisan::call('event:cache');
 
-    // Optional: dump output for debugging
-    echo Artisan::output();
-});
-Route::get('/migrate', function() {
-    Artisan::call('migrate');
-    return 'Migration done!';
-});
+//     // Optional: dump output for debugging
+//     echo Artisan::output();
+// 	return 'DONE';
+// });
+// Route::get('/migrate', function() {
+//     Artisan::call('migrate');
+//     return 'Migration done!';
+// });
