@@ -13,7 +13,7 @@
         text-align: center;
         margin-bottom: 20px;
     }
-    form {
+    #order-form {
         background: #ffffff;
         padding: 20px;
         border-radius: 15px;
@@ -91,7 +91,7 @@
         </div>
     @endif
 
-    <form action="{{ route('order.store') }}" method="POST">
+    <form action="{{ route('order.store') }}" method="POST" id="order-form">
         @csrf
 
         <div class="form-group">

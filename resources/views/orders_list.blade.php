@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.appendChild(form);
                 form.submit();
             } else if (priceDistance !== null) {
-                alert('Please enter a valid, non-negative number.');
+                alert('لطفا یک عدد صحیح و بزرگتر از صفر وارد کنید');
             }
         });
     });
