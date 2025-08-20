@@ -38,6 +38,10 @@
         display: flex;
         justify-content: center;
     }
+    .no-orders {
+        text-align: center !important;
+        direction: rtl;
+    }
     @media screen and (max-width: 768px) {
         table thead { display: none; }
         table tr {
@@ -61,6 +65,13 @@
             font-weight: bold;
             padding-left: 10px;
             text-align: left;
+        }
+        .no-orders {
+            display: block;
+            width: 100%;
+            padding: 15px 0;
+            border: 0;
+            box-shadow: none;
         }
     }
 </style>
@@ -100,7 +111,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" style="text-align: center; direction: rtl;">هیچ پوزیشنی یافت نشد.</td>
+                        <td colspan="7" class="no-orders"">هیچ پوزیشنی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>

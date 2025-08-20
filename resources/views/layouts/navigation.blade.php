@@ -59,7 +59,7 @@
         justify-content: space-around;
         align-items: center;
     }
-    .mobile-footer-nav a, .mobile-footer-nav form button {
+    .mobile-footer-nav a {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -67,15 +67,6 @@
         color: #555;
         font-size: 12px;
         flex-grow: 1;
-    }
-     .mobile-footer-nav form button {
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: inherit;
-        font-family: inherit;
-        padding: 0;
-        margin: 0;
     }
     .mobile-footer-nav a.selected {
         color: var(--primary-color); /* Highlight color for selected mobile icon */
@@ -131,12 +122,12 @@
         <span class="icon">👤</span>
         <span>پروفایل</span>
     </a>
-    <form action="{{ route('logout') }}" method="POST">
+    <a href="#" onclick="event.preventDefault(); document.getElementById('mobile-logout-form').submit();">
+    <span class="icon">🚪</span>
+    <span>خروج</span>
+    </a>
+    <form id="mobile-logout-form" action="{{ route('logout') }}" method="POST" style="display:none;">
         @csrf
-        <button type="submit">
-            <span class="icon">🚪</span>
-            <span>خروج</span>
-        </button>
     </form>
 </nav>
 

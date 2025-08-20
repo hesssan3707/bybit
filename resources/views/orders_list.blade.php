@@ -68,6 +68,10 @@
         text-align: center;
         margin-bottom: 15px;
     }
+    .no-orders {
+        text-align: center !important;
+        direction: rtl;
+    }
     .alert-success { background: #d1e7dd; color: #0f5132; }
     .alert-danger { background: #f8d7da; color: #842029; }
 
@@ -94,6 +98,13 @@
             font-weight: bold;
             padding-left: 10px;
             text-align: left;
+        }
+        .no-orders {
+            display: block;
+            width: 100%;
+            padding: 15px 0;
+            border: 0;
+            box-shadow: none;
         }
     }
 </style>
@@ -156,7 +167,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" style="text-align: center; direction: rtl;">هیچ سفارشی یافت نشد.</td>
+                        <td colspan="6" class="no-orders">هیچ سفارشی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>
