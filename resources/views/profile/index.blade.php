@@ -45,7 +45,7 @@
             <p>موجودی لحظه ای حساب: <strong>{{ $totalEquity }}$</strong></p>
             <p>موجودی کیف پول: <strong>{{ $totalBalance }}$</strong></p>
         </div>
-        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="text-decoration: none; background-color: var(--danger-color); color: white; padding: 10px 20px; border-radius: 8px;">
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="text-decoration: none; background-color: var(--danger-color); color: red; padding: 10px 20px; border-radius: 8px;">
             خروج از حساب
         </a>
     </div>
