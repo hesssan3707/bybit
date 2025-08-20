@@ -200,4 +200,35 @@ class BybitControllerTest extends TestCase
         // Assert
         $response->assertSessionHas('success');
     }
+
+    /**
+     * @test
+     */
+    public function it_prevents_creating_an_order_within_the_sl_tp_range_of_a_filled_order()
+    {
+        // Arrange
+        Order::create([
+            'status' => 'filled',
+            'entry_price' => 2500,
+            'tp' => 2600,
+            'sl' => 2400,
+        ]);
+
+        $postData = [
+            'entry1' => 2450, // This is within the 2400-2600 range
+            'entry2' => 2450,
+            'tp' => 2700,
+            'sl' => 2300,
+            'steps' => 1,
+            'expire' => 15,
+            'risk_percentage' => 1,
+        ];
+
+        // Act
+        $response = $this->actingAs($this->user)->post(route('order.store'), $postData);
+
+        // Assert
+        $response->assertSessionHasErrors('msg');
+        $this->assertDatabaseMissing('orders', ['entry_price' => 2450]);
+    }
 }

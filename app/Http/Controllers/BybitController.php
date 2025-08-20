@@ -70,6 +70,18 @@ class BybitController extends Controller
                 return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید."])->withInput();
             }
 
+            // New validation: Check against active filled order's SL/TP range
+            $filledOrder = Order::where('status', 'filled')->first();
+            if ($filledOrder) {
+                $newAvgEntry = (($request->input('entry1') + $request->input('entry2')) / 2);
+                $minPrice = min($filledOrder->sl, $filledOrder->tp);
+                $maxPrice = max($filledOrder->sl, $filledOrder->tp);
+
+                if ($newAvgEntry >= $minPrice && $newAvgEntry <= $maxPrice) {
+                    return back()->withErrors(['msg' => "قیمت ورود جدید در محدوده سود و زیان معامله فعال فعلی قرار دارد."])->withInput();
+                }
+            }
+
             // Business Logic
             $symbol = 'ETHUSDT';
             $entry1 = (float) $validated['entry1'];
