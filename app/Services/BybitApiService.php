@@ -102,13 +102,19 @@ class BybitApiService
         return $this->sendRequest('POST', '/v5/position/set-trading-stop', $params);
     }
 
-    public function getClosedPnl(string $symbol, int $limit = 1)
+    public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null)
     {
-        return $this->sendRequest('GET', '/v5/position/closed-pnl', [
+        $params = [
             'category' => 'linear',
             'symbol' => $symbol,
             'limit' => $limit,
-        ]);
+        ];
+
+        if ($startTime) {
+            $params['startTime'] = $startTime;
+        }
+
+        return $this->sendRequest('GET', '/v5/position/closed-pnl', $params);
     }
 
     public function getWalletBalance(string $accountType = 'UNIFIED', ?string $coin = null)
