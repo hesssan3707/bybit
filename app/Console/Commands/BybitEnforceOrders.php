@@ -47,15 +47,17 @@ class BybitEnforceOrders extends Command
                     continue;
                 }
 
-                // Check for external modifications (price change)
+                // Check for external modifications (price or quantity change)
                 $bybitPrice = (float)($bybitOrder['price'] ?? 0);
                 $dbPrice = (float)$dbOrder->entry_price;
+                $bybitQty = (float)($bybitOrder['qty'] ?? 0);
+                $dbQty = (float)$dbOrder->amount;
 
-                if ($bybitPrice !== $dbPrice) {
+                if (abs($bybitPrice - $dbPrice) > 0.0001 || abs($bybitQty - $dbQty) > 0.000001) {
                     try {
                         $this->bybitApiService->cancelOrder($dbOrder->order_id, $symbol);
                         $dbOrder->delete(); // Remove from our DB
-                        $this->info("Canceled and removed modified order: {$dbOrder->order_id}");
+                        $this->info("Canceled and removed modified order: {$dbOrder->order_id} (Reason: Price/Qty mismatch).");
                         continue; // Move to the next order
                     } catch (\Throwable $e) {
                         $this->warn("Failed to cancel modified order {$dbOrder->order_id}: " . $e->getMessage());
