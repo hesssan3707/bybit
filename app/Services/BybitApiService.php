@@ -48,8 +48,8 @@ class BybitApiService
         ];
 
         $response = $method === 'GET'
-            ? Http::withHeaders($headers)->get("{$this->baseUrl}{$endpoint}", $params)
-            : Http::withHeaders($headers)->post("{$this->baseUrl}{$endpoint}", $params);
+            ? Http::withHeaders($headers)->timeout(10)->connectTimeout(5)->get("{$this->baseUrl}{$endpoint}", $params)
+            : Http::withHeaders($headers)->timeout(10)->connectTimeout(5)->post("{$this->baseUrl}{$endpoint}", $params);
 
         $responseData = $response->json();
 
