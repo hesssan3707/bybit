@@ -76,7 +76,7 @@ class SyncStopLoss extends Command
                         'category'    => 'linear',
                         'symbol'      => $symbol,
                         'stopLoss'    => (string)$databaseSl,
-                        'takeProfit'  => (string)(float)($matchingPosition['takeProfit'] ?? 0),
+                        'takeProfit'  => (string)(float)($matchingPosition['takeProfit'] ?? "0"),
                         'tpslMode'    => $matchingPosition['tpslMode'] ?? 'Full',
                         'tpTriggerBy' => $matchingPosition['tpTriggerBy'] ?? 'LastPrice',
                         'slTriggerBy' => $matchingPosition['slTriggerBy'] ?? 'LastPrice',

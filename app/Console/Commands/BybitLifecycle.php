@@ -51,6 +51,20 @@ class BybitLifecycle extends Command
                     $bybitStatus = $order['orderStatus'];
 
                     if ($bybitStatus === 'Filled') {
+                        $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
+                        $tpPrice = (float)$dbOrder->tp;
+                        $tpOrderParams = [
+                            'category' => 'linear',
+                            'symbol' => $symbol,
+                            'side' => $closeSide,
+                            'orderType' => 'Limit',
+                            'qty' => (string)$dbOrder->amount,
+                            'price' => (string)$tpPrice,
+                            'reduceOnly' => true,
+                            'timeInForce' => 'GTC',
+                        ];
+
+                        $tpOrderResult = $this->bybitApiService->createOrder($tpOrderParams);
                         $dbOrder->status = 'filled';
                         $dbOrder->save();
                         $this->info("Order {$dbOrder->order_id} is now 'filled'.");
