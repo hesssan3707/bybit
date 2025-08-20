@@ -83,6 +83,8 @@ class BybitLifecycle extends Command
 
         // --- Sync P&L records ---
         $this->syncPnlRecords('ETHUSDT');
+
+        return self::SUCCESS;
     }
 
     private function syncPnlRecords(string $symbol)
