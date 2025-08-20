@@ -91,16 +91,22 @@ class BybitLifecycle extends Command
     {
         $this->info("Syncing P&L records for symbol: {$symbol}");
 
-        $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 50);
+        // Find the timestamp of the last saved trade to use as a starting point.
+        $lastTrade = Trade::latest('closed_at')->first();
+        // Add a 1-second buffer to avoid fetching the same last record.
+        $startTime = $lastTrade ? Carbon::parse($lastTrade->closed_at)->addSecond()->timestamp * 1000 : null;
+
+        $pnlResult = $this->bybitApiService->getClosedPnl($symbol, 50, $startTime);
         $pnlEvents = $pnlResult['list'] ?? [];
 
         if (empty($pnlEvents)) {
-            $this->info('No P&L events found from API.');
+            $this->info('No new P&L events found from API.');
             return;
         }
 
+        // The check for existing IDs is now a secondary safety measure.
         $existingPnlOrderIds = Trade::pluck('order_id')->all();
-        $newPnlEvents = collect($pnlEvents)->whereNotIn('order_id', $existingPnlOrderIds);
+        $newPnlEvents = collect($pnlEvents)->whereNotIn('orderId', $existingPnlOrderIds);
 
         if ($newPnlEvents->isEmpty()) {
             $this->info('No new P&L events to save.');
