@@ -70,6 +70,55 @@ class BybitController extends Controller
                 return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید."])->withInput();
             }
 
+            // New validation: Check against active filled order's zones
+            $filledOrder = Order::where('status', 'filled')->first();
+            if ($filledOrder) {
+                $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
+                $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
+
+                // Define the zones
+                $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
+                $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
+                $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
+                $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
+
+                // Check Loss Zone (No-Go Zone)
+                if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
+                    return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست.'])->withInput();
+                }
+
+                // Check Profit Zone (Conditional Zone)
+                if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
+                    if (strtolower($newSide) === strtolower($filledOrder->side)) {
+                        return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست.'])->withInput();
+                    }
+                }
+            }
+            // New validation: Check against active filled order's zones
+            $filledOrder = Order::where('status', 'filled')->first();
+            if ($filledOrder) {
+                $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
+                $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
+
+                // Define the zones
+                $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
+                $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
+                $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
+                $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
+
+                // Check Loss Zone (No-Go Zone)
+                if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
+                    return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست.'])->withInput();
+                }
+
+                // Check Profit Zone (Conditional Zone)
+                if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
+                    if (strtolower($newSide) === strtolower($filledOrder->side)) {
+                        return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست.'])->withInput();
+                    }
+                }
+            }
+
             // Business Logic
             $symbol = 'ETHUSDT';
             $entry1 = (float) $validated['entry1'];
