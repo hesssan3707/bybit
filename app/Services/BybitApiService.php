@@ -57,7 +57,11 @@ class BybitApiService
             $errorCode = $responseData['retCode'] ?? 'N/A';
             $errorMsg = $responseData['retMsg'] ?? 'Unknown error';
             $requestBody = json_encode($params);
-            throw new \Exception("Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}");
+            // Add the full response body to the exception message for better debugging.
+            $fullResponse = $response->body();
+            throw new \Exception(
+                "Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
+            );
         }
 
         return $responseData['result'];
