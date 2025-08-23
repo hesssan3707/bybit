@@ -130,4 +130,100 @@ class BybitApiService
     {
         return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
     }
+
+    /**
+     * Create a spot trading order
+     * 
+     * @param array $params - Order parameters including:
+     *   - side: 'Buy' or 'Sell'
+     *   - symbol: Trading pair (e.g., 'BTCUSDT')
+     *   - orderType: 'Market' or 'Limit'
+     *   - qty: Order quantity
+     *   - price: Order price (required for Limit orders)
+     */
+    public function createSpotOrder(array $params)
+    {
+        $orderParams = [
+            'category' => 'spot',
+            'symbol' => $params['symbol'],
+            'side' => $params['side'],
+            'orderType' => $params['orderType'],
+            'qty' => (string)$params['qty'],
+        ];
+
+        // Add price for limit orders
+        if ($params['orderType'] === 'Limit' && isset($params['price'])) {
+            $orderParams['price'] = (string)$params['price'];
+        }
+
+        // Add optional parameters
+        if (isset($params['timeInForce'])) {
+            $orderParams['timeInForce'] = $params['timeInForce'];
+        } else {
+            $orderParams['timeInForce'] = 'GTC'; // Default
+        }
+
+        if (isset($params['orderLinkId'])) {
+            $orderParams['orderLinkId'] = $params['orderLinkId'];
+        }
+
+        return $this->sendRequest('POST', '/v5/order/create', $orderParams);
+    }
+
+    /**
+     * Get spot account balance with detailed breakdown by currency
+     */
+    public function getSpotAccountBalance()
+    {
+        return $this->sendRequest('GET', '/v5/account/wallet-balance', ['accountType' => 'SPOT']);
+    }
+
+    /**
+     * Get spot trading symbols information
+     */
+    public function getSpotInstrumentsInfo(?string $symbol = null)
+    {
+        $params = ['category' => 'spot'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        return $this->sendRequest('GET', '/v5/market/instruments-info', $params);
+    }
+
+    /**
+     * Get spot ticker information
+     */
+    public function getSpotTickerInfo(string $symbol)
+    {
+        return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'spot', 'symbol' => $symbol]);
+    }
+
+    /**
+     * Get spot order history
+     */
+    public function getSpotOrderHistory(?string $symbol = null, int $limit = 50)
+    {
+        $params = [
+            'category' => 'spot',
+            'limit' => $limit,
+        ];
+        
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        
+        return $this->sendRequest('GET', '/v5/order/history', $params);
+    }
+
+    /**
+     * Cancel spot order
+     */
+    public function cancelSpotOrder(string $orderId, string $symbol)
+    {
+        return $this->sendRequest('POST', '/v5/order/cancel', [
+            'category' => 'spot',
+            'orderId' => $orderId,
+            'symbol' => $symbol
+        ]);
+    }
 }

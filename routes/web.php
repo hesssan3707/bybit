@@ -3,6 +3,7 @@
 use App\Http\Controllers\BybitController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SpotTradingController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,14 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/orders/{order}', [BybitController::class, 'destroy'])->name('orders.destroy');
     Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+
+    // Spot Trading Routes
+    Route::prefix('spot')->group(function () {
+        Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view');
+        Route::get('/balances', [SpotTradingController::class, 'spotBalancesView'])->name('spot.balances.view');
+        Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view');
+        Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web');
+    });
 
     // Maintenance Routes (should also be protected)
     

@@ -94,6 +94,16 @@
         <a href="{{ route('orders.index') }}">سفارش‌ها</a>
         <a href="{{ route('pnl.history') }}">تاریخچه سود و زیان</a>
         <a href="{{ route('order.create') }}">سفارش جدید</a>
+        
+        <!-- Spot Trading Menu -->
+        <div style="display: inline-block; position: relative; margin: 0 15px;">
+            <a href="#" style="cursor: pointer;" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
+            <div id="spotMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 200px; z-index: 1001;">
+                <a href="{{ route('spot.orders.view') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">سفارش‌های اسپات</a>
+                <a href="{{ route('spot.balances.view') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">موجودی‌ها</a>
+                <a href="{{ route('spot.order.create.view') }}" style="display: block; padding: 10px 15px; margin: 0;">سفارش اسپات جدید</a>
+            </div>
+        </div>
     </nav>
     <div class="header-right">
         <a href="{{ route('profile.index') }}">پروفایل</a>
@@ -114,6 +124,10 @@
         <span class="icon">📜</span>
         <span>سود و زیان</span>
     </a>
+    <a href="{{ route('spot.orders.view') }}">
+        <span class="icon">💰</span>
+        <span>اسپات</span>
+    </a>
     <a href="{{ route('order.create') }}">
         <span class="icon">➕</span>
         <span>جدید</span>
@@ -122,13 +136,6 @@
         <span class="icon">👤</span>
         <span>پروفایل</span>
     </a>
-    <a href="#" onclick="event.preventDefault(); document.getElementById('mobile-logout-form').submit();">
-    <span class="icon">🚪</span>
-    <span>خروج</span>
-    </a>
-    <form id="mobile-logout-form" action="{{ route('logout') }}" method="POST" style="display:none;">
-        @csrf
-    </form>
 </nav>
 
 <script>
@@ -150,5 +157,22 @@
                 link.classList.add('selected');
             }
         });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const spotMenu = document.getElementById('spotMenu');
+            const spotMenuToggle = event.target.closest('[onclick*="toggleSpotMenu"]');
+            
+            if (!spotMenuToggle && spotMenu) {
+                spotMenu.style.display = 'none';
+            }
+        });
     });
+    
+    function toggleSpotMenu(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = document.getElementById('spotMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
 </script>
