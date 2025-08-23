@@ -33,23 +33,28 @@ class ProfileController extends Controller
             try {
                 $exchangeService = $this->exchangeFactory->createForUserExchange($defaultExchange);
                 
-                if ($defaultExchange->exchange_name === 'bybit') {
-                    $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
-                    $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-                    if ($usdtBalanceData) {
-                        if (isset($usdtBalanceData['totalEquity'])) {
-                            $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
-                        }
-                        if (isset($usdtBalanceData['totalWalletBalance'])) {
-                            $totalBalance = number_format((float)$usdtBalanceData['totalWalletBalance'], 2);
-                        }
+                // Try to get account balance using the generic method first
+                $balance = $exchangeService->getAccountBalance();
+                if ($balance && isset($balance['success']) && $balance['success']) {
+                    if (isset($balance['total'])) {
+                        $totalEquity = number_format((float)$balance['total'], 2);
+                    }
+                    if (isset($balance['available'])) {
+                        $totalBalance = number_format((float)$balance['available'], 2);
                     }
                 } else {
-                    // For other exchanges, use generic balance method when implemented
-                    $balance = $exchangeService->getAccountBalance();
-                    if ($balance && isset($balance['total'])) {
-                        $totalEquity = number_format((float)$balance['total'], 2);
-                        $totalBalance = number_format((float)$balance['available'], 2);
+                    // Fallback to exchange-specific methods if generic doesn't work
+                    if ($defaultExchange->exchange_name === 'bybit') {
+                        $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+                        $usdtBalanceData = $balanceInfo['list'][0] ?? null;
+                        if ($usdtBalanceData) {
+                            if (isset($usdtBalanceData['totalEquity'])) {
+                                $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
+                            }
+                            if (isset($usdtBalanceData['totalWalletBalance'])) {
+                                $totalBalance = number_format((float)$usdtBalanceData['totalWalletBalance'], 2);
+                            }
+                        }
                     }
                 }
             } catch (\Exception $e) {

@@ -47,7 +47,11 @@
     .current-exchange {
         border-left: 5px solid var(--exchange-color, #007bff);
         padding: 20px;
+        @if($currentExchange)
         background: linear-gradient(135deg, rgba({{ $currentExchange->exchange_color_rgb }}, 0.1), #ffffff);
+        @else
+        background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), #ffffff);
+        @endif
         border-radius: 10px;
         margin-bottom: 20px;
     }
@@ -279,7 +283,7 @@
                 <div class="exchange-grid">
                     @foreach($activeExchanges as $exchange)
                         <div class="exchange-option {{ $exchange->is_default ? 'current' : '' }}" 
-                             style="--exchange-color: {{ $exchange->exchange_color }}; {{ $exchange->is_default ? 'background: linear-gradient(135deg, rgba(' . $exchange->exchange_color_rgb . ', 0.15), #ffffff);' : '' }}"
+                             style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }}; {{ $exchange->is_default ? 'background: linear-gradient(135deg, rgba(' . ($exchange->exchange_color_rgb ?? '0, 123, 255') . ', 0.15), #ffffff);' : '' }}"
                              onclick="switchExchange({{ $exchange->id }})">
                             <div class="mini-logo">
                                 {{ substr($exchange->exchange_display_name, 0, 2) }}

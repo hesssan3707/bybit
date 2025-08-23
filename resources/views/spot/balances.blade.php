@@ -164,7 +164,17 @@
 <div class="container">
     <h2>موجودی‌های اسپات</h2>
     
-    <a href="{{ route('spot.balances.view') }}" class="refresh-btn">🔄 بروزرسانی موجودی‌ها</a>
+    @if(!$hasActiveExchange)
+        <div class="error-message">
+            {{ $exchangeMessage }}
+            <br><br>
+            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
+                برای فعال کردن صرافی کلیک کنید
+            </a>
+        </div>
+    @else
+        <a href="{{ route('spot.balances.view') }}" class="refresh-btn">🔄 بروزرسانی موجودی‌ها</a>
+    @endif
     
     @if(isset($error))
         <div class="error-message">

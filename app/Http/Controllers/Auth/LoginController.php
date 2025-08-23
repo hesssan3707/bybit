@@ -33,16 +33,24 @@ class LoginController extends Controller
         
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['نام کاربری یا رمز عبور اشتباه است.'],
+                'email' => [__('auth.failed')],
             ]);
         }
 
-        // Check if account is active
+        // Check if account is active (email verification handled separately for demo)
         if (!$user->isActive()) {
             throw ValidationException::withMessages([
-                'email' => ['حساب کاربری شما هنوز فعال نشده است. لطفاً منتظر تأیید مدیر باشید.'],
+                'email' => [__('messages.account_inactive')],
             ]);
         }
+
+        // For demo: Allow login without email verification
+        // In production, add email verification check:
+        // if (!$user->hasVerifiedEmail()) {
+        //     throw ValidationException::withMessages([
+        //         'email' => ['لطفاً ابتدا ایمیل خود را تأیید کنید.'],
+        //     ]);
+        // }
 
         // Login the user
         Auth::login($user, $request->filled('remember'));

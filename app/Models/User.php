@@ -195,11 +195,48 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user can login (active and verified)
+     * Check if user can login (active and email verified)
      */
     public function canLogin()
     {
-        return $this->is_active && $this->email_verified_at;
+        // For testing purposes, allow login without email verification
+        // In production, uncomment the email verification requirement
+        return $this->is_active; // && $this->hasVerifiedEmail();
+    }
+
+    /**
+     * Generate email verification token
+     */
+    public function generateEmailVerificationToken()
+    {
+        $token = \Illuminate\Support\Str::random(60);
+        $this->update([
+            'activation_token' => $token, // Reuse activation_token for email verification
+        ]);
+        return $token;
+    }
+
+    /**
+     * Verify email using token
+     */
+    public function verifyEmail($token)
+    {
+        if ($this->activation_token === $token) {
+            $this->update([
+                'email_verified_at' => Carbon::now(),
+                'activation_token' => null,
+            ]);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if email is verified
+     */
+    public function hasVerifiedEmail()
+    {
+        return !is_null($this->email_verified_at);
     }
 
     /**

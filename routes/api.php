@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\BybitController;
+use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\SpotTradingController;
 use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\Api\ExchangeConfigController;
@@ -43,7 +43,7 @@ Route::middleware(['api.auth'])->group(function () {
     });
 
     // Legacy futures trading route
-    Route::post('/store', [BybitController::class, 'store'])->name('order.store');
+    Route::post('/store', [FuturesController::class, 'store'])->name('order.store');
 
     // Spot Trading API Routes
     Route::prefix('spot')->group(function () {

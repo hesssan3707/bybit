@@ -171,6 +171,16 @@
     
     <h2>سفارش اسپات جدید</h2>
 
+    @if(!$hasActiveExchange)
+        <div class="alert alert-danger">
+            {{ $exchangeMessage }}
+            <br><br>
+            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
+                برای فعال کردن صرافی کلیک کنید
+            </a>
+        </div>
+    @endif
+
     @if(isset($error))
         <div class="alert alert-danger">
             {{ $error }}
@@ -187,8 +197,9 @@
         </div>
     @endif
 
-    <form action="{{ route('spot.order.store.web') }}" method="POST" id="spotOrderForm">
-        @csrf
+    @if($hasActiveExchange)
+        <form action="{{ route('spot.order.store.web') }}" method="POST" id="spotOrderForm">
+            @csrf
         
         <div class="form-group">
             <label for="symbol">جفت ارز</label>
@@ -261,6 +272,20 @@
             ایجاد سفارش اسپات
         </button>
     </form>
+    @else
+        <!-- Form is disabled when no active exchange -->
+        <div style="opacity: 0.5; pointer-events: none;">
+            <div class="form-group">
+                <label for="symbol">جفت ارز</label>
+                <select disabled class="form-control">
+                    <option>ابتدا صرافی خود را فعال کنید</option>
+                </select>
+            </div>
+            <button type="button" class="submit-btn" disabled>
+                برای ارسال سفارش ابتدا صرافی فعال کنید
+            </button>
+        </div>
+    @endif
 </div>
 @endsection
 

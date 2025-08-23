@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\BybitController;
+use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SpotTradingController;
@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\ExchangeController;
+use App\Http\Controllers\MobileController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -39,14 +40,15 @@ Route::get('password/reset/{token}', [PasswordController::class, 'showResetForm'
 Route::post('password/reset', [PasswordController::class, 'resetPassword'])->name('password.reset');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [BybitController::class, 'index']); // Redirect home to orders list
-    Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
-    Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
-    Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
-    Route::post('/orders/{order}/close', [BybitController::class, 'close'])->name('orders.close');
-    Route::delete('/orders/{order}', [BybitController::class, 'destroy'])->name('orders.destroy');
+    Route::get('/', [FuturesController::class, 'index']); // Redirect home to orders list
+    Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
+    Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
+    Route::get('/orders', [FuturesController::class, 'index'])->name('orders.index');
+    Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
+    Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
     Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
     
     // Password Change Routes (requires authentication)
     Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
@@ -88,17 +90,22 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web');
     });
 
+    // Mobile Routes
+    Route::prefix('mobile')->group(function () {
+        Route::get('/balance', [MobileController::class, 'balance'])->name('mobile.balance');
+    });
+
     // Maintenance Routes (should also be protected)
     
 });
 Route::get('/schedule', function() {
-    Artisan::call('bybit:lifecycle');
+    Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
-    echo '<br> lifecycle 1 done  <br>';
-    Artisan::call('bybit:enforce');
+    echo '<br> lifecycle done  <br>';
+    Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br> enforce done <br>';
-    Artisan::call('bybit:sync-sl');
+    Artisan::call('futures:sync-sl');
     print_r(Artisan::output());
     echo '<br> sync sl done <br> ';
     return 'DONE';

@@ -79,6 +79,16 @@
 <div class="container">
     <h2>ثبت سفارش جدید</h2>
 
+    @if(!$hasActiveExchange)
+        <div class="alert alert-danger">
+            {{ $exchangeMessage }}
+            <br><br>
+            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
+                برای فعال کردن صرافی کلیک کنید
+            </a>
+        </div>
+    @endif
+
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
@@ -139,7 +149,13 @@
             @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
-        <button type="submit">ارسال سفارش</button>
+        <button type="submit" {{ !$hasActiveExchange ? 'disabled' : '' }}>
+            @if($hasActiveExchange)
+                ارسال سفارش
+            @else
+                برای ارسال سفارش ابتدا صرافی فعال کنید
+            @endif
+        </button>
     </form>
 </div>
 @endsection

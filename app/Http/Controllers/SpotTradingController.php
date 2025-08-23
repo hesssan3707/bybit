@@ -3,18 +3,44 @@
 namespace App\Http\Controllers;
 
 use App\Models\SpotOrder;
-use App\Services\Exchanges\BybitApiService;
+use App\Services\Exchanges\ExchangeFactory;
+use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class SpotTradingController extends Controller
 {
-    protected $bybitApiService;
-
-    public function __construct(BybitApiService $bybitApiService)
+    /**
+     * Get the exchange service for the authenticated user
+     */
+    private function getExchangeService(): ExchangeApiServiceInterface
     {
-        $this->bybitApiService = $bybitApiService;
+        if (!auth()->check()) {
+            throw new \Exception('User not authenticated');
+        }
+
+        try {
+            return ExchangeFactory::createForUser(auth()->id());
+        } catch (\Exception $e) {
+            throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
+        }
+    }
+
+    /**
+     * Check if user has an active exchange and return status
+     */
+    private function checkActiveExchange()
+    {
+        try {
+            $this->getExchangeService();
+            return ['hasActiveExchange' => true, 'message' => null];
+        } catch (\Exception $e) {
+            return [
+                'hasActiveExchange' => false, 
+                'message' => 'برای استفاده از این قسمت، لطفاً ابتدا صرافی خود را فعال کنید.'
+            ];
+        }
     }
 
     /**
@@ -26,6 +52,9 @@ class SpotTradingController extends Controller
     public function createSpotOrder(Request $request)
     {
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
             $validated = $request->validate([
                 'side' => 'required|string|in:Buy,Sell',
                 'symbol' => 'required|string', // e.g., BTCUSDT
@@ -44,7 +73,7 @@ class SpotTradingController extends Controller
             }
 
             // Get instrument info to validate symbol and get precision
-            $instrumentInfo = $this->bybitApiService->getSpotInstrumentsInfo($validated['symbol']);
+            $instrumentInfo = $exchangeService->getSpotInstrumentsInfo($validated['symbol']);
             
             if (empty($instrumentInfo['list'])) {
                 return response()->json([
@@ -82,7 +111,7 @@ class SpotTradingController extends Controller
             }
 
             // Create the order
-            $result = $this->bybitApiService->createSpotOrder($orderParams);
+            $result = $exchangeService->createSpotOrder($orderParams);
 
             // Extract base and quote coins from symbol
             $baseCoin = substr($orderParams['symbol'], 0, -4); // Remove last 4 chars (usually USDT)
@@ -159,7 +188,10 @@ class SpotTradingController extends Controller
     public function getAccountBalance()
     {
         try {
-            $balanceData = $this->bybitApiService->getSpotAccountBalance();
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
+            $balanceData = $exchangeService->getSpotAccountBalance();
             
             if (empty($balanceData['list'])) {
                 return response()->json([
@@ -266,11 +298,14 @@ class SpotTradingController extends Controller
     public function getTickerInfo(Request $request)
     {
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
             $validated = $request->validate([
                 'symbol' => 'required|string',
             ]);
 
-            $result = $this->bybitApiService->getSpotTickerInfo($validated['symbol']);
+            $result = $exchangeService->getSpotTickerInfo($validated['symbol']);
 
             return response()->json([
                 'success' => true,
@@ -303,12 +338,15 @@ class SpotTradingController extends Controller
     public function cancelOrder(Request $request)
     {
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
             $validated = $request->validate([
                 'orderId' => 'required|string',
                 'symbol' => 'required|string',
             ]);
 
-            $result = $this->bybitApiService->cancelSpotOrder(
+            $result = $exchangeService->cancelSpotOrder(
                 $validated['orderId'],
                 $validated['symbol']
             );
@@ -343,7 +381,10 @@ class SpotTradingController extends Controller
     public function getTradingPairs()
     {
         try {
-            $result = $this->bybitApiService->getSpotInstrumentsInfo();
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
+            $result = $exchangeService->getSpotInstrumentsInfo();
             
             $tradingPairs = [];
             if (isset($result['list']) && is_array($result['list'])) {
@@ -400,11 +441,18 @@ class SpotTradingController extends Controller
      */
     public function spotOrdersView(Request $request)
     {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        
         $orders = SpotOrder::forUser(auth()->id())
             ->latest('created_at')
             ->paginate(20);
 
-        return view('spot.orders', compact('orders'));
+        return view('spot.orders', [
+            'orders' => $orders,
+            'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
+            'exchangeMessage' => $exchangeStatus['message']
+        ]);
     }
 
     /**
@@ -412,8 +460,25 @@ class SpotTradingController extends Controller
      */
     public function spotBalancesView()
     {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return view('spot.balances', [
+                'balances' => [],
+                'totalEquity' => 0,
+                'totalWalletBalance' => 0,
+                'hasActiveExchange' => false,
+                'exchangeMessage' => $exchangeStatus['message'],
+                'error' => null
+            ]);
+        }
+        
         try {
-            $balanceData = $this->bybitApiService->getSpotAccountBalance();
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
+            $balanceData = $exchangeService->getSpotAccountBalance();
             
             $balances = [];
             if (!empty($balanceData['list'])) {
@@ -435,13 +500,22 @@ class SpotTradingController extends Controller
                     }
                 }
                 
-                return view('spot.balances', compact('balances', 'totalEquity', 'totalWalletBalance'));
+                return view('spot.balances', [
+                    'balances' => $balances,
+                    'totalEquity' => $totalEquity,
+                    'totalWalletBalance' => $totalWalletBalance,
+                    'hasActiveExchange' => true,
+                    'exchangeMessage' => null,
+                    'error' => null
+                ]);
             }
             
             return view('spot.balances', [
                 'balances' => [],
                 'totalEquity' => 0,
                 'totalWalletBalance' => 0,
+                'hasActiveExchange' => true,
+                'exchangeMessage' => null,
                 'error' => 'No balance data available'
             ]);
             
@@ -452,6 +526,8 @@ class SpotTradingController extends Controller
                 'balances' => [],
                 'totalEquity' => 0,
                 'totalWalletBalance' => 0,
+                'hasActiveExchange' => true,
+                'exchangeMessage' => null,
                 'error' => 'Failed to fetch balance data: ' . $e->getMessage()
             ]);
         }
@@ -462,9 +538,24 @@ class SpotTradingController extends Controller
      */
     public function createSpotOrderView()
     {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return view('spot.create_order', [
+                'tradingPairs' => [],
+                'hasActiveExchange' => false,
+                'exchangeMessage' => $exchangeStatus['message'],
+                'error' => null
+            ]);
+        }
+        
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
             // Get available trading pairs
-            $pairsData = $this->bybitApiService->getSpotInstrumentsInfo();
+            $pairsData = $exchangeService->getSpotInstrumentsInfo();
             $tradingPairs = [];
             
             if (isset($pairsData['list']) && is_array($pairsData['list'])) {
@@ -479,13 +570,20 @@ class SpotTradingController extends Controller
                 }
             }
             
-            return view('spot.create_order', compact('tradingPairs'));
+            return view('spot.create_order', [
+                'tradingPairs' => $tradingPairs,
+                'hasActiveExchange' => true,
+                'exchangeMessage' => null,
+                'error' => null
+            ]);
             
         } catch (\Exception $e) {
             Log::error('Failed to fetch trading pairs for create order view: ' . $e->getMessage());
             
             return view('spot.create_order', [
                 'tradingPairs' => [],
+                'hasActiveExchange' => true,
+                'exchangeMessage' => null,
                 'error' => 'Failed to fetch trading pairs: ' . $e->getMessage()
             ]);
         }
@@ -496,7 +594,16 @@ class SpotTradingController extends Controller
      */
     public function storeSpotOrderFromWeb(Request $request)
     {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
+        }
+        
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
             $validated = $request->validate([
                 'side' => 'required|string|in:Buy,Sell',
                 'symbol' => 'required|string',
@@ -512,7 +619,7 @@ class SpotTradingController extends Controller
             }
 
             // Use the same logic as API method
-            $instrumentInfo = $this->bybitApiService->getSpotInstrumentsInfo($validated['symbol']);
+            $instrumentInfo = $exchangeService->getSpotInstrumentsInfo($validated['symbol']);
             
             if (empty($instrumentInfo['list'])) {
                 return back()->withErrors(['symbol' => 'Invalid trading symbol'])->withInput();
@@ -541,7 +648,7 @@ class SpotTradingController extends Controller
                 $orderParams['timeInForce'] = $validated['timeInForce'];
             }
 
-            $result = $this->bybitApiService->createSpotOrder($orderParams);
+            $result = $exchangeService->createSpotOrder($orderParams);
 
             // Save to database (same logic as API method)
             $baseCoin = substr($orderParams['symbol'], 0, -4);
@@ -586,3 +693,4 @@ class SpotTradingController extends Controller
             return back()->withErrors(['error' => 'Failed to create spot order: ' . $e->getMessage()])->withInput();
         }
     }
+}

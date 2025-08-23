@@ -51,6 +51,7 @@
             margin-bottom: 8px;
             font-weight: 600;
             color: var(--label-color);
+            text-align: right;
         }
         input {
             width: 100%;
@@ -87,6 +88,7 @@
             font-size: 14px;
             margin-top: 5px;
             display: block;
+            text-align: right;
         }
         .help-text {
             font-size: 12px;
@@ -109,10 +111,6 @@
 <div class="container">
     <h2>عضویت جدید</h2>
 
-    <div class="info-box">
-        <strong>توجه:</strong> پس از ثبت نام، حساب شما منتظر تأیید مدیر سیستم می‌ماند. تا زمان تأیید نمی‌توانید وارد سیستم شوید.
-    </div>
-
     <form method="POST" action="{{ route('register') }}">
         @csrf
 
@@ -129,20 +127,9 @@
         @endif
 
         <div class="form-group">
-            <label for="username">نام کاربری</label>
-            <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus>
-            <div class="help-text">نام کاربری باید منحصر به فرد باشد</div>
-            @error('username')
-                <span class="invalid-feedback" role="alert">
-                    <strong>{{ $message }}</strong>
-                </span>
-            @enderror
-        </div>
-
-        <div class="form-group">
-            <label for="email">ایمیل</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required>
-            <div class="help-text">ایمیل شما برای ورود به سیستم استفاده خواهد شد</div>
+            <label for="email">ایمیل (نام کاربری)</label>
+            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <div class="help-text">ایمیل شما به عنوان نام کاربری برای ورود به سیستم استفاده خواهد شد</div>
             @error('email')
                 <span class="invalid-feedback" role="alert">
                     <strong>{{ $message }}</strong>

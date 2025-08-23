@@ -13,17 +13,17 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     public function __construct()
     {
-        $this->apiKey = env('BYBIT_API_KEY');
-        $this->apiSecret = env('BYBIT_API_SECRET');
+        // Don't initialize API credentials from .env - they will be set via setCredentials()
+        $this->apiKey = null;
+        $this->apiSecret = null;
         $isTestnet = env('BYBIT_TESTNET', false);
         $this->baseUrl = $isTestnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
     }
 
-    public function setCredentials(string $apiKey, string $apiSecret): ExchangeApiServiceInterface
+    public function setCredentials(string $apiKey, string $apiSecret): void
     {
         $this->apiKey = $apiKey;
         $this->apiSecret = $apiSecret;
-        return $this;
     }
 
     private function generateSignature(string $payload): string
@@ -33,6 +33,11 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     private function sendRequest(string $method, string $endpoint, array $params = [])
     {
+        // Validate API credentials are set
+        if (!$this->apiKey || !$this->apiSecret) {
+            throw new \Exception('API credentials not set. Please ensure the exchange is properly configured.');
+        }
+
         $timestamp = intval(microtime(true) * 1000);
 
         $payloadToSign = '';
@@ -85,32 +90,32 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('POST', '/v5/order/create', $orderData);
     }
 
-    public function getOpenOrdersBySymbol(string $symbol)
+    public function getOpenOrdersBySymbol(string $symbol): array
     {
         return $this->sendRequest('GET', '/v5/order/realtime', ['category' => 'linear', 'symbol' => $symbol]);
     }
 
-    public function getHistoryOrder(string $orderId)
+    public function getHistoryOrder(string $orderId): array
     {
         return $this->sendRequest('GET', '/v5/order/history', ['category' => 'linear', 'orderId' => $orderId]);
     }
 
-    public function cancelOrderWithSymbol(string $orderId, string $symbol)
+    public function cancelOrderWithSymbol(string $orderId, string $symbol): array
     {
         return $this->sendRequest('POST', '/v5/order/cancel', ['category' => 'linear', 'orderId' => $orderId, 'symbol' => $symbol]);
     }
 
-    public function getPositionInfo(string $symbol)
+    public function getPositionInfo(string $symbol): array
     {
         return $this->sendRequest('GET', '/v5/position/list', ['category' => 'linear', 'symbol' => $symbol]);
     }
 
-    public function setTradingStop(array $params)
+    public function setTradingStop(array $params): array
     {
         return $this->sendRequest('POST', '/v5/position/set-trading-stop', $params);
     }
 
-    public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null)
+    public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null): array
     {
         $params = [
             'category' => 'linear',
@@ -125,7 +130,7 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('GET', '/v5/position/closed-pnl', $params);
     }
 
-    public function getWalletBalance(string $accountType = 'UNIFIED', ?string $coin = null)
+    public function getWalletBalance(string $accountType = 'UNIFIED', ?string $coin = null): array
     {
         $params = ['accountType' => $accountType];
         if ($coin) {
@@ -134,7 +139,7 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('GET', '/v5/account/wallet-balance', $params);
     }
 
-    public function getTickerInfo(string $symbol)
+    public function getTickerInfo(string $symbol): array
     {
         return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
     }
@@ -198,7 +203,7 @@ class BybitApiService implements ExchangeApiServiceInterface
     /**
      * Get spot ticker information
      */
-    public function getSpotTickerInfo(string $symbol)
+    public function getSpotTickerInfo(string $symbol): array
     {
         return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'spot', 'symbol' => $symbol]);
     }
@@ -217,7 +222,7 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('GET', '/v5/order/history', $params);
     }
 
-    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol)
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
     {
         return $this->sendRequest('POST', '/v5/order/cancel', [
             'category' => 'spot',

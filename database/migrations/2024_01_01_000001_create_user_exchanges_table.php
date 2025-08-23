@@ -13,23 +13,33 @@ return new class extends Migration
     {
         Schema::create('user_exchanges', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('exchange_name'); // 'bybit', 'binance', 'bingx'
-            $table->text('api_key'); // Encrypted API key
-            $table->text('api_secret'); // Encrypted API secret
+            $table->unsignedBigInteger('user_id');
+            $table->string('exchange_name'); // bybit, binance, bingx, etc.
+            $table->text('api_key'); // Encrypted
+            $table->text('api_secret'); // Encrypted
             $table->boolean('is_active')->default(false);
             $table->boolean('is_default')->default(false);
-            $table->enum('status', ['pending', 'approved', 'rejected', 'suspended'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'deactivated'])->default('pending');
+            
+            // Activation workflow fields
             $table->timestamp('activation_requested_at')->nullable();
             $table->timestamp('activated_at')->nullable();
-            $table->foreignId('activated_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->unsignedBigInteger('activated_by')->nullable();
             $table->timestamp('deactivated_at')->nullable();
-            $table->foreignId('deactivated_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->unsignedBigInteger('deactivated_by')->nullable();
+            
+            // Admin notes and user reason
+            $table->text('user_reason')->nullable();
             $table->text('admin_notes')->nullable();
-            $table->text('user_reason')->nullable(); // User's reason for activation request
+            
             $table->timestamps();
             
-            // Ensure one default exchange per user
+            // Foreign key constraints
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('activated_by')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('deactivated_by')->references('id')->on('users')->onDelete('set null');
+            
+            // Indexes
             $table->unique(['user_id', 'exchange_name']);
             $table->index(['user_id', 'is_active']);
             $table->index(['user_id', 'is_default']);

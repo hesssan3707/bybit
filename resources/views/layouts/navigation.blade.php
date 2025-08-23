@@ -91,9 +91,15 @@
 <header class="main-header">
     <div class="logo">Trader Assistant</div>
     <nav class="nav-links">
-        <a href="{{ route('orders.index') }}">سفارش‌ها</a>
-        <a href="{{ route('pnl.history') }}">تاریخچه سود و زیان</a>
-        <a href="{{ route('order.create') }}">سفارش جدید</a>
+        <!-- Futures Trading Menu -->
+        <div style="display: inline-block; position: relative; margin: 0 15px;">
+            <a href="#" style="cursor: pointer;" onclick="toggleFuturesMenu(event)">معاملات آتی ▼</a>
+            <div id="futuresMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 200px; z-index: 1001;">
+                <a href="{{ route('orders.index') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">تاریخچه سفارش‌ها</a>
+                <a href="{{ route('pnl.history') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">سود و زیان</a>
+                <a href="{{ route('order.create') }}" style="display: block; padding: 10px 15px; margin: 0;">سفارش آتی جدید</a>
+            </div>
+        </div>
         
         <!-- Spot Trading Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
@@ -133,9 +139,9 @@
         <span class="icon">📊</span>
         <span>سفارش‌ها</span>
     </a>
-    <a href="{{ route('pnl.history') }}">
-        <span class="icon">📜</span>
-        <span>سود و زیان</span>
+    <a href="{{ route('mobile.balance') }}">
+        <span class="icon">💳</span>
+        <span>موجودی</span>
     </a>
     <a href="{{ route('spot.orders.view') }}">
         <span class="icon">💰</span>
@@ -155,18 +161,31 @@
     document.addEventListener('DOMContentLoaded', function() {
         const currentPath = window.location.pathname;
 
-        // Web header
-        const webNavLinks = document.querySelectorAll('.main-header .nav-links a, .main-header .header-right a');
+        // Web header - be more specific about selection
+        const webNavLinks = document.querySelectorAll('.main-header .nav-links a[href], .main-header .header-right a[href]');
         webNavLinks.forEach(link => {
-            if (link.getAttribute('href') === window.location.href) {
+            const href = link.getAttribute('href');
+            // Only add selected class if it's an exact match and not a dropdown toggle
+            if (href && href === currentPath && !link.hasAttribute('onclick')) {
                 link.classList.add('selected');
+            }
+        });
+
+        // For dropdown menu items, check more specifically
+        const dropdownLinks = document.querySelectorAll('#futuresMenu a, #spotMenu a, #adminMenu a');
+        dropdownLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && href === currentPath) {
+                link.style.backgroundColor = 'var(--primary-color)';
+                link.style.color = '#fff';
             }
         });
 
         // Mobile footer
         const mobileNavLinks = document.querySelectorAll('.mobile-footer-nav a');
         mobileNavLinks.forEach(link => {
-            if (link.getAttribute('href') === window.location.href) {
+            const href = link.getAttribute('href');
+            if (href && href === currentPath) {
                 link.classList.add('selected');
             }
         });
@@ -175,8 +194,10 @@
         document.addEventListener('click', function(event) {
             const spotMenu = document.getElementById('spotMenu');
             const adminMenu = document.getElementById('adminMenu');
+            const futuresMenu = document.getElementById('futuresMenu');
             const spotMenuToggle = event.target.closest('[onclick*="toggleSpotMenu"]');
             const adminMenuToggle = event.target.closest('[onclick*="toggleAdminMenu"]');
+            const futuresMenuToggle = event.target.closest('[onclick*="toggleFuturesMenu"]');
             
             if (!spotMenuToggle && spotMenu) {
                 spotMenu.style.display = 'none';
@@ -184,6 +205,10 @@
             
             if (!adminMenuToggle && adminMenu) {
                 adminMenu.style.display = 'none';
+            }
+            
+            if (!futuresMenuToggle && futuresMenu) {
+                futuresMenu.style.display = 'none';
             }
         });
     });
@@ -199,6 +224,13 @@
         event.preventDefault();
         event.stopPropagation();
         const menu = document.getElementById('adminMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    function toggleFuturesMenu(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = document.getElementById('futuresMenu');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 </script>

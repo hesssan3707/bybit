@@ -13,7 +13,6 @@ Create a new user account.
 
 ```json
 {
-    "username": "user123",
     "email": "user@example.com", 
     "password": "password123",
     "password_confirmation": "password123"
@@ -45,8 +44,9 @@ Authenticate with username and password to get access token.
 
 ```json
 {
-    "username": "user123",
-    "password": "password123"
+    "email": "user@example.com",
+    "password": "password123",
+    "exchange_name": "bybit"
 }
 ```
 
@@ -118,8 +118,9 @@ Authorization: Bearer your-access-token-here
 curl -X POST http://your-domain.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "user123",
-    "password": "password123"
+    "email": "user@example.com",
+    "password": "password123",
+    "exchange_name": "bybit"
   }'
 
 # Response will include access_token: "abc123token"

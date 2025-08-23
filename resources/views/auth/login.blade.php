@@ -51,6 +51,7 @@
             margin-bottom: 8px;
             font-weight: 600;
             color: var(--label-color);
+            text-align: right;
         }
         input {
             width: 100%;
@@ -87,6 +88,7 @@
             font-size: 14px;
             margin-top: 5px;
             display: block;
+            text-align: right;
         }
     </style>
 </head>
@@ -100,7 +102,7 @@
 
         @error('email')
             <div class="form-group">
-                <span class="invalid-feedback" role="alert" style="text-align: center;">
+                <span class="invalid-feedback" role="alert" style="text-align: right;">
                     <strong>{{ $message }}</strong>
                 </span>
             </div>

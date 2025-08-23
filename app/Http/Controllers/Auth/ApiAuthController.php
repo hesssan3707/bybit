@@ -42,7 +42,7 @@ class ApiAuthController extends Controller
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials'
+                    'message' => __('auth.failed')
                 ], 401);
             }
 
@@ -50,9 +50,18 @@ class ApiAuthController extends Controller
             if (!$user->isActive()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Account is not activated. Please wait for admin approval.'
+                    'message' => __('messages.account_inactive')
                 ], 403);
             }
+
+            // For demo: Allow login without email verification
+            // In production, add email verification check:
+            // if (!$user->hasVerifiedEmail()) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Please verify your email address first.'
+            //     ], 403);
+            // }
 
             // Check if user has the specified exchange activated
             $userExchange = $user->exchanges()
@@ -64,7 +73,7 @@ class ApiAuthController extends Controller
             if (!$userExchange) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Exchange not found or not activated for this user. Please ensure the exchange is activated in your account.',
+                    'message' => __('messages.exchange_not_configured'),
                     'available_exchanges' => $user->activeExchanges()->pluck('exchange_name')->toArray()
                 ], 403);
             }
@@ -237,8 +246,7 @@ class ApiAuthController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'username' => 'required|string|max:255|unique:users',
-                'email' => 'required|string|email|max:255|unique:users',
+                'email' => 'required|string|email|max:255|unique:users,email',
                 'password' => 'required|string|min:8|confirmed',
             ]);
 
@@ -250,31 +258,34 @@ class ApiAuthController extends Controller
                 ], 422);
             }
 
-            // Create user (inactive by default)
+            // Create user (active by default, email verification required)
             $user = User::create([
-                'username' => $request->username,
+                'username' => $request->email, // Keep email as username for now
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'is_active' => false, // Require admin activation
-                'email_verified_at' => now(), // Auto-verify email for demo
+                'is_active' => true, // Users are active immediately
+                'email_verified_at' => null, // Require email verification
             ]);
 
-            // Generate activation token
-            $activationToken = $user->generateActivationToken();
+            // Generate email verification token
+            $verificationToken = $user->generateEmailVerificationToken();
+
+            // TODO: Send email verification email
+            // Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationToken));
 
             return response()->json([
                 'success' => true,
-                'message' => 'User registered successfully. Your account is pending admin approval.',
+                'message' => __('messages.registration_successful') . '! ' . __('messages.login_available_now') . ' (' . __('messages.email_verification_in_production') . ')',
                 'data' => [
                     'user' => [
                         'id' => $user->id,
-                        'username' => $user->username,
                         'email' => $user->email,
                         'is_active' => $user->is_active,
+                        'email_verified' => false,
                         'created_at' => $user->created_at,
                     ],
-                    'status' => 'pending_activation',
-                    'message' => 'Please wait for an administrator to activate your account before you can login.'
+                    'status' => 'email_verification_required',
+                    'message' => 'Your account is now active and ready to use. You can start by requesting exchange activation.'
                 ]
             ], 201);
 

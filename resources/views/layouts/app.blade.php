@@ -21,6 +21,38 @@
             color: var(--text-color);
             min-height: 100vh;
         }
+        
+        /* RTL styles for all input fields and text areas */
+        input, textarea, select {
+            direction: rtl;
+            text-align: right;
+        }
+        
+        input[type="email"], input[type="password"], input[type="text"], input[type="number"] {
+            direction: rtl;
+            text-align: right;
+            padding-right: 12px;
+            padding-left: 12px;
+        }
+        
+        /* Form elements */
+        .form-group {
+            text-align: right;
+        }
+        
+        label {
+            text-align: right;
+            display: block;
+        }
+        
+        /* Specific adjustments for forms */
+        .invalid-feedback {
+            text-align: right;
+        }
+        
+        .help-text {
+            text-align: right;
+        }
         main {
             width: 100%;
             max-width: 1200px;

@@ -21,7 +21,7 @@ function loginUser($baseUrl, $username, $password) {
     $url = $baseUrl . '/auth/login';
     
     $loginData = [
-        'username' => $username,
+        'email' => $username, // Use email as username
         'password' => $password
     ];
     
@@ -58,7 +58,6 @@ function registerUser($baseUrl, $username, $email, $password) {
     $url = $baseUrl . '/auth/register';
     
     $registerData = [
-        'username' => $username,
         'email' => $email,
         'password' => $password,
         'password_confirmation' => $password

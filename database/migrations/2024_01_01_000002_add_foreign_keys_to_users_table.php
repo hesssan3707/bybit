@@ -12,11 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('api_token', 80)->after('password')
-                                ->unique()
-                                ->nullable()
-                                ->default(null);
-            $table->timestamp('api_token_expires_at')->nullable();
+            // Add foreign key constraints after user_exchanges table exists
+            $table->foreign('current_exchange_id')->references('id')->on('user_exchanges')->onDelete('set null');
+            $table->foreign('activated_by')->references('id')->on('users')->onDelete('set null');
         });
     }
 
@@ -26,7 +24,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['api_token', 'api_token_expires_at']);
+            $table->dropForeign(['current_exchange_id']);
+            $table->dropForeign(['activated_by']);
         });
     }
 };

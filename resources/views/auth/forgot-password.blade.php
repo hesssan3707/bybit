@@ -53,6 +53,7 @@
             margin-bottom: 8px;
             font-weight: 600;
             color: var(--label-color);
+            text-align: right;
         }
         input {
             width: 100%;
@@ -89,6 +90,7 @@
             font-size: 14px;
             margin-top: 5px;
             display: block;
+            text-align: right;
         }
         .help-text {
             font-size: 12px;
@@ -112,7 +114,7 @@
 <div class="container">
     <h2>فراموشی رمز عبور</h2>
 
-    <form method="POST" action="{{ route('password.email') }}">
+    <form method="POST" action="{{ route('password.forgot') }}">
         @csrf
 
         @if($errors->any())

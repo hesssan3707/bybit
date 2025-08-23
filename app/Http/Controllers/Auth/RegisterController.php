@@ -29,8 +29,7 @@ class RegisterController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:255|unique:users',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -39,20 +38,23 @@ class RegisterController extends Controller
         }
 
         try {
-            // Create user (inactive by default)
+            // Create user (active by default, email verification required)
             $user = User::create([
-                'username' => $request->username,
+                'username' => $request->email, // Keep email as username for now
                 'email' => $request->email,
                 'password' => $request->password, // Will be hashed automatically
-                'is_active' => false, // Require admin activation
-                'email_verified_at' => now(), // Auto-verify email for demo
+                'is_active' => true, // Users are active immediately
+                'email_verified_at' => null, // Require email verification
             ]);
 
-            // Generate activation token
-            $activationToken = $user->generateActivationToken();
+            // Generate email verification token
+            $verificationToken = $user->generateEmailVerificationToken();
+
+            // TODO: Send email verification email
+            // Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationToken));
 
             return redirect()->route('login')->with('success', 
-                'حساب کاربری شما با موفقیت ایجاد شد. لطفاً منتظر تأیید مدیر سیستم باشید تا بتوانید وارد شوید.'
+                __('messages.registration_successful') . '! ' . __('messages.login_available_now') . ' (' . __('messages.email_verification_in_production') . ')'
             );
 
         } catch (\Exception $e) {

@@ -5,13 +5,15 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\Trade;
 use App\Models\User;
-use App\Services\Exchanges\BybitApiService;
+use App\Models\UserExchange;
+use App\Services\Exchanges\ExchangeFactory;
+use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Mockery;
 use Tests\TestCase;
 
-class BybitControllerTest extends TestCase
+class FuturesControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -21,6 +23,19 @@ class BybitControllerTest extends TestCase
     {
         parent::setUp();
         $this->user = User::factory()->create();
+        
+        // Create an active exchange for the user
+        UserExchange::create([
+            'user_id' => $this->user->id,
+            'exchange_name' => 'bybit',
+            'api_key' => 'test_key',
+            'api_secret' => 'test_secret',
+            'is_active' => true,
+            'is_default' => true,
+            'status' => 'approved',
+            'activated_at' => now(),
+        ]);
+        
         Order::truncate();
         Trade::truncate();
     }
@@ -67,13 +82,19 @@ class BybitControllerTest extends TestCase
      */
     public function it_allows_creating_an_order_if_the_last_loss_was_more_than_an_hour_ago()
     {
-        // Arrange
-        $this->mock(BybitApiService::class, function ($mock) {
-            $mock->shouldReceive('getTickerInfo')->andReturn(['list' => [['lastPrice' => '3000']]]);
-            $mock->shouldReceive('getWalletBalance')->andReturn(['list' => [['totalWalletBalance' => '1000', 'totalEquity' => '1000']]]);
-            $mock->shouldReceive('getInstrumentsInfo')->andReturn(['list' => [['lotSizeFilter' => ['qtyStep' => '0.01'], 'priceScale' => '2']]]);
-            $mock->shouldReceive('createOrder')->andReturn(['orderId' => '12345']);
+        // Arrange - Mock the exchange service
+        $mockExchangeService = Mockery::mock(ExchangeApiServiceInterface::class);
+        $mockExchangeService->shouldReceive('getTickerInfo')->andReturn(['list' => [['lastPrice' => '3000']]]);
+        $mockExchangeService->shouldReceive('getWalletBalance')->andReturn(['list' => [['totalWalletBalance' => '1000', 'totalEquity' => '1000']]]);
+        $mockExchangeService->shouldReceive('getInstrumentsInfo')->andReturn(['list' => [['lotSizeFilter' => ['qtyStep' => '0.01'], 'priceScale' => '2']]]);
+        $mockExchangeService->shouldReceive('createOrder')->andReturn(['orderId' => '12345']);
+        
+        // Mock ExchangeFactory to return our mock service
+        $this->app->bind(ExchangeApiServiceInterface::class, function () use ($mockExchangeService) {
+            return $mockExchangeService;
         });
+        
+        ExchangeFactory::partialMock()->shouldReceive('createForUser')->andReturn($mockExchangeService);
 
         Trade::create([
             'pnl' => -10,
