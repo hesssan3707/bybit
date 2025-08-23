@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>بازیابی رمز عبور</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
@@ -88,39 +88,72 @@
             margin-top: 5px;
             display: block;
         }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert-success {
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+        .alert-error {
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid #f5c2c7;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>ورود به سیستم</h2>
+    <h2>بازیابی رمز عبور</h2>
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('password.reset') }}">
         @csrf
 
-        @error('email')
-            <div class="form-group">
-                <span class="invalid-feedback" role="alert" style="text-align: center;">
-                    <strong>{{ $message }}</strong>
-                </span>
-            </div>
-        @enderror
+        <input type="hidden" name="token" value="{{ $token }}">
 
         @if(session('success'))
-            <div class="form-group">
-                <div style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
-                    {{ session('success') }}
-                </div>
+            <div class="alert alert-success">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-error">
+                @foreach($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
             </div>
         @endif
 
         <div class="form-group">
             <label for="email">ایمیل</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <input id="email" type="email" name="email" value="{{ old('email', $email) }}" required autofocus>
+            @error('email')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
         </div>
 
         <div class="form-group">
-            <label for="password">رمز عبور</label>
+            <label for="password">رمز عبور جدید</label>
             <input id="password" type="password" name="password" required>
             @error('password')
                 <span class="invalid-feedback" role="alert">
@@ -129,23 +162,22 @@
             @enderror
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center;">
-            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }} style="width: auto; margin-left: 10px;">
-            <label for="remember" style="margin-bottom: 0;">
-                مرا به خاطر بسپار
-            </label>
+        <div class="form-group">
+            <label for="password_confirmation">تکرار رمز عبور جدید</label>
+            <input id="password_confirmation" type="password" name="password_confirmation" required>
+            @error('password_confirmation')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
         </div>
 
-        <button type="submit">ورود</button>
-        
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
-                عضویت جدید
-            </a>
-            <span style="color: #ccc;">|</span>
-            <a href="{{ route('password.forgot') }}" style="color: var(--primary-color); text-decoration: none; margin-right: 15px;">
-                فراموشی رمز عبور
-            </a>
+        <button type="submit">
+            تغییر رمز عبور
+        </button>
+
+        <div class="links">
+            <a href="{{ route('login') }}">بازگشت به صفحه ورود</a>
         </div>
     </form>
 </div>

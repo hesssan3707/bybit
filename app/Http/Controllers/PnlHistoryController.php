@@ -10,7 +10,9 @@ class PnlHistoryController extends Controller
 {
     public function index()
     {
-        $trades = Trade::latest('closed_at')->paginate(20);
+        $trades = Trade::forUser(auth()->id())
+            ->latest('closed_at')
+            ->paginate(20);
 
         return view('pnl_history', ['positions' => $trades]);
     }

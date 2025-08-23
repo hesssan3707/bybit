@@ -5,6 +5,10 @@ use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SpotTradingController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\ExchangeController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +28,16 @@ Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [LoginController::class, 'login']);
 Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 
+// Registration Routes
+Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+Route::post('register', [RegisterController::class, 'register']);
+
+// Password Reset Routes
+Route::get('password/forgot', [PasswordController::class, 'showForgotForm'])->name('password.forgot');
+Route::post('password/forgot', [PasswordController::class, 'forgotPassword']);
+Route::get('password/reset/{token}', [PasswordController::class, 'showResetForm'])->name('password.reset.form');
+Route::post('password/reset', [PasswordController::class, 'resetPassword'])->name('password.reset');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [BybitController::class, 'index']); // Redirect home to orders list
     Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
@@ -33,8 +47,40 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/orders/{order}', [BybitController::class, 'destroy'])->name('orders.destroy');
     Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    
+    // Password Change Routes (requires authentication)
+    Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
+    Route::post('/password/change', [PasswordController::class, 'changePassword'])->name('password.change');
+    
+    // Exchange Management Routes (requires authentication)
+    Route::prefix('exchanges')->group(function () {
+        Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
+        Route::get('/create', [ExchangeController::class, 'create'])->name('exchanges.create');
+        Route::post('/', [ExchangeController::class, 'store'])->name('exchanges.store');
+        Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
+        Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
+        Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
+        Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
+    });
+    
+    // Admin Routes (requires authentication and admin privileges)
+    Route::prefix('admin')->group(function () {
+        // User Management
+        Route::get('/pending-users', [UserManagementController::class, 'pendingUsers'])->name('admin.pending-users');
+        Route::get('/all-users', [UserManagementController::class, 'allUsers'])->name('admin.all-users');
+        Route::post('/users/{user}/activate', [UserManagementController::class, 'activateUser'])->name('admin.activate-user');
+        Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivateUser'])->name('admin.deactivate-user');
+        Route::delete('/users/{user}', [UserManagementController::class, 'deleteUser'])->name('admin.delete-user');
+        
+        // Exchange Management
+        Route::get('/pending-exchanges', [UserManagementController::class, 'pendingExchanges'])->name('admin.pending-exchanges');
+        Route::get('/all-exchanges', [UserManagementController::class, 'allExchanges'])->name('admin.all-exchanges');
+        Route::post('/exchanges/{exchange}/approve', [UserManagementController::class, 'approveExchange'])->name('admin.approve-exchange');
+        Route::post('/exchanges/{exchange}/reject', [UserManagementController::class, 'rejectExchange'])->name('admin.reject-exchange');
+        Route::post('/exchanges/{exchange}/deactivate', [UserManagementController::class, 'deactivateExchange'])->name('admin.deactivate-exchange');
+    });
 
-    // Spot Trading Routes
+    // Spot Trading Routes - All require authentication
     Route::prefix('spot')->group(function () {
         Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view');
         Route::get('/balances', [SpotTradingController::class, 'spotBalancesView'])->name('spot.balances.view');

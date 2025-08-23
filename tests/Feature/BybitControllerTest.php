@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\Trade;
 use App\Models\User;
-use App\Services\BybitApiService;
+use App\Services\Exchanges\BybitApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Mockery;

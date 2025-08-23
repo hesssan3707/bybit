@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SpotOrder;
-use App\Services\BybitApiService;
+use App\Services\Exchanges\BybitApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -102,6 +102,7 @@ class SpotTradingController extends Controller
 
             // Save order to database
             $spotOrder = SpotOrder::create([
+                'user_id' => $request->user()->id,
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],
@@ -223,12 +224,21 @@ class SpotTradingController extends Controller
             $symbol = $validated['symbol'] ?? null;
             $limit = $validated['limit'] ?? 20;
 
-            $result = $this->bybitApiService->getSpotOrderHistory($symbol, $limit);
+            // Get orders for the authenticated user only
+            $query = SpotOrder::forUser($request->user()->id);
+            
+            if ($symbol) {
+                $query->where('symbol', $symbol);
+            }
+            
+            $orders = $query->latest('created_at')
+                          ->limit($limit)
+                          ->get();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order history retrieved successfully',
-                'data' => $result
+                'data' => $orders
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -388,9 +398,10 @@ class SpotTradingController extends Controller
     /**
      * Display spot orders list view
      */
-    public function spotOrdersView()
+    public function spotOrdersView(Request $request)
     {
-        $orders = SpotOrder::latest('created_at')
+        $orders = SpotOrder::forUser(auth()->id())
+            ->latest('created_at')
             ->paginate(20);
 
         return view('spot.orders', compact('orders'));
@@ -548,6 +559,7 @@ class SpotTradingController extends Controller
             }
 
             SpotOrder::create([
+                'user_id' => auth()->id(),
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],

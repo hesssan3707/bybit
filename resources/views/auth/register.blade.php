@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Register</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
@@ -88,40 +88,72 @@
             margin-top: 5px;
             display: block;
         }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border: 1px solid #b8d4fd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #004085;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>ورود به سیستم</h2>
+    <h2>عضویت جدید</h2>
 
-    <form method="POST" action="{{ route('login') }}">
+    <div class="info-box">
+        <strong>توجه:</strong> پس از ثبت نام، حساب شما منتظر تأیید مدیر سیستم می‌ماند. تا زمان تأیید نمی‌توانید وارد سیستم شوید.
+    </div>
+
+    <form method="POST" action="{{ route('register') }}">
         @csrf
 
-        @error('email')
+        @if($errors->any())
             <div class="form-group">
-                <span class="invalid-feedback" role="alert" style="text-align: center;">
-                    <strong>{{ $message }}</strong>
-                </span>
-            </div>
-        @enderror
-
-        @if(session('success'))
-            <div class="form-group">
-                <div style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
-                    {{ session('success') }}
+                <div style="background: var(--error-bg); color: var(--error-text); padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                    <ul style="margin: 0; padding-right: 20px;">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             </div>
         @endif
 
         <div class="form-group">
+            <label for="username">نام کاربری</label>
+            <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus>
+            <div class="help-text">نام کاربری باید منحصر به فرد باشد</div>
+            @error('username')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
+        </div>
+
+        <div class="form-group">
             <label for="email">ایمیل</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <input id="email" type="email" name="email" value="{{ old('email') }}" required>
+            <div class="help-text">ایمیل شما برای ورود به سیستم استفاده خواهد شد</div>
+            @error('email')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
         </div>
 
         <div class="form-group">
             <label for="password">رمز عبور</label>
             <input id="password" type="password" name="password" required>
+            <div class="help-text">حداقل 8 کاراکتر</div>
             @error('password')
                 <span class="invalid-feedback" role="alert">
                     <strong>{{ $message }}</strong>
@@ -129,22 +161,21 @@
             @enderror
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center;">
-            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }} style="width: auto; margin-left: 10px;">
-            <label for="remember" style="margin-bottom: 0;">
-                مرا به خاطر بسپار
-            </label>
+        <div class="form-group">
+            <label for="password_confirmation">تکرار رمز عبور</label>
+            <input id="password_confirmation" type="password" name="password_confirmation" required>
+            @error('password_confirmation')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
         </div>
 
-        <button type="submit">ورود</button>
+        <button type="submit">ثبت نام</button>
         
         <div style="text-align: center; margin-top: 20px;">
-            <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
-                عضویت جدید
-            </a>
-            <span style="color: #ccc;">|</span>
-            <a href="{{ route('password.forgot') }}" style="color: var(--primary-color); text-decoration: none; margin-right: 15px;">
-                فراموشی رمز عبور
+            <a href="{{ route('login') }}" style="color: var(--primary-color); text-decoration: none;">
+                قبلاً عضو هستید؟ ورود
             </a>
         </div>
     </form>

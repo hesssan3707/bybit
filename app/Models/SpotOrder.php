@@ -13,6 +13,7 @@ class SpotOrder extends Model
     protected $table = 'spot_orders';
 
     protected $fillable = [
+        'user_exchange_id',
         'order_id',
         'order_link_id',
         'symbol',
@@ -44,6 +45,40 @@ class SpotOrder extends Model
         'order_updated_at' => 'datetime',
         'raw_response' => 'array',
     ];
+
+    /**
+     * Get the user exchange that owns the spot order
+     */
+    public function userExchange()
+    {
+        return $this->belongsTo(UserExchange::class);
+    }
+
+    /**
+     * Get the user that owns the spot order (through user exchange)
+     */
+    public function user()
+    {
+        return $this->hasOneThrough(User::class, UserExchange::class, 'id', 'id', 'user_exchange_id', 'user_id');
+    }
+
+    /**
+     * Scope a query to only include orders for a specific user exchange
+     */
+    public function scopeForUserExchange($query, $userExchangeId)
+    {
+        return $query->where('user_exchange_id', $userExchangeId);
+    }
+
+    /**
+     * Scope a query to only include orders for a specific user
+     */
+    public function scopeForUser($query, $userId)
+    {
+        return $query->whereHas('userExchange', function($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
+    }
 
     /**
      * Get orders by status

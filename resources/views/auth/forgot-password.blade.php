@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Forgot Password</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         :root {
@@ -16,6 +16,8 @@
             --border-color: #ccc;
             --error-bg: #f8d7da;
             --error-text: #842029;
+            --success-bg: #d1e7dd;
+            --success-text: #0f5132;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -88,28 +90,55 @@
             margin-top: 5px;
             display: block;
         }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .token-display {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 15px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>ورود به سیستم</h2>
+    <h2>فراموشی رمز عبور</h2>
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('password.email') }}">
         @csrf
 
-        @error('email')
+        @if($errors->any())
             <div class="form-group">
-                <span class="invalid-feedback" role="alert" style="text-align: center;">
-                    <strong>{{ $message }}</strong>
-                </span>
+                <div style="background: var(--error-bg); color: var(--error-text); padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
             </div>
-        @enderror
+        @endif
 
         @if(session('success'))
             <div class="form-group">
-                <div style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
+                <div style="background: var(--success-bg); color: var(--success-text); padding: 10px; border-radius: 6px; margin-bottom: 15px;">
                     {{ session('success') }}
+                    
+                    @if(session('reset_token'))
+                        <div class="token-display">
+                            <strong>لینک بازیابی (محیط تست):</strong><br>
+                            <a href="{{ route('password.reset.form', ['token' => session('reset_token'), 'email' => session('user_email')]) }}" 
+                               style="color: var(--primary-color);">
+                                کلیک کنید برای بازیابی رمز عبور
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
         @endif
@@ -117,34 +146,19 @@
         <div class="form-group">
             <label for="email">ایمیل</label>
             <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
-        </div>
-
-        <div class="form-group">
-            <label for="password">رمز عبور</label>
-            <input id="password" type="password" name="password" required>
-            @error('password')
+            <div class="help-text">ایمیل حساب کاربری خود را وارد کنید</div>
+            @error('email')
                 <span class="invalid-feedback" role="alert">
                     <strong>{{ $message }}</strong>
                 </span>
             @enderror
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center;">
-            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }} style="width: auto; margin-left: 10px;">
-            <label for="remember" style="margin-bottom: 0;">
-                مرا به خاطر بسپار
-            </label>
-        </div>
-
-        <button type="submit">ورود</button>
+        <button type="submit">ارسال لینک بازیابی</button>
         
         <div style="text-align: center; margin-top: 20px;">
-            <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
-                عضویت جدید
-            </a>
-            <span style="color: #ccc;">|</span>
-            <a href="{{ route('password.forgot') }}" style="color: var(--primary-color); text-decoration: none; margin-right: 15px;">
-                فراموشی رمز عبور
+            <a href="{{ route('login') }}" style="color: var(--primary-color); text-decoration: none;">
+                بازگشت به صفحه ورود
             </a>
         </div>
     </form>

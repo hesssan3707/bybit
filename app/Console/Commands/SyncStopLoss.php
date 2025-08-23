@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Order;
-use App\Services\BybitApiService;
+use App\Services\Exchanges\BybitApiService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 

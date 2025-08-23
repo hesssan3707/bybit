@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Trade;
-use App\Services\BybitApiService;
+use App\Services\Exchanges\BybitApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -21,12 +21,13 @@ class BybitController extends Controller
     {
         $threeDaysAgo = now()->subDays(3);
 
-        $orders = Order::where(function ($query) use ($threeDaysAgo) {
-            $query->whereIn('status', ['pending', 'filled'])
-                  ->orWhere('updated_at', '>=', $threeDaysAgo);
-        })
-        ->latest('updated_at')
-        ->paginate(20);
+        $orders = Order::forUser(auth()->id())
+            ->where(function ($query) use ($threeDaysAgo) {
+                $query->whereIn('status', ['pending', 'filled'])
+                      ->orWhere('updated_at', '>=', $threeDaysAgo);
+            })
+            ->latest('updated_at')
+            ->paginate(20);
 
         return view('orders_list', ['orders' => $orders]);
     }
@@ -61,7 +62,8 @@ class BybitController extends Controller
 
         try {
             // Check for recent loss
-            $lastLoss = Trade::where('pnl', '<', 0)
+            $lastLoss = Trade::forUser(auth()->id())
+                ->where('pnl', '<', 0)
                 ->latest('closed_at')
                 ->first();
 
@@ -71,7 +73,7 @@ class BybitController extends Controller
             }
 
             // New validation: Check against active filled order's zones
-            $filledOrder = Order::where('status', 'filled')->first();
+            $filledOrder = Order::forUser(auth()->id())->where('status', 'filled')->first();
             if ($filledOrder) {
                 $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
                 $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
@@ -94,8 +96,7 @@ class BybitController extends Controller
                     }
                 }
             }
-            // New validation: Check against active filled order's zones
-            $filledOrder = Order::where('status', 'filled')->first();
+            // New validation: Check against active filled order's zones (duplicate removed)
             if ($filledOrder) {
                 $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
                 $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
@@ -194,6 +195,7 @@ class BybitController extends Controller
                 $responseData = $this->bybitApiService->createOrder($orderParams);
 
                 Order::create([
+                    'user_id'        => auth()->id(),
                     'order_id'       => $responseData['orderId'] ?? null,
                     'order_link_id'  => $orderLinkId,
                     'symbol'         => $symbol,
