@@ -40,25 +40,21 @@ class RegisterController extends Controller
         try {
             // Create user (active by default, email verification required)
             $user = User::create([
-                'username' => $request->email, // Keep email as username for now
+                'name' => $request->email, // Use email as name for now
+                'username' => $request->email, // Keep email as username for backward compatibility
                 'email' => $request->email,
-                'password' => $request->password, // Will be hashed automatically
+                'password' => $request->password, // Will be hashed automatically by cast
                 'is_active' => true, // Users are active immediately
-                'email_verified_at' => null, // Require email verification
+                'email_verified_at' => now(), // Skip email verification for now
             ]);
 
-            // Generate email verification token
-            $verificationToken = $user->generateEmailVerificationToken();
-
-            // TODO: Send email verification email
-            // Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationToken));
-
             return redirect()->route('login')->with('success', 
-                __('messages.registration_successful') . '! ' . __('messages.login_available_now') . ' (' . __('messages.email_verification_in_production') . ')'
+                'ثبت نام با موفقیت انجام شد! اکنون می‌توانید وارد شوید.'
             );
 
         } catch (\Exception $e) {
-            return back()->withErrors(['email' => 'خطا در ایجاد حساب کاربری.'])->withInput();
+            \Illuminate\Support\Facades\Log::error('Registration failed: ' . $e->getMessage());
+            return back()->withErrors(['email' => 'خطا در ایجاد حساب کاربری: ' . $e->getMessage()])->withInput();
         }
     }
 }

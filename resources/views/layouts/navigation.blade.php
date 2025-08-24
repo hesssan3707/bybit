@@ -36,9 +36,19 @@
         transition: background-color 0.3s, color 0.3s;
         font-weight: 500;
     }
-    .main-header a:hover, .main-header a.selected {
+    /* Only apply selected/hover styling to header-right links and dropdown menu items */
+    .main-header .header-right a:hover, 
+    .main-header .header-right a.selected,
+    #futuresMenu a:hover,
+    #spotMenu a:hover,
+    #adminMenu a:hover {
         background-color: var(--primary-color);
         color: #fff;
+    }
+    /* Dropdown toggle links have different hover effect */
+    .nav-links > div > a:hover {
+        background-color: #f0f0f0;
+        color: #333;
     }
     .main-header .equity {
         font-weight: bold;
@@ -161,25 +171,36 @@
     document.addEventListener('DOMContentLoaded', function() {
         const currentPath = window.location.pathname;
 
-        // Web header - be more specific about selection
-        const webNavLinks = document.querySelectorAll('.main-header .nav-links a[href], .main-header .header-right a[href]');
-        webNavLinks.forEach(link => {
-            const href = link.getAttribute('href');
-            // Only add selected class if it's an exact match and not a dropdown toggle
-            if (href && href === currentPath && !link.hasAttribute('onclick')) {
-                link.classList.add('selected');
-            }
+        // Clear any existing selected styles first
+        const allLinks = document.querySelectorAll('.main-header a');
+        allLinks.forEach(link => {
+            link.classList.remove('selected');
+            link.style.backgroundColor = '';
+            link.style.color = '';
         });
 
-        // For dropdown menu items, check more specifically
+        // Only highlight dropdown menu items that match current path
         const dropdownLinks = document.querySelectorAll('#futuresMenu a, #spotMenu a, #adminMenu a');
+        let hasActiveDropdownItem = false;
         dropdownLinks.forEach(link => {
             const href = link.getAttribute('href');
             if (href && href === currentPath) {
                 link.style.backgroundColor = 'var(--primary-color)';
                 link.style.color = '#fff';
+                hasActiveDropdownItem = true;
             }
         });
+
+        // Only highlight header-right links if no dropdown item is active
+        if (!hasActiveDropdownItem) {
+            const headerLinks = document.querySelectorAll('.main-header .header-right a[href]');
+            headerLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && href === currentPath) {
+                    link.classList.add('selected');
+                }
+            });
+        }
 
         // Mobile footer
         const mobileNavLinks = document.querySelectorAll('.mobile-footer-nav a');
