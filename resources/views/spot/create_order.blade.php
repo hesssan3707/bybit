@@ -170,16 +170,8 @@
     <a href="{{ route('spot.orders.view') }}" class="back-btn">← بازگشت به سفارش‌ها</a>
     
     <h2>سفارش اسپات جدید</h2>
-
-    @if(!$hasActiveExchange)
-        <div class="alert alert-danger">
-            {{ $exchangeMessage }}
-            <br><br>
-            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
-                برای فعال کردن صرافی کلیک کنید
-            </a>
-        </div>
-    @endif
+    
+    @include('partials.exchange-access-check')
 
     @if(isset($error))
         <div class="alert alert-danger">

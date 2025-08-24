@@ -151,18 +151,19 @@
 <div class="container">
     <h2>سفارش‌های اسپات</h2>
     
-    @if(!$hasActiveExchange)
-        <div class="alert alert-danger">
-            {{ $exchangeMessage }}
-            <br><br>
-            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
-                برای فعال کردن صرافی کلیک کنید
-            </a>
-        </div>
-    @else
+    @include('partials.exchange-access-check')
+    
+    {{-- Show create order button only if user has proper access --}}
+    @php
+        $exchangeAccess = request()->attributes->get('exchange_access');
+        $accessRestricted = request()->attributes->get('access_restricted', false);
+        $hasExchangeAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
+    @endphp
+    
+    @if($hasExchangeAccess)
         <a href="{{ route('spot.order.create.view') }}" class="create-order-btn">+ سفارش اسپات جدید</a>
     @endif
-
+    
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif

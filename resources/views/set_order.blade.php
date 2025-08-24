@@ -78,16 +78,8 @@
 @section('content')
 <div class="container">
     <h2>ثبت سفارش جدید</h2>
-
-    @if(!$hasActiveExchange)
-        <div class="alert alert-danger">
-            {{ $exchangeMessage }}
-            <br><br>
-            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
-                برای فعال کردن صرافی کلیک کنید
-            </a>
-        </div>
-    @endif
+    
+    @include('partials.exchange-access-check')
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
@@ -149,8 +141,15 @@
             @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
-        <button type="submit" {{ !$hasActiveExchange ? 'disabled' : '' }}>
-            @if($hasActiveExchange)
+        {{-- Submit button with dynamic state based on access --}}
+        @php
+            $exchangeAccess = request()->attributes->get('exchange_access');
+            $accessRestricted = request()->attributes->get('access_restricted', false);
+            $hasAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
+        @endphp
+        
+        <button type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
+            @if($hasAccess)
                 ارسال سفارش
             @else
                 برای ارسال سفارش ابتدا صرافی فعال کنید

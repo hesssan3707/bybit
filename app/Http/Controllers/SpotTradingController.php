@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\SpotOrder;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
+use App\Traits\HandlesExchangeAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class SpotTradingController extends Controller
 {
+    use HandlesExchangeAccess;
     /**
      * Get the exchange service for the authenticated user
      */
@@ -199,38 +201,44 @@ class SpotTradingController extends Controller
                     'message' => 'No balance data found'
                 ], 404);
             }
-
-            $account = $balanceData['list'][0];
-            $currencies = [];
             
-            // Process each currency balance
-            if (isset($account['coin']) && is_array($account['coin'])) {
-                foreach ($account['coin'] as $coin) {
-                    $currencies[] = [
-                        'currency' => $coin['coin'],
-                        'walletBalance' => (float)$coin['walletBalance'],
-                        'transferBalance' => (float)$coin['transferBalance'],
-                        'bonus' => (float)$coin['bonus'],
-                        'usdValue' => isset($coin['usdValue']) ? (float)$coin['usdValue'] : null,
-                    ];
-                }
+            // Process balance data...
+            $balances = [];
+            foreach ($balanceData['list'] as $balance) {
+                $balances[] = [
+                    'coin' => $balance['coin'],
+                    'walletBalance' => $balance['walletBalance'],
+                    'transferBalance' => $balance['transferBalance'],
+                    'locked' => $balance['locked'] ?? '0'
+                ];
             }
-
+            
             return response()->json([
                 'success' => true,
-                'message' => 'Account balance retrieved successfully',
-                'data' => [
-                    'accountType' => $account['accountType'] ?? 'SPOT',
-                    'totalEquity' => (float)($account['totalEquity'] ?? 0),
-                    'totalWalletBalance' => (float)($account['totalWalletBalance'] ?? 0),
-                    'totalMarginBalance' => (float)($account['totalMarginBalance'] ?? 0),
-                    'totalAvailableBalance' => (float)($account['totalAvailableBalance'] ?? 0),
-                    'currencies' => $currencies
-                ]
+                'data' => $balances
             ]);
-
+            
         } catch (\Exception $e) {
-            Log::error('Get account balance failed: ' . $e->getMessage());
+            // Handle API access validation dynamically
+            $user = auth()->user();
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            
+            if ($currentExchange) {
+                try {
+                    $this->handleApiException($e, $currentExchange, 'spot_balance');
+                } catch (\Exception $handledException) {
+                    // Exception was handled and validation updated
+                    $errorMessage = $this->getAccessLimitationMessage('balance', $currentExchange->exchange_name);
+                    
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errorMessage,
+                        'access_updated' => true
+                    ], 403);
+                }
+            }
+            
+            Log::error('Failed to get account balance: ' . $e->getMessage());
             
             return response()->json([
                 'success' => false,

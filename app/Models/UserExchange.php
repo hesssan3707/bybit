@@ -28,6 +28,12 @@ class UserExchange extends Model
         'deactivated_by',
         'admin_notes',
         'user_reason',
+        'validation_results',
+        'last_validation_at',
+        'spot_access',
+        'futures_access',
+        'ip_access',
+        'validation_message',
     ];
 
     protected $casts = [
@@ -36,6 +42,11 @@ class UserExchange extends Model
         'activation_requested_at' => 'datetime',
         'activated_at' => 'datetime',
         'deactivated_at' => 'datetime',
+        'last_validation_at' => 'datetime',
+        'validation_results' => 'array',
+        'spot_access' => 'boolean',
+        'futures_access' => 'boolean',
+        'ip_access' => 'boolean',
     ];
 
     protected $hidden = [
@@ -371,5 +382,131 @@ class UserExchange extends Model
             'activation_requested_at' => now(),
             'user_reason' => $reason,
         ]);
+    }
+
+    /**
+     * Update validation results for this exchange
+     */
+    public function updateValidationResults(array $validationData)
+    {
+        return $this->update([
+            'validation_results' => $validationData,
+            'last_validation_at' => now(),
+            'spot_access' => $validationData['spot']['success'] ?? null,
+            'futures_access' => $validationData['futures']['success'] ?? null,
+            'ip_access' => $validationData['ip']['success'] ?? null,
+            'validation_message' => $this->generateValidationMessage($validationData),
+        ]);
+    }
+
+    /**
+     * Generate a human-readable validation message
+     */
+    private function generateValidationMessage(array $validationData)
+    {
+        $messages = [];
+        
+        if (!($validationData['ip']['success'] ?? true)) {
+            $messages[] = 'آدرس IP مسدود است';
+        }
+        
+        if (!($validationData['spot']['success'] ?? true)) {
+            if (($validationData['spot']['details']['error_type'] ?? '') === 'not_supported') {
+                $messages[] = 'معاملات اسپات پشتیبانی نمی‌شود';
+            } else {
+                $messages[] = 'دسترسی به معاملات اسپات ندارد';
+            }
+        }
+        
+        if (!($validationData['futures']['success'] ?? true)) {
+            if (($validationData['futures']['details']['error_type'] ?? '') === 'not_supported') {
+                $messages[] = 'معاملات آتی پشتیبانی نمی‌شود';
+            } else {
+                $messages[] = 'دسترسی به معاملات آتی ندارد';
+            }
+        }
+        
+        if (empty($messages)) {
+            return 'تمام دسترسی‌ها تأیید شده';
+        }
+        
+        return implode(' | ', $messages);
+    }
+
+    /**
+     * Check if validation results are recent (within last 24 hours)
+     */
+    public function hasRecentValidation()
+    {
+        return $this->last_validation_at && 
+               $this->last_validation_at->isAfter(now()->subHours(24));
+    }
+
+    /**
+     * Get validation status summary
+     */
+    public function getValidationSummary()
+    {
+        if (!$this->last_validation_at) {
+            return [
+                'status' => 'not_validated',
+                'message' => 'هنوز اعتبارسنجی نشده',
+                'icon' => '⚠️',
+                'class' => 'warning'
+            ];
+        }
+        
+        if (!$this->ip_access) {
+            return [
+                'status' => 'ip_blocked',
+                'message' => 'آدرس IP مسدود',
+                'icon' => '🚫',
+                'class' => 'danger'
+            ];
+        }
+        
+        $hasAnyAccess = $this->spot_access || $this->futures_access;
+        
+        if (!$hasAnyAccess) {
+            return [
+                'status' => 'no_access',
+                'message' => 'هیچ دسترسی معاملاتی ندارد',
+                'icon' => '❌',
+                'class' => 'danger'
+            ];
+        }
+        
+        if ($this->spot_access && $this->futures_access) {
+            return [
+                'status' => 'full_access',
+                'message' => 'دسترسی کامل',
+                'icon' => '✅',
+                'class' => 'success'
+            ];
+        }
+        
+        $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
+        return [
+            'status' => 'limited_access',
+            'message' => "دسترسی محدود ({$limitedType})",
+            'icon' => '⚠️',
+            'class' => 'warning'
+        ];
+    }
+
+    /**
+     * Check if user can access spot trading
+     */
+    public function canAccessSpot()
+    {
+        return $this->is_active && $this->ip_access && $this->spot_access;
+    }
+
+    /**
+     * Check if user can access futures trading
+     */
+    public function canAccessFutures()
+    {
+        return $this->is_active && $this->ip_access && $this->futures_access;
     }
 }

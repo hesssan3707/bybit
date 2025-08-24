@@ -40,13 +40,13 @@ Route::get('password/reset/{token}', [PasswordController::class, 'showResetForm'
 Route::post('password/reset', [PasswordController::class, 'resetPassword'])->name('password.reset');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [FuturesController::class, 'index']); // Redirect home to orders list
-    Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
-    Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
-    Route::get('/orders', [FuturesController::class, 'index'])->name('orders.index');
-    Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
-    Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
-    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
+    Route::get('/', [FuturesController::class, 'index'])->middleware('exchange.access:futures'); // Redirect home to orders list
+    Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create')->middleware('exchange.access:futures');
+    Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store')->middleware('exchange.access:futures');
+    Route::get('/orders', [FuturesController::class, 'index'])->name('orders.index')->middleware('exchange.access:futures');
+    Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close')->middleware('exchange.access:futures');
+    Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy')->middleware('exchange.access:futures');
+    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history')->middleware('exchange.access:futures');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
     
@@ -80,14 +80,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/exchanges/{exchange}/approve', [UserManagementController::class, 'approveExchange'])->name('admin.approve-exchange');
         Route::post('/exchanges/{exchange}/reject', [UserManagementController::class, 'rejectExchange'])->name('admin.reject-exchange');
         Route::post('/exchanges/{exchange}/deactivate', [UserManagementController::class, 'deactivateExchange'])->name('admin.deactivate-exchange');
+        Route::post('/exchanges/{exchange}/test', [UserManagementController::class, 'testExchangeConnection'])->name('admin.test-exchange');
     });
 
     // Spot Trading Routes - All require authentication
     Route::prefix('spot')->group(function () {
-        Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view');
-        Route::get('/balances', [SpotTradingController::class, 'spotBalancesView'])->name('spot.balances.view');
-        Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view');
-        Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web');
+        Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view')->middleware('exchange.access:spot');
+        Route::get('/balances', [SpotTradingController::class, 'spotBalancesView'])->name('spot.balances.view')->middleware('exchange.access:spot');
+        Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view')->middleware('exchange.access:spot');
+        Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web')->middleware('exchange.access:spot');
     });
 
     // Mobile Routes

@@ -138,4 +138,28 @@ interface ExchangeApiServiceInterface
      * Get exchange-specific API rate limits
      */
     public function getRateLimits(): array;
+
+    /**
+     * Check if the API key has spot trading permissions
+     * @return array ['success' => bool, 'message' => string, 'details' => array]
+     */
+    public function checkSpotAccess(): array;
+
+    /**
+     * Check if the API key has futures trading permissions
+     * @return array ['success' => bool, 'message' => string, 'details' => array]
+     */
+    public function checkFuturesAccess(): array;
+
+    /**
+     * Check if the current IP address is allowed by the API key
+     * @return array ['success' => bool, 'message' => string, 'details' => array]
+     */
+    public function checkIPAccess(): array;
+
+    /**
+     * Comprehensive API validation check (combines all checks above)
+     * @return array ['spot' => array, 'futures' => array, 'ip' => array, 'overall' => bool]
+     */
+    public function validateAPIAccess(): array;
 }

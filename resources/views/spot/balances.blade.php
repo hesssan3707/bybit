@@ -164,15 +164,16 @@
 <div class="container">
     <h2>موجودی‌های اسپات</h2>
     
-    @if(!$hasActiveExchange)
-        <div class="error-message">
-            {{ $exchangeMessage }}
-            <br><br>
-            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
-                برای فعال کردن صرافی کلیک کنید
-            </a>
-        </div>
-    @else
+    @include('partials.exchange-access-check')
+    
+    {{-- Show refresh button only if user has proper access --}}
+    @php
+        $exchangeAccess = request()->attributes->get('exchange_access');
+        $accessRestricted = request()->attributes->get('access_restricted', false);
+        $hasExchangeAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
+    @endphp
+    
+    @if($hasExchangeAccess)
         <a href="{{ route('spot.balances.view') }}" class="refresh-btn">🔄 بروزرسانی موجودی‌ها</a>
     @endif
     

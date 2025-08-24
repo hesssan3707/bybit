@@ -59,10 +59,44 @@ class FuturesOrderEnforcer extends Command
     {
         $this->info("Enforcing orders for user {$userId}...");
         
+        $user = User::find($userId);
+        if (!$user) {
+            $this->warn("User {$userId} not found.");
+            return;
+        }
+
+        $activeExchanges = $user->activeExchanges;
+        if ($activeExchanges->isEmpty()) {
+            $this->warn("No active exchanges for user {$userId}.");
+            return;
+        }
+
+        foreach ($activeExchanges as $userExchange) {
+            try {
+                $this->enforceForUserExchange($userId, $userExchange);
+            } catch (\Exception $e) {
+                $this->error("Failed to enforce orders for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
+                Log::error("Order enforcement failed", [
+                    'user_id' => $userId,
+                    'exchange' => $userExchange->exchange_name,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+    }
+
+    private function enforceForUserExchange(int $userId, $userExchange): void
+    {
+        $this->info("  Enforcing orders for user {$userId} on {$userExchange->exchange_name}...");
+        
         try {
-            $exchangeService = ExchangeFactory::createForUser($userId);
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange_name,
+                $userExchange->api_key,
+                $userExchange->api_secret
+            );
         } catch (\Exception $e) {
-            $this->warn("No active exchange for user {$userId}: " . $e->getMessage());
+            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;
         }
 
@@ -78,8 +112,8 @@ class FuturesOrderEnforcer extends Command
             $exchangeOpenOrdersMap = array_combine($exchangeOpenOrderIds, $exchangeOpenOrders);
 
             // 2. Handle local 'pending' orders (check for modifications, expiration)
-            $this->info("  Checking local pending orders for user {$userId}...");
-            $ourPendingOrders = Order::where('user_id', $userId)
+            $this->info("    Checking local pending orders for user {$userId} on {$userExchange->exchange_name}...");
+            $ourPendingOrders = Order::where('user_exchange_id', $userExchange->id)
                 ->where('status', 'pending')
                 ->get();
             
@@ -103,10 +137,10 @@ class FuturesOrderEnforcer extends Command
                     try {
                         $exchangeService->cancelOrder($dbOrder->order_id, $symbol);
                         $dbOrder->delete();
-                        $this->info("  Canceled and removed modified order: {$dbOrder->order_id} (Price/Qty mismatch)");
+                        $this->info("    Canceled and removed modified order: {$dbOrder->order_id} (Price/Qty mismatch)");
                         continue;
                     } catch (\Throwable $e) {
-                        $this->warn("  Failed to cancel modified order {$dbOrder->order_id}: " . $e->getMessage());
+                        $this->warn("    Failed to cancel modified order {$dbOrder->order_id}: " . $e->getMessage());
                     }
                 }
 
@@ -118,16 +152,16 @@ class FuturesOrderEnforcer extends Command
                         $dbOrder->status = 'expired';
                         $dbOrder->closed_at = now();
                         $dbOrder->save();
-                        $this->info("  Canceled expired order: {$dbOrder->order_id}");
+                        $this->info("    Canceled expired order: {$dbOrder->order_id}");
                     } catch (\Throwable $e) {
-                        $this->warn("  Failed to cancel expired order {$dbOrder->order_id}: " . $e->getMessage());
+                        $this->warn("    Failed to cancel expired order {$dbOrder->order_id}: " . $e->getMessage());
                     }
                 }
             }
 
             // 3. Handle foreign orders (not in our DB for this user)
-            $this->info("  Checking for foreign orders to cancel for user {$userId}...");
-            $ourTrackedIds = Order::where('user_id', $userId)
+            $this->info("    Checking for foreign orders to cancel for user {$userId} on {$userExchange->exchange_name}...");
+            $ourTrackedIds = Order::where('user_exchange_id', $userExchange->id)
                 ->whereIn('status', ['pending', 'filled'])
                 ->pluck('order_id')
                 ->filter()
@@ -136,9 +170,9 @@ class FuturesOrderEnforcer extends Command
             $foreignOrderIds = array_diff($exchangeOpenOrderIds, $ourTrackedIds);
 
             if (empty($foreignOrderIds)) {
-                $this->info("  No foreign orders found for user {$userId}");
+                $this->info("    No foreign orders found for user {$userId} on {$userExchange->exchange_name}");
             } else {
-                $this->info("  Found " . count($foreignOrderIds) . " foreign orders for user {$userId}");
+                $this->info("    Found " . count($foreignOrderIds) . " foreign orders for user {$userId} on {$userExchange->exchange_name}");
                 foreach ($foreignOrderIds as $orderId) {
                     try {
                         $orderToCancel = $exchangeOpenOrdersMap[$orderId] ?? null;
@@ -155,7 +189,7 @@ class FuturesOrderEnforcer extends Command
             }
 
         } catch (\Throwable $e) {
-            $this->error("  Order enforcement failed for user {$userId}: " . $e->getMessage());
+            $this->error("    Order enforcement failed for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             throw $e;
         }
     }

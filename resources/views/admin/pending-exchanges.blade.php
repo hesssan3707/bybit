@@ -155,6 +155,50 @@
         display: flex;
         gap: 10px;
     }
+    .test-result {
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+    .test-result.success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .test-result.warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    .test-result.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .test-result.loading {
+        background-color: #e3f2fd;
+        color: #0277bd;
+        border: 1px solid #bbdefb;
+    }
+    .validation-details {
+        margin-top: 10px;
+    }
+    .validation-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .validation-item:last-child {
+        border-bottom: none;
+    }
+    .status-icon {
+        font-weight: bold;
+    }
+    .status-allowed { color: #28a745; }
+    .status-denied { color: #dc3545; }
+    .status-blocked { color: #dc3545; }
+    .status-not-supported { color: #6c757d; }
 </style>
 @endpush
 
@@ -217,6 +261,14 @@
                         @endif
                         
                         <div class="approval-form">
+                            <!-- Test Connection Section -->
+                            <div class="test-connection-section" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <button type="button" class="btn btn-info" onclick="testConnection({{ $exchange->id }})" id="test-btn-{{ $exchange->id }}">
+                                    تست اتصال
+                                </button>
+                                <div id="test-result-{{ $exchange->id }}" class="test-result" style="margin-top: 10px; display: none;"></div>
+                            </div>
+                            
                             <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" style="display: inline;">
                                 @csrf
                                 <textarea name="admin_notes" placeholder="یادداشت تأیید (اختیاری)..."></textarea>
@@ -254,4 +306,95 @@
         @endif
     </div>
 </div>
+
+<script>
+// CSRF token for AJAX requests
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+function testConnection(exchangeId) {
+    const button = document.getElementById(`test-btn-${exchangeId}`);
+    const resultDiv = document.getElementById(`test-result-${exchangeId}`);
+    
+    // Show loading state
+    button.disabled = true;
+    button.textContent = 'در حال تست...';
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'test-result loading';
+    resultDiv.innerHTML = 'در حال بررسی اتصال و اعتبارسنجی کلید API...';
+    
+    // Make AJAX request
+    fetch(`/admin/exchanges/${exchangeId}/test`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.textContent = 'تست اتصال';
+        
+        if (data.success) {
+            // Determine result class based on recommendation
+            let resultClass = 'success';
+            if (data.recommendation === 'reject') {
+                resultClass = 'error';
+            } else if (data.recommendation === 'approve_with_warning') {
+                resultClass = 'warning';
+            }
+            
+            resultDiv.className = `test-result ${resultClass}`;
+            
+            let html = `<div><strong>${data.message}</strong></div>`;
+            
+            if (data.details) {
+                html += '<div class="validation-details">';
+                
+                if (data.details.ip) {
+                    const ipIcon = data.details.ip.status === 'allowed' ? '✓' : '✗';
+                    const ipClass = `status-${data.details.ip.status}`;
+                    html += `<div class="validation-item">
+                        <span>دسترسی IP:</span>
+                        <span class="status-icon ${ipClass}">${ipIcon} ${data.details.ip.message}</span>
+                    </div>`;
+                }
+                
+                if (data.details.spot) {
+                    const spotIcon = data.details.spot.status === 'allowed' ? '✓' : (data.details.spot.status === 'not_supported' ? '!' : '✗');
+                    const spotClass = `status-${data.details.spot.status}`;
+                    html += `<div class="validation-item">
+                        <span>معاملات اسپات:</span>
+                        <span class="status-icon ${spotClass}">${spotIcon} ${data.details.spot.message}</span>
+                    </div>`;
+                }
+                
+                if (data.details.futures) {
+                    const futuresIcon = data.details.futures.status === 'allowed' ? '✓' : (data.details.futures.status === 'not_supported' ? '!' : '✗');
+                    const futuresClass = `status-${data.details.futures.status}`;
+                    html += `<div class="validation-item">
+                        <span>معاملات آتی:</span>
+                        <span class="status-icon ${futuresClass}">${futuresIcon} ${data.details.futures.message}</span>
+                    </div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.className = 'test-result error';
+            resultDiv.innerHTML = `<div><strong>خطا:</strong> ${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.textContent = 'تست اتصال';
+        resultDiv.className = 'test-result error';
+        resultDiv.innerHTML = `<div><strong>خطا در ارتباط:</strong> لطفاً دوباره تلاش کنید</div>`;
+        console.error('Test connection error:', error);
+    });
+}
+</script>
 @endsection

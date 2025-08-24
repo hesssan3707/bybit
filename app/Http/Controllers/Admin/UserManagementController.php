@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserExchange;
+use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -365,5 +366,132 @@ class UserManagementController extends Controller
             }
             return $next($request);
         });
+    }
+
+    /**
+     * Test exchange connection and validate API access
+     */
+    public function testExchangeConnection(Request $request, UserExchange $exchange)
+    {
+        try {
+            if ($exchange->status !== 'pending') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'تست اتصال فقط برای درخواست‌های در انتظار امکان‌پذیر است.'
+                ], 400);
+            }
+
+            // Create exchange service instance
+            $exchangeService = ExchangeFactory::create(
+                $exchange->exchange_name,
+                $exchange->api_key,
+                $exchange->api_secret
+            );
+
+            // Run comprehensive validation
+            $validation = $exchangeService->validateAPIAccess();
+            
+            // Prepare response with Persian messages
+            $responseMessage = '';
+            $validationDetails = [];
+            
+            // Check IP access
+            if (!$validation['ip']['success']) {
+                $responseMessage = 'آدرس IP سرور در لیست مجاز کلید API قرار ندارد';
+                $validationDetails['ip'] = [
+                    'status' => 'blocked',
+                    'message' => $validation['ip']['message']
+                ];
+            } else {
+                $validationDetails['ip'] = [
+                    'status' => 'allowed',
+                    'message' => 'آدرس IP مجاز است'
+                ];
+            }
+            
+            // Check spot access
+            if (!$validation['spot']['success']) {
+                if ($validation['spot']['details']['error_type'] === 'not_supported') {
+                    $validationDetails['spot'] = [
+                        'status' => 'not_supported',
+                        'message' => 'این صرافی از معاملات اسپات پشتیبانی نمی‌کند'
+                    ];
+                } else {
+                    $validationDetails['spot'] = [
+                        'status' => 'denied',
+                        'message' => 'کلید API مجوز معاملات اسپات ندارد'
+                    ];
+                }
+            } else {
+                $validationDetails['spot'] = [
+                    'status' => 'allowed',
+                    'message' => 'دسترسی به معاملات اسپات تأیید شد'
+                ];
+            }
+            
+            // Check futures access
+            if (!$validation['futures']['success']) {
+                if ($validation['futures']['details']['error_type'] === 'not_supported') {
+                    $validationDetails['futures'] = [
+                        'status' => 'not_supported',
+                        'message' => 'این صرافی از معاملات آتی پشتیبانی نمی‌کند'
+                    ];
+                } else {
+                    $validationDetails['futures'] = [
+                        'status' => 'denied',
+                        'message' => 'کلید API مجوز معاملات آتی ندارد'
+                    ];
+                }
+            } else {
+                $validationDetails['futures'] = [
+                    'status' => 'allowed',
+                    'message' => 'دسترسی به معاملات آتی تأیید شد'
+                ];
+            }
+            
+            // Determine overall status and recommendation
+            $overallSuccess = $validation['overall'];
+            $hasAnyTrading = $validation['spot']['success'] || $validation['futures']['success'];
+            
+            if (!$validation['ip']['success']) {
+                $recommendation = 'reject';
+                $responseMessage = 'توصیه: این درخواست را رد کنید. آدرس IP سرور در لیست مجاز نیست.';
+            } elseif (!$hasAnyTrading) {
+                $recommendation = 'reject';
+                $responseMessage = 'توصیه: این درخواست را رد کنید. کلید API هیچ مجوز معاملاتی ندارد.';
+            } elseif ($validation['spot']['success'] && $validation['futures']['success']) {
+                $recommendation = 'approve';
+                $responseMessage = 'توصیه: این درخواست را تأیید کنید. تمام دسترسی‌ها موجود است.';
+            } else {
+                $recommendation = 'approve_with_warning';
+                $limitedAccess = $validation['spot']['success'] ? 'فقط معاملات اسپات' : 'فقط معاملات آتی';
+                $responseMessage = "توصیه: می‌توانید تأیید کنید اما کاربر {$limitedAccess} خواهد داشت.";
+            }
+            
+            return response()->json([
+                'success' => true,
+                'overall_success' => $overallSuccess,
+                'recommendation' => $recommendation,
+                'message' => $responseMessage,
+                'details' => $validationDetails,
+                'raw_validation' => $validation // for debugging
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Exchange connection test failed: ' . $e->getMessage(), [
+                'exchange_id' => $exchange->id,
+                'exchange_name' => $exchange->exchange_name,
+                'user_id' => $exchange->user_id
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'خطا در تست اتصال: ' . $e->getMessage(),
+                'recommendation' => 'manual_review',
+                'details' => [
+                    'error' => $e->getMessage()
+                ]
+            ], 500);
+        }
     }
 }

@@ -61,25 +61,59 @@ class FuturesLifecycleManager extends Command
     {
         $this->info("Syncing lifecycle for user {$userId}...");
         
-        try {
-            $exchangeService = ExchangeFactory::createForUser($userId);
-        } catch (\Exception $e) {
-            $this->warn("No active exchange for user {$userId}: " . $e->getMessage());
+        $user = User::find($userId);
+        if (!$user) {
+            $this->warn("User {$userId} not found.");
             return;
         }
 
-        $this->syncOrderStatuses($userId, $exchangeService);
-        $this->syncPnlRecords($userId, $exchangeService);
+        $activeExchanges = $user->activeExchanges;
+        if ($activeExchanges->isEmpty()) {
+            $this->warn("No active exchanges for user {$userId}.");
+            return;
+        }
+
+        foreach ($activeExchanges as $userExchange) {
+            try {
+                $this->syncForUserExchange($userId, $userExchange);
+            } catch (\Exception $e) {
+                $this->error("Failed to sync lifecycle for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
+                Log::error("Lifecycle sync failed", [
+                    'user_id' => $userId,
+                    'exchange' => $userExchange->exchange_name,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
     }
 
-    private function syncOrderStatuses(int $userId, ExchangeApiServiceInterface $exchangeService): void
+    private function syncForUserExchange(int $userId, $userExchange): void
     {
-        $ordersToCheck = Order::where('user_id', $userId)
+        $this->info("  Syncing lifecycle for user {$userId} on {$userExchange->exchange_name}...");
+        
+        try {
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange_name,
+                $userExchange->api_key,
+                $userExchange->api_secret
+            );
+        } catch (\Exception $e) {
+            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
+            return;
+        }
+
+        $this->syncOrderStatuses($userId, $userExchange, $exchangeService);
+        $this->syncPnlRecords($userId, $userExchange, $exchangeService);
+    }
+
+    private function syncOrderStatuses(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
+    {
+        $ordersToCheck = Order::where('user_exchange_id', $userExchange->id)
             ->whereIn('status', ['pending', 'filled'])
             ->where('symbol', 'ETHUSDT') // Make this configurable if needed
             ->get();
 
-        $this->info("  Found " . $ordersToCheck->count() . " orders to check for user {$userId}");
+        $this->info("    Found " . $ordersToCheck->count() . " orders to check for user {$userId} on {$userExchange->exchange_name}");
 
         foreach ($ordersToCheck as $dbOrder) {
             try {
@@ -121,9 +155,9 @@ class FuturesLifecycleManager extends Command
                             $exchangeService->createOrder($tpOrderParams);
                             $dbOrder->status = 'filled';
                             $dbOrder->save();
-                            $this->info("  Order {$dbOrder->order_id} is now 'filled' with TP order created");
+                            $this->info("    Order {$dbOrder->order_id} is now 'filled' with TP order created");
                         } catch (\Exception $e) {
-                            $this->warn("  Failed to create TP order for {$dbOrder->order_id}: " . $e->getMessage());
+                            $this->warn("    Failed to create TP order for {$dbOrder->order_id}: " . $e->getMessage());
                             // Still mark as filled even if TP creation fails
                             $dbOrder->status = 'filled';
                             $dbOrder->save();
@@ -132,21 +166,21 @@ class FuturesLifecycleManager extends Command
                         $dbOrder->status = 'canceled';
                         $dbOrder->closed_at = now();
                         $dbOrder->save();
-                        $this->info("  Marked order {$dbOrder->order_id} as canceled");
+                        $this->info("    Marked order {$dbOrder->order_id} as canceled");
                     }
                 }
             } catch (\Throwable $e) {
-                $this->error("  Lifecycle check failed for order {$dbOrder->id}: " . $e->getMessage());
+                $this->error("    Lifecycle check failed for order {$dbOrder->id}: " . $e->getMessage());
             }
         }
 
         // Mark 'filled' orders as 'closed' if position is no longer open
-        $this->checkClosedPositions($userId, $exchangeService);
+        $this->checkClosedPositions($userId, $userExchange, $exchangeService);
     }
 
-    private function checkClosedPositions(int $userId, ExchangeApiServiceInterface $exchangeService): void
+    private function checkClosedPositions(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
     {
-        $filledOrders = Order::where('user_id', $userId)
+        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('status', 'filled')
             ->get();
             
@@ -164,22 +198,22 @@ class FuturesLifecycleManager extends Command
                     $order->status = 'closed';
                     $order->closed_at = now();
                     $order->save();
-                    $this->info("  Marked order {$order->order_id} as closed (no open position)");
+                    $this->info("    Marked order {$order->order_id} as closed (no open position)");
                 }
             }
         } catch (\Exception $e) {
-            $this->warn("  Failed to check positions for user {$userId}: " . $e->getMessage());
+            $this->warn("    Failed to check positions for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
         }
     }
 
-    private function syncPnlRecords(int $userId, ExchangeApiServiceInterface $exchangeService): void
+    private function syncPnlRecords(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
     {
-        $this->info("  Syncing P&L records for user {$userId}...");
+        $this->info("    Syncing P&L records for user {$userId} on {$userExchange->exchange_name}...");
         $symbol = 'ETHUSDT'; // Make this configurable if needed
 
         try {
-            // Find the timestamp of the last saved trade for this user
-            $lastTrade = Trade::where('user_id', $userId)
+            // Find the timestamp of the last saved trade for this user on this exchange
+            $lastTrade = Trade::where('user_exchange_id', $userExchange->id)
                 ->latest('closed_at')
                 ->first();
                 
@@ -193,12 +227,12 @@ class FuturesLifecycleManager extends Command
             $pnlEvents = $pnlResult['list'] ?? [];
 
             if (empty($pnlEvents)) {
-                $this->info('  No new P&L events found for user ' . $userId);
+                $this->info('    No new P&L events found for user ' . $userId . ' on ' . $userExchange->exchange_name);
                 return;
             }
 
             // Filter out existing records
-            $existingPnlOrderIds = Trade::where('user_id', $userId)
+            $existingPnlOrderIds = Trade::where('user_exchange_id', $userExchange->id)
                 ->pluck('order_id')
                 ->all();
                 
@@ -206,13 +240,13 @@ class FuturesLifecycleManager extends Command
                 ->whereNotIn('orderId', $existingPnlOrderIds);
 
             if ($newPnlEvents->isEmpty()) {
-                $this->info('  No new P&L events to save for user ' . $userId);
+                $this->info('    No new P&L events to save for user ' . $userId . ' on ' . $userExchange->exchange_name);
                 return;
             }
 
             foreach ($newPnlEvents->reverse() as $pnlEvent) { // Process oldest first
                 Trade::create([
-                    'user_id' => $userId,
+                    'user_exchange_id' => $userExchange->id,
                     'symbol' => $pnlEvent['symbol'],
                     'side' => $pnlEvent['side'],
                     'order_type' => $pnlEvent['orderType'],
@@ -224,11 +258,11 @@ class FuturesLifecycleManager extends Command
                     'order_id' => $pnlEvent['orderId'],
                     'closed_at' => Carbon::createFromTimestampMs($pnlEvent['updatedTime']),
                 ]);
-                $this->info("  Saved new P&L record for user {$userId}, order ID: {$pnlEvent['orderId']}");
+                $this->info("    Saved new P&L record for user {$userId} on {$userExchange->exchange_name}, order ID: {$pnlEvent['orderId']}");
             }
 
         } catch (\Exception $e) {
-            $this->warn("  Failed to sync P&L for user {$userId}: " . $e->getMessage());
+            $this->warn("    Failed to sync P&L for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
         }
     }
 }

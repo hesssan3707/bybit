@@ -80,6 +80,10 @@
 @section('content')
 <div class="container">
     <h2>تاریخچه سود و زیان</h2>
+    
+    @include('partials.exchange-access-check')
+
+    @if(session('success'))
 
     <div class="table-responsive">
         <table>

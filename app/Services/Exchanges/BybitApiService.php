@@ -346,4 +346,169 @@ class BybitApiService implements ExchangeApiServiceInterface
             'orders_per_second' => 5,
         ];
     }
+
+    /**
+     * Check if the API key has spot trading permissions
+     */
+    public function checkSpotAccess(): array
+    {
+        try {
+            // Test spot wallet access
+            $balance = $this->getSpotAccountBalance();
+            
+            // Test spot instruments access
+            $instruments = $this->getSpotInstrumentsInfo();
+            
+            return [
+                'success' => true,
+                'message' => 'Spot trading access confirmed',
+                'details' => [
+                    'wallet_access' => true,
+                    'instruments_access' => true,
+                    'permissions' => ['spot_read', 'spot_trade']
+                ]
+            ];
+        } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Parse specific Bybit error codes
+            $isPermissionError = str_contains($errorMessage, '10001') || // Invalid API key
+                               str_contains($errorMessage, '10003') || // Missing required parameter
+                               str_contains($errorMessage, '10004') || // Invalid signature
+                               str_contains($errorMessage, '10005') || // Permission denied
+                               str_contains($errorMessage, '10006'); // Too many requests
+            
+            $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
+                          str_contains($errorMessage, '403');
+            
+            return [
+                'success' => false,
+                'message' => $isIPBlocked 
+                    ? 'IP address is not whitelisted for this API key'
+                    : ($isPermissionError 
+                        ? 'API key does not have spot trading permissions'
+                        : 'Spot access validation failed: ' . $errorMessage),
+                'details' => [
+                    'error_type' => $isIPBlocked ? 'ip_blocked' : 'permission_denied',
+                    'raw_error' => $errorMessage,
+                    'permissions' => []
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Check if the API key has futures trading permissions
+     */
+    public function checkFuturesAccess(): array
+    {
+        try {
+            // Test futures wallet access
+            $balance = $this->getWalletBalance('UNIFIED');
+            
+            // Test futures instruments access
+            $instruments = $this->getInstrumentsInfo();
+            
+            // Test position list access (futures specific)
+            $positions = $this->getPositions();
+            
+            return [
+                'success' => true,
+                'message' => 'Futures trading access confirmed',
+                'details' => [
+                    'wallet_access' => true,
+                    'instruments_access' => true,
+                    'positions_access' => true,
+                    'permissions' => ['contract_read', 'contract_trade']
+                ]
+            ];
+        } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Parse specific Bybit error codes
+            $isPermissionError = str_contains($errorMessage, '10001') || // Invalid API key
+                               str_contains($errorMessage, '10003') || // Missing required parameter
+                               str_contains($errorMessage, '10004') || // Invalid signature
+                               str_contains($errorMessage, '10005') || // Permission denied
+                               str_contains($errorMessage, '10006'); // Too many requests
+            
+            $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
+                          str_contains($errorMessage, '403');
+            
+            return [
+                'success' => false,
+                'message' => $isIPBlocked 
+                    ? 'IP address is not whitelisted for this API key'
+                    : ($isPermissionError 
+                        ? 'API key does not have futures trading permissions'
+                        : 'Futures access validation failed: ' . $errorMessage),
+                'details' => [
+                    'error_type' => $isIPBlocked ? 'ip_blocked' : 'permission_denied',
+                    'raw_error' => $errorMessage,
+                    'permissions' => []
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Check if the current IP address is allowed by the API key
+     */
+    public function checkIPAccess(): array
+    {
+        try {
+            // Test basic API connectivity
+            $serverTime = $this->sendRequest('GET', '/v5/market/time');
+            
+            // Test an authenticated endpoint to verify IP whitelist
+            $balance = $this->getWalletBalance('UNIFIED');
+            
+            return [
+                'success' => true,
+                'message' => 'IP address is whitelisted and has API access',
+                'details' => [
+                    'ip_whitelisted' => true,
+                    'server_time' => $serverTime['timeSecond'] ?? null,
+                    'authenticated_access' => true
+                ]
+            ];
+        } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            
+            $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
+                          str_contains($errorMessage, '403') ||
+                          str_contains($errorMessage, 'Forbidden');
+            
+            return [
+                'success' => false,
+                'message' => $isIPBlocked 
+                    ? 'Your IP address is not in the API key whitelist'
+                    : 'IP access validation failed: ' . $errorMessage,
+                'details' => [
+                    'error_type' => $isIPBlocked ? 'ip_blocked' : 'connection_error',
+                    'raw_error' => $errorMessage,
+                    'ip_whitelisted' => false
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Comprehensive API validation check (combines all checks above)
+     */
+    public function validateAPIAccess(): array
+    {
+        $spotCheck = $this->checkSpotAccess();
+        $futuresCheck = $this->checkFuturesAccess();
+        $ipCheck = $this->checkIPAccess();
+        
+        $overallSuccess = $spotCheck['success'] || $futuresCheck['success'];
+        
+        return [
+            'spot' => $spotCheck,
+            'futures' => $futuresCheck,
+            'ip' => $ipCheck,
+            'overall' => $overallSuccess && $ipCheck['success']
+        ];
+    }
 }

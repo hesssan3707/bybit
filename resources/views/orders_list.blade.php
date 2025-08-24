@@ -113,16 +113,8 @@
 @section('content')
 <div class="container">
     <h2>لیست سفارش‌های ثبت شده</h2>
-
-    @if(!$hasActiveExchange)
-        <div class="alert alert-danger">
-            {{ $exchangeMessage }}
-            <br><br>
-            <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline; font-weight: bold;">
-                برای فعال کردن صرافی کلیک کنید
-            </a>
-        </div>
-    @endif
+    
+    @include('partials.exchange-access-check')
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>

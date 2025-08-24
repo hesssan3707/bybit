@@ -59,23 +59,57 @@ class FuturesStopLossSync extends Command
     {
         $this->info("Syncing stop loss for user {$userId}...");
         
+        $user = User::find($userId);
+        if (!$user) {
+            $this->warn("User {$userId} not found.");
+            return;
+        }
+
+        $activeExchanges = $user->activeExchanges;
+        if ($activeExchanges->isEmpty()) {
+            $this->warn("No active exchanges for user {$userId}.");
+            return;
+        }
+
+        foreach ($activeExchanges as $userExchange) {
+            try {
+                $this->syncForUserExchange($userId, $userExchange);
+            } catch (\Exception $e) {
+                $this->error("Failed to sync stop loss for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
+                Log::error("Stop loss sync failed", [
+                    'user_id' => $userId,
+                    'exchange' => $userExchange->exchange_name,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+    }
+
+    private function syncForUserExchange(int $userId, $userExchange): void
+    {
+        $this->info("  Syncing stop loss for user {$userId} on {$userExchange->exchange_name}...");
+        
         try {
-            $exchangeService = ExchangeFactory::createForUser($userId);
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange_name,
+                $userExchange->api_key,
+                $userExchange->api_secret
+            );
         } catch (\Exception $e) {
-            $this->warn("No active exchange for user {$userId}: " . $e->getMessage());
+            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;
         }
 
         $symbol = 'ETHUSDT'; // Make this configurable if needed
 
-        // Get all filled orders for this user
-        $filledOrders = Order::where('user_id', $userId)
+        // Get all filled orders for this user on this exchange
+        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('status', 'filled')
             ->where('symbol', $symbol)
             ->get();
 
         if ($filledOrders->isEmpty()) {
-            $this->info("  No filled {$symbol} orders found for user {$userId}");
+            $this->info("    No filled {$symbol} orders found for user {$userId} on {$userExchange->exchange_name}");
             return;
         }
 
@@ -84,7 +118,7 @@ class FuturesStopLossSync extends Command
             $positions = $positionResult['list'] ?? [];
 
             if (empty($positions)) {
-                $this->info("  No open positions found for user {$userId} on {$symbol}");
+                $this->info("    No open positions found for user {$userId} on {$userExchange->exchange_name} for {$symbol}");
                 return;
             }
 
@@ -99,7 +133,7 @@ class FuturesStopLossSync extends Command
                 }
 
                 if (!$matchingPosition) {
-                    Log::warning("Could not find matching position for user {$userId}, order ID: {$dbOrder->id}");
+                    Log::warning("Could not find matching position for user {$userId} on {$userExchange->exchange_name}, order ID: {$dbOrder->id}");
                     continue;
                 }
 
@@ -108,7 +142,7 @@ class FuturesStopLossSync extends Command
 
                 // Compare SL with tolerance for floating point precision
                 if (abs($exchangeSl - $databaseSl) > 0.001) {
-                    $this->warn("  SL mismatch for user {$userId}, {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
+                    $this->warn("    SL mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
 
                     try {
                         // Prepare parameters to update stop loss
@@ -124,23 +158,23 @@ class FuturesStopLossSync extends Command
                         ];
 
                         $exchangeService->setStopLoss($symbol, $databaseSl, $dbOrder->side);
-                        $this->info("  Successfully reset SL for user {$userId}, {$symbol} to {$databaseSl}");
+                        $this->info("    Successfully reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} to {$databaseSl}");
                     } catch (\Exception $e) {
-                        $this->error("  Failed to reset SL for user {$userId}, {$symbol}: " . $e->getMessage());
-                        Log::error("Failed to reset SL for user {$userId}", [
+                        $this->error("    Failed to reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol}: " . $e->getMessage());
+                        Log::error("Failed to reset SL for user {$userId} on exchange {$userExchange->exchange_name}", [
                             'symbol' => $symbol,
                             'order_id' => $dbOrder->id,
                             'error' => $e->getMessage()
                         ]);
                     }
                 } else {
-                    $this->info("  SL for user {$userId}, {$symbol} (Side: {$dbOrder->side}) is in sync");
+                    $this->info("    SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}) is in sync");
                 }
             }
 
         } catch (\Exception $e) {
-            $this->error("  Failed to sync SL for user {$userId}, symbol {$symbol}: " . $e->getMessage());
-            Log::error("Stop loss sync error for user {$userId}", [
+            $this->error("    Failed to sync SL for user {$userId} on {$userExchange->exchange_name}, symbol {$symbol}: " . $e->getMessage());
+            Log::error("Stop loss sync error for user {$userId} on exchange {$userExchange->exchange_name}", [
                 'symbol' => $symbol,
                 'error' => $e->getMessage()
             ]);

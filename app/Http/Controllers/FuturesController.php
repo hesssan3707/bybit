@@ -6,11 +6,13 @@ use App\Models\Order;
 use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
+use App\Traits\HandlesExchangeAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class FuturesController extends Controller
 {
+    use HandlesExchangeAccess;
     /**
      * Get the exchange service for the authenticated user
      */
@@ -80,9 +82,18 @@ class FuturesController extends Controller
                 $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
                 $marketPrice = (string)round($price);
             } catch (\Exception $e) {
-                // Log the error or handle it as needed, but don't block the page from loading.
-                // For now, we'll just use the default price.
-                \Illuminate\Support\Facades\Log::error("Could not fetch market price: " . $e->getMessage());
+                // Check if this is an access permission error and update validation
+                $user = auth()->user();
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                
+                if ($currentExchange) {
+                    try {
+                        $this->handleApiException($e, $currentExchange, 'futures');
+                    } catch (\Exception $handledException) {
+                        // Log the error but continue with default price
+                        \Illuminate\Support\Facades\Log::error("Could not fetch market price: " . $e->getMessage());
+                    }
+                }
             }
         }
         
