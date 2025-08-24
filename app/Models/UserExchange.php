@@ -443,9 +443,36 @@ class UserExchange extends Model
     }
 
     /**
-     * Get validation status summary
+     * Get validation status summary (returns string for view compatibility)
      */
     public function getValidationSummary()
+    {
+        if (!$this->last_validation_at) {
+            return 'هنوز اعتبارسنجی نشده';
+        }
+        
+        if (!$this->ip_access) {
+            return 'آدرس IP مسدود';
+        }
+        
+        $hasAnyAccess = $this->spot_access || $this->futures_access;
+        
+        if (!$hasAnyAccess) {
+            return 'هیچ دسترسی معاملاتی ندارد';
+        }
+        
+        if ($this->spot_access && $this->futures_access) {
+            return 'دسترسی کامل';
+        }
+        
+        $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
+        return "دسترسی محدود ({$limitedType})";
+    }
+    
+    /**
+     * Get detailed validation status with icon and class (for admin panel)
+     */
+    public function getValidationDetails()
     {
         if (!$this->last_validation_at) {
             return [
