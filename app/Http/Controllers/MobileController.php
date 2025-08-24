@@ -63,8 +63,8 @@ class MobileController extends Controller
                                 $spotBalances[] = [
                                     'currency' => $coin['coin'],
                                     'walletBalance' => (float)$coin['walletBalance'],
-                                    'transferBalance' => (float)$coin['transferBalance'],
-                                    'bonus' => (float)$coin['bonus'],
+                                    'transferBalance' => (float)($coin['transferBalance'] ?? $coin['walletBalance']),
+                                    'bonus' => (float)($coin['bonus'] ?? 0),
                                     'usdValue' => isset($coin['usdValue']) ? (float)$coin['usdValue'] : null,
                                 ];
                             }

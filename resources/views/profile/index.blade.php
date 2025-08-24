@@ -203,13 +203,16 @@
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
-            padding: 10px;
-            margin: 0;
+            padding: 0;
+            margin: 0 auto;
+            width: 100%;
         }
         
         .profile-card {
             padding: 20px;
-            margin-bottom: 15px;
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
         }
         
         .profile-card .username {
@@ -228,7 +231,9 @@
         
         .exchange-section {
             padding: 15px;
-            margin-bottom: 15px;
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
         }
         
         .current-exchange {
@@ -320,11 +325,14 @@
     /* Extra small screens */
     @media (max-width: 480px) {
         .container {
-            padding: 5px;
+            padding: 0;
+            margin: 0 auto;
         }
         
         .profile-card {
             padding: 15px;
+            margin: 5px;
+            width: calc(100% - 10px);
         }
         
         .profile-card .username {
@@ -333,6 +341,8 @@
         
         .exchange-section {
             padding: 10px;
+            margin: 5px;
+            width: calc(100% - 10px);
         }
         
         .current-exchange {

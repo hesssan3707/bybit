@@ -99,7 +99,7 @@
 
 <!-- Web Header -->
 <header class="main-header">
-    <div class="logo">Trader Assistant</div>
+    <div class="logo">Trader Bridge</div>
     <nav class="nav-links">
         <!-- Balance Menu -->
         <a href="{{ route('balance') }}" style="margin: 0 15px;">موجودی‌ها</a>
@@ -119,7 +119,6 @@
             <a href="#" style="cursor: pointer;" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
             <div id="spotMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 200px; z-index: 1001;">
                 <a href="{{ route('spot.orders.view') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">سفارش‌های اسپات</a>
-                <a href="{{ route('balance') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">موجودی‌ها</a>
                 <a href="{{ route('spot.order.create.view') }}" style="display: block; padding: 10px 15px; margin: 0;">سفارش اسپات جدید</a>
             </div>
         </div>
@@ -152,17 +151,17 @@
         <span class="icon">📊</span>
         <span>سفارش‌ها</span>
     </a>
-    <a href="{{ route('balance') }}">
-        <span class="icon">💳</span>
-        <span>موجودی</span>
+    <a href="{{ route('order.create') }}">
+        <span class="icon">➕</span>
+        <span>جدید</span>
     </a>
     <a href="{{ route('spot.orders.view') }}">
         <span class="icon">💰</span>
         <span>اسپات</span>
     </a>
-    <a href="{{ route('order.create') }}">
-        <span class="icon">➕</span>
-        <span>جدید</span>
+    <a href="{{ route('balance') }}">
+        <span class="icon">💳</span>
+        <span>موجودی</span>
     </a>
     <a href="{{ route('profile.index') }}">
         <span class="icon">👤</span>

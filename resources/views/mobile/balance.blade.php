@@ -4,10 +4,17 @@
 
 @push('styles')
 <style>
-    .balance-container {
+    .container {
+        background: #ffffff;
         padding: 20px;
-        max-width: 600px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        max-width: 1200px;
         margin: 0 auto;
+    }
+    
+    .balance-container {
+        width: 100%;
     }
 
     .balance-card {
@@ -159,8 +166,9 @@
 @endpush
 
 @section('content')
-<div class="balance-container">
-    <h1 style="text-align: center; margin-bottom: 30px; color: #2d3748;">موجودی حساب</h1>
+<div class="container">
+    <div class="balance-container">
+        <h1 style="text-align: center; margin-bottom: 30px; color: #2d3748;">موجودی حساب</h1>
 
     @if(isset($error))
         <div class="error-message">
@@ -282,6 +290,7 @@
             بروزرسانی موجودی
         </button>
     @endif
+    </div>
 </div>
 @endsection
 

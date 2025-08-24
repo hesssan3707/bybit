@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Orders List')
+@section('title', 'Order History')
 
 @push('styles')
 <style>
@@ -14,6 +14,48 @@
         text-align: center;
         margin-bottom: 25px;
     }
+    
+    /* Mobile redirect buttons */
+    .mobile-redirect-section {
+        display: none;
+        margin-bottom: 20px;
+    }
+    
+    .redirect-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .redirect-btn {
+        flex: 1;
+        padding: 15px;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+    }
+    
+    .redirect-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,123,255,0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .redirect-btn.secondary {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+    }
+    
+    .redirect-btn.secondary:hover {
+        box-shadow: 0 6px 20px rgba(40,167,69,0.4);
+    }
+    
     .table-responsive {
         overflow-x: auto;
     }
@@ -76,6 +118,20 @@
     .alert-danger { background: #f8d7da; color: #842029; }
 
     @media screen and (max-width: 768px) {
+        .mobile-redirect-section {
+            display: block;
+        }
+        
+        .redirect-buttons {
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .redirect-btn {
+            padding: 18px;
+            font-size: 16px;
+        }
+        
         table thead { display: none; }
         table tr {
             display: block;
@@ -112,7 +168,7 @@
 
 @section('content')
 <div class="container">
-    <h2>لیست سفارش‌های ثبت شده</h2>
+    <h2>تاریخچه معاملات</h2>
     
     @include('partials.exchange-access-check')
 
@@ -127,6 +183,19 @@
         </div>
     @endif
 
+    <!-- Mobile redirect buttons (only visible on mobile) -->
+    <div class="mobile-redirect-section">
+        <div class="redirect-buttons">
+            <a href="{{ route('orders.index') }}" class="redirect-btn">
+                📊 سفارش‌های آتی
+            </a>
+            <a href="{{ route('pnl.history') }}" class="redirect-btn secondary">
+                📈 سود و زیان
+            </a>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
     <div class="table-responsive">
         <table>
             <thead>
@@ -175,7 +244,6 @@
             </tbody>
         </table>
     </div>
-
     <div class="pagination">
         {{ $orders->links() }}
     </div>
@@ -184,6 +252,7 @@
 
 @push('scripts')
 <script>
+// Order closing functionality
 document.addEventListener('DOMContentLoaded', function() {
     const closeButtons = document.querySelectorAll('.close-btn');
 

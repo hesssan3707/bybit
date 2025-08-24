@@ -208,7 +208,7 @@ class SpotTradingController extends Controller
                 $balances[] = [
                     'coin' => $balance['coin'],
                     'walletBalance' => $balance['walletBalance'],
-                    'transferBalance' => $balance['transferBalance'],
+                    'transferBalance' => $balance['transferBalance'] ?? $balance['walletBalance'],
                     'locked' => $balance['locked'] ?? '0'
                 ];
             }
@@ -500,8 +500,8 @@ class SpotTradingController extends Controller
                             $balances[] = [
                                 'currency' => $coin['coin'],
                                 'walletBalance' => (float)$coin['walletBalance'],
-                                'transferBalance' => (float)$coin['transferBalance'],
-                                'bonus' => (float)$coin['bonus'],
+                                'transferBalance' => (float)($coin['transferBalance'] ?? $coin['walletBalance']),
+                                'bonus' => (float)($coin['bonus'] ?? 0),
                                 'usdValue' => isset($coin['usdValue']) ? (float)$coin['usdValue'] : null,
                             ];
                         }

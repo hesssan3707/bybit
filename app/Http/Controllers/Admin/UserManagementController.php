@@ -283,6 +283,34 @@ class UserManagementController extends Controller
                 return back()->withErrors($validator);
             }
 
+            // Run validation and save results before activation
+            try {
+                $exchangeService = ExchangeFactory::create(
+                    $exchange->exchange_name,
+                    $exchange->api_key,
+                    $exchange->api_secret
+                );
+                
+                $validation = $exchangeService->validateAPIAccess();
+                $exchange->updateValidationResults($validation);
+                
+                Log::info('Exchange validation completed during approval', [
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name,
+                    'user_id' => $exchange->user_id,
+                    'spot_access' => $validation['spot']['success'] ?? false,
+                    'futures_access' => $validation['futures']['success'] ?? false,
+                    'ip_access' => $validation['ip']['success'] ?? false
+                ]);
+            } catch (\Exception $validationError) {
+                Log::warning('Validation failed during exchange approval, proceeding anyway', [
+                    'exchange_id' => $exchange->id,
+                    'error' => $validationError->getMessage()
+                ]);
+                // Continue with activation even if validation fails
+                // Admin has already tested the connection manually
+            }
+
             $exchange->activate(auth()->id(), $request->admin_notes);
 
             return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$exchange->user->email} تأیید شد.");
