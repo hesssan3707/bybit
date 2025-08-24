@@ -86,7 +86,9 @@ Route::middleware(['auth'])->group(function () {
     // Spot Trading Routes - All require authentication
     Route::prefix('spot')->group(function () {
         Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view')->middleware('exchange.access:spot');
-        Route::get('/balances', [SpotTradingController::class, 'spotBalancesView'])->name('spot.balances.view')->middleware('exchange.access:spot');
+        Route::get('/balances', function() {
+            return redirect()->route('balance');
+        })->name('spot.balances.view'); // Redirect to unified balance page
         Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view')->middleware('exchange.access:spot');
         Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web')->middleware('exchange.access:spot');
     });

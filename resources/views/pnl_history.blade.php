@@ -84,6 +84,10 @@
     @include('partials.exchange-access-check')
 
     @if(session('success'))
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
 
     <div class="table-responsive">
         <table>

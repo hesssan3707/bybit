@@ -389,12 +389,52 @@ class UserExchange extends Model
      */
     public function updateValidationResults(array $validationData)
     {
+        $spotAccess = $validationData['spot']['success'] ?? null;
+        $futuresAccess = $validationData['futures']['success'] ?? null;
+        $ipAccess = $validationData['ip']['success'] ?? null;
+        
+        // Special handling for Bybit UNIFIED accounts
+        // If either spot or futures validation succeeds for Bybit, both should be marked as successful
+        // since UNIFIED account provides access to both spot and futures trading
+        if ($this->exchange_name === 'bybit') {
+            // Check if either validation indicates UNIFIED account access
+            $hasUnifiedAccess = false;
+            
+            // Check spot validation for UNIFIED account indicators
+            if (isset($validationData['spot']['details']['account_type']) && 
+                $validationData['spot']['details']['account_type'] === 'UNIFIED') {
+                $hasUnifiedAccess = true;
+            }
+            
+            // Check futures validation for UNIFIED account indicators  
+            if (isset($validationData['futures']['details']['account_type']) && 
+                $validationData['futures']['details']['account_type'] === 'UNIFIED') {
+                $hasUnifiedAccess = true;
+            }
+            
+            // Check for successful spot access (which indicates UNIFIED access)
+            if ($spotAccess === true) {
+                $hasUnifiedAccess = true;
+            }
+            
+            // Check for successful futures access (which indicates UNIFIED access)
+            if ($futuresAccess === true) {
+                $hasUnifiedAccess = true;
+            }
+            
+            // If UNIFIED access is detected, set both spot and futures to true
+            if ($hasUnifiedAccess) {
+                $spotAccess = true;
+                $futuresAccess = true;
+            }
+        }
+        
         return $this->update([
             'validation_results' => $validationData,
             'last_validation_at' => now(),
-            'spot_access' => $validationData['spot']['success'] ?? null,
-            'futures_access' => $validationData['futures']['success'] ?? null,
-            'ip_access' => $validationData['ip']['success'] ?? null,
+            'spot_access' => $spotAccess,
+            'futures_access' => $futuresAccess,
+            'ip_access' => $ipAccess,
             'validation_message' => $this->generateValidationMessage($validationData),
         ]);
     }
