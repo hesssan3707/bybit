@@ -95,6 +95,9 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('mobile')->group(function () {
         Route::get('/balance', [MobileController::class, 'balance'])->name('mobile.balance');
     });
+    
+    // Universal Balance Route (works for both web and mobile)
+    Route::get('/balance', [MobileController::class, 'balance'])->name('balance');
 
     // Maintenance Routes (should also be protected)
     

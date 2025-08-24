@@ -28,6 +28,9 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     private function generateSignature(string $payload): string
     {
+        if (!$this->apiSecret) {
+            throw new \Exception('API secret is not set');
+        }
         return hash_hmac('sha256', $payload, $this->apiSecret);
     }
 
@@ -185,10 +188,11 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     /**
      * Get spot account balance with detailed breakdown by currency
+     * Note: Bybit uses UNIFIED account type for both spot and derivatives trading
      */
     public function getSpotAccountBalance(): array
     {
-        return $this->sendRequest('GET', '/v5/account/wallet-balance', ['accountType' => 'SPOT']);
+        return $this->sendRequest('GET', '/v5/account/wallet-balance', ['accountType' => 'UNIFIED']);
     }
 
     /**
@@ -349,29 +353,63 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     /**
      * Check if the API key has spot trading permissions
+     * Note: Bybit uses UNIFIED accounts which provide access to both spot and futures
      */
     public function checkSpotAccess(): array
     {
         try {
-            // Test spot wallet access
-            $balance = $this->getSpotAccountBalance();
+            // For Bybit, test UNIFIED wallet access (which includes spot trading)
+            $balance = $this->getWalletBalance('UNIFIED');
             
             // Test spot instruments access
             $instruments = $this->getSpotInstrumentsInfo();
             
             return [
                 'success' => true,
-                'message' => 'Spot trading access confirmed',
+                'message' => 'Spot trading access confirmed via UNIFIED account',
                 'details' => [
                     'wallet_access' => true,
                     'instruments_access' => true,
-                    'permissions' => ['spot_read', 'spot_trade']
+                    'account_type' => 'UNIFIED',
+                    'permissions' => ['spot_read', 'spot_trade', 'unified_account']
                 ]
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
             
-            // Parse specific Bybit error codes
+            // Special handling for Bybit error 10001 with "accountType only support UNIFIED"
+            // This actually indicates the user HAS UNIFIED account access
+            if (str_contains($errorMessage, '10001') && str_contains($errorMessage, 'accountType only support UNIFIED')) {
+                try {
+                    // If we get this error, it means user has UNIFIED account
+                    // Let's test UNIFIED account directly
+                    $unifiedBalance = $this->getWalletBalance('UNIFIED');
+                    return [
+                        'success' => true,
+                        'message' => 'Spot trading access confirmed via UNIFIED account (detected from API response)',
+                        'details' => [
+                            'wallet_access' => true,
+                            'instruments_access' => true,
+                            'account_type' => 'UNIFIED',
+                            'permissions' => ['spot_read', 'spot_trade', 'unified_account'],
+                            'detection_method' => 'error_analysis'
+                        ]
+                    ];
+                } catch (\Exception $unifiedError) {
+                    // If UNIFIED also fails, then it's a real permission issue
+                    return [
+                        'success' => false,
+                        'message' => 'No access to UNIFIED account: ' . $unifiedError->getMessage(),
+                        'details' => [
+                            'error_type' => 'permission_denied',
+                            'raw_error' => $unifiedError->getMessage(),
+                            'permissions' => []
+                        ]
+                    ];
+                }
+            }
+            
+            // Parse other specific Bybit error codes
             $isPermissionError = str_contains($errorMessage, '10001') || // Invalid API key
                                str_contains($errorMessage, '10003') || // Missing required parameter
                                str_contains($errorMessage, '10004') || // Invalid signature
@@ -386,7 +424,7 @@ class BybitApiService implements ExchangeApiServiceInterface
                 'message' => $isIPBlocked 
                     ? 'IP address is not whitelisted for this API key'
                     : ($isPermissionError 
-                        ? 'API key does not have spot trading permissions'
+                        ? 'API key does not have trading permissions'
                         : 'Spot access validation failed: ' . $errorMessage),
                 'details' => [
                     'error_type' => $isIPBlocked ? 'ip_blocked' : 'permission_denied',
@@ -399,11 +437,12 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     /**
      * Check if the API key has futures trading permissions
+     * Note: Bybit uses UNIFIED accounts which provide access to both spot and futures
      */
     public function checkFuturesAccess(): array
     {
         try {
-            // Test futures wallet access
+            // Test futures wallet access via UNIFIED account
             $balance = $this->getWalletBalance('UNIFIED');
             
             // Test futures instruments access
@@ -414,12 +453,13 @@ class BybitApiService implements ExchangeApiServiceInterface
             
             return [
                 'success' => true,
-                'message' => 'Futures trading access confirmed',
+                'message' => 'Futures trading access confirmed via UNIFIED account',
                 'details' => [
                     'wallet_access' => true,
                     'instruments_access' => true,
                     'positions_access' => true,
-                    'permissions' => ['contract_read', 'contract_trade']
+                    'account_type' => 'UNIFIED',
+                    'permissions' => ['contract_read', 'contract_trade', 'unified_account']
                 ]
             ];
         } catch (\Exception $e) {

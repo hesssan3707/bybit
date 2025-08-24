@@ -199,6 +199,165 @@
         border-radius: 10px;
         margin-bottom: 20px;
     }
+    
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+        .container {
+            padding: 10px;
+            margin: 0;
+        }
+        
+        .profile-card {
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .profile-card .username {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        
+        .profile-card .equity {
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        
+        .profile-card .equity strong {
+            font-size: 1.3em;
+        }
+        
+        .exchange-section {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .current-exchange {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .exchange-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 15px;
+        }
+        
+        .exchange-info {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .exchange-logo {
+            width: 40px;
+            height: 40px;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .exchange-details h3 {
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+        
+        .exchange-status {
+            font-size: 0.85em;
+            margin-bottom: 15px;
+        }
+        
+        .exchange-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .exchange-option {
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .exchange-option .mini-logo {
+            width: 25px;
+            height: 25px;
+            font-size: 10px;
+            margin: 0 auto 8px;
+        }
+        
+        .exchange-option .name {
+            font-size: 0.9em;
+            margin-bottom: 3px;
+        }
+        
+        .exchange-option .status {
+            font-size: 0.75em;
+        }
+        
+        .btn {
+            padding: 12px 16px;
+            margin: 3px;
+            font-size: 0.9em;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        
+        .no-exchange {
+            padding: 20px;
+        }
+        
+        .no-exchange h3 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+        
+        .no-exchange p {
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .container {
+            padding: 5px;
+        }
+        
+        .profile-card {
+            padding: 15px;
+        }
+        
+        .profile-card .username {
+            font-size: 1.2em;
+        }
+        
+        .exchange-section {
+            padding: 10px;
+        }
+        
+        .current-exchange {
+            padding: 10px;
+        }
+        
+        .exchange-logo {
+            width: 35px;
+            height: 35px;
+            font-size: 14px;
+        }
+        
+        .exchange-details h3 {
+            font-size: 1.1em;
+        }
+        
+        .exchange-status {
+            font-size: 0.8em;
+        }
+        
+        .btn {
+            padding: 10px 12px;
+            font-size: 0.85em;
+        }
+    }
 </style>
 @endpush
 
