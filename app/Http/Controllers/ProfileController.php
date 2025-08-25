@@ -3,17 +3,17 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-
-use App\Services\BybitApiService;
 use Illuminate\Support\Facades\Auth;
+use App\Services\Exchanges\ExchangeFactory;
+use App\Models\UserExchange;
 
 class ProfileController extends Controller
 {
-    protected $bybitApiService;
+    protected $exchangeFactory;
 
-    public function __construct(BybitApiService $bybitApiService)
+    public function __construct(ExchangeFactory $exchangeFactory)
     {
-        $this->bybitApiService = $bybitApiService;
+        $this->exchangeFactory = $exchangeFactory;
     }
 
     public function index()
@@ -21,26 +21,57 @@ class ProfileController extends Controller
         $user = Auth::user();
         $totalEquity = 'N/A';
         $totalBalance = 'N/A';
-
-        try {
-            $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
-            $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-            if ($usdtBalanceData) {
-                if (isset($usdtBalanceData['totalEquity'])) {
-                    $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
+        $currentExchange = null;
+        $activeExchanges = [];
+        
+        // Load user's default/active exchange
+        $defaultExchange = $user->defaultExchange;
+        
+        if ($defaultExchange) {
+            $currentExchange = $defaultExchange;
+            
+            try {
+                $exchangeService = $this->exchangeFactory->createForUserExchange($defaultExchange);
+                
+                // Try to get account balance using the generic method first
+                $balance = $exchangeService->getAccountBalance();
+                if ($balance && isset($balance['success']) && $balance['success']) {
+                    if (isset($balance['total'])) {
+                        $totalEquity = number_format((float)$balance['total'], 2);
+                    }
+                    if (isset($balance['available'])) {
+                        $totalBalance = number_format((float)$balance['available'], 2);
+                    }
+                } else {
+                    // Fallback to exchange-specific methods if generic doesn't work
+                    if ($defaultExchange->exchange_name === 'bybit') {
+                        $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+                        $usdtBalanceData = $balanceInfo['list'][0] ?? null;
+                        if ($usdtBalanceData) {
+                            if (isset($usdtBalanceData['totalEquity'])) {
+                                $totalEquity = number_format((float)$usdtBalanceData['totalEquity'], 2);
+                            }
+                            if (isset($usdtBalanceData['totalWalletBalance'])) {
+                                $totalBalance = number_format((float)$usdtBalanceData['totalWalletBalance'], 2);
+                            }
+                        }
+                    }
                 }
-                if (isset($usdtBalanceData['totalWalletBalance'])) {
-                    $totalBalance = number_format((float)$usdtBalanceData['totalWalletBalance'], 2);
-                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Could not fetch wallet balance for profile: " . $e->getMessage());
             }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Could not fetch Bybit wallet balance for profile: " . $e->getMessage());
         }
-
+        
+        // Load all active exchanges for switching
+        $activeExchanges = $user->activeExchanges()->get();
+        
         return view('profile.index', [
             'user' => $user,
             'totalEquity' => $totalEquity,
             'totalBalance' => $totalBalance,
+            'currentExchange' => $currentExchange,
+            'activeExchanges' => $activeExchanges,
+            'availableExchanges' => UserExchange::getAvailableExchanges(),
         ]);
     }
 }

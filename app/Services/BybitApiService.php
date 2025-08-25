@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Exchanges;
 
 use Illuminate\Support\Facades\Http;
 
-class BybitApiService
+class BybitApiService implements ExchangeApiServiceInterface
 {
     private $apiKey;
     private $apiSecret;
@@ -17,6 +17,13 @@ class BybitApiService
         $this->apiSecret = env('BYBIT_API_SECRET');
         $isTestnet = env('BYBIT_TESTNET', false);
         $this->baseUrl = $isTestnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
+    }
+
+    public function setCredentials(string $apiKey, string $apiSecret): ExchangeApiServiceInterface
+    {
+        $this->apiKey = $apiKey;
+        $this->apiSecret = $apiSecret;
+        return $this;
     }
 
     private function generateSignature(string $payload): string
@@ -67,17 +74,18 @@ class BybitApiService
         return $responseData['result'];
     }
 
-    public function getInstrumentsInfo(string $symbol)
+    public function getInstrumentsInfo(): array
     {
-        return $this->sendRequest('GET', '/v5/market/instruments-info', ['category' => 'linear', 'symbol' => $symbol]);
+        $params = ['category' => 'linear'];
+        return $this->sendRequest('GET', '/v5/market/instruments-info', $params);
     }
 
-    public function createOrder(array $params)
+    public function createOrder(array $orderData): array
     {
-        return $this->sendRequest('POST', '/v5/order/create', $params);
+        return $this->sendRequest('POST', '/v5/order/create', $orderData);
     }
 
-    public function getOpenOrders(string $symbol)
+    public function getOpenOrdersBySymbol(string $symbol)
     {
         return $this->sendRequest('GET', '/v5/order/realtime', ['category' => 'linear', 'symbol' => $symbol]);
     }
@@ -87,7 +95,7 @@ class BybitApiService
         return $this->sendRequest('GET', '/v5/order/history', ['category' => 'linear', 'orderId' => $orderId]);
     }
 
-    public function cancelOrder(string $orderId, string $symbol)
+    public function cancelOrderWithSymbol(string $orderId, string $symbol)
     {
         return $this->sendRequest('POST', '/v5/order/cancel', ['category' => 'linear', 'orderId' => $orderId, 'symbol' => $symbol]);
     }
@@ -129,5 +137,208 @@ class BybitApiService
     public function getTickerInfo(string $symbol)
     {
         return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
+    }
+
+    /**
+     * Create a spot trading order
+     * 
+     * @param array $orderData - Order parameters including:
+     *   - side: 'Buy' or 'Sell'
+     *   - symbol: Trading pair (e.g., 'BTCUSDT')
+     *   - orderType: 'Market' or 'Limit'
+     *   - qty: Order quantity
+     *   - price: Order price (required for Limit orders)
+     */
+    public function createSpotOrder(array $orderData): array
+    {
+        $orderParams = [
+            'category' => 'spot',
+            'symbol' => $orderData['symbol'],
+            'side' => $orderData['side'],
+            'orderType' => $orderData['orderType'],
+            'qty' => (string)$orderData['qty'],
+        ];
+
+        // Add price for limit orders
+        if ($orderData['orderType'] === 'Limit' && isset($orderData['price'])) {
+            $orderParams['price'] = (string)$orderData['price'];
+        }
+
+        // Add optional parameters
+        if (isset($orderData['timeInForce'])) {
+            $orderParams['timeInForce'] = $orderData['timeInForce'];
+        } else {
+            $orderParams['timeInForce'] = 'GTC'; // Default
+        }
+
+        if (isset($orderData['orderLinkId'])) {
+            $orderParams['orderLinkId'] = $orderData['orderLinkId'];
+        }
+
+        return $this->sendRequest('POST', '/v5/order/create', $orderParams);
+    }
+
+    /**
+     * Get spot account balance with detailed breakdown by currency
+     */
+    public function getSpotAccountBalance(): array
+    {
+        return $this->sendRequest('GET', '/v5/account/wallet-balance', ['accountType' => 'SPOT']);
+    }
+
+    /**
+     * Get spot trading symbols information
+     */
+    public function getSpotInstrumentsInfo(): array
+    {
+        $params = ['category' => 'spot'];
+        return $this->sendRequest('GET', '/v5/market/instruments-info', $params);
+    }
+
+    /**
+     * Get spot ticker information
+     */
+    public function getSpotTickerInfo(string $symbol)
+    {
+        return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'spot', 'symbol' => $symbol]);
+    }
+
+    public function getSpotOrderHistory(string $symbol = null, int $limit = 50): array
+    {
+        $params = [
+            'category' => 'spot',
+            'limit' => $limit,
+        ];
+        
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        
+        return $this->sendRequest('GET', '/v5/order/history', $params);
+    }
+
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol)
+    {
+        return $this->sendRequest('POST', '/v5/order/cancel', [
+            'category' => 'spot',
+            'orderId' => $orderId,
+            'symbol' => $symbol
+        ]);
+    }
+
+    // Interface implementation methods
+    public function getAccountBalance(): array
+    {
+        return $this->getWalletBalance();
+    }
+
+    public function getOrder(string $orderId): array
+    {
+        return $this->getHistoryOrder($orderId);
+    }
+
+    public function getSpotOrder(string $orderId): array
+    {
+        return $this->sendRequest('GET', '/v5/order/history', [
+            'category' => 'spot',
+            'orderId' => $orderId
+        ]);
+    }
+
+    public function cancelOrder(string $orderId): array
+    {
+        // Note: Bybit requires symbol for cancellation, this is a compatibility method
+        throw new \Exception('Use cancelOrder with symbol parameter for Bybit');
+    }
+
+    public function cancelSpotOrder(string $orderId): array
+    {
+        // Note: Bybit requires symbol for cancellation, this is a compatibility method
+        throw new \Exception('Use cancelSpotOrder with symbol parameter for Bybit');
+    }
+
+    public function getOpenOrders(string $symbol = null): array
+    {
+        $params = ['category' => 'linear'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        return $this->sendRequest('GET', '/v5/order/realtime', $params);
+    }
+
+    public function getOpenSpotOrders(string $symbol = null): array
+    {
+        $params = ['category' => 'spot'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        return $this->sendRequest('GET', '/v5/order/realtime', $params);
+    }
+
+    public function getOrderHistory(string $symbol = null, int $limit = 50): array
+    {
+        $params = [
+            'category' => 'linear',
+            'limit' => $limit,
+        ];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        return $this->sendRequest('GET', '/v5/order/history', $params);
+    }
+
+    public function getPositions(string $symbol = null): array
+    {
+        $params = ['category' => 'linear'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        return $this->sendRequest('GET', '/v5/position/list', $params);
+    }
+
+    public function closePosition(string $symbol, string $side, float $qty): array
+    {
+        return $this->createOrder([
+            'category' => 'linear',
+            'symbol' => $symbol,
+            'side' => $side === 'Buy' ? 'Sell' : 'Buy', // Opposite side to close
+            'orderType' => 'Market',
+            'qty' => (string)$qty,
+            'reduceOnly' => true,
+        ]);
+    }
+
+    public function setStopLoss(string $symbol, float $stopLoss, string $side): array
+    {
+        return $this->setTradingStop([
+            'category' => 'linear',
+            'symbol' => $symbol,
+            'stopLoss' => (string)$stopLoss,
+            'positionIdx' => 0, // One-way mode
+        ]);
+    }
+
+    public function getExchangeName(): string
+    {
+        return 'bybit';
+    }
+
+    public function testConnection(): bool
+    {
+        try {
+            $this->sendRequest('GET', '/v5/market/time');
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function getRateLimits(): array
+    {
+        return [
+            'requests_per_second' => 10,
+            'requests_per_minute' => 600,
+            'orders_per_second' => 5,
+        ];
     }
 }

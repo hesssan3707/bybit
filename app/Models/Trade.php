@@ -12,6 +12,7 @@ class Trade extends Model
     protected $table = 'trades';
 
     protected $fillable = [
+        'user_exchange_id',
         'symbol',
         'side',
         'order_type',
@@ -23,4 +24,70 @@ class Trade extends Model
         'order_id',
         'closed_at',
     ];
+
+    protected $casts = [
+        'qty' => 'decimal:10',
+        'avg_entry_price' => 'decimal:10',
+        'avg_exit_price' => 'decimal:10',
+        'pnl' => 'decimal:10',
+        'closed_at' => 'datetime',
+    ];
+
+    /**
+     * Get the user exchange that owns the trade
+     */
+    public function userExchange()
+    {
+        return $this->belongsTo(UserExchange::class);
+    }
+
+    /**
+     * Get the user that owns the trade (through user exchange)
+     */
+    public function user()
+    {
+        return $this->hasOneThrough(User::class, UserExchange::class, 'id', 'id', 'user_exchange_id', 'user_id');
+    }
+
+    /**
+     * Scope a query to only include trades for a specific user exchange
+     */
+    public function scopeForUserExchange($query, $userExchangeId)
+    {
+        return $query->where('user_exchange_id', $userExchangeId);
+    }
+
+    /**
+     * Scope a query to only include trades for a specific user
+     */
+    public function scopeForUser($query, $userId)
+    {
+        return $query->whereHas('userExchange', function($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
+    }
+
+    /**
+     * Scope a query to only include profitable trades
+     */
+    public function scopeProfitable($query)
+    {
+        return $query->where('pnl', '>', 0);
+    }
+
+    /**
+     * Scope a query to only include losing trades
+     */
+    public function scopeLosing($query)
+    {
+        return $query->where('pnl', '<', 0);
+    }
+
+    /**
+     * Scope a query to only include recent trades
+     */
+    public function scopeRecent($query, $days = 30)
+    {
+        return $query->where('created_at', '>=', now()->subDays($days));
+    }
 }

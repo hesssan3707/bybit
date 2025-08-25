@@ -4,51 +4,95 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Trade;
-use App\Services\BybitApiService;
+use App\Services\Exchanges\ExchangeFactory;
+use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
-class BybitController extends Controller
+class FuturesController extends Controller
 {
-    protected $bybitApiService;
-
-    public function __construct(BybitApiService $bybitApiService)
+    /**
+     * Get the exchange service for the authenticated user
+     */
+    private function getExchangeService(): ExchangeApiServiceInterface
     {
-        $this->bybitApiService = $bybitApiService;
+        if (!auth()->check()) {
+            throw new \Exception('User not authenticated');
+        }
+
+        try {
+            return ExchangeFactory::createForUser(auth()->id());
+        } catch (\Exception $e) {
+            throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
+        }
+    }
+
+    /**
+     * Check if user has an active exchange and redirect if not
+     */
+    private function checkActiveExchange()
+    {
+        try {
+            $this->getExchangeService();
+        } catch (\Exception $e) {
+            return redirect()->route('profile.show')
+                ->with('error', 'برای استفاده از این قسمت، لطفاً ابتدا صرافی خود را فعال کنید.');
+        }
+        return null;
     }
 
     public function index()
     {
+        // Check if user has active exchange
+        $redirectResponse = $this->checkActiveExchange();
+        if ($redirectResponse) {
+            return $redirectResponse;
+        }
+        
         $threeDaysAgo = now()->subDays(3);
 
-        $orders = Order::where(function ($query) use ($threeDaysAgo) {
-            $query->whereIn('status', ['pending', 'filled'])
-                  ->orWhere('updated_at', '>=', $threeDaysAgo);
-        })
-        ->latest('updated_at')
-        ->paginate(20);
+        $orders = Order::forUser(auth()->id())
+            ->where(function ($query) use ($threeDaysAgo) {
+                $query->whereIn('status', ['pending', 'filled'])
+                      ->orWhere('updated_at', '>=', $threeDaysAgo);
+            })
+            ->latest('updated_at')
+            ->paginate(20);
 
         return view('orders_list', ['orders' => $orders]);
     }
 
     public function create()
     {
+        // Check if user has active exchange
+        $redirectResponse = $this->checkActiveExchange();
+        if ($redirectResponse) {
+            return $redirectResponse;
+        }
+        
         $symbol = 'ETHUSDT';
         $marketPrice = '0'; // Default value in case of an error
         try {
-            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $exchangeService = $this->getExchangeService();
+            $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
             $marketPrice = (string)round($price);
         } catch (\Exception $e) {
             // Log the error or handle it as needed, but don't block the page from loading.
             // For now, we'll just use the default price.
-            \Illuminate\Support\Facades\Log::error("Could not fetch Bybit market price: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("Could not fetch market price: " . $e->getMessage());
         }
         return view('set_order', ['marketPrice' => $marketPrice]);
     }
 
     public function store(Request $request)
     {
+        // Check if user has active exchange
+        $redirectResponse = $this->checkActiveExchange();
+        if ($redirectResponse) {
+            return $redirectResponse;
+        }
+        
         $validated = $request->validate([
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
@@ -60,8 +104,11 @@ class BybitController extends Controller
         ]);
 
         try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
             // Check for recent loss
-            $lastLoss = Trade::where('pnl', '<', 0)
+            $lastLoss = Trade::forUser(auth()->id())
+                ->where('pnl', '<', 0)
                 ->latest('closed_at')
                 ->first();
 
@@ -71,7 +118,7 @@ class BybitController extends Controller
             }
 
             // New validation: Check against active filled order's zones
-            $filledOrder = Order::where('status', 'filled')->first();
+            $filledOrder = Order::forUser(auth()->id())->where('status', 'filled')->first();
             if ($filledOrder) {
                 $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
                 $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
@@ -94,8 +141,7 @@ class BybitController extends Controller
                     }
                 }
             }
-            // New validation: Check against active filled order's zones
-            $filledOrder = Order::where('status', 'filled')->first();
+            // New validation: Check against active filled order's zones (duplicate removed)
             if ($filledOrder) {
                 $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
                 $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
@@ -132,7 +178,7 @@ class BybitController extends Controller
             $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
 
             // Feature 2: Validate entry price against market price
-            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
 
             if ($marketPrice > 0) {
@@ -145,7 +191,7 @@ class BybitController extends Controller
             }
 
             // Fetch live wallet balance instead of using a static .env variable
-            $balanceInfo = $this->bybitApiService->getWalletBalance('UNIFIED', 'USDT');
+            $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
             $usdtBalanceData = $balanceInfo['list'][0] ?? null;
             if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
                 throw new \Exception('امکان دریافت موجودی کیف پول از صرافی وجود ندارد.');
@@ -164,7 +210,7 @@ class BybitController extends Controller
             $amount = $maxLossUSD / $slDistance;
 
             // Get Market Precision via Service
-            $instrumentInfo = $this->bybitApiService->getInstrumentsInfo($symbol);
+            $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $instrumentData = $instrumentInfo['list'][0];
             $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
             $pricePrec = (int) $instrumentData['priceScale'];
@@ -191,9 +237,10 @@ class BybitController extends Controller
                     'orderLinkId' => $orderLinkId,
                 ];
 
-                $responseData = $this->bybitApiService->createOrder($orderParams);
+                $responseData = $exchangeService->createOrder($orderParams);
 
                 Order::create([
+                    'user_id'        => auth()->id(),
                     'order_id'       => $responseData['orderId'] ?? null,
                     'order_link_id'  => $orderLinkId,
                     'symbol'         => $symbol,
@@ -218,17 +265,24 @@ class BybitController extends Controller
 
     public function destroy(Order $order)
     {
+        // Check if user has active exchange
+        $redirectResponse = $this->checkActiveExchange();
+        if ($redirectResponse) {
+            return $redirectResponse;
+        }
+        
         $status = $order->status;
 
         // Logic for 'pending' orders (Revoke)
         if ($status === 'pending') {
             try {
                 if ($order->order_id) {
-                    $this->bybitApiService->cancelOrder($order->order_id, $order->symbol);
+                    $exchangeService = $this->getExchangeService();
+                    $exchangeService->cancelOrder($order->order_id, $order->symbol);
                 }
             } catch (\Exception $e) {
                 // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
-                \Illuminate\Support\Facades\Log::warning("Could not cancel order {$order->order_id} on Bybit during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
             }
         }
         // For 'expired' orders, we just delete them from the DB.
@@ -245,6 +299,12 @@ class BybitController extends Controller
 
     public function close(Request $request, Order $order)
     {
+        // Check if user has active exchange
+        $redirectResponse = $this->checkActiveExchange();
+        if ($redirectResponse) {
+            return $redirectResponse;
+        }
+        
         $validated = $request->validate([
             'price_distance' => 'required|numeric|min:0',
         ]);
@@ -254,6 +314,7 @@ class BybitController extends Controller
         }
 
         try {
+            $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
             $priceDistance = (float)$validated['price_distance'];
 
@@ -262,14 +323,14 @@ class BybitController extends Controller
             // The user is manually closing the position.
 
             // 2. Get current market price
-            $tickerInfo = $this->bybitApiService->getTickerInfo($symbol);
+            $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
             if ($marketPrice === 0) {
                 throw new \Exception('امکان دریافت قیمت لحظه‌ای بازار برای ثبت سفارش بسته شدن وجود ندارد.');
             }
 
             // 3. Calculate the new closing price
-            $instrumentInfo = $this->bybitApiService->getInstrumentsInfo($symbol);
+            $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $pricePrec = (int) $instrumentInfo['list'][0]['priceScale'];
 
             $closePrice = ($order->side === 'buy')
@@ -290,7 +351,7 @@ class BybitController extends Controller
                 'timeInForce' => 'GTC',
             ];
 
-            $this->bybitApiService->createOrder($newTpOrderParams);
+            $exchangeService->createOrder($newTpOrderParams);
 
             return redirect()->route('orders.index')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
 

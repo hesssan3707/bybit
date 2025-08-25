@@ -1,9 +1,17 @@
 <?php
 
-use App\Http\Controllers\BybitController;
+use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SpotTradingController;
+use App\Http\Controllers\ApiDocumentationController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\ExchangeController;
+use App\Http\Controllers\MobileController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -23,27 +31,96 @@ Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('login', [LoginController::class, 'login']);
 Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 
+// Registration Routes
+Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+Route::post('register', [RegisterController::class, 'register']);
+
+// Password Reset Routes
+Route::get('password/forgot', [PasswordController::class, 'showForgotForm'])->name('password.forgot');
+Route::post('password/forgot', [PasswordController::class, 'forgotPassword']);
+Route::get('password/reset/{token}', [PasswordController::class, 'showResetForm'])->name('password.reset.form');
+Route::post('password/reset', [PasswordController::class, 'resetPassword'])->name('password.reset');
+
+// Public API Documentation Route
+Route::get('api-documentation', [ApiDocumentationController::class, 'index'])->name('api.documentation');
+
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [BybitController::class, 'index']); // Redirect home to orders list
-    Route::get('/set-order', [BybitController::class, 'create'])->name('order.create');
-    Route::post('/set-order', [BybitController::class, 'store'])->name('order.store');
-    Route::get('/orders', [BybitController::class, 'index'])->name('orders.index');
-    Route::post('/orders/{order}/close', [BybitController::class, 'close'])->name('orders.close');
-    Route::delete('/orders/{order}', [BybitController::class, 'destroy'])->name('orders.destroy');
-    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history');
+    Route::get('/', [FuturesController::class, 'index'])->middleware('exchange.access:futures'); // Redirect home to orders list
+    Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create')->middleware('exchange.access:futures');
+    Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store')->middleware('exchange.access:futures');
+    Route::get('/orders', [FuturesController::class, 'index'])->name('orders.index')->middleware('exchange.access:futures');
+    Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close')->middleware('exchange.access:futures');
+    Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy')->middleware('exchange.access:futures');
+    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history')->middleware('exchange.access:futures');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
+    
+    // Password Change Routes (requires authentication)
+    Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
+    Route::post('/password/change', [PasswordController::class, 'changePassword'])->name('password.change');
+    
+    // Settings Routes (requires authentication)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
+    
+    // Exchange Management Routes (requires authentication)
+    Route::prefix('exchanges')->group(function () {
+        Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
+        Route::get('/create', [ExchangeController::class, 'create'])->name('exchanges.create');
+        Route::post('/', [ExchangeController::class, 'store'])->name('exchanges.store');
+        Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
+        Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
+        Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
+        Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
+    });
+    
+    // Admin Routes (requires authentication and admin privileges)
+    Route::prefix('admin')->group(function () {
+        // User Management
+        Route::get('/pending-users', [UserManagementController::class, 'pendingUsers'])->name('admin.pending-users');
+        Route::get('/all-users', [UserManagementController::class, 'allUsers'])->name('admin.all-users');
+        Route::post('/users/{user}/activate', [UserManagementController::class, 'activateUser'])->name('admin.activate-user');
+        Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivateUser'])->name('admin.deactivate-user');
+        Route::delete('/users/{user}', [UserManagementController::class, 'deleteUser'])->name('admin.delete-user');
+        
+        // Exchange Management
+        Route::get('/pending-exchanges', [UserManagementController::class, 'pendingExchanges'])->name('admin.pending-exchanges');
+        Route::get('/all-exchanges', [UserManagementController::class, 'allExchanges'])->name('admin.all-exchanges');
+        Route::post('/exchanges/{exchange}/approve', [UserManagementController::class, 'approveExchange'])->name('admin.approve-exchange');
+        Route::post('/exchanges/{exchange}/reject', [UserManagementController::class, 'rejectExchange'])->name('admin.reject-exchange');
+        Route::post('/exchanges/{exchange}/deactivate', [UserManagementController::class, 'deactivateExchange'])->name('admin.deactivate-exchange');
+        Route::post('/exchanges/{exchange}/test', [UserManagementController::class, 'testExchangeConnection'])->name('admin.test-exchange');
+    });
+
+    // Spot Trading Routes - All require authentication
+    Route::prefix('spot')->group(function () {
+        Route::get('/orders', [SpotTradingController::class, 'spotOrdersView'])->name('spot.orders.view')->middleware('exchange.access:spot');
+        Route::get('/balances', function() {
+            return redirect()->route('balance');
+        })->name('spot.balances.view'); // Redirect to unified balance page
+        Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view')->middleware('exchange.access:spot');
+        Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web')->middleware('exchange.access:spot');
+    });
+
+    // Mobile Routes
+    Route::prefix('mobile')->group(function () {
+        Route::get('/balance', [MobileController::class, 'balance'])->name('mobile.balance');
+    });
+    
+    // Universal Balance Route (works for both web and mobile)
+    Route::get('/balance', [MobileController::class, 'balance'])->name('balance');
 
     // Maintenance Routes (should also be protected)
     
 });
 Route::get('/schedule', function() {
-    Artisan::call('bybit:lifecycle');
+    Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
-    echo '<br> lifecycle 1 done  <br>';
-    Artisan::call('bybit:enforce');
+    echo '<br> lifecycle done  <br>';
+    Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br> enforce done <br>';
-    Artisan::call('bybit:sync-sl');
+    Artisan::call('futures:sync-sl');
     print_r(Artisan::output());
     echo '<br> sync sl done <br> ';
     return 'DONE';

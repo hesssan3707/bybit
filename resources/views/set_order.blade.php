@@ -78,6 +78,8 @@
 @section('content')
 <div class="container">
     <h2>ثبت سفارش جدید</h2>
+    
+    @include('partials.exchange-access-check')
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
@@ -139,7 +141,20 @@
             @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
-        <button type="submit">ارسال سفارش</button>
+        {{-- Submit button with dynamic state based on access --}}
+        @php
+            $exchangeAccess = request()->attributes->get('exchange_access');
+            $accessRestricted = request()->attributes->get('access_restricted', false);
+            $hasAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
+        @endphp
+        
+        <button type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
+            @if($hasAccess)
+                ارسال سفارش
+            @else
+                برای ارسال سفارش ابتدا صرافی فعال کنید
+            @endif
+        </button>
     </form>
 </div>
 @endsection

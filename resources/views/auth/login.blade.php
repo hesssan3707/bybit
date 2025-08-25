@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
             --primary-color: #007bff;
@@ -51,6 +52,7 @@
             margin-bottom: 8px;
             font-weight: 600;
             color: var(--label-color);
+            text-align: right;
         }
         input {
             width: 100%;
@@ -87,6 +89,23 @@
             font-size: 14px;
             margin-top: 5px;
             display: block;
+            text-align: right;
+        }
+        .password-field {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+            user-select: none;
+        }
+        .password-toggle:hover {
+            color: var(--primary-color);
         }
     </style>
 </head>
@@ -98,22 +117,35 @@
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
-        @error('username')
+        @error('email')
             <div class="form-group">
-                <span class="invalid-feedback" role="alert" style="text-align: center;">
+                <span class="invalid-feedback" role="alert" style="text-align: right;">
                     <strong>{{ $message }}</strong>
                 </span>
             </div>
         @enderror
 
+        @if(session('success'))
+            <div class="form-group">
+                <div style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
+                    {{ session('success') }}
+                </div>
+            </div>
+        @endif
+
         <div class="form-group">
-            <label for="username">نام کاربری</label>
-            <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus>
+            <label for="email">ایمیل</label>
+            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
         </div>
 
         <div class="form-group">
             <label for="password">رمز عبور</label>
-            <input id="password" type="password" name="password" required>
+            <div class="password-field">
+                <input id="password" type="password" name="password" required>
+                <span class="password-toggle" onclick="togglePassword('password')">
+                    <i id="password-icon" class="fas fa-eye"></i>
+                </span>
+            </div>
             @error('password')
                 <span class="invalid-feedback" role="alert">
                     <strong>{{ $message }}</strong>
@@ -129,8 +161,33 @@
         </div>
 
         <button type="submit">ورود</button>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
+                عضویت جدید
+            </a>
+            <span style="color: #ccc;">|</span>
+            <a href="{{ route('password.forgot') }}" style="color: var(--primary-color); text-decoration: none; margin-right: 15px;">
+                فراموشی رمز عبور
+            </a>
+        </div>
     </form>
 </div>
+
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const icon = document.getElementById(fieldId + '-icon');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        field.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+</script>
 
 </body>
 </html>
