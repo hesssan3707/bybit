@@ -33,6 +33,8 @@ class User extends Authenticatable
         'password_reset_expires_at',
         'activated_at',
         'activated_by',
+        'future_strict_mode',
+        'future_strict_mode_activated_at',
     ];
 
     /**
@@ -60,6 +62,8 @@ class User extends Authenticatable
         'password_reset_expires_at' => 'datetime',
         'activated_at' => 'datetime',
         'is_active' => 'boolean',
+        'future_strict_mode' => 'boolean',
+        'future_strict_mode_activated_at' => 'datetime',
     ];
 
     /**

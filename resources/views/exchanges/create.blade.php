@@ -137,6 +137,22 @@
         padding-right: 20px;
         color: #856404;
     }
+    .password-field {
+        position: relative;
+    }
+    .password-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #666;
+        font-size: 18px;
+        user-select: none;
+    }
+    .password-toggle:hover {
+        color: var(--primary-color);
+    }
 </style>
 @endpush
 
@@ -211,8 +227,13 @@
 
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
-                        <input id="api_secret" type="password" name="api_secret" required 
-                               placeholder="کلید محرمانه صرافی خود را وارد کنید">
+                        <div class="password-field">
+                            <input id="api_secret" type="password" name="api_secret" required 
+                                   placeholder="کلید محرمانه صرافی خود را وارد کنید">
+                            <span class="password-toggle" onclick="togglePassword('api_secret')">
+                                <i id="api_secret-icon" class="fas fa-eye"></i>
+                            </span>
+                        </div>
                         @error('api_secret')
                             <span class="invalid-feedback" role="alert">
                                 <strong>{{ $message }}</strong>

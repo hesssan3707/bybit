@@ -399,6 +399,9 @@
             <a href="{{ route('password.change.form') }}" class="btn btn-primary">
                 تغییر رمز عبور
             </a>
+            <a href="{{ route('settings.index') }}" class="btn btn-success" style="margin-right: 10px;">
+                تنظیمات
+            </a>
         </div>
         
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger">

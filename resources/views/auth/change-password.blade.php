@@ -101,6 +101,23 @@
         border: 1px solid #f5c2c7;
     }
     
+    .password-field {
+        position: relative;
+    }
+    .password-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #666;
+        font-size: 18px;
+        user-select: none;
+    }
+    .password-toggle:hover {
+        color: var(--primary-color);
+    }
+    
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -180,7 +197,12 @@
 
             <div class="form-group">
                 <label for="current_password">رمز عبور فعلی</label>
-                <input id="current_password" type="password" name="current_password" required autofocus>
+                <div class="password-field">
+                    <input id="current_password" type="password" name="current_password" required autofocus>
+                    <span class="password-toggle" onclick="togglePassword('current_password')">
+                        <i id="current_password-icon" class="fas fa-eye"></i>
+                    </span>
+                </div>
                 @error('current_password')
                     <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>
@@ -190,7 +212,12 @@
 
             <div class="form-group">
                 <label for="password">رمز عبور جدید</label>
-                <input id="password" type="password" name="password" required>
+                <div class="password-field">
+                    <input id="password" type="password" name="password" required>
+                    <span class="password-toggle" onclick="togglePassword('password')">
+                        <i id="password-icon" class="fas fa-eye"></i>
+                    </span>
+                </div>
                 @error('password')
                     <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>
@@ -200,7 +227,12 @@
 
             <div class="form-group">
                 <label for="password_confirmation">تکرار رمز عبور جدید</label>
-                <input id="password_confirmation" type="password" name="password_confirmation" required>
+                <div class="password-field">
+                    <input id="password_confirmation" type="password" name="password_confirmation" required>
+                    <span class="password-toggle" onclick="togglePassword('password_confirmation')">
+                        <i id="password_confirmation-icon" class="fas fa-eye"></i>
+                    </span>
+                </div>
                 @error('password_confirmation')
                     <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>

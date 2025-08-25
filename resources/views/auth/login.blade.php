@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
             --primary-color: #007bff;
@@ -90,6 +91,22 @@
             display: block;
             text-align: right;
         }
+        .password-field {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+            user-select: none;
+        }
+        .password-toggle:hover {
+            color: var(--primary-color);
+        }
     </style>
 </head>
 <body>
@@ -123,7 +140,12 @@
 
         <div class="form-group">
             <label for="password">رمز عبور</label>
-            <input id="password" type="password" name="password" required>
+            <div class="password-field">
+                <input id="password" type="password" name="password" required>
+                <span class="password-toggle" onclick="togglePassword('password')">
+                    <i id="password-icon" class="fas fa-eye"></i>
+                </span>
+            </div>
             @error('password')
                 <span class="invalid-feedback" role="alert">
                     <strong>{{ $message }}</strong>
@@ -151,6 +173,21 @@
         </div>
     </form>
 </div>
+
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const icon = document.getElementById(fieldId + '-icon');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        field.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+</script>
 
 </body>
 </html>

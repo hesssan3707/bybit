@@ -3,7 +3,9 @@
 use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SpotTradingController;
+use App\Http\Controllers\ApiDocumentationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\PasswordController;
@@ -39,6 +41,9 @@ Route::post('password/forgot', [PasswordController::class, 'forgotPassword']);
 Route::get('password/reset/{token}', [PasswordController::class, 'showResetForm'])->name('password.reset.form');
 Route::post('password/reset', [PasswordController::class, 'resetPassword'])->name('password.reset');
 
+// Public API Documentation Route
+Route::get('api-documentation', [ApiDocumentationController::class, 'index'])->name('api.documentation');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [FuturesController::class, 'index'])->middleware('exchange.access:futures'); // Redirect home to orders list
     Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create')->middleware('exchange.access:futures');
@@ -53,6 +58,10 @@ Route::middleware(['auth'])->group(function () {
     // Password Change Routes (requires authentication)
     Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
     Route::post('/password/change', [PasswordController::class, 'changePassword'])->name('password.change');
+    
+    // Settings Routes (requires authentication)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
     
     // Exchange Management Routes (requires authentication)
     Route::prefix('exchanges')->group(function () {

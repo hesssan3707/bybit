@@ -36,14 +36,17 @@ class FuturesStopLossSync extends Command
 
     private function syncForAllUsers(): void
     {
-        $users = User::whereHas('activeExchanges')->get();
+        // Only process users with future_strict_mode enabled
+        $users = User::where('future_strict_mode', true)
+                    ->whereHas('activeExchanges')
+                    ->get();
         
         if ($users->isEmpty()) {
-            $this->info('No users with active exchanges found.');
+            $this->info('No users with future strict mode enabled and active exchanges found.');
             return;
         }
 
-        $this->info("Found {$users->count()} users with active exchanges.");
+        $this->info("Found {$users->count()} users with future strict mode enabled and active exchanges.");
         
         foreach ($users as $user) {
             try {
@@ -62,6 +65,12 @@ class FuturesStopLossSync extends Command
         $user = User::find($userId);
         if (!$user) {
             $this->warn("User {$userId} not found.");
+            return;
+        }
+
+        // Check if user has future strict mode enabled
+        if (!$user->future_strict_mode) {
+            $this->info("User {$userId} does not have future strict mode enabled. Skipping...");
             return;
         }
 

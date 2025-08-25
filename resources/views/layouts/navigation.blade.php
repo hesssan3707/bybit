@@ -123,6 +123,9 @@
             </div>
         </div>
         
+        <!-- API Documentation Link -->
+        <a href="{{ route('api.documentation') }}" style="margin: 0 15px; color: #667eea; font-weight: 600;" title="مستندات API">API مستندات</a>
+        
         @if(auth()->id() === 1)
         <!-- Admin Menu (only for admin user) -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
