@@ -126,8 +126,8 @@
         <!-- API Documentation Link -->
         <a href="{{ route('api.documentation') }}" style="margin: 0 15px; color: #667eea; font-weight: 600;" title="مستندات API">API مستندات</a>
         
-        @if(auth()->id() === 1)
-        <!-- Admin Menu (only for admin user) -->
+        @if(auth()->user()?->isAdmin())
+        <!-- Admin Menu (only for admin users) -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleAdminMenu(event)">مدیریت ▼</a>
             <div id="adminMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 220px; z-index: 1001;">

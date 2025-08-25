@@ -33,6 +33,7 @@ class User extends Authenticatable
         'password_reset_expires_at',
         'activated_at',
         'activated_by',
+        'role',
         'future_strict_mode',
         'future_strict_mode_activated_at',
     ];
@@ -424,8 +425,30 @@ class User extends Authenticatable
      */
     public function isAdmin()
     {
-        // For demo purposes, first user is admin
-        // In production, implement proper role-based system
-        return $this->id === 1;
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Set user role to admin
+     */
+    public function makeAdmin()
+    {
+        $this->update(['role' => 'admin']);
+    }
+
+    /**
+     * Remove admin role from user
+     */
+    public function removeAdmin()
+    {
+        $this->update(['role' => 'user']);
+    }
+
+    /**
+     * Scope for admin users only
+     */
+    public function scopeAdmin($query)
+    {
+        return $query->where('role', 'admin');
     }
 }

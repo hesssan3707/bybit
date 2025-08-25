@@ -75,7 +75,7 @@ Route::middleware(['auth'])->group(function () {
     });
     
     // Admin Routes (requires authentication and admin privileges)
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('admin')->group(function () {
         // User Management
         Route::get('/pending-users', [UserManagementController::class, 'pendingUsers'])->name('admin.pending-users');
         Route::get('/all-users', [UserManagementController::class, 'allUsers'])->name('admin.all-users');

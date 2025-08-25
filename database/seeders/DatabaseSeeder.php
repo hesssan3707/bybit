@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('admin123'),
             'is_active' => true,
             'activated_at' => now(),
+            'role' => 'admin',
         ]);
 
         echo "Created admin user:\n";
@@ -39,6 +40,7 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
             'activated_at' => now(),
             'activated_by' => $admin->id,
+            'role' => 'user',
         ]);
 
         echo "Created demo user:\n";

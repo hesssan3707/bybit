@@ -227,16 +227,6 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Check if current user is admin (for demo, you can implement proper role system)
-     */
-    private function isAdmin()
-    {
-        // For demo purposes, first user is admin
-        // In production, implement proper role-based system
-        return auth()->id() === 1;
-    }
-
-    /**
      * Exchange Management Methods
      */
     
@@ -375,25 +365,6 @@ class UserManagementController extends Controller
             Log::error('Exchange deactivation failed: ' . $e->getMessage());
             return back()->withErrors(['msg' => 'خطا در غیرفعال‌سازی صرافی.']);
         }
-    }
-
-    /**
-     * Middleware to check admin access
-     */
-    public function __construct()
-    {
-        $this->middleware(function ($request, $next) {
-            if (!$this->isAdmin()) {
-                if ($request->expectsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Unauthorized. Admin access required.'
-                    ], 403);
-                }
-                abort(403, 'دسترسی مجاز نیست. نیاز به دسترسی مدیر.');
-            }
-            return $next($request);
-        });
     }
 
     /**
