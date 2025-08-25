@@ -76,7 +76,19 @@ class WalletBalanceController extends Controller
                 
                 // Provide exchange-specific error messages
                 $exchangeName = $currentExchange->exchange_name ?? 'Unknown';
-                if (str_contains($e->getMessage(), 'not supported') || str_contains($e->getMessage(), 'Invalid')) {
+                $errorMessage = $e->getMessage();
+                
+                // Enhanced error detection for better user messages
+                if (str_contains($errorMessage, 'Unknown error') || 
+                    str_contains($errorMessage, 'N/A') || 
+                    str_contains($errorMessage, 'Msg: Unknown error') ||
+                    (str_contains($errorMessage, 'Code: N/A') && str_contains($errorMessage, 'Unknown'))) {
+                    $spotError = "دسترسی به این API محدود شده است. احتمالات:\n• آدرس IP شما در لیست مجاز نیست\n• کلید API مجوز دسترسی به این بخش را ندارد\n• تنظیمات امنیتی صرافی محدودیت ایجاد کرده\nلطفاً تنظیمات کلید API و IP را بررسی کنید.";
+                } elseif (str_contains($errorMessage, '10015') || str_contains($errorMessage, 'IP not allowed') || str_contains($errorMessage, 'Forbidden')) {
+                    $spotError = "آدرس IP شما در لیست مجاز کلید API قرار ندارد. به تنظیمات صرافی مراجعه کرده و IP فعلی را اضافه کنید.";
+                } elseif (str_contains($errorMessage, '10001') || str_contains($errorMessage, 'Invalid API key') || str_contains($errorMessage, 'Permission denied')) {
+                    $spotError = "کلید API شما مجوز دسترسی به معاملات اسپات را ندارد. لطفاً تنظیمات کلید API را بررسی کنید.";
+                } elseif (str_contains($errorMessage, 'not supported') || str_contains($errorMessage, 'Invalid')) {
                     $spotError = "صرافی {$exchangeName} از معاملات اسپات پشتیبانی نمی‌کند. به جای آن موجودی کل را از قسمت آتی مشاهده کنید.";
                 } else {
                     $spotError = 'خطا در دریافت موجودی اسپات: ' . $e->getMessage();
@@ -137,7 +149,16 @@ class WalletBalanceController extends Controller
                         Log::error('Failed to fetch alternative balance: ' . $altException->getMessage());
                     }
                 } else {
-                    $perpetualError = 'خطا در دریافت موجودی آتی: ' . $e->getMessage();
+                    // Enhanced error detection for perpetual balances
+                    $errorMessage = $e->getMessage();
+                    if (str_contains($errorMessage, 'Unknown error') || 
+                        str_contains($errorMessage, 'N/A') || 
+                        str_contains($errorMessage, 'Msg: Unknown error') ||
+                        (str_contains($errorMessage, 'Code: N/A') && str_contains($errorMessage, 'Unknown'))) {
+                        $perpetualError = "دسترسی به API محدود شده است. احتمالات:\n• آدرس IP شما در لیست مجاز نیست\n• کلید API مجوز دسترسی به این بخش را ندارد\n• تنظیمات امنیتی صرافی محدودیت ایجاد کرده\nلطفاً تنظیمات کلید API و IP را بررسی کنید.";
+                    } else {
+                        $perpetualError = 'خطا در دریافت موجودی آتی: ' . $e->getMessage();
+                    }
                 }
             }
 

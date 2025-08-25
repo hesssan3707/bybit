@@ -90,8 +90,8 @@ class SpotTradingController extends Controller
             $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
             $priceStep = (float)$instrument['priceFilter']['tickSize'];
             
-            // Round quantity to proper precision
-            $qty = $this->roundToStep($validated['qty'], $qtyStep);
+            // Validate and adjust quantity to meet minimum requirements
+            $qty = $this->validateAndAdjustQuantity($validated['qty'], $instrument);
             
             $orderParams = [
                 'side' => $validated['side'],
@@ -442,6 +442,50 @@ class SpotTradingController extends Controller
         return round($number / $step) * $step;
     }
 
+    /**
+     * Validate and adjust quantity to meet minimum requirements
+     * 
+     * @param float $qty
+     * @param array $instrument
+     * @return float
+     * @throws \Exception
+     */
+    private function validateAndAdjustQuantity($qty, $instrument)
+    {
+        $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
+        $minOrderQty = (float)$instrument['lotSizeFilter']['minOrderQty'];
+        
+        // Additional validation before processing
+        if ($qty <= 0) {
+            throw new \Exception("مقدار سفارش باید بزرگتر از صفر باشد. حداقل مجاز: {$minOrderQty}");
+        }
+        
+        // If input quantity is already less than minimum, reject immediately
+        if ($qty < $minOrderQty) {
+            throw new \Exception("مقدار وارد شده ({$qty}) کمتر از حداقل مجاز است. حداقل: {$minOrderQty}");
+        }
+        
+        // Round to step
+        $adjustedQty = $this->roundToStep($qty, $qtyStep);
+        
+        // Ensure rounding didn't make it zero or negative
+        if ($adjustedQty <= 0) {
+            throw new \Exception("مقدار پس از تنظیم دقت صفر شد. مقدار ورودی: {$qty}, حداقل مجاز: {$minOrderQty}, دقت: {$qtyStep}");
+        }
+        
+        // Final check after rounding
+        if ($adjustedQty < $minOrderQty) {
+            throw new \Exception("مقدار پس از تنظیم دقت ({$adjustedQty}) کمتر از حداقل مجاز است. حداقل: {$minOrderQty}");
+        }
+        
+        // Additional safety check - ensure it's not effectively zero
+        if ((string)$adjustedQty === '0' || (string)$adjustedQty === '0.0' || (string)$adjustedQty === '0.00000000') {
+            throw new \Exception("مقدار نهایی صفر محاسبه شد. مقدار ورودی: {$qty}, حداقل مجاز: {$minOrderQty}");
+        }
+        
+        return $adjustedQty;
+    }
+
     // Web View Methods
 
     /**
@@ -637,7 +681,8 @@ class SpotTradingController extends Controller
             $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
             $priceStep = (float)$instrument['priceFilter']['tickSize'];
             
-            $qty = $this->roundToStep($validated['qty'], $qtyStep);
+            // Validate and adjust quantity to meet minimum requirements
+            $qty = $this->validateAndAdjustQuantity($validated['qty'], $instrument);
 
             $orderParams = [
                 'side' => $validated['side'],
