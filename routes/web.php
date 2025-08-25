@@ -11,7 +11,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\ExchangeController;
-use App\Http\Controllers\MobileController;
+use App\Http\Controllers\WalletBalanceController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -102,13 +102,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web')->middleware('exchange.access:spot');
     });
 
-    // Mobile Routes
+    // Wallet Balance Routes
     Route::prefix('mobile')->group(function () {
-        Route::get('/balance', [MobileController::class, 'balance'])->name('mobile.balance');
+        Route::get('/balance', [WalletBalanceController::class, 'balance'])->name('mobile.balance');
     });
     
     // Universal Balance Route (works for both web and mobile)
-    Route::get('/balance', [MobileController::class, 'balance'])->name('balance');
+    Route::get('/balance', [WalletBalanceController::class, 'balance'])->name('balance');
 
     // Maintenance Routes (should also be protected)
     

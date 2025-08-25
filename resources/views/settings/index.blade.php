@@ -47,7 +47,8 @@
     }
     .warning-box {
         background: #fff3cd;
-        border: 1px solid #ffeaa7;
+        border: 1px solid #ffc107;
+        border-left: 4px solid #ffc107;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 15px;
@@ -127,6 +128,13 @@
         border: 1px solid #f5c2c7;
     }
     
+    /* Back to profile button styling */
+    .back-to-profile {
+        text-align: center;
+        margin-top: 30px;
+        padding: 0 15px;
+    }
+    
     /* Modal Styles */
     .modal {
         display: none;
@@ -196,6 +204,18 @@
         .btn {
             width: 100%;
             margin: 5px 0;
+        }
+        
+        .back-to-profile {
+            margin-top: 20px;
+            padding: 0 10px;
+        }
+        
+        .back-to-profile .btn {
+            width: calc(100% - 20px);
+            max-width: 300px;
+            margin: 0 auto;
+            display: block;
         }
     }
 </style>
@@ -267,7 +287,7 @@
         </div>
         
         <!-- Back to Profile Button -->
-        <div style="text-align: center; margin-top: 30px;">
+        <div class="back-to-profile">
             <a href="{{ route('profile.index') }}" class="btn btn-primary">
                 بازگشت به پروفایل
             </a>

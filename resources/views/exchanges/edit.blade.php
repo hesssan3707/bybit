@@ -105,7 +105,8 @@
     }
     .warning-box {
         background: #fff3cd;
-        border: 1px solid #ffeaa7;
+        border: 1px solid #ffc107;
+        border-left: 4px solid #ffc107;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;

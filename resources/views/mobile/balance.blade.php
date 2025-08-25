@@ -101,6 +101,15 @@
         border-radius: 8px;
         text-align: center;
         margin-bottom: 20px;
+        line-height: 1.6;
+    }
+    
+    .error-message a {
+        display: inline-block;
+        margin-top: 10px;
+        color: #c53030;
+        text-decoration: underline;
+        font-weight: bold;
     }
 
     .loading {

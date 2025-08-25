@@ -110,11 +110,11 @@
         color: #842029;
         border: 1px solid #f5c2c7;
     }
-    .nav-links {
+    .admin-nav-links {
         margin-bottom: 20px;
         text-align: center;
     }
-    .nav-links a {
+    .admin-nav-links a {
         display: inline-block;
         padding: 10px 20px;
         margin: 0 5px;
@@ -124,10 +124,10 @@
         border-radius: 8px;
         font-weight: bold;
     }
-    .nav-links a:hover {
+    .admin-nav-links a:hover {
         opacity: 0.8;
     }
-    .nav-links a.active {
+    .admin-nav-links a.active {
         background-color: var(--primary-hover);
     }
     .empty-state {
@@ -208,7 +208,7 @@
         <h2>مدیریت صرافی‌ها - درخواست‌های در انتظار تأیید</h2>
     </div>
 
-    <div class="nav-links">
+    <div class="admin-nav-links">
         <a href="{{ route('admin.pending-exchanges') }}" class="active">درخواست‌های در انتظار</a>
         <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
         <a href="{{ route('admin.pending-users') }}">کاربران در انتظار</a>

@@ -128,11 +128,11 @@
         color: #842029;
         border: 1px solid #f5c2c7;
     }
-    .nav-links {
+    .admin-nav-links {
         margin-bottom: 20px;
         text-align: center;
     }
-    .nav-links a {
+    .admin-nav-links a {
         display: inline-block;
         padding: 10px 20px;
         margin: 0 5px;
@@ -142,10 +142,10 @@
         border-radius: 8px;
         font-weight: bold;
     }
-    .nav-links a:hover {
+    .admin-nav-links a:hover {
         opacity: 0.8;
     }
-    .nav-links a.active {
+    .admin-nav-links a.active {
         background-color: var(--primary-hover);
     }
     .masked-key {
@@ -169,7 +169,7 @@
         <h2>مدیریت صرافی‌ها - همه صرافی‌ها</h2>
     </div>
 
-    <div class="nav-links">
+    <div class="admin-nav-links">
         <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های در انتظار</a>
         <a href="{{ route('admin.all-exchanges') }}" class="active">همه صرافی‌ها</a>
         <a href="{{ route('admin.pending-users') }}">کاربران در انتظار</a>
@@ -321,7 +321,7 @@
             </div>
             <div style="text-align: left;">
                 <button type="button" onclick="hideDeactivateModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; margin-left: 10px;">انصراف</button>
-                <button type="submit" style="background: #ffc107; color: black; border: none; padding: 10px 20px; border-radius: 6px;">غیرفعال کردن</button>
+                <button type="submit" style="background: #ffc107; color: white; border: none; padding: 10px 20px; border-radius: 6px;">غیرفعال کردن</button>
             </div>
         </form>
     </div>

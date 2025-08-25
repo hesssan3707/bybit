@@ -7,7 +7,7 @@ use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-class MobileController extends Controller
+class WalletBalanceController extends Controller
 {
     /**
      * Get the exchange service for the authenticated user

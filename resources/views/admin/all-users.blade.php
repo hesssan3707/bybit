@@ -98,11 +98,11 @@
         background-color: #f8d7da;
         color: #842029;
     }
-    .nav-links {
+    .admin-nav-links {
         margin-bottom: 20px;
         text-align: center;
     }
-    .nav-links a {
+    .admin-nav-links a {
         display: inline-block;
         padding: 10px 20px;
         margin: 0 5px;
@@ -112,7 +112,7 @@
         border-radius: 8px;
         font-weight: bold;
     }
-    .nav-links a:hover {
+    .admin-nav-links a:hover {
         opacity: 0.8;
     }
 </style>
@@ -124,7 +124,7 @@
         <h2>مدیریت کاربران - همه کاربران</h2>
     </div>
 
-    <div class="nav-links">
+    <div class="admin-nav-links">
         <a href="{{ route('admin.pending-users') }}">کاربران در انتظار تأیید</a>
         <a href="{{ route('admin.all-users') }}" class="active">همه کاربران</a>
     </div>

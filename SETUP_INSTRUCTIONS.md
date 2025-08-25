@@ -5,7 +5,7 @@
 ### Controllers
 - `BybitController.php` → `FuturesController.php` (handles futures/perpetual trading)
 - `SpotTradingController.php` → (kept same name, handles spot trading)
-- `MobileController.php` → (new, handles mobile-specific pages)
+- `WalletBalanceController.php` → (handles wallet balance and mobile balance pages)
 
 ### Console Commands
 - `BybitEnforceOrders.php` → `FuturesOrderEnforcer.php` 

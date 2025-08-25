@@ -157,17 +157,27 @@
         align-items: flex-start;
         padding: 15px;
         gap: 12px;
+        text-align: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+    
+    .exchange-access-alert .alert-content i {
+        margin: 0 auto 10px;
     }
     
     .exchange-access-alert i {
         font-size: 20px;
         margin-top: 2px;
         flex-shrink: 0;
+        align-self: center;
     }
     
     .exchange-access-alert .alert-text {
         flex: 1;
         line-height: 1.5;
+        text-align: center;
+        width: 100%;
     }
     
     .exchange-access-alert .alert-link {
@@ -185,16 +195,18 @@
     
     .alert-danger.exchange-access-alert {
         background: #f8d7da;
-        color: #842029;
+        color: #c53030;
+        border-left: 4px solid #e53e3e;
     }
     
     .alert-warning.exchange-access-alert {
         background: #fff3cd;
-        color: #664d03;
+        color: #856404;
+        border-left: 4px solid #ffc107;
     }
     
     .alert-danger.exchange-access-alert i {
-        color: #dc3545;
+        color: #e53e3e;
     }
     
     .alert-warning.exchange-access-alert i {

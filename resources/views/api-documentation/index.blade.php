@@ -8,7 +8,9 @@
         width: 100%;
         max-width: 1200px;
         margin: auto;
+        padding: 0;
     }
+    
     .doc-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -17,22 +19,39 @@
         margin-bottom: 30px;
         text-align: center;
     }
+    
+    .doc-section {
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    
+    .endpoint {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .endpoint:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
     .doc-header h1 {
         margin: 0 0 10px 0;
         font-size: 2.5em;
     }
+    
     .doc-header p {
         margin: 0;
         font-size: 1.1em;
         opacity: 0.9;
     }
-    .doc-section {
-        background: #ffffff;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-    }
+    
     .doc-section h2 {
         color: #333;
         border-bottom: 3px solid #667eea;
@@ -40,18 +59,12 @@
         margin-bottom: 25px;
         text-align: right;
     }
+    
     .doc-section h3 {
         color: #555;
         margin-top: 30px;
         margin-bottom: 15px;
         text-align: right;
-    }
-    .endpoint {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
     }
     .method {
         display: inline-block;
@@ -111,18 +124,25 @@
     .optional {
         color: #6c757d;
     }
-    .nav-links {
+    .doc-nav-links {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
         border-radius: 10px;
+        padding: 20px;
         margin-bottom: 30px;
         direction: rtl;
         text-align: right;
     }
-    .nav-links h3 {
+    
+    .doc-nav-links h3 {
         margin-top: 0;
+        margin-bottom: 15px;
         color: #333;
         text-align: right;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 10px;
     }
-    .nav-links a {
+    .doc-nav-links a {
         display: inline-block;
         color: #007bff;
         text-decoration: none;
@@ -131,7 +151,7 @@
         border-radius: 4px;
         transition: all 0.3s;
     }
-    .nav-links a:hover {
+    .doc-nav-links a:hover {
         background: #007bff;
         color: white;
     }
@@ -152,6 +172,28 @@
         margin: 10px 0;
         direction: ltr;
         text-align: left;
+    }
+    
+    /* Mobile-specific improvements */
+    .mobile-view {
+        background: #f8f9fa;
+    }
+    
+    .mobile-view .doc-section {
+        background: white;
+        box-shadow: none;
+        border: 1px solid #e9ecef;
+    }
+    
+    .mobile-view .endpoint {
+        background: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 10px;
+    }
+    
+    .mobile-view .doc-nav-links {
+        background: white;
+        border: 1px solid #e9ecef;
     }
     
     /* Text Direction Styles */
@@ -175,50 +217,322 @@
         text-align: left;
     }
     
+    /* Mobile table wrapper */
+    .table-wrapper {
+        overflow-x: auto;
+        margin: 15px 0;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    
+    /* Collapsible sections for mobile */
+    .endpoint-toggle {
+        display: none;
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        width: 100%;
+        text-align: right;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        font-size: 1em;
+        direction: rtl;
+    }
+    
+    .endpoint-content {
+        display: block;
+    }
+    
     /* Mobile responsive */
     @media (max-width: 768px) {
         .container {
             padding: 0;
-            margin: 0 auto;
+            margin: 0;
             width: 100%;
         }
-        .doc-header, .doc-section {
-            margin: 10px;
-            width: calc(100% - 20px);
+        
+        .doc-header {
+            margin: 0;
+            width: 100%;
+            padding: 20px 15px;
+            border-radius: 0;
             box-sizing: border-box;
         }
-        .doc-header {
-            padding: 20px;
-        }
+        
         .doc-header h1 {
-            font-size: 2em;
+            font-size: 1.8em;
+            margin-bottom: 8px;
         }
+        
+        .doc-header p {
+            font-size: 1em;
+        }
+        
         .doc-section {
-            padding: 20px;
+            margin: 0;
+            width: 100%;
+            padding: 20px 15px;
+            border-radius: 0;
+            box-sizing: border-box;
+            box-shadow: none;
+            border-bottom: 1px solid #e9ecef;
         }
-        .nav-links a {
-            display: block;
-            margin: 5px 0;
+        
+        .doc-section h2 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
         }
-        .param-table {
-            font-size: 14px;
+        
+        .doc-section h3 {
+            font-size: 1.2em;
+            margin-top: 25px;
+            margin-bottom: 12px;
         }
-        .code-block {
-            font-size: 12px;
+        
+        .doc-nav-links {
+            margin: 0;
+            width: 100%;
             padding: 15px;
+            border-radius: 0;
+            box-sizing: border-box;
+            background: #f8f9fa;
+            border: none;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .doc-nav-links h3 {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .doc-nav-links a {
+            display: block;
+            margin: 8px 0;
+            padding: 12px 15px;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .doc-nav-links a:hover {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .endpoint {
+            padding: 0;
+            margin-bottom: 0;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        
+        .endpoint + .endpoint {
+            border-top: 1px solid #e9ecef;
+            padding-top: 20px;
+        }
+        
+        .endpoint h3 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        .method {
+            display: inline-block;
+            margin: 8px 8px 8px 0;
+            text-align: center;
+            padding: 6px 12px;
+            font-size: 0.8em;
+        }
+        
+        .endpoint-url {
+            font-size: 0.85em;
+            padding: 10px;
+            margin: 10px 0;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+        }
+        
+        .endpoint-toggle {
+            display: block;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            padding: 12px 15px;
+        }
+        
+        .endpoint-content {
+            display: none;
+            padding: 0;
+        }
+        
+        .endpoint-content.active {
+            display: block;
+        }
+        
+        .param-table {
+            font-size: 0.8em;
+            width: 100%;
+            margin: 15px 0;
+            display: table;
+            border-collapse: collapse;
+        }
+        
+        .param-table th,
+        .param-table td {
+            padding: 8px 6px;
+            border: 1px solid #dee2e6;
+            word-wrap: break-word;
+        }
+        
+        .param-table th {
+            background: #f8f9fa;
+            font-size: 0.75em;
+        }
+        
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            background: white;
+        }
+        
+        .code-block {
+            font-size: 0.75em;
+            padding: 12px;
+            margin: 15px 0;
+            width: 100%;
+            border-radius: 6px;
+            overflow-x: auto;
+            box-sizing: border-box;
+        }
+        
+        .response-example {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        
+        .base-url {
+            margin: 0;
+            width: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+            border-radius: 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .base-url code {
+            font-size: 0.85em;
+            word-break: break-all;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .doc-header {
+            padding: 15px 10px;
+        }
+        
+        .doc-header h1 {
+            font-size: 1.5em;
+        }
+        
+        .doc-section {
+            padding: 15px 10px;
+        }
+        
+        .doc-section h2 {
+            font-size: 1.2em;
+        }
+        
+        .doc-nav-links {
+            padding: 10px;
+        }
+        
+        .doc-nav-links a {
+            padding: 10px 12px;
+            margin: 6px 0;
+            font-size: 0.9em;
+        }
+        
+        .endpoint-toggle {
+            padding: 10px 12px;
+            font-size: 0.85em;
+        }
+        
+        .method {
+            padding: 4px 8px;
+            font-size: 0.75em;
+        }
+        
+        .param-table {
+            font-size: 0.7em;
+        }
+        
+        .param-table th,
+        .param-table td {
+            padding: 6px 4px;
+        }
+        
+        .code-block {
+            font-size: 0.7em;
+            padding: 10px;
+        }
+        
+        .endpoint-url {
+            font-size: 0.8em;
+            padding: 8px;
+        }
+        
+        .base-url {
+            padding: 10px;
+        }
+    }
+    
+    /* Landscape tablets */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .container {
+            max-width: 95%;
+            padding: 0 15px;
+        }
+        
+        .doc-header, .doc-section {
+            margin: 15px 0;
+        }
+        
+        .param-table {
+            font-size: 0.9em;
+        }
+        
+        .code-block {
+            font-size: 0.9em;
         }
     }
 </style>
 @endpush
 
 @section('content')
-<div class="container">
+<div class="container" id="docs-container">
     <div class="doc-header">
         <h1>🔗 مستندات API</h1>
         <p>راهنمای کامل برای نحوه استفاده از API های پلتفرم Trader Bridge</p>
     </div>
 
-    <div class="nav-links">
+    <div class="doc-nav-links">
         <h3>📋 فهرست محتویات</h3>
         <a href="#authentication">احراز هویت</a>
         <a href="#futures-trading">معاملات آتی</a>
@@ -238,37 +552,41 @@
         <p>تمام درخواست‌های API نیاز به احراز هویت با استفاده از Bearer token دارند. ابتدا با ورود به سیستم، یک token دریافت کنید.</p>
 
         <div class="endpoint">
-            <h3>ورود به سیستم <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/auth/login</div>
-            <p>احراز هویت کاربر و دریافت token دسترسی.</p>
-            
-            <h4>پارامترهای درخواست:</h4>
-            <table class="param-table">
-                <tr>
-                    <th>پارامتر</th>
-                    <th>نوع</th>
-                    <th>الزامی</th>
-                    <th>توضیحات</th>
-                </tr>
-                <tr>
-                    <td>email</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>آدرس ایمیل کاربر</td>
-                </tr>
-                <tr>
-                    <td>password</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>رمز عبور کاربر</td>
-                </tr>
-                <tr>
-                    <td>exchange_name</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>صرافی مورد استفاده (bybit, binance, bingx)</td>
-                </tr>
-            </table>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ورود به سیستم - دریافت Token</button>
+            <div class="endpoint-content">
+                <h3>ورود به سیستم <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/api/auth/login</div>
+                <p>احراز هویت کاربر و دریافت token دسترسی.</p>
+                
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
+                        <tr>
+                            <th>پارامتر</th>
+                            <th>نوع</th>
+                            <th>الزامی</th>
+                            <th>توضیحات</th>
+                        </tr>
+                        <tr>
+                            <td>email</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>آدرس ایمیل کاربر</td>
+                        </tr>
+                        <tr>
+                            <td>password</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>رمز عبور کاربر</td>
+                        </tr>
+                        <tr>
+                            <td>exchange_name</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>صرافی مورد استفاده (bybit, binance, bingx)</td>
+                        </tr>
+                    </table>
+                </div>
 
             <h4>مثال درخواست:</h4>
             <div class="code-block">curl -X POST {{ url('/api/auth/login') }} \
@@ -298,12 +616,15 @@
         </div>
 
         <div class="endpoint">
-            <h3>خروج از سیستم <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/auth/logout</div>
-            <p>لغو token جاری.</p>
-            
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">خروج از سیستم</button>
+            <div class="endpoint-content">
+                <h3>خروج از سیستم <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/api/auth/logout</div>
+                <p>لغو token جاری.</p>
+                
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
         </div>
     </div>
 
@@ -312,16 +633,19 @@
         <h2>📈 معاملات آتی</h2>
 
         <div class="endpoint">
-            <h3>ایجاد سفارش آتی <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/store</div>
-            <p>ایجاد سفارش جدید معاملات آتی با stop loss و take profit.</p>
-            
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ایجاد سفارش آتی</button>
+            <div class="endpoint-content">
+                <h3>ایجاد سفارش آتی <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/api/store</div>
+                <p>ایجاد سفارش جدید معاملات آتی با stop loss و take profit.</p>
+                
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here
 Content-Type: application/json</div>
 
-            <h4>پارامترهای درخواست:</h4>
-            <table class="param-table">
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
                 <tr>
                     <th>پارامتر</th>
                     <th>نوع</th>
@@ -377,6 +701,7 @@ Content-Type: application/json</div>
                     <td>تعداد مراحل ورود (پیش‌فرض: 1)</td>
                 </tr>
             </table>
+                </div>
 
             <h4>مثال درخواست:</h4>
             <div class="code-block">curl -X POST {{ url('/api/store') }} \
@@ -392,6 +717,7 @@ Content-Type: application/json</div>
     "expire_minutes": 120,
     "steps": 1
   }'</div>
+            </div>
         </div>
 
         <div class="endpoint">
@@ -449,16 +775,19 @@ Content-Type: application/json</div>
         <h2>💰 معاملات اسپات</h2>
 
         <div class="endpoint">
-            <h3>ایجاد سفارش اسپات <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/spot/orders</div>
-            <p>ایجاد یک سفارش معاملات اسپات جدید.</p>
-            
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ایجاد سفارش اسپات</button>
+            <div class="endpoint-content">
+                <h3>ایجاد سفارش اسپات <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/api/spot/orders</div>
+                <p>ایجاد یک سفارش معاملات اسپات جدید.</p>
+                
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here
 Content-Type: application/json</div>
 
-            <h4>پارامترهای درخواست:</h4>
-            <table class="param-table">
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
                 <tr>
                     <th>پارامتر</th>
                     <th>نوع</th>
@@ -495,7 +824,8 @@ Content-Type: application/json</div>
                     <td class="optional">اختیاری</td>
                     <td>قیمت سفارش (برای سفارشات Limit الزامی است)</td>
                 </tr>
-            </table>
+                </table>
+                </div>
 
             <h4>مثال درخواست:</h4>
             <div class="code-block">curl -X POST {{ url('/api/spot/orders') }} \
@@ -508,6 +838,7 @@ Content-Type: application/json</div>
     "qty": 0.1,
     "price": 2000
   }'</div>
+            </div>
         </div>
 
         <div class="endpoint">
@@ -752,4 +1083,120 @@ Content-Type: application/json</div>
         </ul>
     </div>
 </div>
+
+@push('scripts')
+<script>
+function toggleEndpoint(button) {
+    const content = button.nextElementSibling;
+    const isActive = content.classList.contains('active');
+    
+    // Close all other open endpoints on mobile for cleaner view
+    if (window.innerWidth <= 768) {
+        document.querySelectorAll('.endpoint-content.active').forEach(el => {
+            if (el !== content) {
+                el.classList.remove('active');
+                const btn = el.previousElementSibling;
+                if (btn && btn.classList.contains('endpoint-toggle')) {
+                    btn.style.background = '#007bff';
+                    btn.textContent = btn.textContent.replace(' ✓', '');
+                }
+            }
+        });
+    }
+    
+    // Toggle current endpoint with visual feedback
+    if (!isActive) {
+        content.classList.add('active');
+        button.style.background = '#28a745';
+        button.textContent = button.textContent + ' ✓';
+        
+        // Smooth scroll to the opened section
+        if (window.innerWidth <= 768) {
+            setTimeout(() => {
+                button.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+    } else {
+        content.classList.remove('active');
+        button.style.background = '#007bff';
+        button.textContent = button.textContent.replace(' ✓', '');
+    }
+}
+
+// Auto-expand endpoints on larger screens, collapse on mobile
+function handleResize() {
+    const contents = document.querySelectorAll('.endpoint-content');
+    const buttons = document.querySelectorAll('.endpoint-toggle');
+    
+    if (window.innerWidth > 768) {
+        // Desktop view - show all content
+        contents.forEach(content => {
+            content.classList.add('active');
+            content.style.display = 'block';
+        });
+        buttons.forEach(btn => {
+            btn.style.background = '#007bff';
+            btn.textContent = btn.textContent.replace(' ✓', '');
+        });
+    } else {
+        // Mobile view - collapse all initially
+        contents.forEach(content => {
+            content.classList.remove('active');
+            content.style.display = 'none';
+        });
+        buttons.forEach(btn => {
+            btn.style.background = '#007bff';
+            btn.textContent = btn.textContent.replace(' ✓', '');
+        });
+    }
+}
+
+// Smooth scrolling for navigation links
+function setupSmoothScrolling() {
+    document.querySelectorAll('.doc-nav-links a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            
+            if (targetElement) {
+                const offsetTop = targetElement.offsetTop - 20;
+                window.scrollTo({
+                    top: offsetTop,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('docs-container');
+    
+    // Add mobile class for additional styling control
+    function updateMobileClass() {
+        if (window.innerWidth <= 768) {
+            container.classList.add('mobile-view');
+        } else {
+            container.classList.remove('mobile-view');
+        }
+    }
+    
+    updateMobileClass();
+    handleResize();
+    setupSmoothScrolling();
+    
+    // Debounced resize handler for better performance
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            updateMobileClass();
+            handleResize();
+        }, 150);
+    });
+});
+</script>
+@endpush
 @endsection

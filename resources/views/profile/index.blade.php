@@ -200,6 +200,16 @@
         margin-bottom: 20px;
     }
     
+    /* Profile buttons styling */
+    .profile-buttons {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+    
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -301,10 +311,23 @@
             padding: 12px 16px;
             margin: 3px;
             font-size: 0.9em;
-            display: block;
-            width: 100%;
+            flex: 1;
+            min-width: calc(50% - 10px);
+            max-width: 200px;
             box-sizing: border-box;
             text-align: center;
+        }
+        
+        .profile-buttons {
+            flex-direction: column;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .profile-buttons .btn {
+            width: 100%;
+            max-width: none;
+            flex: none;
         }
         
         .no-exchange {
@@ -395,11 +418,11 @@
             </div>
         @endif
         
-        <div style="margin: 20px 0;">
+        <div class="profile-buttons">
             <a href="{{ route('password.change.form') }}" class="btn btn-primary">
                 تغییر رمز عبور
             </a>
-            <a href="{{ route('settings.index') }}" class="btn btn-success" style="margin-right: 10px;">
+            <a href="{{ route('settings.index') }}" class="btn btn-success">
                 تنظیمات
             </a>
         </div>
