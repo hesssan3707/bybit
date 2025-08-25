@@ -45,6 +45,87 @@ class FuturesController extends Controller
         }
     }
 
+    /**
+     * Parse Bybit API error message and return user-friendly message
+     * 
+     * @param string $errorMessage
+     * @return string
+     */
+    private function parseBybitError($errorMessage)
+    {
+        // Extract error code if present
+        $errorCode = null;
+        if (preg_match('/Code: (\d+)/', $errorMessage, $matches)) {
+            $errorCode = $matches[1];
+        }
+        
+        // Extract symbol if present
+        $symbol = null;
+        if (preg_match('/"symbol":"([^"]+)"/', $errorMessage, $matches)) {
+            $symbol = $matches[1];
+        }
+        
+        // Extract side if present  
+        $side = null;
+        if (preg_match('/"side":"([^"]+)"/', $errorMessage, $matches)) {
+            $side = $matches[1] === 'Buy' ? 'خرید' : 'فروش';
+        }
+        
+        // Extract quantity if present
+        $qty = null;
+        if (preg_match('/"qty":"([^"]+)"/', $errorMessage, $matches)) {
+            $qty = $matches[1];
+        }
+        
+        // Map specific error codes to user-friendly messages
+        switch ($errorCode) {
+            case '170131': // Insufficient balance
+                return "موجودی USDT شما برای این معامله آتی کافی نیست.\n" .
+                       "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید.";
+                
+            case '10001': // Parameter error
+                if (str_contains($errorMessage, 'minimum limit')) {
+                    return "مقدار سفارش ({$qty}) کمتر از حداقل مجاز است.\n" .
+                           "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
+                } elseif (str_contains($errorMessage, 'qty')) {
+                    return "مقدار سفارش نامعتبر است ({$qty}).\n" .
+                           "احتمالاً مقدار محاسبه شده خیلی کوچک است. لطفاً درصد ریسک را افزایش دهید.";
+                } elseif (str_contains($errorMessage, 'price')) {
+                    return "قیمت سفارش نامعتبر است.\n" .
+                           "لطفاً قیمت صحیح وارد کنید.";
+                } else {
+                    return "اطلاعات سفارش نامعتبر است.\n" .
+                           "لطفاً اطلاعات وارد شده را بررسی کنید.";
+                }
+                
+            case '110003': // Order quantity exceeds upper limit
+                return "مقدار سفارش از حد مجاز بیشتر است.\n" .
+                       "لطفاً درصد ریسک را کاهش دهید.";
+                
+            case '110012': // Order quantity is lower than the minimum
+                return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
+                       "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
+                
+            case '110025': // Order would immediately trigger
+                return "سفارش شما بلافاصله اجرا می‌شود.\n" .
+                       "برای سفارش محدود، قیمت مناسب‌تری انتخاب کنید.";
+                
+            default:
+                // Generic error handling
+                if (str_contains($errorMessage, 'Insufficient balance')) {
+                    return "موجودی حساب شما کافی نیست.\n" .
+                           "لطفاً ابتدا حساب خود را شارژ کنید.";
+                } elseif (str_contains($errorMessage, 'minimum limit')) {
+                    return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
+                           "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
+                } else {
+                    // Return a generic but helpful message
+                    return "خطا در ایجاد سفارش رخ داد.\n" .
+                           "لطفاً اطلاعات وارد شده را بررسی کرده و دوباره تلاش کنید.";
+                }
+        }
+    }
+
     public function index()
     {
         // Check if user has active exchange
@@ -224,10 +305,32 @@ class FuturesController extends Controller
             $instrumentData = $instrumentInfo['list'][0];
             $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
             $pricePrec = (int) $instrumentData['priceScale'];
+            
+            // Get minimum order quantity from instrument data
+            $minOrderQty = (float)($instrumentData['lotSizeFilter']['minOrderQty'] ?? 0.01);
+            $qtyStep = (float)($instrumentData['lotSizeFilter']['qtyStep'] ?? 0.01);
+            
             $amount = round($amount, $amountPrec);
 
             // Create Orders via Service
             $amountPerStep = round($amount / $steps, $amountPrec);
+            
+            // Critical fix: Ensure quantity doesn't become zero after rounding
+            if ($amountPerStep <= 0 || $amountPerStep < $minOrderQty) {
+                // If the calculated amount per step is too small, adjust it
+                $amountPerStep = max($minOrderQty, $qtyStep);
+                
+                // Recalculate total amount based on minimum viable step amount
+                $totalMinAmount = $amountPerStep * $steps;
+                $requiredMinLoss = $totalMinAmount * $slDistance;
+                
+                throw new \Exception(
+                    "مقدار محاسبه شده برای هر مرحله ({$amount}/{$steps} = " . round($amount/$steps, 8) . ") کمتر از حداقل مجاز صرافی است.\n" .
+                    "حداقل مقدار مجاز: {$minOrderQty}\n" .
+                    "برای {$steps} مرحله، حداقل ریسک مورد نیاز: " . round($requiredMinLoss, 2) . " USDT\n" .
+                    "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید."
+                );
+            }
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
 
             foreach (range(0, $steps - 1) as $i) {
@@ -267,7 +370,12 @@ class FuturesController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            return back()->withErrors(['msg' => 'خطای API رخ داد: ' . $e->getMessage()])->withInput();
+            Log::error('Futures order creation failed: ' . $e->getMessage());
+            
+            // Parse Bybit error message for user-friendly response
+            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            
+            return back()->withErrors(['msg' => $userFriendlyMessage])->withInput();
         }
 
         return back()->with('success', "سفارش شما با موفقیت ثبت شد.");
@@ -366,7 +474,12 @@ class FuturesController extends Controller
             return redirect()->route('orders.index')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
 
         } catch (\Exception $e) {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'خطا در ثبت سفارش بسته شدن: ' . $e->getMessage()]);
+            Log::error('Futures order close failed: ' . $e->getMessage());
+            
+            // Parse Bybit error message for user-friendly response
+            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            
+            return redirect()->route('orders.index')->withErrors(['msg' => $userFriendlyMessage]);
         }
     }
 }
