@@ -482,6 +482,11 @@ class BingXApiService implements ExchangeApiServiceInterface
         throw new \Exception('BingX spot does not support futures stop loss');
     }
 
+    public function setStopLossAdvanced(array $params): array
+    {
+        throw new \Exception('BingX spot does not support futures stop loss with advanced parameters');
+    }
+
     public function getInstrumentsInfo(): array
     {
         return $this->getTradingPairs();

@@ -90,6 +90,12 @@ interface ExchangeApiServiceInterface
     public function setStopLoss(string $symbol, float $stopLoss, string $side): array;
 
     /**
+     * Set stop loss with advanced parameters
+     * Allows setting additional parameters like tpslMode, positionIdx, trigger types, etc.
+     */
+    public function setStopLossAdvanced(array $params): array;
+
+    /**
      * Get trading symbols/instruments
      */
     public function getInstrumentsInfo(): array;

@@ -154,26 +154,39 @@ class FuturesStopLossSync extends Command
                     $this->warn("    SL mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
 
                     try {
-                        // Prepare parameters to update stop loss
+                        // Prepare parameters to update stop loss with all required fields
                         $params = [
                             'category' => 'linear',
                             'symbol' => $symbol,
                             'stopLoss' => (string)$databaseSl,
-                            'takeProfit' => (string)(float)($matchingPosition['takeProfit'] ?? "0"),
-                            'tpslMode' => $matchingPosition['tpslMode'] ?? 'Full',
-                            'tpTriggerBy' => $matchingPosition['tpTriggerBy'] ?? 'LastPrice',
-                            'slTriggerBy' => $matchingPosition['slTriggerBy'] ?? 'LastPrice',
-                            'positionIdx' => $matchingPosition['positionIdx'] ?? 0,
+                            'tpslMode' => 'Full', // Use Full mode for entire position
+                            'positionIdx' => (int)($matchingPosition['positionIdx'] ?? 0),
                         ];
 
-                        $exchangeService->setStopLoss($symbol, $databaseSl, $dbOrder->side);
+                        // Preserve existing take profit if it exists
+                        $existingTp = (float)($matchingPosition['takeProfit'] ?? 0);
+                        if ($existingTp > 0) {
+                            $params['takeProfit'] = (string)$existingTp;
+                        }
+
+                        // Preserve trigger settings if they exist
+                        if (isset($matchingPosition['tpTriggerBy']) && !empty($matchingPosition['tpTriggerBy'])) {
+                            $params['tpTriggerBy'] = $matchingPosition['tpTriggerBy'];
+                        }
+                        if (isset($matchingPosition['slTriggerBy']) && !empty($matchingPosition['slTriggerBy'])) {
+                            $params['slTriggerBy'] = $matchingPosition['slTriggerBy'];
+                        }
+
+                        // Use the advanced method with all parameters
+                        $exchangeService->setStopLossAdvanced($params);
                         $this->info("    Successfully reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} to {$databaseSl}");
                     } catch (\Exception $e) {
                         $this->error("    Failed to reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol}: " . $e->getMessage());
                         Log::error("Failed to reset SL for user {$userId} on exchange {$userExchange->exchange_name}", [
                             'symbol' => $symbol,
                             'order_id' => $dbOrder->id,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
+                            'api_params' => $params ?? null
                         ]);
                     }
                 } else {

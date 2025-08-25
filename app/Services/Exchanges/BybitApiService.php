@@ -324,7 +324,22 @@ class BybitApiService implements ExchangeApiServiceInterface
             'symbol' => $symbol,
             'stopLoss' => (string)$stopLoss,
             'positionIdx' => 0, // One-way mode
+            'tpslMode' => 'Full', // Required parameter for Bybit API v5
         ]);
+    }
+
+    /**
+     * Enhanced method to set stop loss with additional parameters
+     * Useful for preserving existing take profit and other settings
+     */
+    public function setStopLossAdvanced(array $params): array
+    {
+        // Ensure required parameters are set
+        $params['category'] = $params['category'] ?? 'linear';
+        $params['tpslMode'] = $params['tpslMode'] ?? 'Full';
+        $params['positionIdx'] = $params['positionIdx'] ?? 0;
+        
+        return $this->setTradingStop($params);
     }
 
     public function getExchangeName(): string
