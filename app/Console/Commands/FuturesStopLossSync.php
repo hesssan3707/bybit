@@ -86,6 +86,7 @@ class FuturesStopLossSync extends Command
             } catch (\Exception $e) {
                 $this->error("Failed to sync stop loss for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
                 Log::error("Stop loss sync failed", [
+                    'user_exchange_id' => $userExchange->id,
                     'user_id' => $userId,
                     'exchange' => $userExchange->exchange_name,
                     'error' => $e->getMessage()

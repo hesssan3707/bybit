@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('trades', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('user_exchange_id')->nullable();
+            $table->unsignedBigInteger('user_exchange_id');
             $table->string('symbol');
             $table->enum('side', ['Buy', 'Sell']);
             $table->string('order_type');
@@ -28,11 +27,9 @@ return new class extends Migration
             $table->timestamps();
             
             // Foreign key constraints
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('user_exchange_id')->references('id')->on('user_exchanges')->onDelete('set null');
+            $table->foreign('user_exchange_id')->references('id')->on('user_exchanges')->onDelete('cascade');
             
             // Indexes
-            $table->index(['user_id', 'closed_at']);
             $table->index(['user_exchange_id', 'closed_at']);
             $table->index('order_id');
             $table->index('symbol');

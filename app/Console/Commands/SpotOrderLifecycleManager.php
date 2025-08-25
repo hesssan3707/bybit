@@ -95,6 +95,7 @@ class SpotOrderLifecycleManager extends Command
             } catch (\Exception $e) {
                 $this->error("Failed to manage spot orders for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
                 Log::error("Spot order lifecycle management failed", [
+                    'user_exchange_id' => $userExchange->id,
                     'user_id' => $userId,
                     'exchange' => $userExchange->exchange_name,
                     'error' => $e->getMessage()

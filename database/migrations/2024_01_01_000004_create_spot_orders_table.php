@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('spot_orders', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('user_exchange_id')->nullable();
+            $table->unsignedBigInteger('user_exchange_id');
             $table->string('order_id')->nullable(); // Exchange order ID
             $table->string('order_link_id')->nullable(); // Our internal reference
             $table->string('symbol'); // Trading pair (e.g., BTCUSDT)
@@ -31,11 +30,9 @@ return new class extends Migration
             $table->timestamps();
             
             // Foreign key constraints
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('user_exchange_id')->references('id')->on('user_exchanges')->onDelete('set null');
+            $table->foreign('user_exchange_id')->references('id')->on('user_exchanges')->onDelete('cascade');
             
             // Indexes
-            $table->index(['user_id', 'status']);
             $table->index(['user_exchange_id', 'status']);
             $table->index('order_id');
             $table->index('symbol');

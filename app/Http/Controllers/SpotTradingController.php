@@ -259,9 +259,19 @@ class SpotTradingController extends Controller
                 $quoteCoin = 'ETH';
             }
 
+            // Get user's current active exchange ID
+            $user = $request->user();
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            if (!$currentExchange) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.'
+                ], 400);
+            }
+
             // Save order to database
             $spotOrder = SpotOrder::create([
-                'user_id' => $request->user()->id,
+                'user_exchange_id' => $currentExchange->id,
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],
@@ -866,8 +876,15 @@ class SpotTradingController extends Controller
                 $quoteCoin = 'ETH';
             }
 
+            // Get user's current active exchange ID
+            $user = auth()->user();
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            if (!$currentExchange) {
+                return back()->withErrors(['msg' => 'لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.'])->withInput();
+            }
+
             SpotOrder::create([
-                'user_id' => auth()->id(),
+                'user_exchange_id' => $currentExchange->id,
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],

@@ -287,6 +287,7 @@ class FuturesController extends Controller
             // Fetch live wallet balance instead of using a static .env variable
             $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
             $usdtBalanceData = $balanceInfo['list'][0] ?? null;
+            
             if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
                 throw new \Exception('امکان دریافت موجودی کیف پول از صرافی وجود ندارد.');
             }
@@ -307,31 +308,8 @@ class FuturesController extends Controller
             $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
             $pricePrec = (int) $instrumentData['priceScale'];
             
-            // Get minimum order quantity from instrument data
-            $minOrderQty = (float)($instrumentData['lotSizeFilter']['minOrderQty'] ?? 0.01);
-            $qtyStep = (float)($instrumentData['lotSizeFilter']['qtyStep'] ?? 0.01);
-            
-            $amount = round($amount, $amountPrec);
-
             // Create Orders via Service
-            $amountPerStep = round($amount / $steps, $amountPrec);
-            
-            // Critical fix: Ensure quantity doesn't become zero after rounding
-            if ($amountPerStep <= 0 || $amountPerStep < $minOrderQty) {
-                // If the calculated amount per step is too small, adjust it
-                $amountPerStep = max($minOrderQty, $qtyStep);
-                
-                // Recalculate total amount based on minimum viable step amount
-                $totalMinAmount = $amountPerStep * $steps;
-                $requiredMinLoss = $totalMinAmount * $slDistance;
-                
-                throw new \Exception(
-                    "مقدار محاسبه شده برای هر مرحله ({$amount}/{$steps} = " . round($amount/$steps, 8) . ") کمتر از حداقل مجاز صرافی است.\n" .
-                    "حداقل مقدار مجاز: {$minOrderQty}\n" .
-                    "برای {$steps} مرحله، حداقل ریسک مورد نیاز: " . round($requiredMinLoss, 2) . " USDT\n" .
-                    "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید."
-                );
-            }
+            $amountPerStep = $amount / $steps;
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
 
             foreach (range(0, $steps - 1) as $i) {
@@ -339,35 +317,47 @@ class FuturesController extends Controller
 
                 $orderLinkId = (string) Str::uuid();
 
+                // Round only the final order parameters (like the old version)
+                $finalQty = round($amountPerStep, 2); // Round to 2 decimal places like old version
+                $finalPrice = round($price, 2); // Round price to 2 decimal places
+                $finalSL = round((float)$validated['sl'], 2); // Round SL to 2 decimal places
+                
                 $orderParams = [
                     'category' => 'linear',
                     'symbol' => $symbol,
                     'side' => $side,
                     'orderType' => 'Limit',
-                    'qty' => (string)$amountPerStep,
-                    'price' => (string)$price,
+                    'qty' => (string)$finalQty,
+                    'price' => (string)$finalPrice,
                     'timeInForce' => 'GTC',
-                    'stopLoss'  => (string)$validated['sl'],
+                    'stopLoss'  => (string)$finalSL,
                     'orderLinkId' => $orderLinkId,
                 ];
 
                 $responseData = $exchangeService->createOrder($orderParams);
 
+                // Get user's current active exchange ID
+                $user = auth()->user();
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if (!$currentExchange) {
+                    throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
+                }
+
                 Order::create([
-                    'user_id'        => auth()->id(),
-                    'order_id'       => $responseData['orderId'] ?? null,
-                    'order_link_id'  => $orderLinkId,
-                    'symbol'         => $symbol,
-                    'entry_price'    => $price,
-                    'tp'             => (float)$validated['tp'],
-                    'sl'             => (float)$validated['sl'],
-                    'steps'          => $steps,
-                    'expire_minutes' => (int)$validated['expire'],
-                    'status'         => 'pending',
-                    'side'           => strtolower($side),
-                    'amount'         => $amountPerStep,
-                    'entry_low'      => $entry1,
-                    'entry_high'     => $entry2,
+                    'user_exchange_id' => $currentExchange->id,
+                    'order_id'         => $responseData['orderId'] ?? null,
+                    'order_link_id'    => $orderLinkId,
+                    'symbol'           => $symbol,
+                    'entry_price'      => $finalPrice,
+                    'tp'               => (float)$validated['tp'],
+                    'sl'               => (float)$validated['sl'],
+                    'steps'            => $steps,
+                    'expire_minutes'   => (int)$validated['expire'],
+                    'status'           => 'pending',
+                    'side'             => strtolower($side),
+                    'amount'           => $finalQty, // Use the rounded quantity that was sent to Bybit
+                    'entry_low'        => $entry1,
+                    'entry_high'       => $entry2,
                 ]);
             }
         } catch (\Exception $e) {

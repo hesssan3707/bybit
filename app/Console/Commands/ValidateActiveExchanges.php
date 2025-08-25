@@ -96,6 +96,7 @@ class ValidateActiveExchanges extends Command
                 Log::error('Exchange validation failed', [
                     'exchange_id' => $exchange->id,
                     'exchange_name' => $exchange->exchange_name,
+                    'user_exchange_id' => $exchange->id,
                     'user_id' => $exchange->user_id,
                     'error' => $e->getMessage()
                 ]);
@@ -159,6 +160,7 @@ class ValidateActiveExchanges extends Command
         Log::info('Exchange validation performed', [
             'exchange_id' => $exchange->id,
             'exchange_name' => $exchange->exchange_name,
+            'user_exchange_id' => $exchange->id,
             'user_id' => $exchange->user_id,
             'spot_success' => $validation['spot']['success'] ?? false,
             'futures_success' => $validation['futures']['success'] ?? false,
