@@ -9,6 +9,7 @@ use App\Services\Exchanges\ExchangeApiServiceInterface;
 use App\Traits\HandlesExchangeAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class FuturesController extends Controller
 {
