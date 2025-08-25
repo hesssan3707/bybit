@@ -198,9 +198,12 @@ class BybitApiService implements ExchangeApiServiceInterface
     /**
      * Get spot trading symbols information
      */
-    public function getSpotInstrumentsInfo(): array
+    public function getSpotInstrumentsInfo(string $symbol = null): array
     {
         $params = ['category' => 'spot'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
         return $this->sendRequest('GET', '/v5/market/instruments-info', $params);
     }
 

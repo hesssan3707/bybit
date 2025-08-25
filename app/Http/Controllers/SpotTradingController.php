@@ -80,15 +80,17 @@ class SpotTradingController extends Controller
             if (empty($instrumentInfo['list'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid trading symbol'
+                    'message' => 'Invalid trading symbol: ' . $validated['symbol']
                 ], 400);
             }
 
             $instrument = $instrumentInfo['list'][0];
             
             // Format quantity and price according to instrument precision
-            $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
-            $priceStep = (float)$instrument['priceFilter']['tickSize'];
+            $lotSizeFilter = $instrument['lotSizeFilter'] ?? [];
+            $priceFilter = $instrument['priceFilter'] ?? [];
+            $qtyStep = (float)($lotSizeFilter['qtyStep'] ?? $lotSizeFilter['basePrecision'] ?? 0.00000001);
+            $priceStep = (float)($priceFilter['tickSize'] ?? $priceFilter['quotePrecision'] ?? 0.01);
             
             // Validate and adjust quantity to meet minimum requirements
             $qty = $this->validateAndAdjustQuantity($validated['qty'], $instrument);
@@ -397,15 +399,18 @@ class SpotTradingController extends Controller
             $tradingPairs = [];
             if (isset($result['list']) && is_array($result['list'])) {
                 foreach ($result['list'] as $instrument) {
+                    $lotSizeFilter = $instrument['lotSizeFilter'] ?? [];
+                    $priceFilter = $instrument['priceFilter'] ?? [];
+                    
                     $tradingPairs[] = [
-                        'symbol' => $instrument['symbol'],
-                        'baseCoin' => $instrument['baseCoin'],
-                        'quoteCoin' => $instrument['quoteCoin'],
-                        'status' => $instrument['status'],
-                        'minOrderQty' => $instrument['lotSizeFilter']['minOrderQty'],
-                        'maxOrderQty' => $instrument['lotSizeFilter']['maxOrderQty'],
-                        'qtyStep' => $instrument['lotSizeFilter']['qtyStep'],
-                        'tickSize' => $instrument['priceFilter']['tickSize'],
+                        'symbol' => $instrument['symbol'] ?? 'Unknown',
+                        'baseCoin' => $instrument['baseCoin'] ?? 'Unknown',
+                        'quoteCoin' => $instrument['quoteCoin'] ?? 'Unknown',
+                        'status' => $instrument['status'] ?? 'Unknown',
+                        'minOrderQty' => $lotSizeFilter['minOrderQty'] ?? $lotSizeFilter['minQty'] ?? '0.00000001',
+                        'maxOrderQty' => $lotSizeFilter['maxOrderQty'] ?? $lotSizeFilter['maxQty'] ?? '1000000',
+                        'qtyStep' => $lotSizeFilter['qtyStep'] ?? $lotSizeFilter['basePrecision'] ?? '0.00000001',
+                        'tickSize' => $priceFilter['tickSize'] ?? $priceFilter['quotePrecision'] ?? '0.01',
                     ];
                 }
             }
@@ -452,8 +457,19 @@ class SpotTradingController extends Controller
      */
     private function validateAndAdjustQuantity($qty, $instrument)
     {
-        $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
-        $minOrderQty = (float)$instrument['lotSizeFilter']['minOrderQty'];
+        // Handle different data structures defensively
+        $lotSizeFilter = $instrument['lotSizeFilter'] ?? [];
+        $qtyStep = (float)($lotSizeFilter['qtyStep'] ?? $lotSizeFilter['basePrecision'] ?? 0.00000001);
+        $minOrderQty = (float)($lotSizeFilter['minOrderQty'] ?? $lotSizeFilter['minQty'] ?? 0.00000001);
+        
+        // If we couldn't get proper values, throw descriptive error
+        if ($qtyStep <= 0) {
+            throw new \Exception("خطا در دریافت اطلاعات دقت مقدار از صرافی. لطفاً دوباره تلاش کنید.");
+        }
+        
+        if ($minOrderQty <= 0) {
+            throw new \Exception("خطا در دریافت حداقل مقدار مجاز از صرافی. لطفاً دوباره تلاش کنید.");
+        }
         
         // Additional validation before processing
         if ($qty <= 0) {
@@ -674,12 +690,15 @@ class SpotTradingController extends Controller
             $instrumentInfo = $exchangeService->getSpotInstrumentsInfo($validated['symbol']);
             
             if (empty($instrumentInfo['list'])) {
-                return back()->withErrors(['symbol' => 'Invalid trading symbol'])->withInput();
+                return back()->withErrors(['symbol' => 'Invalid trading symbol: ' . $validated['symbol']])->withInput();
             }
 
             $instrument = $instrumentInfo['list'][0];
-            $qtyStep = (float)$instrument['lotSizeFilter']['qtyStep'];
-            $priceStep = (float)$instrument['priceFilter']['tickSize'];
+            
+            $lotSizeFilter = $instrument['lotSizeFilter'] ?? [];
+            $priceFilter = $instrument['priceFilter'] ?? [];
+            $qtyStep = (float)($lotSizeFilter['qtyStep'] ?? $lotSizeFilter['basePrecision'] ?? 0.00000001);
+            $priceStep = (float)($priceFilter['tickSize'] ?? $priceFilter['quotePrecision'] ?? 0.01);
             
             // Validate and adjust quantity to meet minimum requirements
             $qty = $this->validateAndAdjustQuantity($validated['qty'], $instrument);

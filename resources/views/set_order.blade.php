@@ -98,14 +98,6 @@
     
     @include('partials.exchange-access-check')
 
-    {{-- Show strict mode indicator if active --}}
-    @if(isset($user) && $user->future_strict_mode)
-        <div class="alert alert-warning">
-            <strong>🔒 حالت سخت‌گیرانه آتی فعال است</strong><br>
-            <small>محدودیت‌های امنیتی اعمال شده: ریسک حداکثر ۱۰٪، منع معامله پس از ضرر تا ۱ ساعت، محدودیت محدوده قیمت</small>
-        </div>
-    @endif
-
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif

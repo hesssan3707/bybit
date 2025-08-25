@@ -103,7 +103,7 @@ interface ExchangeApiServiceInterface
     /**
      * Get spot trading symbols/instruments
      */
-    public function getSpotInstrumentsInfo(): array;
+    public function getSpotInstrumentsInfo(string $symbol = null): array;
 
     /**
      * Get ticker information for futures

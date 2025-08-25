@@ -455,7 +455,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
         return $this->getTradingPairs();
     }
 
-    public function getSpotInstrumentsInfo(): array
+    public function getSpotInstrumentsInfo(string $symbol = null): array
     {
         return $this->getTradingPairs();
     }
