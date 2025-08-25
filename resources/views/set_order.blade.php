@@ -68,9 +68,26 @@
         border-radius: 8px;
         text-align: center;
         font-size: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .alert-success { background-color: #d1e7dd; color: #0f5132; }
-    .alert-danger { background-color: #f8d7da; color: #842029; }
+    .alert-success { 
+        background-color: #d1e7dd; 
+        color: #0f5132; 
+        border: 1px solid #badbcc;
+        border-left: 4px solid #28a745;
+    }
+    .alert-danger { 
+        background-color: #f8d7da; 
+        color: #721c24; 
+        border: 1px solid #f1aeb5;
+        border-left: 4px solid #dc3545;
+    }
+    .alert-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+        border-left: 4px solid #ffc107;
+    }
     .invalid-feedback { color: #842029; font-size: 14px; margin-top: 5px; display: block; }
 </style>
 @endpush
@@ -80,6 +97,14 @@
     <h2>ثبت سفارش جدید</h2>
     
     @include('partials.exchange-access-check')
+
+    {{-- Show strict mode indicator if active --}}
+    @if(isset($user) && $user->future_strict_mode)
+        <div class="alert alert-warning">
+            <strong>🔒 حالت سخت‌گیرانه آتی فعال است</strong><br>
+            <small>محدودیت‌های امنیتی اعمال شده: ریسک حداکثر ۱۰٪، منع معامله پس از ضرر تا ۱ ساعت، محدودیت محدوده قیمت</small>
+        </div>
+    @endif
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
@@ -136,8 +161,10 @@
         </div>
 
         <div class="form-group">
-            <label for="risk_percentage">درصد ریسک (حداکثر ۱۰٪):</label>
-            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="10" step="0.1" value="{{ old('risk_percentage', 10) }}" required>
+            <label for="risk_percentage">
+                درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪ - حالت سخت‌گیرانه)@else(حداکثر ۱۰٪)@endif:
+            </label>
+            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', 10) }}" required>
             @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 

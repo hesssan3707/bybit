@@ -100,7 +100,8 @@ class FuturesController extends Controller
         return view('set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
-            'exchangeMessage' => $exchangeStatus['message']
+            'exchangeMessage' => $exchangeStatus['message'],
+            'user' => auth()->user()
         ]);
     }
 
@@ -125,63 +126,55 @@ class FuturesController extends Controller
         try {
             // Get user's active exchange service
             $exchangeService = $this->getExchangeService();
-            // Check for recent loss
-            $lastLoss = Trade::forUser(auth()->id())
-                ->where('pnl', '<', 0)
-                ->latest('closed_at')
-                ->first();
+            
+            // Get the current user
+            $user = auth()->user();
+            
+            // Apply strict mode conditions only if user has strict mode enabled
+            if ($user->future_strict_mode) {
+                // Check for recent loss (only in strict mode)
+                $lastLoss = Trade::forUser(auth()->id())
+                    ->where('pnl', '<', 0)
+                    ->latest('closed_at')
+                    ->first();
 
-            if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
-                $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
-                return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید."])->withInput();
-            }
-
-            // New validation: Check against active filled order's zones
-            $filledOrder = Order::forUser(auth()->id())->where('status', 'filled')->first();
-            if ($filledOrder) {
-                $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
-                $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
-
-                // Define the zones
-                $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
-                $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
-                $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
-                $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
-
-                // Check Loss Zone (No-Go Zone)
-                if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
-                    return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست.'])->withInput();
+                if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
+                    $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
+                    return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
 
-                // Check Profit Zone (Conditional Zone)
-                if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
-                    if (strtolower($newSide) === strtolower($filledOrder->side)) {
-                        return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست.'])->withInput();
+                // Validate against active filled order's zones (only in strict mode)
+                $filledOrder = Order::forUser(auth()->id())->where('status', 'filled')->first();
+                if ($filledOrder) {
+                    $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
+                    $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
+
+                    // Define the zones
+                    $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
+                    $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
+                    $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
+                    $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
+
+                    // Check Loss Zone (No-Go Zone) - only in strict mode
+                    if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
+                        return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست. (حالت سخت‌گیرانه فعال)'])->withInput();
+                    }
+
+                    // Check Profit Zone (Conditional Zone) - only in strict mode
+                    if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
+                        if (strtolower($newSide) === strtolower($filledOrder->side)) {
+                            return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست. (حالت سخت‌گیرانه فعال)'])->withInput();
+                        }
                     }
                 }
             }
-            // New validation: Check against active filled order's zones (duplicate removed)
-            if ($filledOrder) {
-                $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
-                $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
-
-                // Define the zones
-                $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
-                $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
-                $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
-                $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
-
-                // Check Loss Zone (No-Go Zone)
-                if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
-                    return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست.'])->withInput();
-                }
-
-                // Check Profit Zone (Conditional Zone)
-                if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
-                    if (strtolower($newSide) === strtolower($filledOrder->side)) {
-                        return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست.'])->withInput();
-                    }
-                }
+            // Apply strict mode risk percentage cap (only in strict mode)
+            if ($user->future_strict_mode) {
+                // Cap risk percentage to 10% in strict mode
+                $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
+            } else {
+                // Allow higher risk percentage in non-strict mode
+                $riskPercentage = (float)$validated['risk_percentage'];
             }
 
             // Business Logic
@@ -217,8 +210,6 @@ class FuturesController extends Controller
             }
             $capitalUSD = min((float) $usdtBalanceData['totalWalletBalance'] , (float) $usdtBalanceData['totalEquity']);
 
-            // Use the risk percentage from the form, capped at 10%
-            $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
             $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
 
             $slDistance = abs($avgEntry - (float) $validated['sl']);

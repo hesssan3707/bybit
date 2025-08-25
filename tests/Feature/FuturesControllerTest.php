@@ -43,9 +43,14 @@ class FuturesControllerTest extends TestCase
     /**
      * @test
      */
-    public function it_prevents_creating_an_order_if_a_loss_occurred_within_the_last_hour()
+    public function it_prevents_creating_an_order_if_a_loss_occurred_within_the_last_hour_when_strict_mode_is_enabled()
     {
-        // Arrange
+        // Arrange - Enable strict mode for user
+        $this->user->update([
+            'future_strict_mode' => true,
+            'future_strict_mode_activated_at' => now()
+        ]);
+        
         Trade::create([
             'pnl' => -10,
             'closed_at' => now()->subMinutes(30),
@@ -75,6 +80,57 @@ class FuturesControllerTest extends TestCase
         // Assert
         $response->assertSessionHasErrors('msg');
         $this->assertDatabaseMissing('orders', ['entry_price' => 3000]);
+    }
+
+    /**
+     * @test
+     */
+    public function it_allows_creating_an_order_after_loss_when_strict_mode_is_disabled()
+    {
+        // Arrange - Mock the exchange service
+        $mockExchangeService = Mockery::mock(ExchangeApiServiceInterface::class);
+        $mockExchangeService->shouldReceive('getTickerInfo')->andReturn(['list' => [['lastPrice' => '3000']]]);
+        $mockExchangeService->shouldReceive('getWalletBalance')->andReturn(['list' => [['totalWalletBalance' => '1000', 'totalEquity' => '1000']]]);
+        $mockExchangeService->shouldReceive('getInstrumentsInfo')->andReturn(['list' => [['lotSizeFilter' => ['qtyStep' => '0.01'], 'priceScale' => '2']]]);
+        $mockExchangeService->shouldReceive('createOrder')->andReturn(['orderId' => '12345']);
+        
+        $this->app->bind(ExchangeApiServiceInterface::class, function () use ($mockExchangeService) {
+            return $mockExchangeService;
+        });
+        
+        ExchangeFactory::partialMock()->shouldReceive('createForUser')->andReturn($mockExchangeService);
+        
+        // Strict mode is disabled (default)
+        $this->assertFalse($this->user->future_strict_mode);
+        
+        Trade::create([
+            'pnl' => -10,
+            'closed_at' => now()->subMinutes(30), // Recent loss within 1 hour
+            'symbol' => 'ETHUSDT',
+            'side' => 'Buy',
+            'order_type' => 'Limit',
+            'leverage' => 1,
+            'qty' => 1,
+            'avg_entry_price' => 2500,
+            'avg_exit_price' => 2490,
+            'order_id' => '123',
+        ]);
+
+        $postData = [
+            'entry1' => 3000,
+            'entry2' => 3000,
+            'tp' => 3100,
+            'sl' => 2900,
+            'steps' => 1,
+            'expire' => 15,
+            'risk_percentage' => 1,
+        ];
+
+        // Act
+        $response = $this->actingAs($this->user)->post(route('order.store'), $postData);
+
+        // Assert - Should NOT have errors because strict mode is disabled
+        $response->assertSessionDoesntHaveErrors('msg');
     }
 
     /**
@@ -224,9 +280,14 @@ class FuturesControllerTest extends TestCase
     /**
      * @test
      */
-    public function it_prevents_creating_an_order_in_the_loss_zone_of_a_filled_order()
+    public function it_prevents_creating_an_order_in_the_loss_zone_of_a_filled_order_when_strict_mode_is_enabled()
     {
-        // Arrange
+        // Arrange - Enable strict mode
+        $this->user->update([
+            'future_strict_mode' => true,
+            'future_strict_mode_activated_at' => now()
+        ]);
+        
         Order::create([
             'status' => 'filled',
             'side' => 'buy',
@@ -256,9 +317,14 @@ class FuturesControllerTest extends TestCase
     /**
      * @test
      */
-    public function it_prevents_same_direction_order_in_profit_zone_of_a_filled_order()
+    public function it_prevents_same_direction_order_in_profit_zone_of_a_filled_order_when_strict_mode_is_enabled()
     {
-        // Arrange
+        // Arrange - Enable strict mode
+        $this->user->update([
+            'future_strict_mode' => true,
+            'future_strict_mode_activated_at' => now()
+        ]);
+        
         Order::create([
             'status' => 'filled',
             'side' => 'buy',
