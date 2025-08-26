@@ -131,7 +131,6 @@
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleAdminMenu(event)">مدیریت ▼</a>
             <div id="adminMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 220px; z-index: 1001;">
-                <a href="{{ route('admin.pending-users') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">کاربران در انتظار تأیید</a>
                 <a href="{{ route('admin.all-users') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">همه کاربران</a>
                 <a href="{{ route('admin.pending-exchanges') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">درخواست‌های صرافی</a>
                 <a href="{{ route('admin.all-exchanges') }}" style="display: block; padding: 10px 15px; margin: 0;">همه صرافی‌ها</a>
@@ -166,17 +165,10 @@
         <span class="icon">💳</span>
         <span>موجودی</span>
     </a>
-    @if(auth()->user()?->isAdmin())
-        <a href="{{ route('admin.all-users') }}">
-            <span class="icon">⚙️</span>
-            <span>مدیریت</span>
-        </a>
-    @else
-        <a href="{{ route('profile.index') }}">
-            <span class="icon">👤</span>
-            <span>پروفایل</span>
-        </a>
-    @endif
+    <a href="{{ route('profile.index') }}">
+        <span class="icon">👤</span>
+        <span>پروفایل</span>
+    </a>
 </nav>
 
 <script>

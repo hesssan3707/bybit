@@ -275,7 +275,8 @@
     </div>
 
     <div class="admin-nav-links">
-        <a href="{{ route('admin.pending-users') }}">کاربران در انتظار تأیید</a>
+        <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های صرافی</a>
+        <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
         <a href="{{ route('admin.all-users') }}" class="active">همه کاربران</a>
     </div>
 
