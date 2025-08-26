@@ -198,11 +198,6 @@
         <div class="form-group">
             <label for="expire">
                 مدت انقضای سفارش (دقیقه)
-                @if(isset($user) && $user->future_strict_mode)
-                    - (پیش‌فرض ۱۵ دقیقه - حالت سخت‌گیرانه)
-                @else
-                    - (پیش‌فرض ۹۹۹ دقیقه)
-                @endif:
             </label>
             <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? 999) }}" required>
             @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
@@ -240,6 +235,7 @@
         const entry1Input = document.getElementById('entry1');
         const entry2Input = document.getElementById('entry2');
         const chainIcon = document.getElementById('chain-icon');
+        const symbolSelect = document.getElementById('symbol');
         let isChained = true; // Chained by default
 
         function updateChainIcon() {
@@ -250,6 +246,63 @@
                 chainIcon.textContent = '🚫'; // Or any other "unchained" icon
                 chainIcon.title = 'Prices are unchained. Click to chain.';
             }
+        }
+
+        // Function to fetch market price for selected symbol
+        function fetchMarketPrice(symbol) {
+            if (!symbol) return;
+            
+            // Show loading state with visual feedback
+            entry1Input.style.backgroundColor = '#f8f9fa';
+            entry2Input.style.backgroundColor = '#f8f9fa';
+            entry1Input.placeholder = 'در حال دریافت قیمت بازار...';
+            entry2Input.placeholder = 'در حال دریافت قیمت بازار...';
+            
+            fetch(`/api/market-price/${symbol}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.price) {
+                    // Only update if fields are empty or user confirms update
+                    const shouldUpdate = entry1Input.value === '' || 
+                        confirm(`قیمت فعلی ${symbol}: ${data.price}\n\nآیا می‌خواهید قیمت‌ها را به‌روزرسانی کنید؟`);
+                    
+                    if (shouldUpdate) {
+                        entry1Input.value = data.price;
+                        if (isChained) {
+                            entry2Input.value = data.price;
+                        }
+                        // Flash success feedback
+                        entry1Input.style.backgroundColor = '#d4edda';
+                        entry2Input.style.backgroundColor = '#d4edda';
+                        setTimeout(() => {
+                            entry1Input.style.backgroundColor = '';
+                            entry2Input.style.backgroundColor = '';
+                        }, 1000);
+                    }
+                } else {
+                    alert('خطا در دریافت قیمت بازار: ' + (data.message || 'قیمت یافت نشد'));
+                }
+                // Clear loading state
+                entry1Input.style.backgroundColor = '';
+                entry2Input.style.backgroundColor = '';
+                entry1Input.placeholder = '';
+                entry2Input.placeholder = '';
+            })
+            .catch(error => {
+                console.error('Error fetching market price:', error);
+                alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
+                // Clear loading state
+                entry1Input.style.backgroundColor = '';
+                entry2Input.style.backgroundColor = '';
+                entry1Input.placeholder = '';
+                entry2Input.placeholder = '';
+            });
         }
 
         // Initial state
@@ -281,7 +334,17 @@
             updateChainIcon();
         });
 
-        // --- Existing market price logic ---
+        // Market selection change event (only for non-strict mode)
+        if (symbolSelect) {
+            symbolSelect.addEventListener('change', function() {
+                const selectedSymbol = this.value;
+                if (selectedSymbol) {
+                    fetchMarketPrice(selectedSymbol);
+                }
+            });
+        }
+
+        // --- Initial market price logic ---
         const marketPrice = '{{ $marketPrice ?? '' }}';
         if (marketPrice && marketPrice !== '0') {
             // Only set the value if the fields are empty (e.g., on first load, not after a validation error)

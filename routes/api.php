@@ -70,4 +70,7 @@ Route::middleware(['api.auth'])->group(function () {
     Route::prefix('exchanges')->group(function () {
         Route::get('/statistics', [ExchangeConfigController::class, 'statistics'])->name('api.exchanges.statistics');
     });
+    
+    // Market price API for dynamic price updates
+    Route::get('/market-price/{symbol}', [FuturesController::class, 'getMarketPrice'])->name('api.market.price');
 });

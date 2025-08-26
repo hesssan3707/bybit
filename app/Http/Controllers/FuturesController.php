@@ -200,7 +200,8 @@ class FuturesController extends Controller
             'user' => $user,
             'availableMarkets' => $availableMarkets,
             'selectedMarket' => $selectedMarket,
-            'defaultExpiration' => $defaultExpiration
+            'defaultExpiration' => $defaultExpiration,
+            'currentSymbol' => $symbol // Pass the current symbol for proper price display
         ]);
     }
 
@@ -567,6 +568,47 @@ class FuturesController extends Controller
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
             
             return redirect()->route('orders.index')->withErrors(['msg' => $userFriendlyMessage]);
+        }
+    }
+    
+    /**
+     * API method to get market price for a symbol
+     */
+    public function getMarketPrice($symbol)
+    {
+        // Validate symbol is in supported markets
+        $supportedMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
+        
+        if (!in_array($symbol, $supportedMarkets)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'نماد ارز پشتیبانی نمی‌شود'
+            ], 400);
+        }
+        
+        try {
+            $exchangeService = $this->getExchangeService();
+            $tickerInfo = $exchangeService->getTickerInfo($symbol);
+            $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+            
+            if ($price <= 0) {
+                throw new \Exception('قیمت معتبر دریافت نشد');
+            }
+            
+            return response()->json([
+                'success' => true,
+                'symbol' => $symbol,
+                'price' => (string)round($price),
+                'raw_price' => $price
+            ]);
+            
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Market price fetch failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'خطا در دریافت قیمت بازار: ' . $e->getMessage()
+            ], 500);
         }
     }
 }
