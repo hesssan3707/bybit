@@ -174,7 +174,7 @@ class FuturesController extends Controller
                 $exchangeService = $this->getExchangeService();
                 $tickerInfo = $exchangeService->getTickerInfo($symbol);
                 $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
-                $marketPrice = (string)round($price);
+                $marketPrice = (string)$price;
             } catch (\Exception $e) {
                 // Check if this is an access permission error and update validation
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
@@ -343,7 +343,7 @@ class FuturesController extends Controller
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
 
             foreach (range(0, $steps - 1) as $i) {
-                $price = round($entry1 + ($stepSize * $i), $pricePrec);
+                $price = $entry1 + ($stepSize * $i);
 
                 $orderLinkId = (string) Str::uuid();
 
@@ -607,7 +607,7 @@ class FuturesController extends Controller
             return response()->json([
                 'success' => true,
                 'symbol' => $symbol,
-                'price' => (string)round($price),
+                'price' => (string)$price,
                 'raw_price' => $price
             ]);
             
