@@ -1,0 +1,27 @@
+/* Yekan Font Face Declarations */
+@font-face {
+    font-family: 'Yekan';
+    src: url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Yekan';
+    src: url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan-Bold.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan-Bold.woff') format('woff');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Yekan';
+    src: url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan-Light.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/gh/rastikerdar/yekan-font@v2.0.0/dist/font-face/Yekan-Light.woff') format('woff');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}

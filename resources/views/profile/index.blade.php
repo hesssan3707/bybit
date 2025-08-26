@@ -419,8 +419,8 @@
         
         @if($currentExchange)
             <div class="equity">
-                <p>موجودی لحظه ای حساب ({{ $currentExchange->exchange_display_name }}): <strong>{{ $totalEquity }}$</strong></p>
-                <p>موجودی کیف پول: <strong>{{ $totalBalance }}$</strong></p>
+                <p>موجودی لحظه ای حساب ({{ $currentExchange->exchange_display_name }}): <strong>${{ $totalEquity }}</strong></p>
+                <p>موجودی کیف پول({{ $currentExchange->exchange_display_name }}): <strong>${{ $totalBalance }}</strong></p>
             </div>
         @else
             <div class="equity">

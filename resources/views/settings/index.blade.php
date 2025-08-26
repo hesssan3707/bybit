@@ -232,7 +232,7 @@
         }
         
         .back-to-profile .btn {
-            width: calc(100% - 20px);
+            width: calc(100% - 40px);
             max-width: 300px;
             margin: 0 auto;
             display: block;

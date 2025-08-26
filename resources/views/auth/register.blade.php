@@ -5,6 +5,7 @@
     <title>Register</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ asset('css/fonts.css') }}">
     <style>
         :root {
             --primary-color: #007bff;
@@ -19,7 +20,7 @@
             --error-text: #842029;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
