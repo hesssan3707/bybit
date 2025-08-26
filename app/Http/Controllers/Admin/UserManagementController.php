@@ -303,7 +303,8 @@ class UserManagementController extends Controller
 
             $exchange->activate(auth()->id(), $request->admin_notes);
 
-            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$exchange->user->email} تأیید شد.");
+            $userEmail = $exchange->user ? $exchange->user->email : 'کاربر حذف شده';
+            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$userEmail} تأیید شد.");
 
         } catch (\Exception $e) {
             Log::error('Exchange approval failed: ' . $e->getMessage());
@@ -331,7 +332,8 @@ class UserManagementController extends Controller
 
             $exchange->reject(auth()->id(), $request->admin_notes);
 
-            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$exchange->user->email} رد شد.");
+            $userEmail = $exchange->user ? $exchange->user->email : 'کاربر حذف شده';
+            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$userEmail} رد شد.");
 
         } catch (\Exception $e) {
             Log::error('Exchange rejection failed: ' . $e->getMessage());
@@ -359,7 +361,8 @@ class UserManagementController extends Controller
 
             $exchange->deactivate(auth()->id(), $request->admin_notes);
 
-            return back()->with('success', "صرافی {$exchange->exchange_display_name} برای کاربر {$exchange->user->email} غیرفعال شد.");
+            $userEmail = $exchange->user ? $exchange->user->email : 'کاربر حذف شده';
+            return back()->with('success', "صرافی {$exchange->exchange_display_name} برای کاربر {$userEmail} غیرفعال شد.");
 
         } catch (\Exception $e) {
             Log::error('Exchange deactivation failed: ' . $e->getMessage());

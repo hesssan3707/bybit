@@ -425,6 +425,11 @@
             <a href="{{ route('settings.index') }}" class="btn btn-success">
                 تنظیمات
             </a>
+            @if(auth()->user()->isAdmin())
+                <a href="{{ route('admin.all-users') }}" class="btn" style="background-color: #6f42c1; color: white;">
+                    پنل مدیریت
+                </a>
+            @endif
         </div>
         
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger">

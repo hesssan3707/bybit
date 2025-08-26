@@ -160,6 +160,222 @@
     .action-form {
         display: inline;
     }
+    
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+        .container {
+            padding: 0;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .admin-header {
+            padding: 15px;
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
+        }
+        
+        .admin-header h2 {
+            font-size: 1.3em;
+            margin: 0;
+        }
+        
+        .admin-nav-links {
+            margin: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .admin-nav-links a {
+            padding: 8px 12px;
+            margin: 0;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        
+        .exchanges-table {
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
+            border-radius: 10px;
+        }
+        
+        /* Convert table to card layout on mobile */
+        table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        
+        thead {
+            display: none;
+        }
+        
+        tbody {
+            display: block;
+        }
+        
+        tr {
+            display: block;
+            background: #fff;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: normal;
+        }
+        
+        td {
+            display: block;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            text-align: right;
+        }
+        
+        td:last-child {
+            border-bottom: none;
+        }
+        
+        td:before {
+            content: attr(data-label) ": ";
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 10px;
+            color: #333;
+        }
+        
+        .exchange-info {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: right;
+        }
+        
+        .exchange-logo {
+            width: 25px;
+            height: 25px;
+            font-size: 10px;
+            margin: 0 0 5px 10px;
+        }
+        
+        .status-badge {
+            padding: 3px 6px;
+            font-size: 10px;
+        }
+        
+        .default-badge {
+            font-size: 9px;
+            padding: 2px 4px;
+        }
+        
+        .masked-key {
+            font-size: 9px;
+            word-break: break-all;
+        }
+        
+        .notes-cell {
+            max-width: none;
+            font-size: 10px;
+        }
+        
+        .btn {
+            padding: 8px 12px;
+            margin: 2px;
+            font-size: 11px;
+            display: inline-block;
+        }
+        
+        .alert {
+            padding: 10px 12px;
+            margin: 10px;
+            font-size: 0.9em;
+        }
+        
+        /* Modal responsiveness */
+        #rejectModal > div,
+        #deactivateModal > div {
+            width: 90%;
+            max-width: 350px;
+            padding: 20px;
+        }
+        
+        #rejectModal h3,
+        #deactivateModal h3 {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+        
+        #rejectModal textarea,
+        #deactivateModal textarea {
+            font-size: 14px;
+            min-height: 60px;
+        }
+        
+        #rejectModal button,
+        #deactivateModal button {
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .admin-header {
+            padding: 10px;
+            margin: 5px;
+            width: calc(100% - 10px);
+        }
+        
+        .admin-header h2 {
+            font-size: 1.1em;
+        }
+        
+        .admin-nav-links {
+            margin: 5px;
+            grid-template-columns: 1fr;
+            gap: 5px;
+        }
+        
+        .admin-nav-links a {
+            padding: 6px 10px;
+            font-size: 0.8em;
+        }
+        
+        .exchanges-table {
+            margin: 5px;
+            width: calc(100% - 10px);
+        }
+        
+        tr {
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        
+        td {
+            padding: 6px 0;
+            font-size: 0.85em;
+        }
+        
+        .exchange-logo {
+            width: 20px;
+            height: 20px;
+            font-size: 8px;
+        }
+        
+        .btn {
+            padding: 6px 10px;
+            font-size: 10px;
+            margin: 1px;
+        }
+        
+        #rejectModal > div,
+        #deactivateModal > div {
+            width: 95%;
+            padding: 15px;
+        }
+    }
 </style>
 @endpush
 
@@ -208,7 +424,7 @@
                 <tbody>
                     @foreach($exchanges as $exchange)
                         <tr>
-                            <td>
+                            <td data-label="صرافی">
                                 <div class="exchange-info">
                                     <div class="exchange-logo" style="background-color: {{ $exchange->exchange_color }}">
                                         {{ substr($exchange->exchange_display_name, 0, 2) }}
@@ -221,11 +437,16 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>
-                                <div>{{ $exchange->user->email }}</div>
-                                <small>({{ $exchange->user->username }})</small>
+                            <td data-label="کاربر">
+                                @if($exchange->user)
+                                    <div>{{ $exchange->user->email }}</div>
+                                    <small>({{ $exchange->user->username }})</small>
+                                @else
+                                    <div style="color: #dc3545;">کاربر حذف شده</div>
+                                    <small>(ID: {{ $exchange->user_id }})</small>
+                                @endif
                             </td>
-                            <td>
+                            <td data-label="وضعیت">
                                 <span class="status-badge status-{{ $exchange->status === 'approved' && $exchange->is_active ? 'active' : $exchange->status }}">
                                     @if($exchange->status === 'approved' && $exchange->is_active)
                                         فعال
@@ -240,24 +461,36 @@
                                     @endif
                                 </span>
                             </td>
-                            <td>
+                            <td data-label="کلید API">
                                 <div class="masked-key">{{ $exchange->masked_api_key }}</div>
                             </td>
-                            <td>{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d') : '-' }}</td>
-                            <td>{{ $exchange->activatedBy ? $exchange->activatedBy->username : '-' }}</td>
-                            <td class="notes-cell">{{ $exchange->admin_notes ?: '-' }}</td>
-                            <td>
+                            <td data-label="تاریخ درخواست">{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d') : '-' }}</td>
+                            <td data-label="فعال شده توسط">
+                                @if($exchange->activatedBy)
+                                    {{ $exchange->activatedBy->username }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td data-label="یادداشت مدیر" class="notes-cell">{{ $exchange->admin_notes ?: '-' }}</td>
+                            <td data-label="عملیات">
                                 @if($exchange->status === 'pending')
                                     <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form">
                                         @csrf
                                         <button type="submit" class="btn btn-success" 
-                                                onclick="return confirm('آیا مطمئن هستید؟')">
+                                                onclick="return confirm('آیا مطمئن هستید؟')"
+                                                {{ !$exchange->user ? 'disabled title="کاربر حذف شده"' : '' }}>
                                             تأیید
                                         </button>
                                     </form>
                                     
-                                    <button onclick="showRejectModal({{ $exchange->id }})" class="btn btn-danger">
+                                    <button onclick="showRejectModal({{ $exchange->id }})" class="btn btn-danger"
+                                            {{ !$exchange->user ? 'disabled title="کاربر حذف شده"' : '' }}>
                                         رد
+                                    </button>
+                                    
+                                    <button type="button" class="btn btn-info" onclick="testConnection({{ $exchange->id }})" id="test-btn-{{ $exchange->id }}">
+                                        تست اتصال
                                     </button>
                                 @elseif($exchange->is_active)
                                     <button onclick="showDeactivateModal({{ $exchange->id }})" class="btn btn-warning">
@@ -328,6 +561,47 @@
 </div>
 
 <script>
+// CSRF token for AJAX requests
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+function testConnection(exchangeId) {
+    const button = document.getElementById(`test-btn-${exchangeId}`);
+    
+    if (!button) return;
+    
+    // Show loading state
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = 'در حال تست...';
+    
+    // Make AJAX request
+    fetch(`/admin/exchanges/${exchangeId}/test`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.textContent = originalText;
+        
+        if (data.success) {
+            alert(`نتیجه تست: ${data.message}`);
+        } else {
+            alert(`خطا: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.textContent = originalText;
+        alert('خطا در ارتباط: لطفاً دوباره تلاش کنید');
+        console.error('Test connection error:', error);
+    });
+}
+
 function showRejectModal(exchangeId) {
     document.getElementById('rejectForm').action = `/admin/exchanges/${exchangeId}/reject`;
     document.getElementById('rejectModal').style.display = 'block';

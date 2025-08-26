@@ -166,10 +166,17 @@
         <span class="icon">💳</span>
         <span>موجودی</span>
     </a>
-    <a href="{{ route('profile.index') }}">
-        <span class="icon">👤</span>
-        <span>پروفایل</span>
-    </a>
+    @if(auth()->user()?->isAdmin())
+        <a href="{{ route('admin.all-users') }}">
+            <span class="icon">⚙️</span>
+            <span>مدیریت</span>
+        </a>
+    @else
+        <a href="{{ route('profile.index') }}">
+            <span class="icon">👤</span>
+            <span>پروفایل</span>
+        </a>
+    @endif
 </nav>
 
 <script>

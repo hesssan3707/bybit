@@ -199,6 +199,181 @@
     .status-denied { color: #dc3545; }
     .status-blocked { color: #dc3545; }
     .status-not-supported { color: #6c757d; }
+    
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+        .container {
+            padding: 0;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .admin-header {
+            padding: 15px;
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
+        }
+        
+        .admin-header h2 {
+            font-size: 1.3em;
+            margin: 0;
+        }
+        
+        .admin-nav-links {
+            margin: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .admin-nav-links a {
+            padding: 8px 12px;
+            margin: 0;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        
+        .exchanges-table {
+            margin: 10px;
+            width: calc(100% - 20px);
+            box-sizing: border-box;
+            border-radius: 10px;
+        }
+        
+        .exchange-row {
+            display: block;
+            padding: 15px;
+            gap: 15px;
+        }
+        
+        .exchange-info {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .exchange-logo {
+            width: 40px;
+            height: 40px;
+            font-size: 16px;
+            margin: 0 0 10px 0;
+        }
+        
+        .exchange-details {
+            width: 100%;
+        }
+        
+        .user-info {
+            padding: 12px;
+            font-size: 0.9em;
+        }
+        
+        .masked-key {
+            font-size: 10px;
+            word-break: break-all;
+        }
+        
+        .approval-form {
+            padding: 12px;
+        }
+        
+        .approval-form textarea {
+            font-size: 14px;
+            min-height: 60px;
+        }
+        
+        .btn {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        
+        .test-connection-section {
+            padding: 8px;
+        }
+        
+        .test-result {
+            font-size: 12px;
+            padding: 8px;
+        }
+        
+        .validation-item {
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 8px 0;
+        }
+        
+        .empty-state {
+            padding: 30px 15px;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.1em;
+        }
+        
+        .empty-state p {
+            font-size: 0.9em;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .admin-header {
+            padding: 10px;
+            margin: 5px;
+            width: calc(100% - 10px);
+        }
+        
+        .admin-header h2 {
+            font-size: 1.1em;
+        }
+        
+        .admin-nav-links {
+            margin: 5px;
+            grid-template-columns: 1fr;
+            gap: 5px;
+        }
+        
+        .admin-nav-links a {
+            padding: 6px 10px;
+            font-size: 0.8em;
+        }
+        
+        .exchanges-table {
+            margin: 5px;
+            width: calc(100% - 10px);
+        }
+        
+        .exchange-row {
+            padding: 10px;
+        }
+        
+        .exchange-logo {
+            width: 35px;
+            height: 35px;
+            font-size: 14px;
+        }
+        
+        .user-info {
+            padding: 10px;
+            font-size: 0.85em;
+        }
+        
+        .approval-form {
+            padding: 10px;
+        }
+        
+        .btn {
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+        
+        .test-result {
+            font-size: 11px;
+            padding: 6px;
+        }
+    }
 </style>
 @endpush
 
@@ -245,7 +420,11 @@
                     
                     <div class="exchange-details">
                         <div class="user-info">
-                            <strong>کاربر:</strong> {{ $exchange->user->email }} ({{ $exchange->user->username }})<br>
+                            @if($exchange->user)
+                                <strong>کاربر:</strong> {{ $exchange->user->email }} ({{ $exchange->user->username }})<br>
+                            @else
+                                <strong>کاربر:</strong> <span style="color: #dc3545;">کاربر حذف شده (ID: {{ $exchange->user_id }})</span><br>
+                            @endif
                             <strong>تاریخ درخواست:</strong> {{ $exchange->activation_requested_at->format('Y-m-d H:i') }}<br>
                             <strong>کلید API:</strong>
                             <div class="masked-key">{{ $exchange->masked_api_key }}</div>
