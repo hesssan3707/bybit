@@ -159,13 +159,14 @@ class FuturesController extends Controller
         $selectedMarket = null;
         $marketPrice = '0'; // Default value in case of an error
         
-        // If user has strict mode enabled, use their selected market
+        // Determine which symbol to use for price fetching
         if ($user->future_strict_mode && $user->selected_market) {
+            // Strict mode: use user's selected market
             $selectedMarket = $user->selected_market;
             $symbol = $selectedMarket;
         } else {
-            // Default to ETHUSDT for non-strict mode users
-            $symbol = 'ETHUSDT';
+            // Non-strict mode: use default market (first in list)
+            $symbol = $availableMarkets[0]; // Use BTCUSDT as default instead of ETHUSDT
         }
         
         if ($exchangeStatus['hasActiveExchange']) {
@@ -189,13 +190,17 @@ class FuturesController extends Controller
             }
         }
         
+        // Set default expiration based on strict mode
+        $defaultExpiration = $user->future_strict_mode ? 15 : 999;
+        
         return view('set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message'],
             'user' => $user,
             'availableMarkets' => $availableMarkets,
-            'selectedMarket' => $selectedMarket
+            'selectedMarket' => $selectedMarket,
+            'defaultExpiration' => $defaultExpiration
         ]);
     }
 
@@ -328,6 +333,7 @@ class FuturesController extends Controller
             // Get Market Precision via Service
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $instrumentData = $instrumentInfo['list'][0];
+            $qtyStep = (float) $instrumentData['lotSizeFilter']['qtyStep'];
             $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
             $pricePrec = (int) $instrumentData['priceScale'];
             
@@ -340,10 +346,26 @@ class FuturesController extends Controller
 
                 $orderLinkId = (string) Str::uuid();
 
-                // Round only the final order parameters (like the old version)
-                $finalQty = round($amountPerStep, 2); // Round to 2 decimal places like old version
-                $finalPrice = round($price, 2); // Round price to 2 decimal places
-                $finalSL = round((float)$validated['sl'], 2); // Round SL to 2 decimal places
+                // Use proper precision for quantity calculation
+                $rawQty = $amountPerStep;
+                
+                // Round quantity according to exchange's qtyStep
+                if ($qtyStep >= 1) {
+                    // For whole numbers, round to nearest integer
+                    $finalQty = round($rawQty / $qtyStep) * $qtyStep;
+                } else {
+                    // For decimals, use proper decimal precision
+                    $finalQty = round($rawQty, $amountPrec);
+                }
+                
+                // Ensure minimum quantity is met
+                $minQty = (float) $instrumentData['lotSizeFilter']['minOrderQty'];
+                if ($finalQty < $minQty) {
+                    throw new \Exception("مقدار سفارش ({$finalQty}) کمتر از حداقل مجاز ({$minQty}) است. لطفاً درصد ریسک را افزایش دهید.");
+                }
+                
+                $finalPrice = round($price, $pricePrec);
+                $finalSL = round((float)$validated['sl'], $pricePrec);
                 
                 $orderParams = [
                     'category' => 'linear',
@@ -512,12 +534,23 @@ class FuturesController extends Controller
 
             // 4. Create the new closing order
             $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
+            
+            // Get proper quantity precision for this symbol
+            $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
+            $qtyStep = (float) $instrumentInfo['list'][0]['lotSizeFilter']['qtyStep'];
+            
+            // Use the exact amount from the order, properly formatted
+            $closeQty = $order->amount;
+            if ($qtyStep >= 1) {
+                $closeQty = round($closeQty / $qtyStep) * $qtyStep;
+            }
+            
             $newTpOrderParams = [
                 'category' => 'linear',
                 'symbol' => $symbol,
                 'side' => $closeSide,
                 'orderType' => 'Limit',
-                'qty' => (string)$order->amount,
+                'qty' => (string)$closeQty,
                 'price' => (string)$closePrice,
                 'reduceOnly' => true,
                 'timeInForce' => 'GTC',

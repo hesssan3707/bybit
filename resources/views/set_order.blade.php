@@ -153,7 +153,7 @@
                 <select id="symbol" name="symbol" required>
                     <option value="">انتخاب بازار...</option>
                     @foreach($availableMarkets as $market)
-                        <option value="{{ $market }}" {{ old('symbol', 'ETHUSDT') == $market ? 'selected' : '' }}>
+                        <option value="{{ $market }}" {{ old('symbol', 'BTCUSDT') == $market ? 'selected' : '' }}>
                             {{ $market }}
                         </option>
                     @endforeach
@@ -196,8 +196,15 @@
         </div>
 
         <div class="form-group">
-            <label for="expire">مدت انقضای سفارش (دقیقه):</label>
-            <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', 10) }}" required>
+            <label for="expire">
+                مدت انقضای سفارش (دقیقه)
+                @if(isset($user) && $user->future_strict_mode)
+                    - (پیش‌فرض ۱۵ دقیقه - حالت سخت‌گیرانه)
+                @else
+                    - (پیش‌فرض ۹۹۹ دقیقه)
+                @endif:
+            </label>
+            <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? 999) }}" required>
             @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
