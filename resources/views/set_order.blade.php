@@ -134,13 +134,6 @@
             {{-- For strict mode users, show selected market as read-only --}}
             @if($selectedMarket)
                 <input type="hidden" name="symbol" value="{{ $selectedMarket }}">
-                <div class="form-group">
-                    <label>بازار انتخابی (حالت سخت‌گیرانه):</label>
-                    <div style="padding: 12px; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; color: #495057;">
-                        {{ $selectedMarket }}
-                    </div>
-                    <small style="color: #6c757d;">در حالت سخت‌گیرانه تنها در این بازار می‌توانید معامله کنید</small>
-                </div>
             @else
                 <div class="alert alert-warning">
                     برای استفاده از حالت سخت‌گیرانه، ابتدا باید در تنظیمات بازار مورد نظر را انتخاب کنید.
@@ -261,49 +254,50 @@
             fetch(`/api/market-price/${symbol}`, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    'Accept': 'application/json'
                 }
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.price) {
-                    // Only update if fields are empty or user confirms update
-                    const shouldUpdate = entry1Input.value === '' || 
-                        confirm(`قیمت فعلی ${symbol}: ${data.price}\n\nآیا می‌خواهید قیمت‌ها را به‌روزرسانی کنید؟`);
-                    
-                    if (shouldUpdate) {
-                        entry1Input.value = data.price;
-                        if (isChained) {
-                            entry2Input.value = data.price;
-                        }
-                        // Flash success feedback
-                        entry1Input.style.backgroundColor = '#d4edda';
-                        entry2Input.style.backgroundColor = '#d4edda';
-                        setTimeout(() => {
-                            entry1Input.style.backgroundColor = '';
-                            entry2Input.style.backgroundColor = '';
-                        }, 1000);
-                    }
-                } else {
-                    alert('خطا در دریافت قیمت بازار: ' + (data.message || 'قیمت یافت نشد'));
-                }
-                // Clear loading state
+                // Clear loading state first
                 entry1Input.style.backgroundColor = '';
                 entry2Input.style.backgroundColor = '';
                 entry1Input.placeholder = '';
                 entry2Input.placeholder = '';
+                
+                if (data.success && data.price) {
+                    entry1Input.value = data.price;
+                    if (isChained) {
+                        entry2Input.value = data.price;
+                    }
+                    // Flash success feedback
+                    entry1Input.style.backgroundColor = '#d4edda';
+                    if (isChained) {
+                        entry2Input.style.backgroundColor = '#d4edda';
+                    }
+                    setTimeout(() => {
+                        entry1Input.style.backgroundColor = '';
+                        entry2Input.style.backgroundColor = '';
+                    }, 1000);
+                    
+                } else {
+                    // On error, clear the input values silently (no alert)
+                    console.warn('Failed to fetch market price:', data.message);
+                    entry1Input.value = '';
+                    entry2Input.value = '';
+                }
             })
             .catch(error => {
                 console.error('Error fetching market price:', error);
-                alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
-                // Clear loading state
+                // Clear loading state and input values on network error
                 entry1Input.style.backgroundColor = '';
                 entry2Input.style.backgroundColor = '';
                 entry1Input.placeholder = '';
                 entry2Input.placeholder = '';
+                entry1Input.value = '';
+                entry2Input.value = '';
             });
-        }
+        }}
 
         // Initial state
         updateChainIcon();

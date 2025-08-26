@@ -572,7 +572,7 @@ class FuturesController extends Controller
     }
     
     /**
-     * API method to get market price for a symbol
+     * API method to get market price for a symbol (public endpoint - no auth required)
      */
     public function getMarketPrice($symbol)
     {
@@ -587,7 +587,8 @@ class FuturesController extends Controller
         }
         
         try {
-            $exchangeService = $this->getExchangeService();
+            // Create a public exchange service (no credentials needed for public data)
+            $exchangeService = ExchangeFactory::create('bybit'); // Use Bybit as default for public price data
             $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
             
