@@ -656,7 +656,7 @@ Content-Type: application/json</div>
                     <td>symbol</td>
                     <td>string</td>
                     <td class="required">الزامی</td>
-                    <td>جفت ارز معاملاتی. بازارهای پشتیبانی شده: BTCUSDT, ETHUSDT, ADAUSDT, DOTUSDT, BNBUSDT, BINGUSDT</td>
+                    <td>جفت ارز معاملاتی. بازارهای پشتیبانی شده: BTCUSDT, ETHUSDT, ADAUSDT, DOTUSDT, BNBUSDT, XRPUSDT, SOLUSDT, TRXUSDT, DOGEUSDT, LTCUSDT</td>
                 </tr>
                 <tr>
                     <td>side</td>

@@ -155,7 +155,7 @@ class FuturesController extends Controller
         $exchangeStatus = $this->checkActiveExchange();
         
         $user = auth()->user();
-        $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'BINGUSDT'];
+        $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
         $selectedMarket = null;
         $marketPrice = '0'; // Default value in case of an error
         
@@ -208,7 +208,7 @@ class FuturesController extends Controller
         }
         
         $validated = $request->validate([
-            'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,BINGUSDT',
+            'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
             'tp'     => 'required|numeric',

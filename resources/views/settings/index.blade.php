@@ -194,10 +194,30 @@
             margin-bottom: 10px;
         }
         .modal-content {
-            margin: 10% auto;
+            margin: 5% auto;
             width: 95%;
-            padding: 20px;
+            padding: 15px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
+        .modal-title {
+            font-size: 1.1em;
+        }
+        .modal-text {
+            font-size: 14px;
+        }
+        .modal-buttons {
+            flex-direction: column;
+            gap: 10px;
+        }
+        .modal-buttons .btn {
+            width: 100%;
+            margin: 0;
+        }
+        .form-control {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+    }
         .modal-buttons {
             flex-direction: column;
         }
@@ -317,7 +337,11 @@
                     <option value="ADAUSDT">ADAUSDT (Cardano/USDT)</option>
                     <option value="DOTUSDT">DOTUSDT (Polkadot/USDT)</option>
                     <option value="BNBUSDT">BNBUSDT (Binance Coin/USDT)</option>
-                    <option value="BINGUSDT">BINGUSDT (BingX/USDT)</option>
+                    <option value="XRPUSDT">XRPUSDT (Ripple/USDT)</option>
+                    <option value="SOLUSDT">SOLUSDT (Solana/USDT)</option>
+                    <option value="TRXUSDT">TRXUSDT (Tron/USDT)</option>
+                    <option value="DOGEUSDT">DOGEUSDT (Dogecoin/USDT)</option>
+                    <option value="LTCUSDT">LTCUSDT (Litecoin/USDT)</option>
                 </select>
                 <small style="color: #666; margin-top: 5px; display: block;">پس از انتخاب، تنها در این بازار می‌توانید معامله کنید</small>
             </div>

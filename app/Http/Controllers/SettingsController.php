@@ -27,7 +27,7 @@ class SettingsController extends Controller
     public function activateFutureStrictMode(Request $request)
     {
         $request->validate([
-            'selected_market' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,BINGUSDT'
+            'selected_market' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT'
         ]);
         
         try {
