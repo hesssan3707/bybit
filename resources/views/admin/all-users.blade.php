@@ -115,6 +115,10 @@
     .admin-nav-links a:hover {
         opacity: 0.8;
     }
+    .admin-nav-links a.active {
+        background-color: var(--primary-hover, #5a32a3) !important;
+        opacity: 1;
+    }
     
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {

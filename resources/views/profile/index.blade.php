@@ -210,6 +210,11 @@
         flex-wrap: wrap;
     }
     
+    /* Hide admin panel button on desktop */
+    .admin-panel-btn {
+        display: none;
+    }
+    
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -330,19 +335,9 @@
             flex: none;
         }
         
-        .admin-panel-section {
-            margin: 15px 0 !important;
-            padding: 15px !important;
-        }
-        
-        .admin-panel-section h3 {
-            font-size: 1em !important;
-            margin-bottom: 10px !important;
-        }
-        
-        .admin-buttons {
-            grid-template-columns: 1fr !important;
-            gap: 8px !important;
+        /* Show admin panel button on mobile */
+        .admin-panel-btn {
+            display: inline-block !important;
         }
         
         .no-exchange {
@@ -440,24 +435,12 @@
             <a href="{{ route('settings.index') }}" class="btn btn-success">
                 تنظیمات
             </a>
+            @if(auth()->user()->isAdmin())
+                <a href="{{ route('admin.all-users') }}" class="btn admin-panel-btn" style="background-color: #6f42c1; color: white;">
+                    پنل مدیریت
+                </a>
+            @endif
         </div>
-        
-        @if(auth()->user()->isAdmin())
-        <div class="admin-panel-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #6f42c1;">
-            <h3 style="margin: 0 0 15px 0; color: #6f42c1; font-size: 1.1em;">🛠️ پنل مدیریت</h3>
-            <div class="admin-buttons" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                <a href="{{ route('admin.all-users') }}" class="btn" style="background-color: #6f42c1; color: white; margin: 0;">
-                    👥 همه کاربران
-                </a>
-                <a href="{{ route('admin.pending-exchanges') }}" class="btn" style="background-color: #fd7e14; color: white; margin: 0;">
-                    ⏳ درخواست‌های صرافی
-                </a>
-                <a href="{{ route('admin.all-exchanges') }}" class="btn" style="background-color: #20c997; color: white; margin: 0;">
-                    🏦 همه صرافی‌ها
-                </a>
-            </div>
-        </div>
-        @endif
         
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger">
             خروج از حساب
