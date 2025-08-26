@@ -47,6 +47,41 @@ class FuturesController extends Controller
     }
 
     /**
+     * Calculate order quantity with proper rounding based on exchange's quantity step
+     * 
+     * @param float $rawQty Raw calculated quantity
+     * @param float $qtyStep Exchange's quantity step
+     * @param int $amountPrec Decimal precision for quantity
+     * @return float Properly rounded quantity
+     */
+    private function calculateOrderQuantity(float $rawQty, float $qtyStep, int $amountPrec): float
+    {
+        // Handle edge case where qtyStep is 0 or invalid
+        if ($qtyStep <= 0) {
+            throw new \Exception('Invalid quantity step received from exchange');
+        }
+        
+        // For whole number steps (e.g., 1, 10, 100)
+        if ($qtyStep >= 1) {
+            $finalQty = round($rawQty / $qtyStep) * $qtyStep;
+        } else {
+            // For decimal steps, use step-based rounding
+            $finalQty = round($rawQty / $qtyStep) * $qtyStep;
+            
+            // Then apply decimal precision to avoid floating point issues
+            $finalQty = round($finalQty, $amountPrec);
+        }
+        
+        // Ensure we don't return 0 due to rounding issues
+        if ($finalQty <= 0 && $rawQty > 0) {
+            // If rounding resulted in 0 but original was positive, use minimum step
+            $finalQty = $qtyStep;
+        }
+        
+        return $finalQty;
+    }
+
+    /**
      * Parse Bybit API error message and return user-friendly message
      * 
      * @param string $errorMessage
@@ -331,36 +366,70 @@ class FuturesController extends Controller
             }
             $amount = $maxLossUSD / $slDistance;
 
-            // Get Market Precision via Service
+            // Get Market Precision via Service - request specific symbol to ensure accuracy
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
-            $instrumentData = $instrumentInfo['list'][0];
+            
+            // Validate that we got instrument data
+            if (empty($instrumentInfo['list'])) {
+                throw new \Exception("Unable to get instrument information for {$symbol} from exchange. Please try again.");
+            }
+            
+            // Find the specific instrument for our symbol
+            $instrumentData = null;
+            foreach ($instrumentInfo['list'] as $instrument) {
+                if ($instrument['symbol'] === $symbol) {
+                    $instrumentData = $instrument;
+                    break;
+                }
+            }
+            
+            // Validate we found our specific symbol
+            if (!$instrumentData) {
+                throw new \Exception("Symbol {$symbol} not found in exchange instrument list. Please check if this symbol is supported.");
+            }
+            
+            // Validate required fields exist
+            if (!isset($instrumentData['lotSizeFilter']['qtyStep']) || !isset($instrumentData['lotSizeFilter']['minOrderQty'])) {
+                throw new \Exception("Incomplete instrument data received for {$symbol}. Missing lot size filter information.");
+            }
+            
             $qtyStep = (float) $instrumentData['lotSizeFilter']['qtyStep'];
-            $amountPrec = strlen(substr(strrchr($instrumentData['lotSizeFilter']['qtyStep'], "."), 1));
+            $minQty = (float) $instrumentData['lotSizeFilter']['minOrderQty'];
             $pricePrec = (int) $instrumentData['priceScale'];
+            
+            // Debug logging for instrument data
+            Log::info("Instrument data for {$symbol}", [
+                'qtyStep' => $qtyStep,
+                'minOrderQty' => $minQty,
+                'symbol' => $symbol,
+                'calculated_amount' => $amount,
+                'amount_per_step' => $amountPerStep
+            ]);
+            
+            // Calculate decimal places for quantity precision
+            $qtyStepStr = (string) $qtyStep;
+            $amountPrec = (strpos($qtyStepStr, '.') !== false) ? strlen(substr($qtyStepStr, strpos($qtyStepStr, '.') + 1)) : 0;
             
             // Create Orders via Service
             $amountPerStep = $amount / $steps;
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
+
+            // Validate that calculated amount can meet minimum requirements before creating any orders
+            $testQty = $this->calculateOrderQuantity($amountPerStep, $qtyStep, $amountPrec);
+            if ($testQty < $minQty) {
+                $requiredRisk = ($minQty * abs($avgEntry - (float) $validated['sl']) / $capitalUSD) * 100;
+                throw new \Exception("مقدار محاسبه شده ({$testQty}) کمتر از حداقل مجاز ({$minQty}) است. لطفاً درصد ریسک را به حداقل {$requiredRisk}% افزایش دهید یا تعداد مراحل را کاهش دهید.");
+            }
 
             foreach (range(0, $steps - 1) as $i) {
                 $price = $entry1 + ($stepSize * $i);
 
                 $orderLinkId = (string) Str::uuid();
 
-                // Use proper precision for quantity calculation
-                $rawQty = $amountPerStep;
+                // Calculate final quantity using improved precision
+                $finalQty = $this->calculateOrderQuantity($amountPerStep, $qtyStep, $amountPrec);
                 
-                // Round quantity according to exchange's qtyStep
-                if ($qtyStep >= 1) {
-                    // For whole numbers, round to nearest integer
-                    $finalQty = round($rawQty / $qtyStep) * $qtyStep;
-                } else {
-                    // For decimals, use proper decimal precision
-                    $finalQty = round($rawQty, $amountPrec);
-                }
-                
-                // Ensure minimum quantity is met
-                $minQty = (float) $instrumentData['lotSizeFilter']['minOrderQty'];
+                // Final safety check (should not trigger due to pre-validation above)
                 if ($finalQty < $minQty) {
                     throw new \Exception("مقدار سفارش ({$finalQty}) کمتر از حداقل مجاز ({$minQty}) است. لطفاً درصد ریسک را افزایش دهید.");
                 }

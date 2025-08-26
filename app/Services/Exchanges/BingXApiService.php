@@ -32,29 +32,6 @@ class BingXApiService implements ExchangeApiServiceInterface
     }
 
     /**
-     * Test connection to exchange
-     */
-    public function testConnection(): array
-    {
-        try {
-            $response = $this->client->get('/openApi/spot/v1/time');
-            $data = json_decode($response->getBody(), true);
-            
-            return [
-                'success' => true,
-                'message' => 'Connection successful',
-                'server_time' => $data['data']['serverTime'] ?? null,
-            ];
-        } catch (\Exception $e) {
-            Log::error('BingX connection test failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Connection failed: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
      * Get account balance
      */
     public function getAccountBalance(): array
@@ -487,7 +464,7 @@ class BingXApiService implements ExchangeApiServiceInterface
         throw new \Exception('BingX spot does not support futures stop loss with advanced parameters');
     }
 
-    public function getInstrumentsInfo(): array
+    public function getInstrumentsInfo(string $symbol = null): array
     {
         return $this->getTradingPairs();
     }

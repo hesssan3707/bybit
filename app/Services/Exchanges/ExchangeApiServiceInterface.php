@@ -98,7 +98,7 @@ interface ExchangeApiServiceInterface
     /**
      * Get trading symbols/instruments
      */
-    public function getInstrumentsInfo(): array;
+    public function getInstrumentsInfo(string $symbol = null): array;
 
     /**
      * Get spot trading symbols/instruments

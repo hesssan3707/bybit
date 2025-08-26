@@ -82,9 +82,12 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $responseData['result'];
     }
 
-    public function getInstrumentsInfo(): array
+    public function getInstrumentsInfo(string $symbol = null): array
     {
         $params = ['category' => 'linear'];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
         return $this->sendRequest('GET', '/v5/market/instruments-info', $params);
     }
 
