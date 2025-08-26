@@ -656,7 +656,7 @@ Content-Type: application/json</div>
                     <td>symbol</td>
                     <td>string</td>
                     <td class="required">الزامی</td>
-                    <td>جفت ارز معاملاتی (مثال: ETHUSDT)</td>
+                    <td>جفت ارز معاملاتی. بازارهای پشتیبانی شده: BTCUSDT, ETHUSDT, ADAUSDT, DOTUSDT, BNBUSDT, BINGUSDT</td>
                 </tr>
                 <tr>
                     <td>side</td>
@@ -708,12 +708,12 @@ Content-Type: application/json</div>
   -H "Authorization: Bearer your-api-token-here" \
   -H "Content-Type: application/json" \
   -d '{
-    "symbol": "ETHUSDT",
+    "symbol": "BTCUSDT",
     "side": "Buy",
     "amount": 100,
-    "entry_price": 2000,
-    "tp": 2200,
-    "sl": 1900,
+    "entry_price": 50000,
+    "tp": 52000,
+    "sl": 48000,
     "expire_minutes": 120,
     "steps": 1
   }'</div>

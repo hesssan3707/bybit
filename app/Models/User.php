@@ -36,6 +36,7 @@ class User extends Authenticatable
         'role',
         'future_strict_mode',
         'future_strict_mode_activated_at',
+        'selected_market',
     ];
 
     /**

@@ -261,6 +261,7 @@
                     <li>تنها از طریق این سیستم می‌توانید سفارش جدید ثبت کنید</li>
                     <li>حداکثر ریسک هر پوزیشن 10 درصد خواهد بود</li>
                     <li>پس از ضرر، باید 1 ساعت صبر کنید تا بتوانید سفارش جدید ثبت کنید</li>
+                    <li><strong>باید یک بازار انتخاب کنید و تنها در همان بازار قابلیت معامله خواهید داشت</strong></li>
                     <li>این حالت پس از فعال‌سازی قابل غیرفعال‌سازی نیست</li>
                 </ul>
             </div>
@@ -268,7 +269,10 @@
             @if($user->future_strict_mode)
                 <div class="alert alert-success">
                     <strong>حالت سخت‌گیرانه آتی فعال است</strong><br>
-                    تاریخ فعال‌سازی: {{ $user->future_strict_mode_activated_at->format('Y/m/d H:i') }}
+                    تاریخ فعال‌سازی: {{ $user->future_strict_mode_activated_at->format('Y/m/d H:i') }}<br>
+                    @if($user->selected_market)
+                        <strong>بازار انتخابی: {{ $user->selected_market }}</strong>
+                    @endif
                 </div>
             @else
                 <div class="warning-box">
@@ -303,6 +307,20 @@
             <p><strong>آیا از فعال‌سازی حالت سخت‌گیرانه آتی اطمینان دارید؟</strong></p>
             <p>توجه: این عمل غیرقابل بازگشت است و پس از فعال‌سازی امکان غیرفعال‌سازی وجود ندارد.</p>
             <p>پس از فعال‌سازی، حساب شما تحت نظارت دقیق قرار گرفته و محدودیت‌های امنیتی اعمال خواهد شد.</p>
+            
+            <div style="margin-top: 20px;">
+                <label for="selectedMarket" style="display: block; margin-bottom: 10px; font-weight: bold;">انتخاب بازار برای معاملات آتی:</label>
+                <select id="selectedMarket" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="">انتخاب بازار...</option>
+                    <option value="BTCUSDT">BTCUSDT (Bitcoin/USDT)</option>
+                    <option value="ETHUSDT">ETHUSDT (Ethereum/USDT)</option>
+                    <option value="ADAUSDT">ADAUSDT (Cardano/USDT)</option>
+                    <option value="DOTUSDT">DOTUSDT (Polkadot/USDT)</option>
+                    <option value="BNBUSDT">BNBUSDT (Binance Coin/USDT)</option>
+                    <option value="BINGUSDT">BINGUSDT (BingX/USDT)</option>
+                </select>
+                <small style="color: #666; margin-top: 5px; display: block;">پس از انتخاب، تنها در این بازار می‌توانید معامله کنید</small>
+            </div>
         </div>
         <div class="modal-buttons">
             <button type="button" class="btn btn-danger" onclick="activateFutureStrictMode()">
@@ -327,6 +345,13 @@ function closeModal() {
 }
 
 function activateFutureStrictMode() {
+    // Validate market selection
+    const selectedMarket = document.getElementById('selectedMarket').value;
+    if (!selectedMarket) {
+        showAlert('لطفاً ابتدا بازار مورد نعر را انتخاب کنید', 'danger');
+        return;
+    }
+    
     // Show loading state
     const button = document.querySelector('.modal-buttons .btn-danger');
     const originalText = button.textContent;
@@ -338,7 +363,10 @@ function activateFutureStrictMode() {
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
+        },
+        body: JSON.stringify({
+            selected_market: selectedMarket
+        })
     })
     .then(response => response.json())
     .then(data => {

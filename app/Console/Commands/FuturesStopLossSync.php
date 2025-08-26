@@ -110,7 +110,9 @@ class FuturesStopLossSync extends Command
             return;
         }
 
-        $symbol = 'ETHUSDT'; // Make this configurable if needed
+        // Get user's selected market, default to ETHUSDT if not set
+        $user = User::find($userId);
+        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
 
         // Get all filled orders for this user on this exchange
         $filledOrders = Order::where('user_exchange_id', $userExchange->id)

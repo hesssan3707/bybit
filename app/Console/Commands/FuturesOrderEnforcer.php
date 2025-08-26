@@ -110,7 +110,9 @@ class FuturesOrderEnforcer extends Command
             return;
         }
 
-        $symbol = 'ETHUSDT'; // You might want to make this configurable
+        // Get user's selected market, default to ETHUSDT if not set
+        $user = User::find($userId);
+        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
 
         try {
             // 1. Get all open orders from the exchange
@@ -170,6 +172,7 @@ class FuturesOrderEnforcer extends Command
             }
 
             // 3. Handle foreign orders (not in our DB for this user)
+            // Skip SL/TP orders as they are legitimate system orders that should remain active
             $this->info("    Checking for foreign orders to cancel for user {$userId} on {$userExchange->exchange_name}...");
             $ourTrackedIds = Order::where('user_exchange_id', $userExchange->id)
                 ->whereIn('status', ['pending', 'filled'])
@@ -186,10 +189,19 @@ class FuturesOrderEnforcer extends Command
                 foreach ($foreignOrderIds as $orderId) {
                     try {
                         $orderToCancel = $exchangeOpenOrdersMap[$orderId] ?? null;
-                        if ($orderToCancel && ($orderToCancel['reduceOnly'] ?? false) === true) {
-                            $this->info("  Skipping reduce-only foreign order: {$orderId}");
-                            continue;
+                        
+                        // Skip SL/TP orders - these are legitimate system orders
+                        if ($orderToCancel) {
+                            $isReduceOnly = ($orderToCancel['reduceOnly'] ?? false) === true;
+                            $isStopLoss = !empty($orderToCancel['stopLoss']) || $orderToCancel['orderType'] === 'Market' && $isReduceOnly;
+                            $isTakeProfit = !empty($orderToCancel['takeProfit']) || (isset($orderToCancel['triggerPrice']) && $isReduceOnly);
+                            
+                            if ($isReduceOnly || $isStopLoss || $isTakeProfit) {
+                                $this->info("  Skipping SL/TP order: {$orderId} (reduceOnly: {$isReduceOnly})");
+                                continue;
+                            }
                         }
+                        
                         $exchangeService->cancelOrder($orderId, $symbol);
                         $this->info("  Canceled foreign order: {$orderId}");
                     } catch (\Throwable $e) {

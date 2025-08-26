@@ -154,8 +154,19 @@ class FuturesController extends Controller
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
         
-        $symbol = 'ETHUSDT';
+        $user = auth()->user();
+        $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'BINGUSDT'];
+        $selectedMarket = null;
         $marketPrice = '0'; // Default value in case of an error
+        
+        // If user has strict mode enabled, use their selected market
+        if ($user->future_strict_mode && $user->selected_market) {
+            $selectedMarket = $user->selected_market;
+            $symbol = $selectedMarket;
+        } else {
+            // Default to ETHUSDT for non-strict mode users
+            $symbol = 'ETHUSDT';
+        }
         
         if ($exchangeStatus['hasActiveExchange']) {
             try {
@@ -165,7 +176,6 @@ class FuturesController extends Controller
                 $marketPrice = (string)round($price);
             } catch (\Exception $e) {
                 // Check if this is an access permission error and update validation
-                $user = auth()->user();
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
                 
                 if ($currentExchange) {
@@ -183,7 +193,9 @@ class FuturesController extends Controller
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message'],
-            'user' => auth()->user()
+            'user' => $user,
+            'availableMarkets' => $availableMarkets,
+            'selectedMarket' => $selectedMarket
         ]);
     }
 
@@ -196,6 +208,7 @@ class FuturesController extends Controller
         }
         
         $validated = $request->validate([
+            'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,BINGUSDT',
             'entry1' => 'required|numeric',
             'entry2' => 'required|numeric',
             'tp'     => 'required|numeric',
@@ -211,6 +224,16 @@ class FuturesController extends Controller
             
             // Get the current user
             $user = auth()->user();
+            
+            // Validate market selection for strict mode users
+            if ($user->future_strict_mode) {
+                if (!$user->selected_market) {
+                    return back()->withErrors(['msg' => 'برای حالت سخت‌گیرانه، باید بازار انتخابی تنظیم شده باشد.'])->withInput();
+                }
+                if ($validated['symbol'] !== $user->selected_market) {
+                    return back()->withErrors(['symbol' => "در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید."])->withInput();
+                }
+            }
             
             // Apply strict mode conditions only if user has strict mode enabled
             if ($user->future_strict_mode) {
@@ -260,7 +283,7 @@ class FuturesController extends Controller
             }
 
             // Business Logic
-            $symbol = 'ETHUSDT';
+            $symbol = $validated['symbol'];
             $entry1 = (float) $validated['entry1'];
             $entry2 = (float) $validated['entry2'];
             if ($entry2 < $entry1) { [$entry1, $entry2] = [$entry2, $entry1]; }
@@ -375,23 +398,48 @@ class FuturesController extends Controller
     public function destroy(Order $order)
     {
         // Check if user has active exchange
-        $redirectResponse = $this->checkActiveExchange();
-        if ($redirectResponse) {
-            return $redirectResponse;
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('orders.index')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+        
+        // Verify order belongs to user (through user exchange relationship)
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('orders.index')
+                ->withErrors(['msg' => 'شما مجاز به حذف این سفارش نیستید.']);
         }
         
         $status = $order->status;
 
         // Logic for 'pending' orders (Revoke)
         if ($status === 'pending') {
+            Log::info("Attempting to cancel pending order {$order->id} with exchange order ID: {$order->order_id}");
             try {
                 if ($order->order_id) {
                     $exchangeService = $this->getExchangeService();
                     $exchangeService->cancelOrder($order->order_id, $order->symbol);
+                    Log::info("Successfully cancelled order {$order->order_id} on exchange", [
+                        'local_order_id' => $order->id,
+                        'exchange_order_id' => $order->order_id,
+                        'symbol' => $order->symbol,
+                        'user_exchange_id' => $order->user_exchange_id
+                    ]);
+                } else {
+                    Log::warning("Order {$order->id} has no exchange order ID, skipping exchange cancellation");
                 }
             } catch (\Exception $e) {
                 // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
-                \Illuminate\Support\Facades\Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. It might have been already filled/canceled. Error: " . $e->getMessage());
+                Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. It might have been already filled/canceled. Error: " . $e->getMessage(), [
+                    'local_order_id' => $order->id,
+                    'exchange_order_id' => $order->order_id,
+                    'symbol' => $order->symbol,
+                    'user_exchange_id' => $order->user_exchange_id,
+                    'error' => $e->getMessage()
+                ]);
             }
         }
         // For 'expired' orders, we just delete them from the DB.
@@ -399,6 +447,11 @@ class FuturesController extends Controller
 
         if ($status === 'pending' || $status === 'expired') {
             $order->delete();
+            Log::info("Successfully deleted order {$order->id} from database", [
+                'order_id' => $order->order_id,
+                'status' => $status,
+                'user_exchange_id' => $order->user_exchange_id
+            ]);
             return redirect()->route('orders.index')->with('success', "سفارش {$status} با موفقیت حذف شد.");
         }
 
@@ -409,9 +462,19 @@ class FuturesController extends Controller
     public function close(Request $request, Order $order)
     {
         // Check if user has active exchange
-        $redirectResponse = $this->checkActiveExchange();
-        if ($redirectResponse) {
-            return $redirectResponse;
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('orders.index')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+        
+        // Verify order belongs to user (through user exchange relationship)
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('orders.index')
+                ->withErrors(['msg' => 'شما مجاز به بستن این سفارش نیستید.']);
         }
         
         $validated = $request->validate([

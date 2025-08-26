@@ -46,6 +46,19 @@
         direction: ltr;
         text-align: left;
     }
+    select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 16px;
+        background-color: white;
+        color: #333;
+    }
+    select:focus {
+        border-color: var(--primary-color);
+        outline: none;
+    }
     button {
         width: 100%;
         padding: 14px;
@@ -94,7 +107,11 @@
 
 @section('content')
 <div class="container">
-    <h2>ثبت سفارش جدید</h2>
+    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
+        <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
+    @else
+        <h2>ثبت سفارش جدید</h2>
+    @endif
     
     @include('partials.exchange-access-check')
 
@@ -112,6 +129,38 @@
 
     <form action="{{ route('order.store') }}" method="POST" id="order-form">
         @csrf
+
+        @if(isset($user) && $user->future_strict_mode)
+            {{-- For strict mode users, show selected market as read-only --}}
+            @if($selectedMarket)
+                <input type="hidden" name="symbol" value="{{ $selectedMarket }}">
+                <div class="form-group">
+                    <label>بازار انتخابی (حالت سخت‌گیرانه):</label>
+                    <div style="padding: 12px; background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; color: #495057;">
+                        {{ $selectedMarket }}
+                    </div>
+                    <small style="color: #6c757d;">در حالت سخت‌گیرانه تنها در این بازار می‌توانید معامله کنید</small>
+                </div>
+            @else
+                <div class="alert alert-warning">
+                    برای استفاده از حالت سخت‌گیرانه، ابتدا باید در تنظیمات بازار مورد نظر را انتخاب کنید.
+                </div>
+            @endif
+        @else
+            {{-- For non-strict mode users, show market dropdown --}}
+            <div class="form-group">
+                <label for="symbol">انتخاب بازار:</label>
+                <select id="symbol" name="symbol" required>
+                    <option value="">انتخاب بازار...</option>
+                    @foreach($availableMarkets as $market)
+                        <option value="{{ $market }}" {{ old('symbol', 'ETHUSDT') == $market ? 'selected' : '' }}>
+                            {{ $market }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('symbol') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
+        @endif
 
         <div class="form-group">
             <label for="entry1">Entry 1 (پایین‌ترین نقطه ورود):</label>
