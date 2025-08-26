@@ -266,19 +266,19 @@
                 entry2Input.placeholder = '';
                 
                 if (data.success && data.price) {
-                    entry1Input.value = data.price;
-                    if (isChained) {
-                        entry2Input.value = data.price;
-                    }
-                    // Flash success feedback
-                    entry1Input.style.backgroundColor = '#d4edda';
-                    if (isChained) {
-                        entry2Input.style.backgroundColor = '#d4edda';
-                    }
-                    setTimeout(() => {
-                        entry1Input.style.backgroundColor = '';
-                        entry2Input.style.backgroundColor = '';
-                    }, 1000);
+                        entry1Input.value = data.price;
+                        if (isChained) {
+                            entry2Input.value = data.price;
+                        }
+                        // Flash success feedback
+                        entry1Input.style.backgroundColor = '#d4edda';
+                        if (isChained) {
+                            entry2Input.style.backgroundColor = '#d4edda';
+                        }
+                        setTimeout(() => {
+                            entry1Input.style.backgroundColor = '';
+                            entry2Input.style.backgroundColor = '';
+                        }, 1000);
                     
                 } else {
                     // On error, clear the input values silently (no alert)
@@ -297,7 +297,7 @@
                 entry1Input.value = '';
                 entry2Input.value = '';
             });
-        }}
+        }
 
         // Initial state
         updateChainIcon();
@@ -340,13 +340,23 @@
 
         // --- Initial market price logic ---
         const marketPrice = '{{ $marketPrice ?? '' }}';
-        if (marketPrice && marketPrice !== '0') {
-            // Only set the value if the fields are empty (e.g., on first load, not after a validation error)
+        const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
+        const selectedMarket = '{{ $selectedMarket ?? '' }}';
+        
+        // For strict mode, use server-provided price
+        if (isStrictMode && marketPrice && marketPrice !== '0') {
             if (entry1Input.value === '') {
                 entry1Input.value = marketPrice;
                 if (isChained) {
                     entry2Input.value = marketPrice;
                 }
+            }
+        }
+        // For non-strict mode, fetch price for the default selected market
+        else if (!isStrictMode && symbolSelect) {
+            const defaultSymbol = symbolSelect.value;
+            if (defaultSymbol && entry1Input.value === '') {
+                fetchMarketPrice(defaultSymbol);
             }
         }
     });
