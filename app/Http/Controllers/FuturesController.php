@@ -572,10 +572,18 @@ class FuturesController extends Controller
     }
     
     /**
-     * API method to get market price for a symbol (public endpoint - no auth required)
+     * API method to get market price for a symbol (requires authentication)
      */
     public function getMarketPrice($symbol)
     {
+        // Check if user is authenticated
+        if (!auth()->check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+        
         // Validate symbol is in supported markets
         $supportedMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
         
@@ -587,8 +595,8 @@ class FuturesController extends Controller
         }
         
         try {
-            // Create a public exchange service (no credentials needed for public data)
-            $exchangeService = ExchangeFactory::create('bybit'); // Use Bybit as default for public price data
+            // Get user's exchange service (requires active exchange)
+            $exchangeService = $this->getExchangeService();
             $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
             

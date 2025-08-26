@@ -6,7 +6,6 @@
     <title>@yield('title', 'Bybit Trading Helper')</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ asset('css/fonts.css') }}">
     <style>
         :root {
             --primary-color: #007bff;
@@ -16,7 +15,7 @@
             --text-color: #333;
         }
         body {
-            font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 80px 20px 20px 20px; /* Add padding for header */
             background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));

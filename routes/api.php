@@ -33,8 +33,10 @@ Route::prefix('exchanges')->group(function () {
     Route::get('/{exchange}/symbols/{symbol}', [ExchangeConfigController::class, 'checkSymbol'])->name('api.exchanges.symbol');
 });
 
-// Public market price API (no authentication required)
-Route::get('/market-price/{symbol}', [FuturesController::class, 'getMarketPrice'])->name('api.market.price');
+// Market price API with session-based authentication (for web interface)
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/market-price/{symbol}', [FuturesController::class, 'getMarketPrice'])->name('api.market.price');
+});
 
 // Protected routes (require authentication)
 Route::middleware(['api.auth'])->group(function () {
