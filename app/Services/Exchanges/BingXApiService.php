@@ -438,6 +438,18 @@ class BingXApiService implements ExchangeApiServiceInterface
         }
     }
 
+    /**
+     * Get conditional orders (including stop loss orders) for a symbol
+     * Note: BingX handles stop-loss differently - it's typically set at position level
+     * This method returns empty for now as BingX uses different stop-loss mechanism
+     */
+    public function getConditionalOrders(string $symbol): array
+    {
+        // BingX doesn't have separate conditional orders like Bybit
+        // Stop-loss is typically handled at position level in futures
+        return ['list' => []];
+    }
+
     public function getOpenSpotOrders(string $symbol = null): array
     {
         return $this->getOpenOrders($symbol);

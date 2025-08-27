@@ -215,6 +215,11 @@ class FuturesStopLossSync extends Command
             return true;
         }
         
+        // Strategy 4: Find and cancel existing SL orders, then set new SL
+        if ($this->tryCancelExistingSlAndReset($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
+            return true;
+        }
+        
         return false;
     }
     
@@ -424,5 +429,110 @@ class FuturesStopLossSync extends Command
         
         // Default to one-way mode
         return 0;
+    }
+    
+    /**
+     * Strategy 4: Find and cancel existing stop loss orders, then set new one
+     * This is the approach suggested by the user - find SL orders by ID and cancel them first
+     */
+    private function tryCancelExistingSlAndReset(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        try {
+            $this->info("      Strategy 4: Finding and canceling existing SL orders, then setting new SL...");
+            
+            // Step 1: Get conditional orders (stop loss orders) for this symbol
+            $conditionalOrdersResult = $exchangeService->getConditionalOrders($symbol);
+            $conditionalOrders = $conditionalOrdersResult['list'] ?? [];
+            
+            if (empty($conditionalOrders)) {
+                $this->info("        No conditional orders found for {$symbol}");
+            } else {
+                $this->info("        Found " . count($conditionalOrders) . " conditional orders for {$symbol}");
+                
+                // Step 2: Find and cancel stop loss orders
+                $canceledOrders = 0;
+                foreach ($conditionalOrders as $order) {
+                    // Check if this is a stop loss order
+                    $isStopLossOrder = false;
+                    
+                    // Method 1: Check if it has stopLoss field set
+                    if (isset($order['stopLoss']) && !empty($order['stopLoss']) && $order['stopLoss'] !== '0') {
+                        $isStopLossOrder = true;
+                    }
+                    
+                    // Method 2: Check if it's a conditional order with triggerPrice and reduceOnly
+                    if (isset($order['triggerPrice']) && !empty($order['triggerPrice']) && 
+                        isset($order['reduceOnly']) && $order['reduceOnly'] === true) {
+                        $isStopLossOrder = true;
+                    }
+                    
+                    // Method 3: Check stopOrderType
+                    if (isset($order['stopOrderType']) && 
+                        in_array($order['stopOrderType'], ['Stop', 'StopLoss', 'sl'])) {
+                        $isStopLossOrder = true;
+                    }
+                    
+                    if ($isStopLossOrder) {
+                        try {
+                            $this->info("        Canceling SL order: {$order['orderId']}");
+                            $exchangeService->cancelOrderWithSymbol($order['orderId'], $symbol);
+                            $canceledOrders++;
+                            
+                            // Small delay between cancellations
+                            usleep(200000); // 0.2 seconds
+                        } catch (\Exception $e) {
+                            $this->warn("        Failed to cancel order {$order['orderId']}: {$e->getMessage()}");
+                            // Continue trying to cancel other orders
+                        }
+                    }
+                }
+                
+                $this->info("        Canceled {$canceledOrders} stop loss orders");
+                
+                // Wait a bit for cancellations to be processed
+                if ($canceledOrders > 0) {
+                    usleep(500000); // 0.5 seconds
+                }
+            }
+            
+            // Step 3: Set new stop loss using position modification
+            $this->info("        Setting new stop loss to {$targetSl}...");
+            
+            $positionIdx = $this->determinePositionIdx($position);
+            
+            $params = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'stopLoss' => (string)$targetSl,
+                'tpslMode' => 'Full',
+                'positionIdx' => $positionIdx,
+            ];
+
+            // Preserve existing take profit if it exists
+            $existingTp = (float)($position['takeProfit'] ?? 0);
+            if ($existingTp > 0) {
+                $params['takeProfit'] = (string)$existingTp;
+            }
+
+            $exchangeService->setStopLossAdvanced($params);
+            $this->info("      Strategy 4: Success - Existing SL orders canceled and new SL set");
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->warn("      Strategy 4: Failed - " . $e->getMessage());
+            Log::warning("Cancel existing SL and reset failed for user {$userId} on {$exchangeName}", [
+                'symbol' => $symbol,
+                'order_id' => $orderId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 }

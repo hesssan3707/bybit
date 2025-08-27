@@ -281,6 +281,20 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('GET', '/v5/order/realtime', $params);
     }
 
+    /**
+     * Get conditional orders (including stop loss orders) for a symbol
+     * These are orders with triggerPrice set (stop loss, take profit, conditional orders)
+     */
+    public function getConditionalOrders(string $symbol): array
+    {
+        $params = [
+            'category' => 'linear',
+            'symbol' => $symbol,
+            'orderFilter' => 'StopOrder', // Filter for conditional orders only
+        ];
+        return $this->sendRequest('GET', '/v5/order/realtime', $params);
+    }
+
     public function getOpenSpotOrders(string $symbol = null): array
     {
         $params = ['category' => 'spot'];

@@ -70,6 +70,12 @@ interface ExchangeApiServiceInterface
     public function getOpenOrders(string $symbol = null): array;
 
     /**
+     * Get conditional orders (including stop loss orders) for a symbol
+     * These are orders with triggerPrice set (stop loss, take profit, conditional orders)
+     */
+    public function getConditionalOrders(string $symbol): array;
+
+    /**
      * Get open spot orders
      */
     public function getOpenSpotOrders(string $symbol = null): array;

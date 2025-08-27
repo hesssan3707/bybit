@@ -401,6 +401,18 @@ class BinanceApiService implements ExchangeApiServiceInterface
         }
     }
 
+    /**
+     * Get conditional orders (including stop loss orders) for a symbol
+     * Note: Binance handles stop-loss differently - it's typically set at position level
+     * This method returns empty for now as Binance uses different stop-loss mechanism
+     */
+    public function getConditionalOrders(string $symbol): array
+    {
+        // Binance doesn't have separate conditional orders like Bybit
+        // Stop-loss is typically handled at position level in futures
+        return ['list' => []];
+    }
+
     public function getOpenSpotOrders(string $symbol = null): array
     {
         return $this->getOpenOrders($symbol);
