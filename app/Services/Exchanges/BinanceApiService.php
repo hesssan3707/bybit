@@ -296,7 +296,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
     /**
      * Cancel an order with symbol
      */
-    public function cancelOrderWithSymbol(string $symbol, string $orderId): array
+    public function cancelOrderWithSymbol(string $orderId, string $symbol): array
     {
         try {
             if (!$this->apiKey || !$this->apiSecret) {

@@ -147,7 +147,7 @@ class FuturesOrderEnforcer extends Command
 
                 if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
                     try {
-                        $exchangeService->cancelOrder($dbOrder->order_id, $symbol);
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
                         $dbOrder->delete();
                         $this->info("    Canceled and removed modified order: {$dbOrder->order_id} (Price/Qty mismatch)");
                         continue;
@@ -160,7 +160,7 @@ class FuturesOrderEnforcer extends Command
                 $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
                 if ($now >= $expireAt) {
                     try {
-                        $exchangeService->cancelOrder($dbOrder->order_id, $symbol);
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
                         $dbOrder->status = 'expired';
                         $dbOrder->closed_at = now();
                         $dbOrder->save();
@@ -202,7 +202,7 @@ class FuturesOrderEnforcer extends Command
                             }
                         }
                         
-                        $exchangeService->cancelOrder($orderId, $symbol);
+                        $exchangeService->cancelOrderWithSymbol($orderId, $symbol);
                         $this->info("  Canceled foreign order: {$orderId}");
                     } catch (\Throwable $e) {
                         $this->warn("  Failed to cancel foreign order {$orderId}: " . $e->getMessage());

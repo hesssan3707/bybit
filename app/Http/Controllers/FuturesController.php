@@ -119,6 +119,10 @@ class FuturesController extends Controller
                 return "موجودی USDT شما برای این معامله آتی کافی نیست.\n" .
                        "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید.";
                 
+            case '110007': // Available balance not enough for new order
+                return "موجودی قابل استفاده شما برای ایجاد سفارش جدید کافی نیست.\n" .
+                       "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید یا سفارشات باز خود را بررسی کنید.";
+                
             case '10001': // Parameter error
                 if (str_contains($errorMessage, 'minimum limit')) {
                     return "مقدار سفارش ({$qty}) کمتر از حداقل مجاز است.\n" .
@@ -148,9 +152,9 @@ class FuturesController extends Controller
                 
             default:
                 // Generic error handling
-                if (str_contains($errorMessage, 'Insufficient balance')) {
+                if (str_contains($errorMessage, 'Insufficient balance') || str_contains($errorMessage, 'not enough for new order')) {
                     return "موجودی حساب شما کافی نیست.\n" .
-                           "لطفاً ابتدا حساب خود را شارژ کنید.";
+                           "لطفاً ابتدا حساب خود را شارژ کنید یا سفارشات باز خود را بررسی کنید.";
                 } elseif (str_contains($errorMessage, 'minimum limit')) {
                     return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
                            "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
@@ -397,15 +401,6 @@ class FuturesController extends Controller
             $minQty = (float) $instrumentData['lotSizeFilter']['minOrderQty'];
             $pricePrec = (int) $instrumentData['priceScale'];
             
-            // Debug logging for instrument data
-            Log::info("Instrument data for {$symbol}", [
-                'qtyStep' => $qtyStep,
-                'minOrderQty' => $minQty,
-                'symbol' => $symbol,
-                'calculated_amount' => $amount,
-                'amount_per_step' => $amountPerStep
-            ]);
-            
             // Calculate decimal places for quantity precision
             $qtyStepStr = (string) $qtyStep;
             $amountPrec = (strpos($qtyStepStr, '.') !== false) ? strlen(substr($qtyStepStr, strpos($qtyStepStr, '.') + 1)) : 0;
@@ -513,7 +508,7 @@ class FuturesController extends Controller
             try {
                 if ($order->order_id) {
                     $exchangeService = $this->getExchangeService();
-                    $exchangeService->cancelOrder($order->order_id, $order->symbol);
+                    $exchangeService->cancelOrderWithSymbol($order->order_id, $order->symbol);
                     Log::info("Successfully cancelled order {$order->order_id} on exchange", [
                         'local_order_id' => $order->id,
                         'exchange_order_id' => $order->order_id,
