@@ -751,6 +751,7 @@ class SpotTradingController extends Controller
         if (!$exchangeStatus['hasActiveExchange']) {
             return view('spot.create_order', [
                 'tradingPairs' => [],
+                'favoriteMarkets' => [],
                 'hasActiveExchange' => false,
                 'exchangeMessage' => $exchangeStatus['message'],
                 'error' => null
@@ -777,8 +778,12 @@ class SpotTradingController extends Controller
                 }
             }
             
+            // Get favorite markets (popular/high volume pairs)
+            $favoriteMarkets = $this->getFavoriteMarkets($tradingPairs);
+            
             return view('spot.create_order', [
                 'tradingPairs' => $tradingPairs,
+                'favoriteMarkets' => $favoriteMarkets,
                 'hasActiveExchange' => true,
                 'exchangeMessage' => null,
                 'error' => null
@@ -789,6 +794,7 @@ class SpotTradingController extends Controller
             
             return view('spot.create_order', [
                 'tradingPairs' => [],
+                'favoriteMarkets' => [],
                 'hasActiveExchange' => true,
                 'exchangeMessage' => null,
                 'error' => 'Failed to fetch trading pairs: ' . $e->getMessage()
@@ -912,6 +918,80 @@ class SpotTradingController extends Controller
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
             
             return back()->withErrors(['error' => $userFriendlyMessage])->withInput();
+        }
+    }
+
+    /**
+     * Get favorite/popular markets based on common trading pairs
+     * Since we can't get actual favorites from exchange, we'll use popular pairs
+     */
+    private function getFavoriteMarkets(array $tradingPairs): array
+    {
+        // Define popular trading pairs that users typically favor
+        $popularSymbols = [
+            'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 
+            'SOLUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT', 'LTCUSDT',
+            'MATICUSDT', 'AVAXUSDT', 'UNIUSDT', 'ATOMUSDT', 'FILUSDT'
+        ];
+        
+        $favorites = [];
+        
+        // Filter trading pairs to get only the popular ones that are available
+        foreach ($popularSymbols as $symbol) {
+            foreach ($tradingPairs as $pair) {
+                if ($pair['symbol'] === $symbol) {
+                    $favorites[] = $pair;
+                    break;
+                }
+            }
+        }
+        
+        return $favorites;
+    }
+
+    /**
+     * Cancel spot order from web interface
+     */
+    public function cancelSpotOrderFromWeb(Request $request)
+    {
+        try {
+            // Get user's active exchange service
+            $exchangeService = $this->getExchangeService();
+            
+            $validated = $request->validate([
+                'orderId' => 'required|string',
+                'symbol' => 'required|string',
+            ]);
+
+            // Cancel order via exchange API
+            $result = $exchangeService->cancelSpotOrderWithSymbol(
+                $validated['orderId'],
+                $validated['symbol']
+            );
+
+            // Update order status in local database
+            $spotOrder = SpotOrder::where('order_id', $validated['orderId'])
+                                ->where('symbol', $validated['symbol'])
+                                ->forUser(auth()->id())
+                                ->first();
+
+            if ($spotOrder) {
+                $spotOrder->update([
+                    'status' => 'Cancelled',
+                    'updated_at' => now()
+                ]);
+            }
+
+            return redirect()->route('spot.orders.view')
+                ->with('success', 'سفارش با موفقیت لغو شد.');
+
+        } catch (\Exception $e) {
+            Log::error('Cancel spot order from web failed: ' . $e->getMessage());
+            
+            // Parse error for user-friendly message
+            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            
+            return back()->withErrors(['error' => $userFriendlyMessage]);
         }
     }
 }

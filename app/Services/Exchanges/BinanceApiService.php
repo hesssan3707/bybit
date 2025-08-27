@@ -366,6 +366,11 @@ class BinanceApiService implements ExchangeApiServiceInterface
         throw new \Exception('Use cancelSpotOrder with symbol parameter for Binance');
     }
 
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
+    {
+        return $this->cancelOrderWithSymbol($orderId, $symbol);
+    }
+
     public function getOpenOrders(string $symbol = null): array
     {
         try {

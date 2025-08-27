@@ -60,6 +60,11 @@ interface ExchangeApiServiceInterface
     public function cancelSpotOrder(string $orderId): array;
 
     /**
+     * Cancel a spot order with symbol (required for exchanges like Bybit)
+     */
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array;
+
+    /**
      * Get open orders
      */
     public function getOpenOrders(string $symbol = null): array;

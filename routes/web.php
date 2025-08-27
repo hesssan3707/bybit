@@ -100,6 +100,7 @@ Route::middleware(['auth'])->group(function () {
         })->name('spot.balances.view'); // Redirect to unified balance page
         Route::get('/create-order', [SpotTradingController::class, 'createSpotOrderView'])->name('spot.order.create.view')->middleware('exchange.access:spot');
         Route::post('/create-order', [SpotTradingController::class, 'storeSpotOrderFromWeb'])->name('spot.order.store.web')->middleware('exchange.access:spot');
+        Route::post('/cancel-order', [SpotTradingController::class, 'cancelSpotOrderFromWeb'])->name('spot.order.cancel.web')->middleware('exchange.access:spot');
     });
 
     // Wallet Balance Routes

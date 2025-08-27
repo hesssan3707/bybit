@@ -107,6 +107,36 @@
         color: white;
         text-decoration: none;
     }
+    
+    .cancel-btn {
+        background: #dc3545;
+        color: white;
+        padding: 4px 8px;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .cancel-btn:hover {
+        background: #c82333;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .cancel-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
 
     @media screen and (max-width: 768px) {
         .stats-row {
@@ -206,6 +236,7 @@
                     <th>اجرا شده</th>
                     <th>وضعیت</th>
                     <th>زمان ایجاد</th>
+                    <th>عملیات</th>
                 </tr>
             </thead>
             <tbody>
@@ -241,10 +272,34 @@
                             {{ $order->created_at->format('Y/m/d H:i') }}
                             <br><small>{{ $order->created_at->diffForHumans() }}</small>
                         </td>
+                        <td data-label="عملیات">
+                            <div class="action-buttons">
+                                @if(in_array($order->status, ['New', 'PartiallyFilled']) && $order->order_id)
+                                    <form method="POST" action="{{ route('spot.order.cancel.web') }}" style="display: inline;" onsubmit="return confirm('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟')">
+                                        @csrf
+                                        <input type="hidden" name="orderId" value="{{ $order->order_id }}">
+                                        <input type="hidden" name="symbol" value="{{ $order->symbol }}">
+                                        <button type="submit" class="cancel-btn">لغو</button>
+                                    </form>
+                                @else
+                                    <span style="color: #6c757d; font-size: 12px;">
+                                        @if($order->status === 'Filled')
+                                            تکمیل شده
+                                        @elseif($order->status === 'Cancelled')
+                                            لغو شده
+                                        @elseif($order->status === 'PartiallyFilledCanceled')
+                                            نیمه لغو
+                                        @else
+                                            -
+                                        @endif
+                                    </span>
+                                @endif
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="no-orders">هیچ سفارش اسپاتی یافت نشد.</td>
+                        <td colspan="9" class="no-orders">هیچ سفارش اسپاتی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>

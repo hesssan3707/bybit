@@ -398,6 +398,11 @@ class BingXApiService implements ExchangeApiServiceInterface
         throw new \Exception('Use cancelSpotOrder with symbol parameter for BingX');
     }
 
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
+    {
+        return $this->cancelOrderWithSymbol($orderId, $symbol);
+    }
+
     public function getOpenOrders(string $symbol = null): array
     {
         try {

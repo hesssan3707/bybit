@@ -153,6 +153,114 @@
         color: white;
     }
     
+    /* Searchable dropdown styles */
+    .search-dropdown {
+        position: relative;
+        width: 100%;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 16px;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+    
+    .dropdown-arrow {
+        transition: transform 0.3s;
+        color: #6c757d;
+    }
+    
+    .dropdown-arrow.rotated {
+        transform: rotate(180deg);
+    }
+    
+    .dropdown-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+    
+    .dropdown-list.active {
+        display: block;
+    }
+    
+    .dropdown-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .dropdown-item.selected {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    .dropdown-item.favorite {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .dropdown-item.favorite:hover {
+        background-color: #ffeaa7;
+    }
+    
+    .favorite-star {
+        color: #ffc107;
+        font-size: 14px;
+    }
+    
+    .pair-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .pair-symbol {
+        font-weight: bold;
+        font-size: 14px;
+    }
+    
+    .pair-details {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    .no-results {
+        padding: 15px;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
     @media screen and (max-width: 768px) {
         .form-row {
             grid-template-columns: 1fr;
@@ -195,14 +303,60 @@
         
         <div class="form-group">
             <label for="symbol">جفت ارز</label>
-            <select name="symbol" id="symbol" class="form-control" required>
-                <option value="">انتخاب جفت ارز</option>
-                @foreach($tradingPairs as $pair)
-                    <option value="{{ $pair['symbol'] }}" {{ old('symbol') == $pair['symbol'] ? 'selected' : '' }}>
-                        {{ $pair['symbol'] }} ({{ $pair['baseCoin'] }}/{{ $pair['quoteCoin'] }})
-                    </option>
-                @endforeach
-            </select>
+            <div class="search-dropdown">
+                <div class="search-input form-control" id="symbolSearchInput" onclick="toggleDropdown()">
+                    <span id="selectedSymbolText">انتخاب جفت ارز</span>
+                    <span class="dropdown-arrow" id="dropdownArrow">▼</span>
+                </div>
+                <div class="dropdown-list" id="symbolDropdown">
+                    <input type="text" id="searchBox" placeholder="جستجو در جفت‌های ارز..." 
+                           style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid #eee; outline: none;"
+                           oninput="filterSymbols()" onkeydown="handleKeyNavigation(event)">
+                    
+                    @if($hasActiveExchange)
+                        @if(!empty($favoriteMarkets))
+                            <div class="dropdown-section-header" style="padding: 8px 15px; background: #f8f9fa; font-weight: bold; color: #495057; font-size: 12px;">
+                                جفت‌های محبوب ⭐
+                            </div>
+                            @foreach($favoriteMarkets as $pair)
+                                <div class="dropdown-item favorite" data-symbol="{{ $pair['symbol'] }}" data-base="{{ $pair['baseCoin'] }}" data-quote="{{ $pair['quoteCoin'] }}" onclick="selectSymbol('{{ $pair['symbol'] }}', '{{ $pair['baseCoin'] }}', '{{ $pair['quoteCoin'] }}')">
+                                    <div class="pair-info">
+                                        <div class="pair-symbol">{{ $pair['symbol'] }}</div>
+                                        <div class="pair-details">{{ $pair['baseCoin'] }}/{{ $pair['quoteCoin'] }}</div>
+                                    </div>
+                                    <div class="favorite-star">⭐</div>
+                                </div>
+                            @endforeach
+                            
+                            @if(!empty($tradingPairs))
+                                <div class="dropdown-section-header" style="padding: 8px 15px; background: #f8f9fa; font-weight: bold; color: #495057; font-size: 12px;">
+                                    سایر جفت‌های ارز
+                                </div>
+                            @endif
+                        @endif
+                        
+                        @if(!empty($tradingPairs))
+                            @foreach($tradingPairs as $pair)
+                                @if(!in_array($pair['symbol'], collect($favoriteMarkets)->pluck('symbol')->toArray()))
+                                    <div class="dropdown-item" data-symbol="{{ $pair['symbol'] }}" data-base="{{ $pair['baseCoin'] }}" data-quote="{{ $pair['quoteCoin'] }}" onclick="selectSymbol('{{ $pair['symbol'] }}', '{{ $pair['baseCoin'] }}', '{{ $pair['quoteCoin'] }}')">
+                                        <div class="pair-info">
+                                            <div class="pair-symbol">{{ $pair['symbol'] }}</div>
+                                            <div class="pair-details">{{ $pair['baseCoin'] }}/{{ $pair['quoteCoin'] }}</div>
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        @endif
+                        
+                        @if(empty($tradingPairs) && empty($favoriteMarkets))
+                            <div class="no-results">هیچ جفت ارزی یافت نشد</div>
+                        @endif
+                    @else
+                        <div class="no-results">ابتدا صرافی خود را فعال کنید</div>
+                    @endif
+                </div>
+            </div>
+            <input type="hidden" name="symbol" id="symbol" value="{{ old('symbol') }}" required>
             <div class="help-text">جفت ارز مورد نظر برای معاملات اسپات را انتخاب کنید</div>
         </div>
 
@@ -283,6 +437,182 @@
 
 @push('scripts')
 <script>
+let allSymbols = [];
+let currentSelectedIndex = -1;
+let filteredSymbols = [];
+
+// Initialize symbols data from PHP
+@if($hasActiveExchange)
+    allSymbols = [
+        @if(!empty($favoriteMarkets))
+            @foreach($favoriteMarkets as $pair)
+                {
+                    symbol: '{{ $pair['symbol'] }}',
+                    baseCoin: '{{ $pair['baseCoin'] }}',
+                    quoteCoin: '{{ $pair['quoteCoin'] }}',
+                    isFavorite: true
+                },
+            @endforeach
+        @endif
+        @if(!empty($tradingPairs))
+            @foreach($tradingPairs as $pair)
+                @if(!in_array($pair['symbol'], collect($favoriteMarkets)->pluck('symbol')->toArray()))
+                    {
+                        symbol: '{{ $pair['symbol'] }}',
+                        baseCoin: '{{ $pair['baseCoin'] }}',
+                        quoteCoin: '{{ $pair['quoteCoin'] }}',
+                        isFavorite: false
+                    },
+                @endif
+            @endforeach
+        @endif
+    ];
+@endif
+
+function toggleDropdown() {
+    const dropdown = document.getElementById('symbolDropdown');
+    const arrow = document.getElementById('dropdownArrow');
+    const searchBox = document.getElementById('searchBox');
+    
+    if (dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+        arrow.classList.remove('rotated');
+    } else {
+        dropdown.classList.add('active');
+        arrow.classList.add('rotated');
+        searchBox.focus();
+        searchBox.value = '';
+        filterSymbols();
+    }
+}
+
+function selectSymbol(symbol, baseCoin, quoteCoin) {
+    document.getElementById('symbol').value = symbol;
+    document.getElementById('selectedSymbolText').textContent = `${symbol} (${baseCoin}/${quoteCoin})`;
+    
+    const dropdown = document.getElementById('symbolDropdown');
+    const arrow = document.getElementById('dropdownArrow');
+    dropdown.classList.remove('active');
+    arrow.classList.remove('rotated');
+    
+    // Remove previous selections
+    document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // Mark current selection
+    const selectedItem = document.querySelector(`[data-symbol="${symbol}"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('selected');
+    }
+}
+
+function filterSymbols() {
+    const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+    const items = document.querySelectorAll('.dropdown-item');
+    const sectionHeaders = document.querySelectorAll('.dropdown-section-header');
+    
+    filteredSymbols = [];
+    let favoritesVisible = false;
+    let othersVisible = false;
+    
+    items.forEach((item, index) => {
+        const symbol = item.getAttribute('data-symbol');
+        const baseCoin = item.getAttribute('data-base');
+        const quoteCoin = item.getAttribute('data-quote');
+        const isFavorite = item.classList.contains('favorite');
+        
+        if (symbol && (
+            symbol.toLowerCase().includes(searchTerm) ||
+            baseCoin.toLowerCase().includes(searchTerm) ||
+            quoteCoin.toLowerCase().includes(searchTerm)
+        )) {
+            item.style.display = 'flex';
+            filteredSymbols.push(item);
+            
+            if (isFavorite) {
+                favoritesVisible = true;
+            } else {
+                othersVisible = true;
+            }
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    // Show/hide section headers based on content
+    sectionHeaders.forEach(header => {
+        if (header.textContent.includes('محبوب')) {
+            header.style.display = favoritesVisible ? 'block' : 'none';
+        } else if (header.textContent.includes('سایر')) {
+            header.style.display = othersVisible ? 'block' : 'none';
+        }
+    });
+    
+    // Reset selection index
+    currentSelectedIndex = -1;
+    
+    // Show no results message if needed
+    const noResults = document.querySelector('.no-results');
+    if (noResults) {
+        noResults.style.display = filteredSymbols.length === 0 ? 'block' : 'none';
+    }
+}
+
+function handleKeyNavigation(event) {
+    if (filteredSymbols.length === 0) return;
+    
+    switch(event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            currentSelectedIndex = Math.min(currentSelectedIndex + 1, filteredSymbols.length - 1);
+            updateHighlight();
+            break;
+        case 'ArrowUp':
+            event.preventDefault();
+            currentSelectedIndex = Math.max(currentSelectedIndex - 1, -1);
+            updateHighlight();
+            break;
+        case 'Enter':
+            event.preventDefault();
+            if (currentSelectedIndex >= 0 && filteredSymbols[currentSelectedIndex]) {
+                const item = filteredSymbols[currentSelectedIndex];
+                const symbol = item.getAttribute('data-symbol');
+                const baseCoin = item.getAttribute('data-base');
+                const quoteCoin = item.getAttribute('data-quote');
+                selectSymbol(symbol, baseCoin, quoteCoin);
+            }
+            break;
+        case 'Escape':
+            toggleDropdown();
+            break;
+    }
+}
+
+function updateHighlight() {
+    filteredSymbols.forEach((item, index) => {
+        if (index === currentSelectedIndex) {
+            item.style.backgroundColor = 'var(--primary-color)';
+            item.style.color = 'white';
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.style.backgroundColor = '';
+            item.style.color = '';
+        }
+    });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const searchDropdown = document.querySelector('.search-dropdown');
+    if (searchDropdown && !searchDropdown.contains(event.target)) {
+        const dropdown = document.getElementById('symbolDropdown');
+        const arrow = document.getElementById('dropdownArrow');
+        dropdown.classList.remove('active');
+        arrow.classList.remove('rotated');
+    }
+});
+
 function setSide(side) {
     document.getElementById('side').value = side;
     
@@ -339,12 +669,28 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!document.getElementById('side').value) {
         setSide('Buy');
     }
+    
+    // Set initial symbol if provided in old input
+    const oldSymbol = '{{ old('symbol') }}';
+    if (oldSymbol) {
+        const symbolData = allSymbols.find(s => s.symbol === oldSymbol);
+        if (symbolData) {
+            selectSymbol(symbolData.symbol, symbolData.baseCoin, symbolData.quoteCoin);
+        }
+    }
 });
 
 // Form validation
 document.getElementById('spotOrderForm').addEventListener('submit', function(e) {
     const orderType = document.getElementById('orderType').value;
     const price = document.getElementById('price').value;
+    const symbol = document.getElementById('symbol').value;
+    
+    if (!symbol) {
+        e.preventDefault();
+        alert('لطفاً جفت ارز را انتخاب کنید');
+        return false;
+    }
     
     if (orderType === 'Limit' && (!price || parseFloat(price) <= 0)) {
         e.preventDefault();
