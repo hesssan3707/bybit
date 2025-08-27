@@ -220,6 +220,11 @@ class FuturesStopLossSync extends Command
             return true;
         }
         
+        // Strategy 5: Cancel existing SL orders and create new conditional order
+        if ($this->tryCancelAndCreateConditionalSl($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
+            return true;
+        }
+        
         return false;
     }
     
@@ -528,6 +533,109 @@ class FuturesStopLossSync extends Command
         } catch (\Exception $e) {
             $this->warn("      Strategy 4: Failed - " . $e->getMessage());
             Log::warning("Cancel existing SL and reset failed for user {$userId} on {$exchangeName}", [
+                'symbol' => $symbol,
+                'order_id' => $orderId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+    
+    /**
+     * Strategy 5: Cancel existing SL orders and create new conditional stop loss order
+     * This creates a new conditional order instead of using position-level stop loss API
+     */
+    private function tryCancelAndCreateConditionalSl(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        try {
+            $this->info("      Strategy 5: Canceling existing SL orders and creating new conditional SL order...");
+            
+            // Step 1: Get and cancel existing conditional orders (same as Strategy 4)
+            $conditionalOrdersResult = $exchangeService->getConditionalOrders($symbol);
+            $conditionalOrders = $conditionalOrdersResult['list'] ?? [];
+            
+            $canceledOrders = 0;
+            foreach ($conditionalOrders as $order) {
+                // Check if this is a stop loss order
+                $isStopLossOrder = false;
+                
+                if (isset($order['stopLoss']) && !empty($order['stopLoss']) && $order['stopLoss'] !== '0') {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['triggerPrice']) && !empty($order['triggerPrice']) && 
+                    isset($order['reduceOnly']) && $order['reduceOnly'] === true) {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['stopOrderType']) && 
+                    in_array($order['stopOrderType'], ['Stop', 'StopLoss', 'sl'])) {
+                    $isStopLossOrder = true;
+                }
+                
+                if ($isStopLossOrder) {
+                    try {
+                        $this->info("        Canceling SL order: {$order['orderId']}");
+                        $exchangeService->cancelOrderWithSymbol($order['orderId'], $symbol);
+                        $canceledOrders++;
+                        usleep(200000); // 0.2 seconds
+                    } catch (\Exception $e) {
+                        $this->warn("        Failed to cancel order {$order['orderId']}: {$e->getMessage()}");
+                    }
+                }
+            }
+            
+            $this->info("        Canceled {$canceledOrders} stop loss orders");
+            
+            // Wait for cancellations to be processed
+            if ($canceledOrders > 0) {
+                usleep(500000); // 0.5 seconds
+            }
+            
+            // Step 2: Create new conditional stop loss order
+            $this->info("        Creating new conditional stop loss order at {$targetSl}...");
+            
+            $positionIdx = $this->determinePositionIdx($position);
+            $positionSize = abs((float)($position['size'] ?? 0));
+            $positionSide = strtolower($position['side'] ?? 'buy');
+            
+            if ($positionSize <= 0) {
+                throw new \Exception('Cannot determine position size for conditional order');
+            }
+            
+            // Create conditional order parameters
+            $orderParams = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'side' => $positionSide === 'buy' ? 'Sell' : 'Buy', // Opposite side to close position
+                'orderType' => 'Market', // Market order when triggered
+                'qty' => (string)$positionSize, // Full position size
+                'triggerPrice' => (string)$targetSl, // Trigger at stop loss price
+                'triggerBy' => 'LastPrice', // Trigger based on last price
+                'reduceOnly' => true, // Only reduce position, don't increase
+                'closeOnTrigger' => true, // Close position when triggered
+                'positionIdx' => $positionIdx,
+                'timeInForce' => 'GTC', // Good till canceled
+                'orderLinkId' => 'sl_' . time() . '_' . rand(1000, 9999), // Unique identifier
+            ];
+            
+            // Create the conditional order
+            $orderResult = $exchangeService->createOrder($orderParams);
+            
+            $this->info("        Successfully created conditional SL order: {$orderResult['orderId']}");
+            $this->info("      Strategy 5: Success - Conditional stop loss order created");
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->warn("      Strategy 5: Failed - " . $e->getMessage());
+            Log::warning("Cancel and create conditional SL failed for user {$userId} on {$exchangeName}", [
                 'symbol' => $symbol,
                 'order_id' => $orderId,
                 'error' => $e->getMessage()

@@ -268,6 +268,108 @@ class FuturesStopLossSyncTest extends TestCase
         $result->assertExitCode(0);
     }
 
+    public function testStopLossSyncWithStrategy5ConditionalOrder()
+    {
+        // Create test user with strict mode enabled
+        $user = User::factory()->create([
+            'future_strict_mode' => true
+        ]);
+
+        // Create user exchange
+        $userExchange = UserExchange::factory()->create([
+            'user_id' => $user->id,
+            'exchange_name' => 'bybit',
+            'api_key' => 'test_key',
+            'api_secret' => 'test_secret',
+            'is_active' => true
+        ]);
+
+        // Create a filled order
+        $order = Order::factory()->create([
+            'user_exchange_id' => $userExchange->id,
+            'status' => 'filled',
+            'symbol' => 'ETHUSDT',
+            'side' => 'Buy',
+            'sl' => 2500.50
+        ]);
+
+        // Mock the exchange service
+        $mockExchangeService = Mockery::mock(BybitApiService::class);
+        
+        // Mock getPositions to return a position with different SL
+        $mockExchangeService->shouldReceive('getPositions')
+            ->with('ETHUSDT')
+            ->andReturn([
+                'list' => [
+                    [
+                        'symbol' => 'ETHUSDT',
+                        'side' => 'Buy',
+                        'stopLoss' => '2400.00', // Different from DB (2500.50)
+                        'takeProfit' => '3000.00',
+                        'positionIdx' => 0,
+                        'size' => '0.1'
+                    ]
+                ]
+            ]);
+
+        // Mock all first 4 strategies to fail (simulating the "Unknown error" scenario)
+        $mockExchangeService->shouldReceive('setStopLossAdvanced')
+            ->times(4) // Strategy 1, 2, 3, and 4
+            ->andThrow(new \Exception('Bybit API Error: Unknown error'));
+
+        // Mock Strategy 5: getConditionalOrders to return existing SL orders (called twice - Strategy 4 and 5)
+        $mockExchangeService->shouldReceive('getConditionalOrders')
+            ->with('ETHUSDT')
+            ->times(2)
+            ->andReturn([
+                'list' => [
+                    [
+                        'orderId' => 'sl-order-456',
+                        'symbol' => 'ETHUSDT',
+                        'stopLoss' => '2400.00',
+                        'reduceOnly' => true,
+                        'triggerPrice' => '2400.00',
+                        'stopOrderType' => 'Stop'
+                    ]
+                ]
+            ]);
+
+        // Mock cancelOrderWithSymbol for the existing SL order (called in both Strategy 4 and 5)
+        $mockExchangeService->shouldReceive('cancelOrderWithSymbol')
+            ->with('sl-order-456', 'ETHUSDT')
+            ->times(2)
+            ->andReturn(['retCode' => 0, 'retMsg' => 'OK']);
+
+        // Mock createOrder for Strategy 5 (creating new conditional order)
+        $mockExchangeService->shouldReceive('createOrder')
+            ->once()
+            ->with(Mockery::on(function ($params) {
+                return $params['category'] === 'linear' &&
+                       $params['symbol'] === 'ETHUSDT' &&
+                       $params['side'] === 'Sell' && // Opposite of Buy position
+                       $params['orderType'] === 'Market' &&
+                       $params['qty'] === '0.1' &&
+                       $params['triggerPrice'] === '2500.5' &&
+                       $params['triggerBy'] === 'LastPrice' &&
+                       $params['reduceOnly'] === true &&
+                       $params['closeOnTrigger'] === true &&
+                       $params['positionIdx'] === 0 &&
+                       $params['timeInForce'] === 'GTC' &&
+                       isset($params['orderLinkId']);
+            }))
+            ->andReturn(['orderId' => 'new-sl-789', 'retCode' => 0, 'retMsg' => 'OK']);
+
+        // Mock ExchangeFactory
+        ExchangeFactory::shouldReceive('create')
+            ->with('bybit', 'test_key', 'test_secret')
+            ->andReturn($mockExchangeService);
+
+        // Run the command
+        $result = $this->artisan('futures:sync-sl', ['--user' => $user->id]);
+
+        $result->assertExitCode(0);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
