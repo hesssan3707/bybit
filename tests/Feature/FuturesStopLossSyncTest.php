@@ -312,15 +312,15 @@ class FuturesStopLossSyncTest extends TestCase
                 ]
             ]);
 
-        // Mock all first 4 strategies to fail (simulating the "Unknown error" scenario)
+        // Mock all first strategy (4) to fail (simulating the "Unknown error" scenario)
         $mockExchangeService->shouldReceive('setStopLossAdvanced')
-            ->times(4) // Strategy 1, 2, 3, and 4
+            ->once() // Only Strategy 4 now
             ->andThrow(new \Exception('Bybit API Error: Unknown error'));
 
-        // Mock Strategy 5: getConditionalOrders to return existing SL orders (called twice - Strategy 4 and 5)
+        // Mock Strategy 5: getConditionalOrders to return existing SL orders
         $mockExchangeService->shouldReceive('getConditionalOrders')
             ->with('ETHUSDT')
-            ->times(2)
+            ->times(2) // Called in both Strategy 4 and 5
             ->andReturn([
                 'list' => [
                     [
@@ -364,6 +364,63 @@ class FuturesStopLossSyncTest extends TestCase
         ExchangeFactory::shouldReceive('create')
             ->with('bybit', 'test_key', 'test_secret')
             ->andReturn($mockExchangeService);
+
+        // Run the command
+        $result = $this->artisan('futures:sync-sl', ['--user' => $user->id]);
+
+        $result->assertExitCode(0);
+    }
+
+    public function testStopLossSyncSkipsMatchingExistingOrders()
+    {
+        // Create test user with strict mode enabled
+        $user = User::factory()->create([
+            'future_strict_mode' => true
+        ]);
+
+        // Create user exchange
+        $userExchange = UserExchange::factory()->create([
+            'user_id' => $user->id,
+            'exchange_name' => 'bybit',
+            'api_key' => 'test_key',
+            'api_secret' => 'test_secret',
+            'is_active' => true
+        ]);
+
+        // Create a filled order
+        $order = Order::factory()->create([
+            'user_exchange_id' => $userExchange->id,
+            'status' => 'filled',
+            'symbol' => 'ETHUSDT',
+            'side' => 'Buy',
+            'sl' => 2500.50
+        ]);
+
+        // Mock the exchange service
+        $mockExchangeService = Mockery::mock(BybitApiService::class);
+        
+        // Mock getPositions to return a position with matching SL (should not trigger reset)
+        $mockExchangeService->shouldReceive('getPositions')
+            ->with('ETHUSDT')
+            ->andReturn([
+                'list' => [
+                    [
+                        'symbol' => 'ETHUSDT',
+                        'side' => 'Buy',
+                        'stopLoss' => '2500.50', // Matches DB exactly
+                        'takeProfit' => '3000.00',
+                        'positionIdx' => 0,
+                        'size' => '0.1'
+                    ]
+                ]
+            ]);
+
+        // Mock ExchangeFactory
+        ExchangeFactory::shouldReceive('create')
+            ->with('bybit', 'test_key', 'test_secret')
+            ->andReturn($mockExchangeService);
+
+        // No other methods should be called since SL matches
 
         // Run the command
         $result = $this->artisan('futures:sync-sl', ['--user' => $user->id]);

@@ -200,21 +200,6 @@ class FuturesStopLossSync extends Command
         int $orderId
     ): bool {
         
-        // Strategy 1: Direct modification with proper parameters
-        if ($this->tryDirectSlModification($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
-            return true;
-        }
-        
-        // Strategy 2: Remove existing SL and set new one
-        if ($this->tryRemoveAndSetSl($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
-            return true;
-        }
-        
-        // Strategy 3: Try with different tpslMode (Partial if Full failed, or vice versa)
-        if ($this->tryAlternativeTpslMode($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
-            return true;
-        }
-        
         // Strategy 4: Find and cancel existing SL orders, then set new SL
         if ($this->tryCancelExistingSlAndReset($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
             return true;
@@ -226,190 +211,6 @@ class FuturesStopLossSync extends Command
         }
         
         return false;
-    }
-    
-    /**
-     * Strategy 1: Direct modification with proper parameters
-     */
-    private function tryDirectSlModification(
-        ExchangeApiServiceInterface $exchangeService,
-        array $position, 
-        string $symbol, 
-        float $targetSl, 
-        int $userId, 
-        string $exchangeName, 
-        int $orderId
-    ): bool {
-        try {
-            $this->info("      Strategy 1: Attempting direct SL modification...");
-            
-            // Ensure positionIdx is properly set
-            $positionIdx = $this->determinePositionIdx($position);
-            
-            $params = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'stopLoss' => (string)$targetSl,
-                'tpslMode' => 'Full',
-                'positionIdx' => $positionIdx,
-            ];
-
-            // Preserve existing take profit if it exists
-            $existingTp = (float)($position['takeProfit'] ?? 0);
-            if ($existingTp > 0) {
-                $params['takeProfit'] = (string)$existingTp;
-            }
-
-            // Preserve trigger settings if they exist
-            if (isset($position['tpTriggerBy']) && !empty($position['tpTriggerBy']) && $position['tpTriggerBy'] !== '') {
-                $params['tpTriggerBy'] = $position['tpTriggerBy'];
-            }
-            if (isset($position['slTriggerBy']) && !empty($position['slTriggerBy']) && $position['slTriggerBy'] !== '') {
-                $params['slTriggerBy'] = $position['slTriggerBy'];
-            }
-
-            $exchangeService->setStopLossAdvanced($params);
-            $this->info("      Strategy 1: Success - SL modified directly");
-            return true;
-            
-        } catch (\Exception $e) {
-            $this->warn("      Strategy 1: Failed - " . $e->getMessage());
-            Log::warning("Direct SL modification failed for user {$userId} on {$exchangeName}", [
-                'symbol' => $symbol,
-                'order_id' => $orderId,
-                'error' => $e->getMessage(),
-                'params' => $params ?? null
-            ]);
-            return false;
-        }
-    }
-    
-    /**
-     * Strategy 2: Remove existing SL and set new one
-     */
-    private function tryRemoveAndSetSl(
-        ExchangeApiServiceInterface $exchangeService,
-        array $position, 
-        string $symbol, 
-        float $targetSl, 
-        int $userId, 
-        string $exchangeName, 
-        int $orderId
-    ): bool {
-        try {
-            $this->info("      Strategy 2: Attempting remove and re-set SL...");
-            
-            $positionIdx = $this->determinePositionIdx($position);
-            
-            // Step 1: Remove existing stop loss by setting it to 0
-            $removeParams = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'stopLoss' => '0', // 0 means cancel SL according to Bybit docs
-                'tpslMode' => 'Full',
-                'positionIdx' => $positionIdx,
-            ];
-            
-            // Preserve existing TP during SL removal
-            $existingTp = (float)($position['takeProfit'] ?? 0);
-            if ($existingTp > 0) {
-                $removeParams['takeProfit'] = (string)$existingTp;
-            }
-            
-            $this->info("        Step 2a: Removing existing SL...");
-            $exchangeService->setStopLossAdvanced($removeParams);
-            
-            // Small delay to ensure the removal is processed
-            usleep(500000); // 0.5 seconds
-            
-            // Step 2: Set new stop loss
-            $setParams = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'stopLoss' => (string)$targetSl,
-                'tpslMode' => 'Full',
-                'positionIdx' => $positionIdx,
-            ];
-            
-            // Restore TP if it existed
-            if ($existingTp > 0) {
-                $setParams['takeProfit'] = (string)$existingTp;
-            }
-            
-            $this->info("        Step 2b: Setting new SL...");
-            $exchangeService->setStopLossAdvanced($setParams);
-            
-            $this->info("      Strategy 2: Success - SL removed and re-set");
-            return true;
-            
-        } catch (\Exception $e) {
-            $this->warn("      Strategy 2: Failed - " . $e->getMessage());
-            Log::warning("Remove and re-set SL failed for user {$userId} on {$exchangeName}", [
-                'symbol' => $symbol,
-                'order_id' => $orderId,
-                'error' => $e->getMessage(),
-                'remove_params' => $removeParams ?? null,
-                'set_params' => $setParams ?? null
-            ]);
-            return false;
-        }
-    }
-    
-    /**
-     * Strategy 3: Try with alternative tpslMode
-     */
-    private function tryAlternativeTpslMode(
-        ExchangeApiServiceInterface $exchangeService,
-        array $position, 
-        string $symbol, 
-        float $targetSl, 
-        int $userId, 
-        string $exchangeName, 
-        int $orderId
-    ): bool {
-        try {
-            $this->info("      Strategy 3: Attempting with Partial tpslMode...");
-            
-            $positionIdx = $this->determinePositionIdx($position);
-            $positionSize = abs((float)($position['size'] ?? 0));
-            
-            if ($positionSize <= 0) {
-                $this->warn("      Strategy 3: Failed - Cannot determine position size");
-                return false;
-            }
-            
-            $params = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'stopLoss' => (string)$targetSl,
-                'tpslMode' => 'Partial',
-                'positionIdx' => $positionIdx,
-                'slSize' => (string)$positionSize, // For partial mode, specify the size
-                'slOrderType' => 'Market', // Ensure we use Market orders for SL
-            ];
-            
-            // For partial mode with TP, both tpSize and slSize must be equal
-            $existingTp = (float)($position['takeProfit'] ?? 0);
-            if ($existingTp > 0) {
-                $params['takeProfit'] = (string)$existingTp;
-                $params['tpSize'] = (string)$positionSize;
-                $params['tpOrderType'] = 'Market';
-            }
-
-            $exchangeService->setStopLossAdvanced($params);
-            $this->info("      Strategy 3: Success - SL set with Partial mode");
-            return true;
-            
-        } catch (\Exception $e) {
-            $this->warn("      Strategy 3: Failed - " . $e->getMessage());
-            Log::warning("Alternative tpslMode SL setting failed for user {$userId} on {$exchangeName}", [
-                'symbol' => $symbol,
-                'order_id' => $orderId,
-                'error' => $e->getMessage(),
-                'params' => $params ?? null
-            ]);
-            return false;
-        }
     }
     
     /**
@@ -464,7 +265,7 @@ class FuturesStopLossSync extends Command
                 // Step 2: Find and cancel stop loss orders
                 $canceledOrders = 0;
                 foreach ($conditionalOrders as $order) {
-                    // Check if this is a stop loss order
+                    // Check if this is a stop loss order with improved detection
                     $isStopLossOrder = false;
                     
                     // Method 1: Check if it has stopLoss field set
@@ -484,9 +285,29 @@ class FuturesStopLossSync extends Command
                         $isStopLossOrder = true;
                     }
                     
+                    // Method 4: Check if it's our created conditional SL order (orderLinkId pattern)
+                    if (isset($order['orderLinkId']) && 
+                        str_starts_with($order['orderLinkId'], 'sl_')) {
+                        $isStopLossOrder = true;
+                    }
+                    
+                    // Method 5: Check if it's a reduce-only order with closeOnTrigger
+                    if (isset($order['reduceOnly']) && $order['reduceOnly'] === true &&
+                        isset($order['closeOnTrigger']) && $order['closeOnTrigger'] === true &&
+                        isset($order['triggerPrice']) && !empty($order['triggerPrice'])) {
+                        $isStopLossOrder = true;
+                    }
+                    
                     if ($isStopLossOrder) {
+                        // Check if the trigger price matches our target (within tolerance)
+                        $orderTriggerPrice = (float)($order['triggerPrice'] ?? 0);
+                        if (abs($orderTriggerPrice - $targetSl) <= 0.001) {
+                            $this->info("        Found matching SL order at correct price ({$orderTriggerPrice}), skipping cancellation");
+                            continue; // Skip cancellation if the price already matches
+                        }
+                        
                         try {
-                            $this->info("        Canceling SL order: {$order['orderId']}");
+                            $this->info("        Canceling SL order: {$order['orderId']} (price: {$orderTriggerPrice})");
                             $exchangeService->cancelOrderWithSymbol($order['orderId'], $symbol);
                             $canceledOrders++;
                             
@@ -563,7 +384,7 @@ class FuturesStopLossSync extends Command
             
             $canceledOrders = 0;
             foreach ($conditionalOrders as $order) {
-                // Check if this is a stop loss order
+                // Check if this is a stop loss order with improved detection
                 $isStopLossOrder = false;
                 
                 if (isset($order['stopLoss']) && !empty($order['stopLoss']) && $order['stopLoss'] !== '0') {
@@ -580,9 +401,29 @@ class FuturesStopLossSync extends Command
                     $isStopLossOrder = true;
                 }
                 
+                // Method 4: Check if it's our created conditional SL order (orderLinkId pattern)
+                if (isset($order['orderLinkId']) && 
+                    str_starts_with($order['orderLinkId'], 'sl_')) {
+                    $isStopLossOrder = true;
+                }
+                
+                // Method 5: Check if it's a reduce-only order with closeOnTrigger
+                if (isset($order['reduceOnly']) && $order['reduceOnly'] === true &&
+                    isset($order['closeOnTrigger']) && $order['closeOnTrigger'] === true &&
+                    isset($order['triggerPrice']) && !empty($order['triggerPrice'])) {
+                    $isStopLossOrder = true;
+                }
+                
                 if ($isStopLossOrder) {
+                    // Check if the trigger price matches our target (within tolerance)
+                    $orderTriggerPrice = (float)($order['triggerPrice'] ?? 0);
+                    if (abs($orderTriggerPrice - $targetSl) <= 0.001) {
+                        $this->info("        Found matching SL order at correct price ({$orderTriggerPrice}), skipping cancellation");
+                        continue; // Skip cancellation if the price already matches
+                    }
+                    
                     try {
-                        $this->info("        Canceling SL order: {$order['orderId']}");
+                        $this->info("        Canceling SL order: {$order['orderId']} (price: {$orderTriggerPrice})");
                         $exchangeService->cancelOrderWithSymbol($order['orderId'], $symbol);
                         $canceledOrders++;
                         usleep(200000); // 0.2 seconds
@@ -597,6 +438,44 @@ class FuturesStopLossSync extends Command
             // Wait for cancellations to be processed
             if ($canceledOrders > 0) {
                 usleep(500000); // 0.5 seconds
+            }
+            
+            // Check if we found a matching order that we didn't cancel
+            foreach ($conditionalOrders as $order) {
+                $isStopLossOrder = false;
+                
+                if (isset($order['stopLoss']) && !empty($order['stopLoss']) && $order['stopLoss'] !== '0') {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['triggerPrice']) && !empty($order['triggerPrice']) && 
+                    isset($order['reduceOnly']) && $order['reduceOnly'] === true) {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['stopOrderType']) && 
+                    in_array($order['stopOrderType'], ['Stop', 'StopLoss', 'sl'])) {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['orderLinkId']) && 
+                    str_starts_with($order['orderLinkId'], 'sl_')) {
+                    $isStopLossOrder = true;
+                }
+                
+                if (isset($order['reduceOnly']) && $order['reduceOnly'] === true &&
+                    isset($order['closeOnTrigger']) && $order['closeOnTrigger'] === true &&
+                    isset($order['triggerPrice']) && !empty($order['triggerPrice'])) {
+                    $isStopLossOrder = true;
+                }
+                
+                if ($isStopLossOrder) {
+                    $orderTriggerPrice = (float)($order['triggerPrice'] ?? 0);
+                    if (abs($orderTriggerPrice - $targetSl) <= 0.001) {
+                        $this->info("      Strategy 5: Success - Found existing matching SL order at correct price ({$orderTriggerPrice})");
+                        return true; // We already have the correct order, no need to create new one
+                    }
+                }
             }
             
             // Step 2: Create new conditional stop loss order
