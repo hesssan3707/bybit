@@ -619,6 +619,7 @@ class FuturesStopLossSync extends Command
                 'qty' => (string)$positionSize, // Full position size
                 'triggerPrice' => (string)$targetSl, // Trigger at stop loss price
                 'triggerBy' => 'LastPrice', // Trigger based on last price
+                'triggerDirection' => $positionSide === 'buy' ? 2 : 1, // 2: price falls (for buy SL), 1: price rises (for sell SL)
                 'reduceOnly' => true, // Only reduce position, don't increase
                 'closeOnTrigger' => true, // Close position when triggered
                 'positionIdx' => $positionIdx,

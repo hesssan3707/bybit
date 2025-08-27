@@ -25,6 +25,7 @@ Instead of trying to set stop loss via the problematic `/v5/position/set-trading
      "qty": "0.01",          // Position size
      "triggerPrice": "835",  // Your target stop loss price
      "triggerBy": "LastPrice",
+     "triggerDirection": 2,   // 2: price falls (for Buy SL), 1: price rises (for Sell SL)
      "reduceOnly": true,     // Only close position, don't open new
      "closeOnTrigger": true, // Close position when triggered
      "positionIdx": 0,

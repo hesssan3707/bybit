@@ -43,6 +43,7 @@ $orderParams = [
     'qty' => (string)$positionSize, // Full position size
     'triggerPrice' => (string)$targetSl, // Trigger at stop loss price
     'triggerBy' => 'LastPrice', // Trigger based on last price
+    'triggerDirection' => $positionSide === 'buy' ? 2 : 1, // 2: falls, 1: rises
     'reduceOnly' => true, // Only reduce position
     'closeOnTrigger' => true, // Close position when triggered
     'positionIdx' => $positionIdx,
@@ -57,6 +58,7 @@ $orderParams = [
 2. **Market Execution**: Uses Market orders for immediate execution when triggered
 3. **Position Safety**: `reduceOnly` and `closeOnTrigger` ensure it only closes positions
 4. **Reliable Triggering**: Uses `triggerBy: LastPrice` for consistent trigger mechanism
+5. **Correct Direction**: `triggerDirection` ensures proper trigger logic (2: falls for Buy SL, 1: rises for Sell SL)
 
 ### Implementation Details
 

@@ -351,6 +351,7 @@ class FuturesStopLossSyncTest extends TestCase
                        $params['qty'] === '0.1' &&
                        $params['triggerPrice'] === '2500.5' &&
                        $params['triggerBy'] === 'LastPrice' &&
+                       $params['triggerDirection'] === 2 && // 2 for Buy position SL (price falls)
                        $params['reduceOnly'] === true &&
                        $params['closeOnTrigger'] === true &&
                        $params['positionIdx'] === 0 &&
