@@ -340,12 +340,64 @@ class BybitApiService implements ExchangeApiServiceInterface
      */
     public function setStopLossAdvanced(array $params): array
     {
-        // Ensure required parameters are set
+        // Validate required parameters
+        if (!isset($params['symbol']) || empty($params['symbol'])) {
+            throw new \Exception('Symbol is required for setStopLossAdvanced');
+        }
+        
+        if (!isset($params['positionIdx']) && !array_key_exists('positionIdx', $params)) {
+            throw new \Exception('positionIdx is required for Bybit API v5 set-trading-stop endpoint');
+        }
+        
+        // Ensure required parameters are set with proper defaults
         $params['category'] = $params['category'] ?? 'linear';
         $params['tpslMode'] = $params['tpslMode'] ?? 'Full';
-        $params['positionIdx'] = $params['positionIdx'] ?? 0;
+        $params['positionIdx'] = isset($params['positionIdx']) ? (int)$params['positionIdx'] : 0;
         
-        return $this->setTradingStop($params);
+        // Validate tpslMode
+        if (!in_array($params['tpslMode'], ['Full', 'Partial'])) {
+            throw new \Exception('tpslMode must be either "Full" or "Partial"');
+        }
+        
+        // For Partial mode, validate required parameters
+        if ($params['tpslMode'] === 'Partial') {
+            if (isset($params['stopLoss']) && $params['stopLoss'] !== '0' && !isset($params['slSize'])) {
+                throw new \Exception('slSize is required when setting stopLoss in Partial mode');
+            }
+            if (isset($params['takeProfit']) && $params['takeProfit'] !== '0' && !isset($params['tpSize'])) {
+                throw new \Exception('tpSize is required when setting takeProfit in Partial mode');
+            }
+            // In Partial mode, if both TP and SL are set, their sizes must be equal
+            if (isset($params['tpSize']) && isset($params['slSize']) && $params['tpSize'] !== $params['slSize']) {
+                throw new \Exception('tpSize and slSize must be equal in Partial mode when both are specified');
+            }
+        }
+        
+        // Log the parameters for debugging
+        \Log::debug('BybitApiService setStopLossAdvanced called', [
+            'symbol' => $params['symbol'],
+            'tpslMode' => $params['tpslMode'],
+            'positionIdx' => $params['positionIdx'],
+            'stopLoss' => $params['stopLoss'] ?? 'not_set',
+            'takeProfit' => $params['takeProfit'] ?? 'not_set',
+            'all_params' => $params
+        ]);
+        
+        try {
+            return $this->setTradingStop($params);
+        } catch (\Exception $e) {
+            // Enhanced error logging
+            \Log::error('BybitApiService setStopLossAdvanced failed', [
+                'symbol' => $params['symbol'],
+                'error' => $e->getMessage(),
+                'params' => $params
+            ]);
+            
+            // Re-throw with more context
+            throw new \Exception(
+                "Failed to set stop loss for {$params['symbol']}: " . $e->getMessage()
+            );
+        }
     }
 
     public function getExchangeName(): string

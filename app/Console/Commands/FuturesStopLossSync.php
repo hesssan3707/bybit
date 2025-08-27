@@ -156,41 +156,13 @@ class FuturesStopLossSync extends Command
                 if (abs($exchangeSl - $databaseSl) > 0.001) {
                     $this->warn("    SL mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Resetting...");
 
-                    try {
-                        // Prepare parameters to update stop loss with all required fields
-                        $params = [
-                            'category' => 'linear',
-                            'symbol' => $symbol,
-                            'stopLoss' => (string)$databaseSl,
-                            'tpslMode' => 'Full', // Use Full mode for entire position
-                            'positionIdx' => (int)($matchingPosition['positionIdx'] ?? 0),
-                        ];
-
-                        // Preserve existing take profit if it exists
-                        $existingTp = (float)($matchingPosition['takeProfit'] ?? 0);
-                        if ($existingTp > 0) {
-                            $params['takeProfit'] = (string)$existingTp;
-                        }
-
-                        // Preserve trigger settings if they exist
-                        if (isset($matchingPosition['tpTriggerBy']) && !empty($matchingPosition['tpTriggerBy'])) {
-                            $params['tpTriggerBy'] = $matchingPosition['tpTriggerBy'];
-                        }
-                        if (isset($matchingPosition['slTriggerBy']) && !empty($matchingPosition['slTriggerBy'])) {
-                            $params['slTriggerBy'] = $matchingPosition['slTriggerBy'];
-                        }
-
-                        // Use the advanced method with all parameters
-                        $exchangeService->setStopLossAdvanced($params);
+                    // Try multiple strategies to set the stop loss
+                    $success = $this->resetStopLoss($exchangeService, $matchingPosition, $symbol, $databaseSl, $userId, $userExchange->exchange_name, $dbOrder->id);
+                    
+                    if ($success) {
                         $this->info("    Successfully reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} to {$databaseSl}");
-                    } catch (\Exception $e) {
-                        $this->error("    Failed to reset SL for user {$userId} on {$userExchange->exchange_name}, {$symbol}: " . $e->getMessage());
-                        Log::error("Failed to reset SL for user {$userId} on exchange {$userExchange->exchange_name}", [
-                            'symbol' => $symbol,
-                            'order_id' => $dbOrder->id,
-                            'error' => $e->getMessage(),
-                            'api_params' => $params ?? null
-                        ]);
+                    } else {
+                        $this->error("    All SL reset strategies failed for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
                     }
                 } else {
                     $this->info("    SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}) is in sync");
@@ -204,5 +176,253 @@ class FuturesStopLossSync extends Command
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Reset stop loss with multiple fallback strategies
+     * 
+     * @param ExchangeApiServiceInterface $exchangeService
+     * @param array $position
+     * @param string $symbol
+     * @param float $targetSl
+     * @param int $userId
+     * @param string $exchangeName
+     * @param int $orderId
+     * @return bool Success status
+     */
+    private function resetStopLoss(
+        ExchangeApiServiceInterface $exchangeService, 
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        
+        // Strategy 1: Direct modification with proper parameters
+        if ($this->tryDirectSlModification($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
+            return true;
+        }
+        
+        // Strategy 2: Remove existing SL and set new one
+        if ($this->tryRemoveAndSetSl($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
+            return true;
+        }
+        
+        // Strategy 3: Try with different tpslMode (Partial if Full failed, or vice versa)
+        if ($this->tryAlternativeTpslMode($exchangeService, $position, $symbol, $targetSl, $userId, $exchangeName, $orderId)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Strategy 1: Direct modification with proper parameters
+     */
+    private function tryDirectSlModification(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        try {
+            $this->info("      Strategy 1: Attempting direct SL modification...");
+            
+            // Ensure positionIdx is properly set
+            $positionIdx = $this->determinePositionIdx($position);
+            
+            $params = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'stopLoss' => (string)$targetSl,
+                'tpslMode' => 'Full',
+                'positionIdx' => $positionIdx,
+            ];
+
+            // Preserve existing take profit if it exists
+            $existingTp = (float)($position['takeProfit'] ?? 0);
+            if ($existingTp > 0) {
+                $params['takeProfit'] = (string)$existingTp;
+            }
+
+            // Preserve trigger settings if they exist
+            if (isset($position['tpTriggerBy']) && !empty($position['tpTriggerBy']) && $position['tpTriggerBy'] !== '') {
+                $params['tpTriggerBy'] = $position['tpTriggerBy'];
+            }
+            if (isset($position['slTriggerBy']) && !empty($position['slTriggerBy']) && $position['slTriggerBy'] !== '') {
+                $params['slTriggerBy'] = $position['slTriggerBy'];
+            }
+
+            $exchangeService->setStopLossAdvanced($params);
+            $this->info("      Strategy 1: Success - SL modified directly");
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->warn("      Strategy 1: Failed - " . $e->getMessage());
+            Log::warning("Direct SL modification failed for user {$userId} on {$exchangeName}", [
+                'symbol' => $symbol,
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+                'params' => $params ?? null
+            ]);
+            return false;
+        }
+    }
+    
+    /**
+     * Strategy 2: Remove existing SL and set new one
+     */
+    private function tryRemoveAndSetSl(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        try {
+            $this->info("      Strategy 2: Attempting remove and re-set SL...");
+            
+            $positionIdx = $this->determinePositionIdx($position);
+            
+            // Step 1: Remove existing stop loss by setting it to 0
+            $removeParams = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'stopLoss' => '0', // 0 means cancel SL according to Bybit docs
+                'tpslMode' => 'Full',
+                'positionIdx' => $positionIdx,
+            ];
+            
+            // Preserve existing TP during SL removal
+            $existingTp = (float)($position['takeProfit'] ?? 0);
+            if ($existingTp > 0) {
+                $removeParams['takeProfit'] = (string)$existingTp;
+            }
+            
+            $this->info("        Step 2a: Removing existing SL...");
+            $exchangeService->setStopLossAdvanced($removeParams);
+            
+            // Small delay to ensure the removal is processed
+            usleep(500000); // 0.5 seconds
+            
+            // Step 2: Set new stop loss
+            $setParams = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'stopLoss' => (string)$targetSl,
+                'tpslMode' => 'Full',
+                'positionIdx' => $positionIdx,
+            ];
+            
+            // Restore TP if it existed
+            if ($existingTp > 0) {
+                $setParams['takeProfit'] = (string)$existingTp;
+            }
+            
+            $this->info("        Step 2b: Setting new SL...");
+            $exchangeService->setStopLossAdvanced($setParams);
+            
+            $this->info("      Strategy 2: Success - SL removed and re-set");
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->warn("      Strategy 2: Failed - " . $e->getMessage());
+            Log::warning("Remove and re-set SL failed for user {$userId} on {$exchangeName}", [
+                'symbol' => $symbol,
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+                'remove_params' => $removeParams ?? null,
+                'set_params' => $setParams ?? null
+            ]);
+            return false;
+        }
+    }
+    
+    /**
+     * Strategy 3: Try with alternative tpslMode
+     */
+    private function tryAlternativeTpslMode(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position, 
+        string $symbol, 
+        float $targetSl, 
+        int $userId, 
+        string $exchangeName, 
+        int $orderId
+    ): bool {
+        try {
+            $this->info("      Strategy 3: Attempting with Partial tpslMode...");
+            
+            $positionIdx = $this->determinePositionIdx($position);
+            $positionSize = abs((float)($position['size'] ?? 0));
+            
+            if ($positionSize <= 0) {
+                $this->warn("      Strategy 3: Failed - Cannot determine position size");
+                return false;
+            }
+            
+            $params = [
+                'category' => 'linear',
+                'symbol' => $symbol,
+                'stopLoss' => (string)$targetSl,
+                'tpslMode' => 'Partial',
+                'positionIdx' => $positionIdx,
+                'slSize' => (string)$positionSize, // For partial mode, specify the size
+                'slOrderType' => 'Market', // Ensure we use Market orders for SL
+            ];
+            
+            // For partial mode with TP, both tpSize and slSize must be equal
+            $existingTp = (float)($position['takeProfit'] ?? 0);
+            if ($existingTp > 0) {
+                $params['takeProfit'] = (string)$existingTp;
+                $params['tpSize'] = (string)$positionSize;
+                $params['tpOrderType'] = 'Market';
+            }
+
+            $exchangeService->setStopLossAdvanced($params);
+            $this->info("      Strategy 3: Success - SL set with Partial mode");
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->warn("      Strategy 3: Failed - " . $e->getMessage());
+            Log::warning("Alternative tpslMode SL setting failed for user {$userId} on {$exchangeName}", [
+                'symbol' => $symbol,
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+                'params' => $params ?? null
+            ]);
+            return false;
+        }
+    }
+    
+    /**
+     * Determine the correct positionIdx from position data
+     */
+    private function determinePositionIdx(array $position): int
+    {
+        // First try to get positionIdx from the position data
+        if (isset($position['positionIdx']) && is_numeric($position['positionIdx'])) {
+            return (int)$position['positionIdx'];
+        }
+        
+        // Fallback: Try to determine from side in hedge mode
+        if (isset($position['side'])) {
+            $side = strtolower($position['side']);
+            if ($side === 'buy') {
+                return 1; // Hedge mode Buy side
+            } elseif ($side === 'sell') {
+                return 2; // Hedge mode Sell side
+            }
+        }
+        
+        // Default to one-way mode
+        return 0;
     }
 }
