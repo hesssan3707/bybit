@@ -128,7 +128,21 @@ Route::get('/schedule', function() {
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     return 'DONE';
-})->middleware('throttle:2');
+    sleep(25);
+    Artisan::call('exchanges:validate-active --force');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    Artisan::call('futures:sync-sl');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
+    return 'DONE';
+})->middleware('throttle:3');
 
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.
