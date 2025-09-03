@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('body-class', 'admin-page')
+
 @section('title', 'همه صرافی‌ها')
 
 @push('styles')

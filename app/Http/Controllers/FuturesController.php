@@ -261,6 +261,7 @@ class FuturesController extends Controller
             'steps'  => 'required|integer|min:1',
             'expire' => 'required|integer|min:1',
             'risk_percentage' => 'required|numeric|min:0.1',
+            'cancel_price' => 'nullable|numeric',
         ]);
 
         try {
@@ -468,6 +469,7 @@ class FuturesController extends Controller
                     'amount'           => $finalQty, // Use the rounded quantity that was sent to Bybit
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
+                    'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
                 ]);
             }
         } catch (\Exception $e) {

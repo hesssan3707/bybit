@@ -124,7 +124,7 @@
         }
     </style>
 </head>
-<body>
+<body class="auth-page">
 
 <div class="container">
     <h2>عضویت جدید</h2>

@@ -168,6 +168,29 @@ class FuturesOrderEnforcer extends Command
                     } catch (\Throwable $e) {
                         $this->warn("    Failed to cancel expired order {$dbOrder->order_id}: " . $e->getMessage());
                     }
+                    continue;
+                }
+                
+                // Check if order has reached cancel price
+                if ($dbOrder->cancel_price) {
+                    try {
+                        $ticker = $exchangeService->getTicker($symbol);
+                        $currentPrice = (float)$ticker['lastPrice'];
+                        
+                        $shouldCancel = ($dbOrder->side === 'buy' && $currentPrice >= $dbOrder->cancel_price) || 
+                                        ($dbOrder->side === 'sell' && $currentPrice <= $dbOrder->cancel_price);
+                        
+                        if ($shouldCancel) {
+                            $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                            $dbOrder->status = 'canceled';
+                            $dbOrder->closed_at = now();
+                            $dbOrder->save();
+                            $this->info("    Canceled order due to price trigger: {$dbOrder->order_id}");
+                            continue;
+                        }
+                    } catch (\Throwable $e) {
+                        $this->warn("    Failed to check cancel price for order {$dbOrder->order_id}: " . $e->getMessage());
+                    }
                 }
             }
 

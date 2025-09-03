@@ -1,0 +1,24 @@
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: url('public/images/background.png') no-repeat center center fixed;
+  background-size: cover;
+}
+
+body.auth-page {
+  background: url('public/images/auth-background.png') no-repeat center center fixed;
+  background-size: cover;
+}
+
+body.spot-page {
+  background: url('public/images/spot-background.svg') no-repeat center center fixed;
+  background-size: cover;
+}
+
+body.admin-page,
+body.documentation-page {
+  background: none;
+}

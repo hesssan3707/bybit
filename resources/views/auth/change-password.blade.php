@@ -174,7 +174,7 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="container auth-page">
     <div class="password-card">
         <h2>تغییر رمز عبور</h2>
 

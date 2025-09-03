@@ -18,10 +18,27 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 80px 20px 20px 20px; /* Add padding for header */
-            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
+            background: url('/images/background.svg') no-repeat center center fixed;
+            background-size: cover;
             direction: rtl;
             color: var(--text-color);
             min-height: 100vh;
+        }
+        
+        body.auth-page {
+            background: url('public/images/auth-background.svg') no-repeat center center fixed;
+            background-size: cover;
+        }
+        
+        body.spot-page {
+            background: url('public/images/spot-background.svg') no-repeat center center fixed;
+            background-size: cover;
+        }
+        
+        body.admin-page,
+        body.documentation-page {
+            background: none;
+            background-color: #f8f9fa;
         }
         
         /* RTL styles for all input fields and text areas */

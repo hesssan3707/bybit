@@ -138,7 +138,7 @@
         }
     </style>
 </head>
-<body>
+<body class="auth-page">
 
 <div class="container">
     <h2>بازیابی رمز عبور</h2>

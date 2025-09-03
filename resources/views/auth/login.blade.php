@@ -23,7 +23,6 @@
             font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
             color: var(--text-color);
             min-height: 100vh;
             display: flex;
@@ -110,7 +109,7 @@
         }
     </style>
 </head>
-<body>
+<body class="auth-page">
 
 <div class="container">
     <h2>ورود به سیستم</h2>
