@@ -173,8 +173,10 @@
 </style>
 @endpush
 
+@section('body-class', 'auth-page')
+
 @section('content')
-<div class="container auth-page">
+<div class="container">
     <div class="password-card">
         <h2>تغییر رمز عبور</h2>
 
