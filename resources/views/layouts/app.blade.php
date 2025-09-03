@@ -26,12 +26,12 @@
         }
         
         body.auth-page {
-            background: url('public/images/auth-background.svg') no-repeat center center fixed;
+            background: url('/images/auth-background.svg') no-repeat center center fixed;
             background-size: cover;
         }
         
         body.spot-page {
-            background: url('public/images/spot-background.svg') no-repeat center center fixed;
+            background: url('/images/spot-background.svg') no-repeat center center fixed;
             background-size: cover;
         }
         
@@ -86,7 +86,7 @@
     </style>
     @stack('styles')
 </head>
-<body>
+<body class="@yield('body-class')">
 
     @include('layouts.navigation')
 
