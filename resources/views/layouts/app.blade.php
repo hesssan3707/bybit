@@ -35,17 +35,17 @@
         body.bg-general {
             background-image:
                 linear-gradient(rgba(2,6,23,0.65), rgba(2,6,23,0.65)),
-                url("public/images/background.png");
+                url("{{ asset('public/images/background.png') }}");
         }
         body.bg-spot {
             background-image:
                 linear-gradient(rgba(2,6,23,0.65), rgba(2,6,23,0.65)),
-                url("public/images/spot-background.png");
+                url("{{ asset('public/images/spot-background.png') }}");
         }
         body.bg-auth {
             background-image:
                 linear-gradient(rgba(2,6,23,0.55), rgba(2,6,23,0.55)),
-                url("public/images/background2.png");
+                url("{{ asset('public/images/auth-background.png') }}");
         }
         body.bg-admin {
             background: var(--admin-bg);
