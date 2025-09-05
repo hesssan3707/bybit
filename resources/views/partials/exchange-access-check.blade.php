@@ -11,15 +11,16 @@
 {{-- Check for access restrictions based on middleware --}}
 @if($accessRestricted)
     @if($restrictionReason === 'no_exchange')
-        <div class="alert alert-danger exchange-access-alert">
+        <div class="alert alert-info exchange-access-alert">
             <div class="alert-content">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i class="fas fa-circle-info"></i>
                 <div class="alert-text">
                     <strong>برای استفاده از این قسمت، لطفاً ابتدا صرافی خود را فعال کنید.</strong>
-                    <br>
-                    <a href="{{ route('profile.index') }}" class="alert-link">
-                        رفتن به صفحه پروفایل
-                    </a>
+                    <div class="alert-actions">
+                        <a href="{{ route('profile.index') }}" class="alert-link">
+                            رفتن به صفحه پروفایل
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -42,7 +43,7 @@
                         <br>
                         <small>صرافی فعلی: {{ $currentExchange->exchange_display_name }}</small>
                         <br>
-                        <small>دسترسی اسپات: {{ $exchangeAccess['spot_access'] ? 'دارد' : 'ندارد' }} | 
+                        <small>دسترسی اسپات: {{ $exchangeAccess['spot_access'] ? 'دارد' : 'ندارد' }} |
                                دسترسی آتی: {{ $exchangeAccess['futures_access'] ? 'دارد' : 'ندارد' }}</small>
                         @if($exchangeAccess['validation_summary'])
                             <br>
@@ -62,15 +63,16 @@
 {{-- Check for session-based flash messages (for backward compatibility) --}}
 @if(session('exchange_required'))
     @php $exchangeRequired = session('exchange_required'); @endphp
-    <div class="alert alert-danger exchange-access-alert">
+    <div class="alert alert-info exchange-access-alert">
         <div class="alert-content">
-            <i class="fas fa-exclamation-triangle"></i>
+            <i class="fas fa-circle-info"></i>
             <div class="alert-text">
                 <strong>{{ $exchangeRequired['message'] }}</strong>
-                <br>
-                <a href="{{ $exchangeRequired['link_url'] }}" class="alert-link">
-                    {{ $exchangeRequired['link_text'] }}
-                </a>
+                <div class="alert-actions">
+                    <a href="{{ $exchangeRequired['link_url'] }}" class="alert-link">
+                        {{ $exchangeRequired['link_text'] }}
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -116,12 +118,12 @@
         $currentExchange = $exchangeAccess['current_exchange'];
         $lastValidation = $currentExchange->last_validation_at;
         $validationMessage = $currentExchange->validation_message;
-        
+
         // Check if validation was recent and shows limitation
         $isRecentValidation = $lastValidation && $lastValidation->diffInMinutes(now()) <= 60;
         $hasLimitationMessage = $validationMessage && str_contains(strtolower($validationMessage), 'limitation');
     @endphp
-    
+
     @if($isRecentValidation && $hasLimitationMessage)
         <div class="alert alert-warning exchange-access-alert">
             <div class="alert-content">
@@ -144,75 +146,52 @@
 
 @push('styles')
 <style>
+    /* Simpler, cleaner alerts for exchange access */
     .exchange-access-alert {
-        border-radius: 8px;
-        margin-bottom: 20px;
-        padding: 0;
-        border: none;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        margin-bottom: 16px;
     }
-    
     .exchange-access-alert .alert-content {
         display: flex;
-        align-items: flex-start;
-        padding: 15px;
+        align-items: center;
         gap: 12px;
         text-align: center;
         justify-content: center;
         flex-direction: column;
+        padding: 0; /* base .alert already has padding */
     }
-    
-    .exchange-access-alert .alert-content i {
-        margin: 0 auto 10px;
-    }
-    
     .exchange-access-alert i {
         font-size: 20px;
-        margin-top: 2px;
         flex-shrink: 0;
-        align-self: center;
+        opacity: 0.9;
     }
-    
     .exchange-access-alert .alert-text {
-        flex: 1;
-        line-height: 1.5;
+        line-height: 1.6;
         text-align: center;
         width: 100%;
     }
-    
+    .exchange-access-alert .alert-actions {
+        margin-top: 10px;
+    }
     .exchange-access-alert .alert-link {
-        color: inherit;
-        text-decoration: underline;
-        font-weight: bold;
-        transition: opacity 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        background: var(--primary-color);
+        color: #fff !important;
+        font-weight: 600;
+        transition: transform .15s ease, opacity .2s ease;
     }
-    
     .exchange-access-alert .alert-link:hover {
-        opacity: 0.8;
-        color: inherit;
-        text-decoration: underline;
+        opacity: 0.92;
+        text-decoration: none;
+        transform: translateY(-1px);
     }
-    
-    .alert-danger.exchange-access-alert {
-        background: #f8d7da;
-        color: #c53030;
-        border-left: 4px solid #e53e3e;
-    }
-    
-    .alert-warning.exchange-access-alert {
-        background: #fff3cd;
-        color: #856404;
-        border-left: 4px solid #ffc107;
-    }
-    
-    .alert-danger.exchange-access-alert i {
-        color: #e53e3e;
-    }
-    
-    .alert-warning.exchange-access-alert i {
-        color: #ffc107;
-    }
-    
+
     /* Form disabling styles */
     .access-restricted form,
     .access-restricted .form-control,
@@ -223,10 +202,7 @@
         pointer-events: none;
         cursor: not-allowed;
     }
-    
-    .access-restricted .submit-btn {
-        background: #6c757d !important;
-    }
+    .access-restricted .submit-btn { background: #6c757d !important; }
 </style>
 @endpush
 

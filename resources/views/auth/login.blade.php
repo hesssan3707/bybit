@@ -8,27 +8,33 @@
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}">
     <style>
         :root {
-            --primary-color: #007bff;
+            --primary-color: #e9e9ea;
             --primary-hover: #0056b3;
             --background-gradient-start: #f0f4f8;
             --background-gradient-end: #d9e4ec;
             --form-background: #ffffff;
-            --text-color: #333;
-            --label-color: #555;
+            --text-color: #ece8e8;
+            --label-color: #c5bfbf;
             --border-color: #ccc;
             --error-bg: #f8d7da;
-            --error-text: #842029;
+            --error-text: #ff0016;
         }
         body {
             font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, var(--background-gradient-start), var(--background-gradient-end));
+            background-image:
+                linear-gradient(rgba(2,6,23,0.55), rgba(2,6,23,0.55)),
+                url("public/images/auth-background.png");
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center;
             color: var(--text-color);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            direction:rtl;
         }
         .container {
             width: 100%;
@@ -40,7 +46,6 @@
             margin-bottom: 20px;
         }
         form {
-            background: var(--form-background);
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
@@ -51,7 +56,7 @@
         label {
             display: block;
             margin-bottom: 8px;
-            font-weight: 600;
+            font-weight: 400;
             color: var(--label-color);
             text-align: right;
         }
@@ -63,6 +68,7 @@
             font-size: 14px;
             box-sizing: border-box;
             transition: border-color 0.3s, box-shadow 0.3s;
+            direction:ltr;
         }
         input:focus {
             border-color: var(--primary-color);
@@ -72,8 +78,6 @@
         button {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
-            color: white;
             border: none;
             border-radius: 8px;
             font-size: 16px;
@@ -108,11 +112,20 @@
         .password-toggle:hover {
             color: var(--primary-color);
         }
+        /* Glass card, animations, and alerts */
+        .glass-card { background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        .alert { padding: 12px 16px; border-radius: 10px; margin: 10px 0 20px; border: 1px solid transparent; }
+        .alert-success { background: rgba(34,197,94,0.12); color: #22c55e; border-color: rgba(34,197,94,0.25); }
+        .alert-danger, .alert-error { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
+        .alert-warning { background: rgba(245,158,11,0.12); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
+        .alert-info { background: rgba(59,130,246,0.12); color: #3b82f6; border-color: rgba(59,130,246,0.25); }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container glass-card fade-in">
     <h2>ورود به سیستم</h2>
 
     <form method="POST" action="{{ route('login') }}">
@@ -128,7 +141,7 @@
 
         @if(session('success'))
             <div class="form-group">
-                <div style="background: #d1e7dd; color: #0f5132; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
+                <div class="alert alert-success auto-dismiss" style="text-align: center;">
                     {{ session('success') }}
                 </div>
             </div>
@@ -162,7 +175,7 @@
         </div>
 
         <button type="submit">ورود</button>
-        
+
         <div style="text-align: center; margin-top: 20px;">
             <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
                 عضویت جدید
@@ -179,7 +192,7 @@
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
     const icon = document.getElementById(fieldId + '-icon');
-    
+
     if (field.type === 'password') {
         field.type = 'text';
         icon.className = 'fas fa-eye-slash';
@@ -190,5 +203,17 @@ function togglePassword(fieldId) {
 }
 </script>
 
+<script>
+// Auto-dismiss alerts
+(function(){
+    const onReady = () => {
+        const alerts = document.querySelectorAll('.alert.auto-dismiss');
+        alerts.forEach(function(el){
+            setTimeout(() => { el.style.transition = 'opacity .35s ease'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 4000);
+        });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady); else onReady();
+})();
+</script>
 </body>
 </html>

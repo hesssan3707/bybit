@@ -12,7 +12,7 @@
         max-width: 1200px;
         margin: 0 auto;
     }
-    
+
     .balance-container {
         width: 100%;
     }
@@ -103,7 +103,7 @@
         margin-bottom: 20px;
         line-height: 1.6;
     }
-    
+
     .error-message a {
         display: inline-block;
         margin-top: 10px;
@@ -180,13 +180,10 @@
         <h1 style="text-align: center; margin-bottom: 30px; color: #2d3748;">موجودی حساب</h1>
 
     @if(isset($error))
-        <div class="error-message">
-            {{ $error }}
+        <div class="alert alert-info" style="text-align: center;">
+            <div style="margin-bottom: 8px;"><strong>{{ $error }}</strong></div>
             @if(str_contains($error, 'صرافی'))
-                <br><br>
-                <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline;">
-                    برای فعال‌سازی صرافی کلیک کنید
-                </a>
+                <a href="{{ route('profile.show') }}" class="alert-link">برای فعال‌سازی صرافی کلیک کنید</a>
             @endif
         </div>
     @else
@@ -309,10 +306,10 @@
         // Remove active class from all tabs and sections
         const tabs = document.querySelectorAll('.balance-tab');
         const sections = document.querySelectorAll('.balance-section');
-        
+
         tabs.forEach(tab => tab.classList.remove('active'));
         sections.forEach(section => section.classList.remove('active'));
-        
+
         // Add active class to selected tab and section
         event.target.classList.add('active');
         document.getElementById(tabName + '-section').classList.add('active');

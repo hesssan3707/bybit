@@ -159,8 +159,7 @@
 
 @section('content')
 <div class="container">
-    <a href="{{ route('exchanges.index') }}" class="back-link">← بازگشت به لیست صرافی‌ها</a>
-    
+
     <div class="form-card">
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
 
@@ -217,7 +216,7 @@
                 <div id="credentials-form" class="form-group hidden">
                     <div class="form-group">
                         <label for="api_key">کلید API (API Key):</label>
-                        <input id="api_key" type="text" name="api_key" value="{{ old('api_key') }}" required 
+                        <input id="api_key" type="text" name="api_key" value="{{ old('api_key') }}" required
                                placeholder="مثال: K2IS7FEKFM3G15T4VXVUHY75QCGN4ZT6LEZJ">
                         @error('api_key')
                             <span class="invalid-feedback" role="alert">
@@ -229,7 +228,7 @@
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
                         <div class="password-field">
-                            <input id="api_secret" type="password" name="api_secret" required 
+                            <input id="api_secret" type="password" name="api_secret" required
                                    placeholder="کلید محرمانه صرافی خود را وارد کنید">
                             <span class="password-toggle" onclick="togglePassword('api_secret')">
                                 <i id="api_secret-icon" class="fas fa-eye"></i>
@@ -244,7 +243,7 @@
 
                     <div class="form-group">
                         <label for="reason">دلیل درخواست (اختیاری):</label>
-                        <textarea id="reason" name="reason" rows="3" 
+                        <textarea id="reason" name="reason" rows="3"
                                   placeholder="دلیل خود برای استفاده از این صرافی را بنویسید...">{{ old('reason') }}</textarea>
                         @error('reason')
                             <span class="invalid-feedback" role="alert">
@@ -270,19 +269,19 @@ function selectExchange(exchangeName, color) {
         option.style.background = '';
         option.style.color = '';
     });
-    
+
     // Select current exchange
     const selectedOption = document.getElementById(`exchange-${exchangeName}`);
     selectedOption.classList.add('selected');
     selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
     selectedOption.style.color = 'white';
-    
+
     // Check the radio button
     selectedOption.querySelector('input[type="radio"]').checked = true;
-    
+
     // Show credentials form
     document.getElementById('credentials-form').classList.remove('hidden');
-    
+
     // Update form styling to match exchange color
     document.documentElement.style.setProperty('--primary-color', color);
 }

@@ -5,11 +5,16 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.18);
         padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        animation: fadeIn 0.5s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
     h2 {
         text-align: center;
         margin-bottom: 25px;
@@ -45,10 +50,10 @@
     .status-secondary { background-color: #6c757d; }
     .status-danger { background-color: #dc3545; }
     .status-info { background-color: #17a2b8; }
-    
+
     .side-buy { color: #28a745; font-weight: bold; }
     .side-sell { color: #dc3545; font-weight: bold; }
-    
+
     .pagination {
         margin-top: 20px;
         display: flex;
@@ -66,7 +71,7 @@
     }
     .alert-success { background: #d1e7dd; color: #0f5132; }
     .alert-danger { background: #f8d7da; color: #842029; }
-    
+
     .stats-row {
         display: flex;
         justify-content: space-between;
@@ -91,7 +96,7 @@
         font-weight: bold;
         color: #333;
     }
-    
+
     .create-order-btn {
         background: var(--primary-color);
         color: white;
@@ -107,7 +112,7 @@
         color: white;
         text-decoration: none;
     }
-    
+
     .cancel-btn {
         background: #dc3545;
         color: white;
@@ -120,18 +125,18 @@
         text-decoration: none;
         display: inline-block;
     }
-    
+
     .cancel-btn:hover {
         background: #c82333;
         color: white;
         text-decoration: none;
     }
-    
+
     .cancel-btn:disabled {
         background: #6c757d;
         cursor: not-allowed;
     }
-    
+
     .action-buttons {
         display: flex;
         gap: 5px;
@@ -180,20 +185,20 @@
 @section('content')
 <div class="container">
     <h2>سفارش‌های اسپات</h2>
-    
+
     @include('partials.exchange-access-check')
-    
+
     {{-- Show create order button only if user has proper access --}}
     @php
         $exchangeAccess = request()->attributes->get('exchange_access');
         $accessRestricted = request()->attributes->get('access_restricted', false);
         $hasExchangeAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
     @endphp
-    
+
     @if($hasExchangeAccess)
         <a href="{{ route('spot.order.create.view') }}" class="create-order-btn">+ سفارش اسپات جدید</a>
     @endif
-    
+
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif

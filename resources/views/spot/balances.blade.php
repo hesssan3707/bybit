@@ -5,11 +5,16 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.18);
         padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        animation: fadeIn 0.5s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
     h2 {
         text-align: center;
         margin-bottom: 25px;
@@ -38,7 +43,7 @@
         font-weight: bold;
         margin: 0;
     }
-    
+
     .balances-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -80,7 +85,7 @@
         font-weight: bold;
         font-size: 12px;
     }
-    
+
     .balance-details {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -106,7 +111,7 @@
         color: #28a745;
         margin-top: 2px;
     }
-    
+
     .no-balances {
         text-align: center;
         padding: 40px 20px;
@@ -117,7 +122,7 @@
         margin-bottom: 15px;
         opacity: 0.5;
     }
-    
+
     .error-message {
         background: #f8d7da;
         color: #842029;
@@ -126,7 +131,7 @@
         text-align: center;
         margin-bottom: 20px;
     }
-    
+
     .refresh-btn {
         background: var(--primary-color);
         color: white;
@@ -144,7 +149,7 @@
         color: white;
         text-decoration: none;
     }
-    
+
     @media screen and (max-width: 768px) {
         .summary-cards {
             grid-template-columns: 1fr;
@@ -163,20 +168,20 @@
 @section('content')
 <div class="container">
     <h2>موجودی‌های اسپات</h2>
-    
+
     @include('partials.exchange-access-check')
-    
+
     {{-- Show refresh button only if user has proper access --}}
     @php
         $exchangeAccess = request()->attributes->get('exchange_access');
         $accessRestricted = request()->attributes->get('access_restricted', false);
         $hasExchangeAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
     @endphp
-    
+
     @if($hasExchangeAccess)
         <a href="{{ route('spot.balances.view') }}" class="refresh-btn">🔄 بروزرسانی موجودی‌ها</a>
     @endif
-    
+
     @if(isset($error))
         <div class="error-message">
             {{ $error }}
@@ -205,7 +210,7 @@
                                 {{ substr($balance['currency'], 0, 2) }}
                             </div>
                         </div>
-                        
+
                         <div class="balance-details">
                             <div class="balance-item">
                                 <div class="label">موجودی کیف پول</div>
@@ -214,12 +219,12 @@
                                     <div class="usd-value">${{ number_format($balance['usdValue'], 2) }}</div>
                                 @endif
                             </div>
-                            
+
                             <div class="balance-item">
                                 <div class="label">قابل انتقال</div>
                                 <div class="value">{{ number_format($balance['transferBalance'], 8) }}</div>
                             </div>
-                            
+
                             @if($balance['bonus'] > 0)
                                 <div class="balance-item">
                                     <div class="label">بونوس</div>
@@ -238,7 +243,7 @@
             </div>
         @endif
     @endif
-    
+
     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center;">
         <small style="color: #6c757d;">
             آخرین بروزرسانی: {{ now()->format('Y/m/d H:i:s') }}
