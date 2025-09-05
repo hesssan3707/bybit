@@ -32,10 +32,6 @@
         text-align: center;
     }
 
-    .balance-header.spot {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-
     .balance-header.perpetual {
         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     }

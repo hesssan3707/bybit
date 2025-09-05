@@ -56,14 +56,7 @@
             color: #1f2937;
         }
 
-        /* RTL styles for all input fields and text areas */
-        input, textarea, select {
-            direction: rtl;
-            text-align: right;
-        }
         input[type="email"], input[type="password"], input[type="text"], input[type="number"] {
-            direction: rtl;
-            text-align: right;
             padding-right: 12px;
             padding-left: 12px;
         }

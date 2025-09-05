@@ -72,6 +72,7 @@
         font-size: 14px;
         box-sizing: border-box;
         transition: border-color 0.3s, box-shadow 0.3s;
+        direction:ltr;
     }
     input:focus, textarea:focus {
         border-color: var(--primary-color);
@@ -81,7 +82,6 @@
     button {
         width: 100%;
         padding: 14px;
-        background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
         color: white;
         border: none;
         border-radius: 8px;
@@ -123,8 +123,6 @@
     }
     .warning-box {
         background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-left: 4px solid #ffc107;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
@@ -216,7 +214,7 @@
                 <div id="credentials-form" class="form-group hidden">
                     <div class="form-group">
                         <label for="api_key">کلید API (API Key):</label>
-                        <input id="api_key" type="text" name="api_key" value="{{ old('api_key') }}" required
+                        <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required
                                placeholder="مثال: K2IS7FEKFM3G15T4VXVUHY75QCGN4ZT6LEZJ">
                         @error('api_key')
                             <span class="invalid-feedback" role="alert">
@@ -228,7 +226,7 @@
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
                         <div class="password-field">
-                            <input id="api_secret" type="password" name="api_secret" required
+                            <input id="api_secret" type="password" autocomplete="off" name="api_secret" required
                                    placeholder="کلید محرمانه صرافی خود را وارد کنید">
                             <span class="password-toggle" onclick="togglePassword('api_secret')">
                                 <i id="api_secret-icon" class="fas fa-eye"></i>

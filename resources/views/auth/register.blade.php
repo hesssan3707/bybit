@@ -167,7 +167,7 @@
 
         <div class="form-group">
             <label for="email">ایمیل (نام کاربری)</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <input id="email" type="email" name="email" autocomplete="off" value="{{ old('email') }}" required autofocus>
         </div>
 
         <div class="form-group">

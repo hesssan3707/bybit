@@ -54,15 +54,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history')->middleware('exchange.access:futures');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
-    
+
     // Password Change Routes (requires authentication)
     Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
     Route::post('/password/change', [PasswordController::class, 'changePassword'])->name('password.change');
-    
+
     // Settings Routes (requires authentication)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
-    
+
     // Exchange Management Routes (requires authentication)
     Route::prefix('exchanges')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
@@ -73,7 +73,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
     });
-    
+
     // Admin Routes (requires authentication and admin privileges)
     Route::prefix('admin')->middleware('admin')->group(function () {
         // User Management
@@ -82,7 +82,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/users/{user}/activate', [UserManagementController::class, 'activateUser'])->name('admin.activate-user');
         Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivateUser'])->name('admin.deactivate-user');
         Route::delete('/users/{user}', [UserManagementController::class, 'deleteUser'])->name('admin.delete-user');
-        
+
         // Exchange Management
         Route::get('/pending-exchanges', [UserManagementController::class, 'pendingExchanges'])->name('admin.pending-exchanges');
         Route::get('/all-exchanges', [UserManagementController::class, 'allExchanges'])->name('admin.all-exchanges');
@@ -103,16 +103,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/cancel-order', [SpotTradingController::class, 'cancelSpotOrderFromWeb'])->name('spot.order.cancel.web')->middleware('exchange.access:spot');
     });
 
-    // Wallet Balance Routes
-    Route::prefix('mobile')->group(function () {
-        Route::get('/balance', [WalletBalanceController::class, 'balance'])->name('mobile.balance');
-    });
-    
     // Universal Balance Route (works for both web and mobile)
     Route::get('/balance', [WalletBalanceController::class, 'balance'])->name('balance');
 
     // Maintenance Routes (should also be protected)
-    
+
 });
 Route::get('/schedule', function() {
 	Artisan::call('exchanges:validate-active --force');

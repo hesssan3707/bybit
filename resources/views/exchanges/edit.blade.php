@@ -14,15 +14,14 @@
         padding: 30px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        border-left: 5px solid {{ $exchange->exchange_color }};
     }
     .exchange-header {
         text-align: center;
         margin-bottom: 30px;
         padding: 20px;
-        background: linear-gradient(135deg, {{ $exchange->exchange_color }}, rgba(255,255,255,0.1));
         border-radius: 10px;
         color: white;
+        background-color:#666;
     }
     .exchange-logo {
         width: 60px;
@@ -54,6 +53,7 @@
         font-size: 14px;
         box-sizing: border-box;
         transition: border-color 0.3s, box-shadow 0.3s;
+        direction:ltr;
     }
     input:focus, textarea:focus {
         border-color: {{ $exchange->exchange_color }};
@@ -105,8 +105,6 @@
     }
     .warning-box {
         background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-left: 4px solid #ffc107;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
@@ -154,8 +152,6 @@
 
 @section('content')
 <div class="container">
-    <a href="{{ route('exchanges.index') }}" class="back-link">← بازگشت به لیست صرافی‌ها</a>
-    
     <div class="form-card">
         <div class="exchange-header">
             <div class="exchange-logo">
@@ -181,9 +177,9 @@
                 </div>
                 <div>
                     <strong>وضعیت:</strong>
-                    <span style="color: 
-                        @if($exchange->is_active) #28a745 
-                        @elseif($exchange->status === 'pending') #ffc107 
+                    <span style="color:
+                        @if($exchange->is_active) #28a745
+                        @elseif($exchange->status === 'pending') #ffc107
                         @else #dc3545 @endif">
                         @if($exchange->is_active)
                             فعال
@@ -213,7 +209,7 @@
 
             <div class="form-group">
                 <label for="api_key">کلید API جدید (API Key):</label>
-                <input id="api_key" type="text" name="api_key" value="{{ old('api_key') }}" required 
+                <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required
                        placeholder="کلید API جدید خود را وارد کنید">
                 @error('api_key')
                     <span class="invalid-feedback" role="alert">
@@ -225,7 +221,7 @@
             <div class="form-group">
                 <label for="api_secret">کلید محرمانه جدید (API Secret):</label>
                 <div class="password-field">
-                    <input id="api_secret" type="password" name="api_secret" required 
+                    <input id="api_secret" type="password" name="api_secret" autocomplete="off" required
                            placeholder="کلید محرمانه جدید خود را وارد کنید">
                     <span class="password-toggle" onclick="togglePassword('api_secret')">
                         <i id="api_secret-icon" class="fas fa-eye"></i>
@@ -240,7 +236,7 @@
 
             <div class="form-group">
                 <label for="reason">دلیل تغییر (اختیاری):</label>
-                <textarea id="reason" name="reason" rows="3" 
+                <textarea id="reason" name="reason" rows="3"
                           placeholder="دلیل تغییر اطلاعات را بنویسید...">{{ old('reason') }}</textarea>
                 @error('reason')
                     <span class="invalid-feedback" role="alert">
