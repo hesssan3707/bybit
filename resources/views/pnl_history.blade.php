@@ -185,7 +185,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="no-orders"">هیچ پوزیشنی یافت نشد.</td>
+                        <td colspan="7" class="no-orders">هیچ پوزیشنی یافت نشد.</td>
                     </tr>
                 @endforelse
             </tbody>
