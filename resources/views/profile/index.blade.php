@@ -10,10 +10,9 @@
         margin: auto;
     }
     .profile-card {
-        background: #ffffff;
         padding: 30px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
         text-align: center;
         margin-bottom: 20px;
     }
@@ -37,10 +36,9 @@
 
     /* Exchange section styles */
     .exchange-section {
-        background: #ffffff;
         padding: 25px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
         margin-bottom: 20px;
     }
 
@@ -194,7 +192,6 @@
         text-align: center;
         padding: 30px;
         color: #666;
-        background: #f8f9fa;
         border-radius: 10px;
         margin-bottom: 20px;
     }
@@ -404,7 +401,7 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="profile-card">
         <h2>پروفایل کاربری</h2>
 

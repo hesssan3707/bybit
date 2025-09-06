@@ -411,7 +411,7 @@
                 <input type="number" name="price" id="price" class="form-control"
                        step="0.0001" min="0.0001"
                        value="{{ old('price') }}">
-                <div class="help-text">قیمت برای سفارش محدود (اختیاری برای سفارش بازار)</div>
+                <div class="help-text">قیمت برای سفارش محدود</div>
             </div>
         </div>
 

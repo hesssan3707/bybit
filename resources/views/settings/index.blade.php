@@ -10,7 +10,6 @@
         margin: auto;
     }
     .settings-card {
-        background: #ffffff;
         padding: 30px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
@@ -23,10 +22,8 @@
     }
     .setting-item {
         padding: 20px;
-        border: 1px solid #e9ecef;
         border-radius: 10px;
         margin-bottom: 20px;
-        background: #f8f9fa;
     }
     .setting-header {
         display: flex;
@@ -37,18 +34,15 @@
     .setting-title {
         font-size: 1.2em;
         font-weight: bold;
-        color: #333;
+        color: #ffffff;
     }
     .setting-description {
-        color: #666;
+        color: #ffffff;
         font-size: 0.95em;
         line-height: 1.5;
         margin-bottom: 15px;
     }
     .warning-box {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-left: 4px solid #ffc107;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 15px;
@@ -127,14 +121,14 @@
         color: #842029;
         border: 1px solid #f5c2c7;
     }
-    
+
     /* Back to profile button styling */
     .back-to-profile {
         text-align: center;
         margin-top: 30px;
         padding: 0 15px;
     }
-    
+
     /* Modal Styles */
     .modal {
         display: none;
@@ -172,13 +166,18 @@
         justify-content: center;
         gap: 15px;
     }
-    
+
     /* Mobile Responsive */
     @media (max-width: 768px) {
         .container {
             padding: 0;
             margin: 0 auto;
             width: 100%;
+        }
+        .setting-item {
+            padding: 0;
+            border-radius: 0;
+            margin-bottom: 20px;
         }
         .settings-card {
             padding: 20px;
@@ -225,12 +224,12 @@
             width: 100%;
             margin: 5px 0;
         }
-        
+
         .back-to-profile {
             margin-top: 20px;
             padding: 0 10px;
         }
-        
+
         .back-to-profile .btn {
             width: calc(100% - 40px);
             max-width: 300px;
@@ -242,24 +241,24 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="settings-card">
         <h2>تنظیمات حساب کاربری</h2>
-        
+
         <div id="alert-container"></div>
-        
+
         @if(session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
             </div>
         @endif
-        
+
         @if(session('error'))
             <div class="alert alert-danger">
                 {{ session('error') }}
             </div>
         @endif
-        
+
         <!-- Future Strict Mode Setting -->
         <div class="setting-item">
             <div class="setting-header">
@@ -272,7 +271,7 @@
                     @endif
                 </div>
             </div>
-            
+
             <div class="setting-description">
                 این حالت زمانی که فعال شود، موارد زیر را تحت تأثیر قرار می‌دهد:
                 <ul style="margin-top: 10px; padding-right: 20px;">
@@ -285,7 +284,7 @@
                     <li>این حالت پس از فعال‌سازی قابل غیرفعال‌سازی نیست</li>
                 </ul>
             </div>
-            
+
             @if($user->future_strict_mode)
                 <div class="alert alert-success">
                     <strong>حالت سخت‌گیرانه آتی فعال است</strong><br>
@@ -303,13 +302,13 @@
                         <li>این حالت بر معاملات اسپات تأثیری ندارد</li>
                     </ul>
                 </div>
-                
+
                 <button type="button" class="btn btn-danger" onclick="showConfirmationModal()">
                     فعال‌سازی حالت سخت‌گیرانه آتی
                 </button>
             @endif
         </div>
-        
+
         <!-- Back to Profile Button -->
         <div class="back-to-profile">
             <a href="{{ route('profile.index') }}" class="btn btn-primary">
@@ -327,7 +326,7 @@
             <p><strong>آیا از فعال‌سازی حالت سخت‌گیرانه آتی اطمینان دارید؟</strong></p>
             <p>توجه: این عمل غیرقابل بازگشت است و پس از فعال‌سازی امکان غیرفعال‌سازی وجود ندارد.</p>
             <p>پس از فعال‌سازی، حساب شما تحت نظارت دقیق قرار گرفته و محدودیت‌های امنیتی اعمال خواهد شد.</p>
-            
+
             <div style="margin-top: 20px;">
                 <label for="selectedMarket" style="display: block; margin-bottom: 10px; font-weight: bold;">انتخاب بازار برای معاملات آتی:</label>
                 <select id="selectedMarket" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
@@ -375,13 +374,13 @@ function activateFutureStrictMode() {
         showAlert('لطفاً ابتدا بازار مورد نعر را انتخاب کنید', 'danger');
         return;
     }
-    
+
     // Show loading state
     const button = document.querySelector('.modal-buttons .btn-danger');
     const originalText = button.textContent;
     button.textContent = 'در حال پردازش...';
     button.disabled = true;
-    
+
     fetch('{{ route("settings.activate-future-strict-mode") }}', {
         method: 'POST',
         headers: {
@@ -420,13 +419,13 @@ function activateFutureStrictMode() {
 function showAlert(message, type) {
     const alertContainer = document.getElementById('alert-container');
     const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-    
+
     alertContainer.innerHTML = `
         <div class="alert ${alertClass}">
             ${message}
         </div>
     `;
-    
+
     // Auto-hide after 5 seconds
     setTimeout(() => {
         alertContainer.innerHTML = '';

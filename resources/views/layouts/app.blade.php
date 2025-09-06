@@ -104,7 +104,7 @@
             border-radius: 10px;
             text-decoration: none;
             background: var(--primary-color);
-            color: #fff;
+            color: #020202;
             font-weight: 600;
             transition: transform .15s ease, opacity .2s ease;
         }

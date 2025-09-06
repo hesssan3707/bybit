@@ -5,7 +5,6 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
@@ -171,9 +170,9 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="balance-container">
-        <h1 style="text-align: center; margin-bottom: 30px; color: #2d3748;">موجودی حساب</h1>
+        <h1 style="text-align: center; margin-bottom: 30px; color: #ffffff;">موجودی حساب</h1>
 
     @if(isset($error))
         <div class="alert alert-info" style="text-align: center;">
