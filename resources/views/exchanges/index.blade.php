@@ -10,26 +10,17 @@
         margin: auto;
     }
     .exchanges-header {
-        background: #ffffff;
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         margin-bottom: 20px;
         text-align: center;
+        color : #ffffff;
     }
     .exchange-card {
-        background: #ffffff;
+        padding:20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
         margin-bottom: 20px;
         overflow: hidden;
-    }
-    .exchange-header {
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: #bbb
     }
     .exchange-info {
         display: flex;
@@ -142,10 +133,9 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="exchanges-header">
         <h2>مدیریت صرافی‌ها</h2>
-        <p>در اینجا می‌توانید صرافی‌های خود را مدیریت کنید و بین آنها تغییر دهید</p>
     </div>
 
     @if(session('success'))
@@ -208,9 +198,6 @@
                                     </button>
                                 </form>
                             @endif
-                            <button onclick="testConnection({{ $exchange->id }})" class="btn " id="test-btn-{{ $exchange->id }}">
-                                تست اتصال
-                            </button>
                         @endif
                     </div>
                 </div>
@@ -244,7 +231,9 @@
                             </div>
                         </div>
                     @endif
-
+                    <button onclick="testConnection({{ $exchange->id }})" class="btn " id="test-btn-{{ $exchange->id }}">
+                        تست اتصال
+                    </button>
                     <div style="text-align: left;">
                         @if($exchange->is_active || $exchange->status === 'rejected')
                             <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">

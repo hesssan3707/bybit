@@ -10,8 +10,7 @@
         margin: auto;
     }
     .form-card {
-        background: #ffffff;
-        padding: 30px;
+        padding: 20px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
@@ -61,10 +60,10 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
-        color: var(--label-color);
+        font-weight: 400;
+        color: white;
     }
-    input, textarea {
+    input {
         width: 100%;
         padding: 12px;
         border: 1px solid var(--border-color);
@@ -74,6 +73,16 @@
         transition: border-color 0.3s, box-shadow 0.3s;
         direction:ltr;
     }
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        direction:rtl;
+    }
     input:focus, textarea:focus {
         border-color: var(--primary-color);
         box-shadow: 0 0 8px rgba(0,123,255,0.25);
@@ -82,7 +91,7 @@
     button {
         width: 100%;
         padding: 14px;
-        color: white;
+        color: #000000;
         border: none;
         border-radius: 8px;
         font-size: 16px;
@@ -122,19 +131,17 @@
         text-decoration: underline;
     }
     .warning-box {
-        background: #fff3cd;
-        border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
     }
     .warning-box h4 {
         margin: 0 0 10px 0;
-        color: #856404;
+        color: #a67f06;
     }
     .warning-box ul {
         margin: 0;
         padding-right: 20px;
-        color: #856404;
+        color: #a67f06;
     }
     .password-field {
         position: relative;
@@ -156,7 +163,7 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
 
     <div class="form-card">
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
@@ -194,7 +201,6 @@
                                 </div>
                                 <div>
                                     <h4 style="margin: 0;">{{ $exchange['name'] }}</h4>
-                                    <small style="color: #666;">{{ $exchange['color'] }}</small>
                                 </div>
                             </div>
                             <div>

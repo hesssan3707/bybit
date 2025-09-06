@@ -10,10 +10,9 @@
         margin: auto;
     }
     .form-card {
-        background: #ffffff;
-        padding: 30px;
+        padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
     }
     .exchange-header {
         text-align: center;
@@ -21,7 +20,6 @@
         padding: 20px;
         border-radius: 10px;
         color: white;
-        background-color:#666;
     }
     .exchange-logo {
         width: 60px;
@@ -42,10 +40,10 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
-        color: var(--label-color);
+        font-weight: 400;
+        color: #ffffff;
     }
-    input, textarea {
+    input {
         width: 100%;
         padding: 12px;
         border: 1px solid var(--border-color);
@@ -55,6 +53,16 @@
         transition: border-color 0.3s, box-shadow 0.3s;
         direction:ltr;
     }
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        direction:rtl;
+    }
     input:focus, textarea:focus {
         border-color: {{ $exchange->exchange_color }};
         box-shadow: 0 0 8px rgba(0,123,255,0.25);
@@ -63,8 +71,7 @@
     button {
         width: 100%;
         padding: 14px;
-        background: {{ $exchange->exchange_color }};
-        color: white;
+        color: #000000;
         border: none;
         border-radius: 8px;
         font-size: 16px;
@@ -104,7 +111,6 @@
         text-decoration: underline;
     }
     .warning-box {
-        background: #fff3cd;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
@@ -119,7 +125,6 @@
         color: #856404;
     }
     .current-info {
-        background: #f8f9fa;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
@@ -151,12 +156,9 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="form-card">
         <div class="exchange-header">
-            <div class="exchange-logo">
-                {{ substr($exchange->exchange_display_name, 0, 2) }}
-            </div>
             <h2>ویرایش اطلاعات {{ $exchange->exchange_display_name }}</h2>
         </div>
 
@@ -209,8 +211,7 @@
 
             <div class="form-group">
                 <label for="api_key">کلید API جدید (API Key):</label>
-                <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required
-                       placeholder="کلید API جدید خود را وارد کنید">
+                <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required>
                 @error('api_key')
                     <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>
@@ -221,8 +222,7 @@
             <div class="form-group">
                 <label for="api_secret">کلید محرمانه جدید (API Secret):</label>
                 <div class="password-field">
-                    <input id="api_secret" type="password" name="api_secret" autocomplete="off" required
-                           placeholder="کلید محرمانه جدید خود را وارد کنید">
+                    <input id="api_secret" type="password" name="api_secret" autocomplete="off" required>
                     <span class="password-toggle" onclick="togglePassword('api_secret')">
                         <i id="api_secret-icon" class="fas fa-eye"></i>
                     </span>

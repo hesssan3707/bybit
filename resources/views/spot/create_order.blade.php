@@ -28,7 +28,7 @@
         display: block;
         margin-bottom: 8px;
         font-weight: bold;
-        color: #333;
+        color: #ffffff;
     }
     .form-control {
         width: 100%;
@@ -279,7 +279,7 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <a href="{{ route('spot.orders.view') }}" class="back-btn">← بازگشت به سفارش‌ها</a>
 
     <h2>سفارش اسپات جدید</h2>
@@ -362,7 +362,6 @@
                 </div>
             </div>
             <input type="hidden" name="symbol" id="symbol" value="{{ old('symbol') }}" required>
-            <div class="help-text">جفت ارز مورد نظر برای معاملات اسپات را انتخاب کنید</div>
         </div>
 
         <div class="form-group">

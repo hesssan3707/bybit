@@ -17,9 +17,8 @@
     }
 
     .balance-card {
-        background: white;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         margin-bottom: 20px;
         overflow: hidden;
     }
@@ -65,7 +64,7 @@
 
     .currency-name {
         font-weight: 600;
-        color: #333;
+        color: #fdfdfd;
     }
 
     .currency-balance {
@@ -75,7 +74,7 @@
 
     .balance-value {
         font-weight: bold;
-        color: #2d3748;
+        color: #ffffff;
     }
 
     .balance-usd {
@@ -126,18 +125,16 @@
     }
 
     .exchange-info {
-        background: #e2e8f0;
         padding: 10px 15px;
         margin-bottom: 20px;
         border-radius: 8px;
         text-align: center;
-        color: #4a5568;
+        color: #fdfdfd;
         font-weight: 500;
     }
 
     .balance-type-tabs {
         display: flex;
-        background: #f7fafc;
         border-radius: 8px;
         margin-bottom: 20px;
         overflow: hidden;
@@ -193,7 +190,7 @@
                 کیف پول اسپات
             </button>
             <button class="balance-tab" onclick="switchTab('perpetual')">
-                معاملات آتی
+                کیف پول آتی
             </button>
         </div>
 
@@ -206,7 +203,6 @@
                         <div class="total-equity">
                             ${{ number_format($spotTotalEquity ?? 0, 2) }}
                         </div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="balance-content">
                         @foreach($spotBalances as $balance)

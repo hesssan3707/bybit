@@ -44,11 +44,6 @@
 
     .current-exchange {
         padding: 20px;
-        @if($currentExchange)
-        background: linear-gradient(135deg, rgba({{ $currentExchange->exchange_color_rgb }}, 0.1), #ffffff);
-        @else
-        background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), #ffffff);
-        @endif
         border-radius: 10px;
         margin-bottom: 20px;
     }
