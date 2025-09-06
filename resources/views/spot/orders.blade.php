@@ -8,7 +8,6 @@
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.18);
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.25);
@@ -29,14 +28,14 @@
     }
     th, td {
         padding: 12px 15px;
-        border: 1px solid #dee2e6;
+        border: 1px solid rgba(222, 226, 230, 0.05);
         text-align: right;
     }
     thead {
-        background-color: #f8f9fa;
+        background-color: rgba(253, 253, 253, 0.05);
     }
     tbody tr:nth-of-type(odd) {
-        background-color: #f9f9f9;
+        background-color: rgba(249, 249, 249, 0.2);
     }
     .status-badge {
         padding: 4px 8px;
@@ -79,22 +78,21 @@
         gap: 15px;
     }
     .stat-card {
-        background: #f8f9fa;
         padding: 15px;
         border-radius: 8px;
         text-align: center;
         flex: 1;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .stat-card h4 {
         margin: 0 0 10px 0;
-        color: #6c757d;
+        color: #f4f5f6;
         font-size: 14px;
     }
     .stat-card .value {
         font-size: 18px;
         font-weight: bold;
-        color: #333;
+        color: #efeeee;
     }
 
     .create-order-btn {
@@ -152,7 +150,6 @@
         table tr {
             display: block;
             margin-bottom: 15px;
-            border: 1px solid #dee2e6;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
@@ -162,7 +159,7 @@
             text-align: right;
             padding: 10px 15px;
             border: none;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(238, 238, 238, 0.25);
         }
         table td:last-child { border-bottom: 0; }
         table td::before {

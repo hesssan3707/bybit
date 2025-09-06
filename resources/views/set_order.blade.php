@@ -5,18 +5,13 @@
 @push('styles')
 <style>
     .container {
-        width: 100%;
         max-width: 500px;
         margin: auto;
+        padding:20px;
     }
     h2 {
         text-align: center;
         margin-bottom: 20px;
-    }
-    #order-form {
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
     .form-group {
         margin-bottom: 15px;

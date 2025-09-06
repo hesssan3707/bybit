@@ -24,14 +24,9 @@
     }
 
     .balance-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 20px;
         text-align: center;
-    }
-
-    .balance-header.perpetual {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     }
 
     .balance-header h2 {
@@ -55,7 +50,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 12px 0;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid rgba(238, 238, 238, 0.2);
     }
 
     .currency-item:last-child {
@@ -169,7 +164,7 @@
 @section('content')
 <div class="glass-card container">
     <div class="balance-container">
-        <h1 style="text-align: center; margin-bottom: 30px; color: #ffffff;">موجودی حساب</h1>
+        <h1 style="text-align: center; margin-bottom: 50px; color: #ffffff;"> موجودی حساب {{ $exchangeInfo['name'] ?? '' }}</h1>
 
     @if(isset($error))
         <div class="alert alert-info" style="text-align: center;">
@@ -179,12 +174,6 @@
             @endif
         </div>
     @else
-        @if(isset($exchangeInfo))
-            <div class="exchange-info">
-                صرافی فعال: {{ $exchangeInfo['name'] }} {{ $exchangeInfo['logo'] }}
-            </div>
-        @endif
-
         <div class="balance-type-tabs">
             <button class="balance-tab active" onclick="switchTab('spot')">
                 کیف پول اسپات
@@ -225,7 +214,6 @@
                     <div class="balance-header spot">
                         <h2>کیف پول اسپات</h2>
                         <div class="total-equity">$0.00</div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="empty-balance">
                         @if(isset($spotError))
@@ -243,11 +231,10 @@
             @if(isset($perpetualBalances) && count($perpetualBalances) > 0)
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>معاملات آتی</h2>
+                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">
                             ${{ number_format($perpetualTotalEquity ?? 0, 2) }}
                         </div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="balance-content">
                         @foreach($perpetualBalances as $balance)
@@ -268,9 +255,8 @@
             @else
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>معاملات آتی</h2>
+                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">$0.00</div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="empty-balance">
                         @if(isset($perpetualError))

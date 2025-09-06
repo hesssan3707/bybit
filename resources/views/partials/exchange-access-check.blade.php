@@ -149,7 +149,6 @@
     /* Simpler, cleaner alerts for exchange access */
     .exchange-access-alert {
         border-radius: 12px;
-        margin-bottom: 16px;
     }
     .exchange-access-alert .alert-content {
         display: flex;

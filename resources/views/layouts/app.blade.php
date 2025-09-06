@@ -78,9 +78,8 @@
             background: var(--glass-bg);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid var(--glass-border);
             border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
 
         /* Simplified alert styles */
@@ -90,10 +89,10 @@
             margin: 10px 0 20px;
             border: 1px solid transparent;
         }
-        .alert-success { background: rgba(34,197,94,0.12); color: #22c55e; border-color: rgba(34,197,94,0.25); }
-        .alert-danger, .alert-error { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
-        .alert-warning { background: rgba(245,158,11,0.12); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
-        .alert-info { background: rgba(59,130,246,0.12); color: #3b82f6; border-color: rgba(59,130,246,0.25); }
+        .alert-success { background: rgba(34,197,94,0.12); color: #22c55e; }
+        .alert-danger, .alert-error { background: rgba(239,68,68,0.12); color: #ef4444; }
+        .alert-warning { background: rgba(245,158,11,0.12); color: #f59e0b; }
+        .alert-info { background: rgba(59,130,246,0.12); color: #3b82f6; }
         /* CTA link inside alerts - simple button look */
         .alert .alert-link {
             display: inline-flex;

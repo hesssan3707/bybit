@@ -10,9 +10,7 @@
         margin: auto;
     }
     .profile-card {
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        padding: 20px;
         text-align: center;
         margin-bottom: 20px;
     }
@@ -36,9 +34,9 @@
 
     /* Exchange section styles */
     .exchange-section {
-        padding: 25px;
+        padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         margin-bottom: 20px;
     }
 

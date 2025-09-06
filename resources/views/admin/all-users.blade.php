@@ -30,7 +30,7 @@
     th, td {
         padding: 12px;
         text-align: right;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid rgba(238, 238, 238, 0.25);
     }
     th {
         background-color: #f8f9fa;
@@ -119,7 +119,7 @@
         background-color: var(--primary-hover, #5a32a3) !important;
         opacity: 1;
     }
-    
+
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -127,40 +127,40 @@
             margin: 0 auto;
             width: 100%;
         }
-        
+
         .admin-header {
             padding: 15px;
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
         }
-        
+
         .admin-header h2 {
             font-size: 1.3em;
             margin: 0;
         }
-        
+
         .admin-nav-links {
             margin: 10px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
-        
+
         .admin-nav-links a {
             padding: 8px 12px;
             margin: 0;
             font-size: 0.85em;
             text-align: center;
         }
-        
+
         .users-table {
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
             border-radius: 10px;
         }
-        
+
         /* Convert table to card layout on mobile */
         table {
             display: block;
@@ -168,15 +168,15 @@
             overflow-x: auto;
             white-space: nowrap;
         }
-        
+
         thead {
             display: none;
         }
-        
+
         tbody {
             display: block;
         }
-        
+
         tr {
             display: block;
             background: #fff;
@@ -186,18 +186,18 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             white-space: normal;
         }
-        
+
         td {
             display: block;
             padding: 8px 0;
             border-bottom: 1px solid #eee;
             text-align: right;
         }
-        
+
         td:last-child {
             border-bottom: none;
         }
-        
+
         td:before {
             content: attr(data-label) ": ";
             font-weight: bold;
@@ -205,26 +205,26 @@
             margin-left: 10px;
             color: #333;
         }
-        
+
         .status-badge {
             padding: 3px 6px;
             font-size: 10px;
         }
-        
+
         .btn {
             padding: 8px 12px;
             margin: 2px;
             font-size: 11px;
             display: inline-block;
         }
-        
+
         .alert {
             padding: 10px 12px;
             margin: 10px;
             font-size: 0.9em;
         }
     }
-    
+
     /* Extra small screens */
     @media (max-width: 480px) {
         .admin-header {
@@ -232,37 +232,37 @@
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         .admin-header h2 {
             font-size: 1.1em;
         }
-        
+
         .admin-nav-links {
             margin: 5px;
             grid-template-columns: 1fr;
             gap: 5px;
         }
-        
+
         .admin-nav-links a {
             padding: 6px 10px;
             font-size: 0.8em;
         }
-        
+
         .users-table {
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         tr {
             padding: 10px;
             margin-bottom: 8px;
         }
-        
+
         td {
             padding: 6px 0;
             font-size: 0.85em;
         }
-        
+
         .btn {
             padding: 6px 10px;
             font-size: 10px;
@@ -330,7 +330,7 @@
                                     @if($user->id !== auth()->id())
                                         <form method="POST" action="{{ route('admin.deactivate-user', $user) }}" style="display: inline;">
                                             @csrf
-                                            <button type="submit" class="btn btn-warning" 
+                                            <button type="submit" class="btn btn-warning"
                                                     onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را غیرفعال کنید؟')">
                                                 غیرفعال‌سازی
                                             </button>
@@ -341,18 +341,18 @@
                                 @else
                                     <form method="POST" action="{{ route('admin.activate-user', $user) }}" style="display: inline;">
                                         @csrf
-                                        <button type="submit" class="btn btn-success" 
+                                        <button type="submit" class="btn btn-success"
                                                 onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را فعال کنید؟')">
                                             فعال‌سازی
                                         </button>
                                     </form>
                                 @endif
-                                
+
                                 @if($user->id !== auth()->id())
                                     <form method="POST" action="{{ route('admin.delete-user', $user) }}" style="display: inline;">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-danger" 
+                                        <button type="submit" class="btn btn-danger"
                                                 onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟ این عمل غیرقابل برگشت است.')">
                                             حذف
                                         </button>
@@ -363,7 +363,7 @@
                     @endforeach
                 </tbody>
             </table>
-            
+
             <div style="padding: 20px;">
                 {{ $users->links() }}
             </div>

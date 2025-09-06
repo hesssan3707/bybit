@@ -8,7 +8,6 @@
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.18);
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.25);
@@ -271,7 +270,6 @@
             grid-template-columns: 1fr;
         }
         .container {
-            margin: 10px;
             max-width: calc(100% - 20px);
         }
     }
@@ -315,7 +313,7 @@
                 </div>
                 <div class="dropdown-list" id="symbolDropdown">
                     <input type="text" id="searchBox" placeholder="جستجو در جفت‌های ارز..."
-                           style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid #eee; outline: none;"
+                           style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid rgba(238, 238, 238, 0.25); outline: none;"
                            oninput="filterSymbols()" onkeydown="handleKeyNavigation(event)">
 
                     @if($hasActiveExchange)

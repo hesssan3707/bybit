@@ -1,7 +1,6 @@
 <style>
     /* Web Header */
     .main-header {
-        background-color: #fff;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         padding: 0 20px;
         position: fixed;
@@ -29,25 +28,50 @@
     }
     .main-header a {
         text-decoration: none;
-        color: #555;
+        color: #eaeaea;
         margin: 0 15px;
         padding: 5px 10px;
         border-radius: 5px;
         transition: background-color 0.3s, color 0.3s;
         font-weight: 500;
     }
+    .main-header a:hover {
+        text-decoration: none;
+        color: #000000;
+        background-color : #00f2fe;
+        margin: 0 15px;
+        padding: 5px 10px;
+        border-radius: 5px;
+        transition: background-color 0.3s, color 0.3s;
+        font-weight: 500;
+    }
+    .main-header .dropdown-list {
+        display: none;
+        position: absolute;
+        top: 100%; left: 0;
+        background: rgba(150, 150, 150, 0.6);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-radius: 5px;
+        min-width: 200px;
+        z-index: 1001;
+        margin-top:20px;
+        backdrop-filter: blur(10px);
+    }
+    .main-header .dropdown-list a{
+        display: block;
+        padding: 10px 15px;
+        margin: 0;
+    }
     /* Only apply selected/hover styling to header-right links and dropdown menu items */
-    .main-header .header-right a:hover, 
+    .main-header .header-right a:hover,
     .main-header .header-right a.selected,
     #futuresMenu a:hover,
     #spotMenu a:hover,
     #adminMenu a:hover {
-        background-color: var(--primary-color);
-        color: #fff;
+        color: #020202;
     }
     /* Dropdown toggle links have different hover effect */
     .nav-links > div > a:hover {
-        background-color: #f0f0f0;
         color: #333;
     }
     .main-header .equity {
@@ -103,37 +127,37 @@
     <nav class="nav-links">
         <!-- Balance Menu -->
         <a href="{{ route('balance') }}" style="margin: 0 15px;">موجودی‌ها</a>
-        
+
         <!-- Futures Trading Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleFuturesMenu(event)">معاملات آتی ▼</a>
-            <div id="futuresMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 200px; z-index: 1001;">
-                <a href="{{ route('orders.index') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">تاریخچه سفارش‌ها</a>
-                <a href="{{ route('pnl.history') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">سود و زیان</a>
-                <a href="{{ route('order.create') }}" style="display: block; padding: 10px 15px; margin: 0;">سفارش آتی جدید</a>
+            <div id="futuresMenu" class="dropdown-list">
+                <a href="{{ route('orders.index') }}">تاریخچه سفارش‌ها</a>
+                <a href="{{ route('pnl.history') }}">سود و زیان</a>
+                <a href="{{ route('order.create') }}">سفارش آتی جدید</a>
             </div>
         </div>
-        
+
         <!-- Spot Trading Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
-            <div id="spotMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 200px; z-index: 1001;">
-                <a href="{{ route('spot.orders.view') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">سفارش‌های اسپات</a>
-                <a href="{{ route('spot.order.create.view') }}" style="display: block; padding: 10px 15px; margin: 0;">سفارش اسپات جدید</a>
+            <div id="spotMenu" class="dropdown-list">
+                <a href="{{ route('spot.orders.view') }}">سفارش‌های اسپات</a>
+                <a href="{{ route('spot.order.create.view') }}">سفارش اسپات جدید</a>
             </div>
         </div>
-        
+
         <!-- API Documentation Link -->
         <a href="{{ route('api.documentation') }}" style="margin: 0 15px; color: #667eea; font-weight: 600;" title="مستندات API">API مستندات</a>
-        
+
         @if(auth()->user()?->isAdmin())
         <!-- Admin Menu (only for admin users) -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleAdminMenu(event)">مدیریت ▼</a>
-            <div id="adminMenu" style="display: none; position: absolute; top: 100%; left: 0; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 5px; min-width: 220px; z-index: 1001;">
-                <a href="{{ route('admin.all-users') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">همه کاربران</a>
-                <a href="{{ route('admin.pending-exchanges') }}" style="display: block; padding: 10px 15px; margin: 0; border-bottom: 1px solid #eee;">درخواست‌های صرافی</a>
-                <a href="{{ route('admin.all-exchanges') }}" style="display: block; padding: 10px 15px; margin: 0;">همه صرافی‌ها</a>
+            <div id="adminMenu" class="dropdown-list">
+                <a href="{{ route('admin.all-users') }}">همه کاربران</a>
+                <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های صرافی</a>
+                <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
             </div>
         </div>
         @endif
@@ -214,7 +238,7 @@
                 link.classList.add('selected');
             }
         });
-        
+
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             const spotMenu = document.getElementById('spotMenu');
@@ -223,35 +247,35 @@
             const spotMenuToggle = event.target.closest('[onclick*="toggleSpotMenu"]');
             const adminMenuToggle = event.target.closest('[onclick*="toggleAdminMenu"]');
             const futuresMenuToggle = event.target.closest('[onclick*="toggleFuturesMenu"]');
-            
+
             if (!spotMenuToggle && spotMenu) {
                 spotMenu.style.display = 'none';
             }
-            
+
             if (!adminMenuToggle && adminMenu) {
                 adminMenu.style.display = 'none';
             }
-            
+
             if (!futuresMenuToggle && futuresMenu) {
                 futuresMenu.style.display = 'none';
             }
         });
     });
-    
+
     function toggleSpotMenu(event) {
         event.preventDefault();
         event.stopPropagation();
         const menu = document.getElementById('spotMenu');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
-    
+
     function toggleAdminMenu(event) {
         event.preventDefault();
         event.stopPropagation();
         const menu = document.getElementById('adminMenu');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
-    
+
     function toggleFuturesMenu(event) {
         event.preventDefault();
         event.stopPropagation();
