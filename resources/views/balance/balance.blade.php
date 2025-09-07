@@ -5,39 +5,28 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         max-width: 1200px;
         margin: 0 auto;
     }
-    
+
     .balance-container {
         width: 100%;
     }
 
     .balance-card {
-        background: white;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         margin-bottom: 20px;
         overflow: hidden;
     }
 
     .balance-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 20px;
         text-align: center;
-    }
-
-    .balance-header.spot {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-
-    .balance-header.perpetual {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     }
 
     .balance-header h2 {
@@ -61,7 +50,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 12px 0;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid rgba(238, 238, 238, 0.2);
     }
 
     .currency-item:last-child {
@@ -70,7 +59,7 @@
 
     .currency-name {
         font-weight: 600;
-        color: #333;
+        color: #fdfdfd;
     }
 
     .currency-balance {
@@ -80,7 +69,7 @@
 
     .balance-value {
         font-weight: bold;
-        color: #2d3748;
+        color: #ffffff;
     }
 
     .balance-usd {
@@ -103,7 +92,7 @@
         margin-bottom: 20px;
         line-height: 1.6;
     }
-    
+
     .error-message a {
         display: inline-block;
         margin-top: 10px;
@@ -131,18 +120,16 @@
     }
 
     .exchange-info {
-        background: #e2e8f0;
         padding: 10px 15px;
         margin-bottom: 20px;
         border-radius: 8px;
         text-align: center;
-        color: #4a5568;
+        color: #fdfdfd;
         font-weight: 500;
     }
 
     .balance-type-tabs {
         display: flex;
-        background: #f7fafc;
         border-radius: 8px;
         margin-bottom: 20px;
         overflow: hidden;
@@ -175,33 +162,24 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="balance-container">
-        <h1 style="text-align: center; margin-bottom: 30px; color: #2d3748;">موجودی حساب</h1>
+        <h1 style="text-align: center; margin-bottom: 50px; color: #ffffff;"> موجودی حساب {{ $exchangeInfo['name'] ?? '' }}</h1>
 
     @if(isset($error))
-        <div class="error-message">
-            {{ $error }}
+        <div class="alert alert-info" style="text-align: center;">
+            <div style="margin-bottom: 8px;"><strong>{{ $error }}</strong></div>
             @if(str_contains($error, 'صرافی'))
-                <br><br>
-                <a href="{{ route('profile.show') }}" style="color: #c53030; text-decoration: underline;">
-                    برای فعال‌سازی صرافی کلیک کنید
-                </a>
+                <a href="{{ route('profile.show') }}" class="alert-link">برای فعال‌سازی صرافی کلیک کنید</a>
             @endif
         </div>
     @else
-        @if(isset($exchangeInfo))
-            <div class="exchange-info">
-                صرافی فعال: {{ $exchangeInfo['name'] }} {{ $exchangeInfo['logo'] }}
-            </div>
-        @endif
-
         <div class="balance-type-tabs">
             <button class="balance-tab active" onclick="switchTab('spot')">
                 کیف پول اسپات
             </button>
             <button class="balance-tab" onclick="switchTab('perpetual')">
-                معاملات آتی
+                کیف پول آتی
             </button>
         </div>
 
@@ -214,7 +192,6 @@
                         <div class="total-equity">
                             ${{ number_format($spotTotalEquity ?? 0, 2) }}
                         </div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="balance-content">
                         @foreach($spotBalances as $balance)
@@ -237,7 +214,6 @@
                     <div class="balance-header spot">
                         <h2>کیف پول اسپات</h2>
                         <div class="total-equity">$0.00</div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="empty-balance">
                         @if(isset($spotError))
@@ -255,11 +231,10 @@
             @if(isset($perpetualBalances) && count($perpetualBalances) > 0)
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>معاملات آتی</h2>
+                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">
                             ${{ number_format($perpetualTotalEquity ?? 0, 2) }}
                         </div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="balance-content">
                         @foreach($perpetualBalances as $balance)
@@ -280,9 +255,8 @@
             @else
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>معاملات آتی</h2>
+                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">$0.00</div>
-                        <small>مجموع دارایی‌ها</small>
                     </div>
                     <div class="empty-balance">
                         @if(isset($perpetualError))
@@ -309,10 +283,10 @@
         // Remove active class from all tabs and sections
         const tabs = document.querySelectorAll('.balance-tab');
         const sections = document.querySelectorAll('.balance-section');
-        
+
         tabs.forEach(tab => tab.classList.remove('active'));
         sections.forEach(section => section.classList.remove('active'));
-        
+
         // Add active class to selected tab and section
         event.target.classList.add('active');
         document.getElementById(tabName + '-section').classList.add('active');

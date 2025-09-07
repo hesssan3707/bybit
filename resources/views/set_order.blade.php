@@ -5,19 +5,13 @@
 @push('styles')
 <style>
     .container {
-        width: 100%;
         max-width: 500px;
         margin: auto;
+        padding:20px;
     }
     h2 {
         text-align: center;
         margin-bottom: 20px;
-    }
-    #order-form {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
     .form-group {
         margin-bottom: 15px;
@@ -25,8 +19,8 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
-        color: #555;
+        font-weight: 400;
+        color: #ffffff;
     }
     input {
         width: 100%;
@@ -83,15 +77,15 @@
         font-size: 16px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .alert-success { 
-        background-color: #d1e7dd; 
-        color: #0f5132; 
+    .alert-success {
+        background-color: #d1e7dd;
+        color: #0f5132;
         border: 1px solid #badbcc;
         border-left: 4px solid #28a745;
     }
-    .alert-danger { 
-        background-color: #f8d7da; 
-        color: #721c24; 
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
         border: 1px solid #f1aeb5;
         border-left: 4px solid #dc3545;
     }
@@ -106,13 +100,13 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     @if(isset($user) && $user->future_strict_mode && $selectedMarket)
         <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
     @else
         <h2>ثبت سفارش جدید</h2>
     @endif
-    
+
     @include('partials.exchange-access-check')
 
     @if(session('success'))
@@ -220,7 +214,7 @@
             $accessRestricted = request()->attributes->get('access_restricted', false);
             $hasAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
         @endphp
-        
+
         <button type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
             @if($hasAccess)
                 ارسال سفارش
@@ -254,13 +248,13 @@
         // Function to fetch market price for selected symbol
         function fetchMarketPrice(symbol) {
             if (!symbol) return;
-            
+
             // Show loading state with visual feedback
             entry1Input.style.backgroundColor = '#f8f9fa';
             entry2Input.style.backgroundColor = '#f8f9fa';
             entry1Input.placeholder = 'در حال دریافت قیمت بازار...';
             entry2Input.placeholder = 'در حال دریافت قیمت بازار...';
-            
+
             fetch(`/api/market-price/${symbol}`, {
                 method: 'GET',
                 headers: {
@@ -275,7 +269,7 @@
                 entry2Input.style.backgroundColor = '';
                 entry1Input.placeholder = '';
                 entry2Input.placeholder = '';
-                
+
                 if (data.success && data.price) {
                         entry1Input.value = data.price;
                         if (isChained) {
@@ -290,7 +284,7 @@
                             entry1Input.style.backgroundColor = '';
                             entry2Input.style.backgroundColor = '';
                         }, 1000);
-                    
+
                 } else {
                     // On error, clear the input values silently (no alert)
                     console.warn('Failed to fetch market price:', data.message);
@@ -353,7 +347,7 @@
         const marketPrice = '{{ $marketPrice ?? '' }}';
         const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
         const selectedMarket = '{{ $selectedMarket ?? '' }}';
-        
+
         // For strict mode, use server-provided price
         if (isStrictMode && marketPrice && marketPrice !== '0') {
             if (entry1Input.value === '') {

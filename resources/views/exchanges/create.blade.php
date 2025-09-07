@@ -10,8 +10,7 @@
         margin: auto;
     }
     .form-card {
-        background: #ffffff;
-        padding: 30px;
+        padding: 20px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
@@ -61,10 +60,10 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
-        color: var(--label-color);
+        font-weight: 400;
+        color: white;
     }
-    input, textarea {
+    input {
         width: 100%;
         padding: 12px;
         border: 1px solid var(--border-color);
@@ -72,6 +71,17 @@
         font-size: 14px;
         box-sizing: border-box;
         transition: border-color 0.3s, box-shadow 0.3s;
+        direction:ltr;
+    }
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        direction:rtl;
     }
     input:focus, textarea:focus {
         border-color: var(--primary-color);
@@ -81,8 +91,7 @@
     button {
         width: 100%;
         padding: 14px;
-        background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
-        color: white;
+        color: #000000;
         border: none;
         border-radius: 8px;
         font-size: 16px;
@@ -122,21 +131,17 @@
         text-decoration: underline;
     }
     .warning-box {
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-left: 4px solid #ffc107;
-        border-radius: 8px;
         padding: 15px;
         margin-bottom: 20px;
     }
     .warning-box h4 {
         margin: 0 0 10px 0;
-        color: #856404;
+        color: #a67f06;
     }
     .warning-box ul {
         margin: 0;
         padding-right: 20px;
-        color: #856404;
+        color: #a67f06;
     }
     .password-field {
         position: relative;
@@ -158,9 +163,8 @@
 @endpush
 
 @section('content')
-<div class="container">
-    <a href="{{ route('exchanges.index') }}" class="back-link">← بازگشت به لیست صرافی‌ها</a>
-    
+<div class="glass-card container">
+
     <div class="form-card">
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
 
@@ -197,7 +201,6 @@
                                 </div>
                                 <div>
                                     <h4 style="margin: 0;">{{ $exchange['name'] }}</h4>
-                                    <small style="color: #666;">{{ $exchange['color'] }}</small>
                                 </div>
                             </div>
                             <div>
@@ -217,7 +220,7 @@
                 <div id="credentials-form" class="form-group hidden">
                     <div class="form-group">
                         <label for="api_key">کلید API (API Key):</label>
-                        <input id="api_key" type="text" name="api_key" value="{{ old('api_key') }}" required 
+                        <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required
                                placeholder="مثال: K2IS7FEKFM3G15T4VXVUHY75QCGN4ZT6LEZJ">
                         @error('api_key')
                             <span class="invalid-feedback" role="alert">
@@ -229,7 +232,7 @@
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
                         <div class="password-field">
-                            <input id="api_secret" type="password" name="api_secret" required 
+                            <input id="api_secret" type="password" autocomplete="off" name="api_secret" required
                                    placeholder="کلید محرمانه صرافی خود را وارد کنید">
                             <span class="password-toggle" onclick="togglePassword('api_secret')">
                                 <i id="api_secret-icon" class="fas fa-eye"></i>
@@ -244,7 +247,7 @@
 
                     <div class="form-group">
                         <label for="reason">دلیل درخواست (اختیاری):</label>
-                        <textarea id="reason" name="reason" rows="3" 
+                        <textarea id="reason" name="reason" rows="3"
                                   placeholder="دلیل خود برای استفاده از این صرافی را بنویسید...">{{ old('reason') }}</textarea>
                         @error('reason')
                             <span class="invalid-feedback" role="alert">
@@ -270,19 +273,19 @@ function selectExchange(exchangeName, color) {
         option.style.background = '';
         option.style.color = '';
     });
-    
+
     // Select current exchange
     const selectedOption = document.getElementById(`exchange-${exchangeName}`);
     selectedOption.classList.add('selected');
     selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
     selectedOption.style.color = 'white';
-    
+
     // Check the radio button
     selectedOption.querySelector('input[type="radio"]').checked = true;
-    
+
     // Show credentials form
     document.getElementById('credentials-form').classList.remove('hidden');
-    
+
     // Update form styling to match exchange color
     document.documentElement.style.setProperty('--primary-color', color);
 }

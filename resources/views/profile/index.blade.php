@@ -10,10 +10,7 @@
         margin: auto;
     }
     .profile-card {
-        background: #ffffff;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        padding: 20px;
         text-align: center;
         margin-bottom: 20px;
     }
@@ -34,40 +31,33 @@
         font-size: 1.5em;
         color: #28a745;
     }
-    
+
     /* Exchange section styles */
     .exchange-section {
-        background: #ffffff;
-        padding: 25px;
+        padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         margin-bottom: 20px;
     }
-    
+
     .current-exchange {
-        border-left: 5px solid var(--exchange-color, #007bff);
         padding: 20px;
-        @if($currentExchange)
-        background: linear-gradient(135deg, rgba({{ $currentExchange->exchange_color_rgb }}, 0.1), #ffffff);
-        @else
-        background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), #ffffff);
-        @endif
         border-radius: 10px;
         margin-bottom: 20px;
     }
-    
+
     .exchange-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-bottom: 15px;
     }
-    
+
     .exchange-info {
         display: flex;
         align-items: center;
     }
-    
+
     .exchange-logo {
         width: 50px;
         height: 50px;
@@ -82,35 +72,35 @@
         font-size: 18px;
         border: 2px solid var(--exchange-color, #007bff);
     }
-    
+
     .exchange-details h3 {
         margin: 0;
         font-size: 1.4em;
         color: var(--exchange-color, #007bff);
     }
-    
+
     .exchange-status {
         font-size: 0.9em;
         color: #666;
         margin-top: 5px;
     }
-    
+
     .quick-switch {
         text-align: center;
     }
-    
+
     .quick-switch h4 {
         margin-bottom: 15px;
         color: #333;
     }
-    
+
     .exchange-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 15px;
         margin-bottom: 15px;
     }
-    
+
     .exchange-option {
         border: 2px solid #e9ecef;
         border-radius: 10px;
@@ -119,16 +109,16 @@
         cursor: pointer;
         background: white;
     }
-    
+
     .exchange-option:hover {
         border-color: var(--exchange-color, #007bff);
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    
+
     .exchange-option.current {
         border-color: var(--exchange-color, #007bff);
     }
-    
+
     .exchange-option .mini-logo {
         width: 30px;
         height: 30px;
@@ -142,18 +132,18 @@
         font-size: 12px;
         margin: 0 auto 10px;
     }
-    
+
     .exchange-option .name {
         font-weight: bold;
         margin-bottom: 5px;
         color: var(--exchange-color, #007bff);
     }
-    
+
     .exchange-option .status {
         font-size: 0.8em;
         color: #666;
     }
-    
+
     .btn {
         display: inline-block;
         padding: 10px 20px;
@@ -195,11 +185,10 @@
         text-align: center;
         padding: 30px;
         color: #666;
-        background: #f8f9fa;
         border-radius: 10px;
         margin-bottom: 20px;
     }
-    
+
     /* Profile buttons styling */
     .profile-buttons {
         display: flex;
@@ -209,12 +198,12 @@
         margin: 20px 0;
         flex-wrap: wrap;
     }
-    
+
     /* Hide admin panel button on desktop */
     .admin-panel-btn {
         display: none;
     }
-    
+
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -222,96 +211,96 @@
             margin: 0 auto;
             width: 100%;
         }
-        
+
         .profile-card {
             padding: 20px;
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
         }
-        
+
         .profile-card .username {
             font-size: 1.3em;
             margin-bottom: 15px;
         }
-        
+
         .profile-card .equity {
             font-size: 1em;
             margin-bottom: 20px;
         }
-        
+
         .profile-card .equity strong {
             font-size: 1.3em;
         }
-        
+
         .exchange-section {
             padding: 15px;
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
         }
-        
+
         .current-exchange {
             padding: 15px;
             margin-bottom: 15px;
         }
-        
+
         .exchange-header {
             flex-direction: column;
             align-items: stretch;
             gap: 15px;
         }
-        
+
         .exchange-info {
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
-        
+
         .exchange-logo {
             width: 40px;
             height: 40px;
             margin: 0 0 10px 0;
             font-size: 16px;
         }
-        
+
         .exchange-details h3 {
             font-size: 1.2em;
             margin-bottom: 5px;
         }
-        
+
         .exchange-status {
             font-size: 0.85em;
             margin-bottom: 15px;
         }
-        
+
         .exchange-grid {
             grid-template-columns: 1fr;
             gap: 10px;
             margin-bottom: 10px;
         }
-        
+
         .exchange-option {
             padding: 12px;
             text-align: center;
         }
-        
+
         .exchange-option .mini-logo {
             width: 25px;
             height: 25px;
             font-size: 10px;
             margin: 0 auto 8px;
         }
-        
+
         .exchange-option .name {
             font-size: 0.9em;
             margin-bottom: 3px;
         }
-        
+
         .exchange-option .status {
             font-size: 0.75em;
         }
-        
+
         .btn {
             padding: 12px 16px;
             margin: 3px;
@@ -322,80 +311,80 @@
             box-sizing: border-box;
             text-align: center;
         }
-        
+
         .profile-buttons {
             flex-direction: column;
             gap: 10px;
             margin: 15px 0;
         }
-        
+
         .profile-buttons .btn {
             width: 100%;
             max-width: none;
             flex: none;
         }
-        
+
         /* Show admin panel button on mobile */
         .admin-panel-btn {
             display: inline-block !important;
         }
-        
+
         .no-exchange {
             padding: 20px;
         }
-        
+
         .no-exchange h3 {
             font-size: 1.1em;
             margin-bottom: 10px;
         }
-        
+
         .no-exchange p {
             font-size: 0.9em;
             margin-bottom: 15px;
         }
     }
-    
+
     /* Extra small screens */
     @media (max-width: 480px) {
         .container {
             padding: 0;
             margin: 0 auto;
         }
-        
+
         .profile-card {
             padding: 15px;
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         .profile-card .username {
             font-size: 1.2em;
         }
-        
+
         .exchange-section {
             padding: 10px;
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         .current-exchange {
             padding: 10px;
         }
-        
+
         .exchange-logo {
             width: 35px;
             height: 35px;
             font-size: 14px;
         }
-        
+
         .exchange-details h3 {
             font-size: 1.1em;
         }
-        
+
         .exchange-status {
             font-size: 0.8em;
         }
-        
+
         .btn {
             padding: 10px 12px;
             font-size: 0.85em;
@@ -405,18 +394,18 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="profile-card">
         <h2>پروفایل کاربری</h2>
-        
+
         @if(session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
             </div>
         @endif
-        
+
         <div class="username">{{ $user->email }}</div>
-        
+
         @if($currentExchange)
             <div class="equity">
                 <p>موجودی لحظه ای حساب ({{ $currentExchange->exchange_display_name }}): <strong>${{ $totalEquity }}</strong></p>
@@ -427,7 +416,7 @@
                 <p style="color: #dc3545;">هیچ صرافی فعالی تنظیم نشده است</p>
             </div>
         @endif
-        
+
         <div class="profile-buttons">
             <a href="{{ route('password.change.form') }}" class="btn btn-primary">
                 تغییر رمز عبور
@@ -441,17 +430,17 @@
                 </a>
             @endif
         </div>
-        
+
         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger">
             خروج از حساب
         </a>
     </div>
-    
+
     <!-- Current Exchange Display -->
     @if($currentExchange)
         <div class="exchange-section">
             <h3 style="text-align: center; margin-bottom: 20px;">صرافی فعال شما</h3>
-            
+
             <div class="current-exchange" style="--exchange-color: {{ $currentExchange->exchange_color }}">
                 <div class="exchange-header">
                     <div class="exchange-info">
@@ -484,7 +473,7 @@
             </div>
         </div>
     @endif
-    
+
     <!-- Quick Exchange Switching -->
     @if($activeExchanges->count() > 1)
         <div class="exchange-section">
@@ -492,7 +481,7 @@
                 <h4>تغییر سریع صرافی</h4>
                 <div class="exchange-grid">
                     @foreach($activeExchanges as $exchange)
-                        <div class="exchange-option {{ $exchange->is_default ? 'current' : '' }}" 
+                        <div class="exchange-option {{ $exchange->is_default ? 'current' : '' }}"
                              style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }}; {{ $exchange->is_default ? 'background: linear-gradient(135deg, rgba(' . ($exchange->exchange_color_rgb ?? '0, 123, 255') . ', 0.15), #ffffff);' : '' }}"
                              onclick="switchExchange({{ $exchange->id }})">
                             <div class="mini-logo">
@@ -519,12 +508,12 @@ function switchExchange(exchangeId) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = `/exchanges/${exchangeId}/switch`;
-        
+
         const csrfInput = document.createElement('input');
         csrfInput.type = 'hidden';
         csrfInput.name = '_token';
         csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        
+
         form.appendChild(csrfInput);
         document.body.appendChild(form);
         form.submit();

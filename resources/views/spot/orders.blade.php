@@ -7,11 +7,15 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        animation: fadeIn 0.5s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
     h2 {
         text-align: center;
         margin-bottom: 25px;
@@ -26,14 +30,14 @@
     }
     th, td {
         padding: 12px 15px;
-        border: 1px solid #dee2e6;
+        border: 1px solid rgba(222, 226, 230, 0.05);
         text-align: right;
     }
     thead {
-        background-color: #f8f9fa;
+        background-color: rgba(253, 253, 253, 0.05);
     }
     tbody tr:nth-of-type(odd) {
-        background-color: #f9f9f9;
+        background-color: rgba(249, 249, 249, 0.2);
     }
     .status-badge {
         padding: 4px 8px;
@@ -47,10 +51,10 @@
     .status-secondary { background-color: #6c757d; }
     .status-danger { background-color: #dc3545; }
     .status-info { background-color: #17a2b8; }
-    
+
     .side-buy { color: #28a745; font-weight: bold; }
     .side-sell { color: #dc3545; font-weight: bold; }
-    
+
     .pagination {
         margin-top: 20px;
         display: flex;
@@ -68,7 +72,7 @@
     }
     .alert-success { background: #d1e7dd; color: #0f5132; }
     .alert-danger { background: #f8d7da; color: #842029; }
-    
+
     .stats-row {
         display: flex;
         justify-content: space-between;
@@ -76,24 +80,23 @@
         gap: 15px;
     }
     .stat-card {
-        background: #f8f9fa;
         padding: 15px;
         border-radius: 8px;
         text-align: center;
         flex: 1;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .stat-card h4 {
         margin: 0 0 10px 0;
-        color: #6c757d;
+        color: #f4f5f6;
         font-size: 14px;
     }
     .stat-card .value {
         font-size: 18px;
         font-weight: bold;
-        color: #333;
+        color: #efeeee;
     }
-    
+
     .create-order-btn {
         background: var(--primary-color);
         color: white;
@@ -109,7 +112,7 @@
         color: white;
         text-decoration: none;
     }
-    
+
     .cancel-btn {
         background: #dc3545;
         color: white;
@@ -122,18 +125,18 @@
         text-decoration: none;
         display: inline-block;
     }
-    
+
     .cancel-btn:hover {
         background: #c82333;
         color: white;
         text-decoration: none;
     }
-    
+
     .cancel-btn:disabled {
         background: #6c757d;
         cursor: not-allowed;
     }
-    
+
     .action-buttons {
         display: flex;
         gap: 5px;
@@ -149,7 +152,6 @@
         table tr {
             display: block;
             margin-bottom: 15px;
-            border: 1px solid #dee2e6;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
@@ -159,7 +161,7 @@
             text-align: right;
             padding: 10px 15px;
             border: none;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(238, 238, 238, 0.25);
         }
         table td:last-child { border-bottom: 0; }
         table td::before {
@@ -182,20 +184,20 @@
 @section('content')
 <div class="container">
     <h2>سفارش‌های اسپات</h2>
-    
+
     @include('partials.exchange-access-check')
-    
+
     {{-- Show create order button only if user has proper access --}}
     @php
         $exchangeAccess = request()->attributes->get('exchange_access');
         $accessRestricted = request()->attributes->get('access_restricted', false);
         $hasExchangeAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
     @endphp
-    
+
     @if($hasExchangeAccess)
         <a href="{{ route('spot.order.create.view') }}" class="create-order-btn">+ سفارش اسپات جدید</a>
     @endif
-    
+
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif

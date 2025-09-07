@@ -32,7 +32,7 @@
     th, td {
         padding: 12px;
         text-align: right;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid rgba(238, 238, 238, 0.25);
     }
     th {
         background-color: #f8f9fa;
@@ -166,7 +166,7 @@
     .action-form {
         display: inline;
     }
-    
+
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .container {
@@ -174,40 +174,40 @@
             margin: 0 auto;
             width: 100%;
         }
-        
+
         .admin-header {
             padding: 15px;
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
         }
-        
+
         .admin-header h2 {
             font-size: 1.3em;
             margin: 0;
         }
-        
+
         .admin-nav-links {
             margin: 10px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
-        
+
         .admin-nav-links a {
             padding: 8px 12px;
             margin: 0;
             font-size: 0.85em;
             text-align: center;
         }
-        
+
         .exchanges-table {
             margin: 10px;
             width: calc(100% - 20px);
             box-sizing: border-box;
             border-radius: 10px;
         }
-        
+
         /* Convert table to card layout on mobile */
         table {
             display: block;
@@ -215,15 +215,15 @@
             overflow-x: auto;
             white-space: nowrap;
         }
-        
+
         thead {
             display: none;
         }
-        
+
         tbody {
             display: block;
         }
-        
+
         tr {
             display: block;
             background: #fff;
@@ -233,18 +233,18 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             white-space: normal;
         }
-        
+
         td {
             display: block;
             padding: 8px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(238, 238, 238, 0.25);
             text-align: right;
         }
-        
+
         td:last-child {
             border-bottom: none;
         }
-        
+
         td:before {
             content: attr(data-label) ": ";
             font-weight: bold;
@@ -252,53 +252,53 @@
             margin-left: 10px;
             color: #333;
         }
-        
+
         .exchange-info {
             flex-direction: column;
             align-items: flex-start;
             text-align: right;
         }
-        
+
         .exchange-logo {
             width: 25px;
             height: 25px;
             font-size: 10px;
             margin: 0 0 5px 10px;
         }
-        
+
         .status-badge {
             padding: 3px 6px;
             font-size: 10px;
         }
-        
+
         .default-badge {
             font-size: 9px;
             padding: 2px 4px;
         }
-        
+
         .masked-key {
             font-size: 9px;
             word-break: break-all;
         }
-        
+
         .notes-cell {
             max-width: none;
             font-size: 10px;
         }
-        
+
         .btn {
             padding: 8px 12px;
             margin: 2px;
             font-size: 11px;
             display: inline-block;
         }
-        
+
         .alert {
             padding: 10px 12px;
             margin: 10px;
             font-size: 0.9em;
         }
-        
+
         /* Modal responsiveness */
         #rejectModal > div,
         #deactivateModal > div {
@@ -306,26 +306,26 @@
             max-width: 350px;
             padding: 20px;
         }
-        
+
         #rejectModal h3,
         #deactivateModal h3 {
             font-size: 1.1em;
             margin-bottom: 15px;
         }
-        
+
         #rejectModal textarea,
         #deactivateModal textarea {
             font-size: 14px;
             min-height: 60px;
         }
-        
+
         #rejectModal button,
         #deactivateModal button {
             padding: 8px 15px;
             font-size: 12px;
         }
     }
-    
+
     /* Extra small screens */
     @media (max-width: 480px) {
         .admin-header {
@@ -333,49 +333,49 @@
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         .admin-header h2 {
             font-size: 1.1em;
         }
-        
+
         .admin-nav-links {
             margin: 5px;
             grid-template-columns: 1fr;
             gap: 5px;
         }
-        
+
         .admin-nav-links a {
             padding: 6px 10px;
             font-size: 0.8em;
         }
-        
+
         .exchanges-table {
             margin: 5px;
             width: calc(100% - 10px);
         }
-        
+
         tr {
             padding: 10px;
             margin-bottom: 8px;
         }
-        
+
         td {
             padding: 6px 0;
             font-size: 0.85em;
         }
-        
+
         .exchange-logo {
             width: 20px;
             height: 20px;
             font-size: 8px;
         }
-        
+
         .btn {
             padding: 6px 10px;
             font-size: 10px;
             margin: 1px;
         }
-        
+
         #rejectModal > div,
         #deactivateModal > div {
             width: 95%;
@@ -482,18 +482,18 @@
                                 @if($exchange->status === 'pending')
                                     <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form">
                                         @csrf
-                                        <button type="submit" class="btn btn-success" 
+                                        <button type="submit" class="btn btn-success"
                                                 onclick="return confirm('آیا مطمئن هستید؟')"
                                                 {{ !$exchange->user ? 'disabled title="کاربر حذف شده"' : '' }}>
                                             تأیید
                                         </button>
                                     </form>
-                                    
+
                                     <button onclick="showRejectModal({{ $exchange->id }})" class="btn btn-danger"
                                             {{ !$exchange->user ? 'disabled title="کاربر حذف شده"' : '' }}>
                                         رد
                                     </button>
-                                    
+
                                     <button type="button" class="btn btn-info" onclick="testConnection({{ $exchange->id }})" id="test-btn-{{ $exchange->id }}">
                                         تست اتصال
                                     </button>
@@ -502,11 +502,11 @@
                                         غیرفعال‌سازی
                                     </button>
                                 @endif
-                                
+
                                 @if($exchange->status === 'rejected')
                                     <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form">
                                         @csrf
-                                        <button type="submit" class="btn btn-info" 
+                                        <button type="submit" class="btn btn-info"
                                                 onclick="return confirm('آیا مطمئن هستید؟')">
                                             فعال‌سازی مجدد
                                         </button>
@@ -517,7 +517,7 @@
                     @endforeach
                 </tbody>
             </table>
-            
+
             <div style="padding: 20px;">
                 {{ $exchanges->links() }}
             </div>
@@ -571,14 +571,14 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribut
 
 function testConnection(exchangeId) {
     const button = document.getElementById(`test-btn-${exchangeId}`);
-    
+
     if (!button) return;
-    
+
     // Show loading state
     button.disabled = true;
     const originalText = button.textContent;
     button.textContent = 'در حال تست...';
-    
+
     // Make AJAX request
     fetch(`/admin/exchanges/${exchangeId}/test`, {
         method: 'POST',
@@ -592,7 +592,7 @@ function testConnection(exchangeId) {
     .then(data => {
         button.disabled = false;
         button.textContent = originalText;
-        
+
         if (data.success) {
             alert(`نتیجه تست: ${data.message}`);
         } else {

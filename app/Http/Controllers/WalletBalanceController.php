@@ -32,7 +32,7 @@ class WalletBalanceController extends Controller
     {
         try {
             $exchangeService = $this->getExchangeService();
-            
+
             // Get current exchange info
             $user = auth()->user();
             $currentExchange = $user->getCurrentExchange();
@@ -52,11 +52,11 @@ class WalletBalanceController extends Controller
             // Try to get spot balances
             try {
                 $spotBalanceData = $exchangeService->getSpotAccountBalance();
-                
+
                 if (!empty($spotBalanceData['list'])) {
                     $account = $spotBalanceData['list'][0];
                     $spotTotalEquity = (float)($account['totalEquity'] ?? 0);
-                    
+
                     if (isset($account['coin']) && is_array($account['coin'])) {
                         foreach ($account['coin'] as $coin) {
                             if ((float)$coin['walletBalance'] > 0) {
@@ -73,14 +73,14 @@ class WalletBalanceController extends Controller
                 }
             } catch (\Exception $e) {
                 Log::error('Failed to fetch spot balances: ' . $e->getMessage());
-                
+
                 // Provide exchange-specific error messages
                 $exchangeName = $currentExchange->exchange_name ?? 'Unknown';
                 $errorMessage = $e->getMessage();
-                
+
                 // Enhanced error detection for better user messages
-                if (str_contains($errorMessage, 'Unknown error') || 
-                    str_contains($errorMessage, 'N/A') || 
+                if (str_contains($errorMessage, 'Unknown error') ||
+                    str_contains($errorMessage, 'N/A') ||
                     str_contains($errorMessage, 'Msg: Unknown error') ||
                     (str_contains($errorMessage, 'Code: N/A') && str_contains($errorMessage, 'Unknown'))) {
                     $spotError = "دسترسی به این API محدود شده است. احتمالات:\n• آدرس IP شما در لیست مجاز نیست\n• کلید API مجوز دسترسی به این بخش را ندارد\n• تنظیمات امنیتی صرافی محدودیت ایجاد کرده\nلطفاً تنظیمات کلید API و IP را بررسی کنید.";
@@ -98,11 +98,11 @@ class WalletBalanceController extends Controller
             // Try to get perpetual/futures balances
             try {
                 $perpetualBalanceData = $exchangeService->getWalletBalance('UNIFIED', null);
-                
+
                 if (!empty($perpetualBalanceData['list'])) {
                     $account = $perpetualBalanceData['list'][0];
                     $perpetualTotalEquity = (float)($account['totalEquity'] ?? 0);
-                    
+
                     if (isset($account['coin']) && is_array($account['coin'])) {
                         foreach ($account['coin'] as $coin) {
                             if ((float)$coin['walletBalance'] > 0) {
@@ -118,19 +118,19 @@ class WalletBalanceController extends Controller
                 }
             } catch (\Exception $e) {
                 Log::error('Failed to fetch perpetual balances: ' . $e->getMessage());
-                
+
                 $exchangeName = $currentExchange->exchange_name ?? 'Unknown';
                 // If exchange doesn't support perpetual trading, show alternative
                 if (str_contains($e->getMessage(), 'not supported') || str_contains($e->getMessage(), 'Invalid') || str_contains($e->getMessage(), 'category')) {
                     $perpetualError = "صرافی {$exchangeName} از معاملات آتی پشتیبانی نمی‌کند. فقط موجودی اسپات در دسترس است.";
-                    
+
                     // For some exchanges, try to get the main wallet balance as alternative
                     try {
                         $mainBalanceData = $exchangeService->getAccountBalance();
                         if (!empty($mainBalanceData) && isset($mainBalanceData['list'])) {
                             $account = $mainBalanceData['list'][0] ?? $mainBalanceData;
                             $perpetualTotalEquity = (float)($account['totalEquity'] ?? $account['totalWalletBalance'] ?? 0);
-                            
+
                             if (isset($account['coin']) && is_array($account['coin'])) {
                                 foreach ($account['coin'] as $coin) {
                                     if ((float)($coin['walletBalance'] ?? $coin['free'] ?? 0) > 0) {
@@ -151,8 +151,8 @@ class WalletBalanceController extends Controller
                 } else {
                     // Enhanced error detection for perpetual balances
                     $errorMessage = $e->getMessage();
-                    if (str_contains($errorMessage, 'Unknown error') || 
-                        str_contains($errorMessage, 'N/A') || 
+                    if (str_contains($errorMessage, 'Unknown error') ||
+                        str_contains($errorMessage, 'N/A') ||
                         str_contains($errorMessage, 'Msg: Unknown error') ||
                         (str_contains($errorMessage, 'Code: N/A') && str_contains($errorMessage, 'Unknown'))) {
                         $perpetualError = "دسترسی به API محدود شده است. احتمالات:\n• آدرس IP شما در لیست مجاز نیست\n• کلید API مجوز دسترسی به این بخش را ندارد\n• تنظیمات امنیتی صرافی محدودیت ایجاد کرده\nلطفاً تنظیمات کلید API و IP را بررسی کنید.";
@@ -162,7 +162,7 @@ class WalletBalanceController extends Controller
                 }
             }
 
-            return view('mobile.balance', compact(
+            return view('balance.balance', compact(
                 'exchangeInfo',
                 'spotBalances',
                 'spotTotalEquity',
@@ -173,9 +173,9 @@ class WalletBalanceController extends Controller
             ));
 
         } catch (\Exception $e) {
-            Log::error('Failed to load mobile balance page: ' . $e->getMessage());
-            
-            return view('mobile.balance', [
+            Log::error('Failed to load balance balance page: ' . $e->getMessage());
+
+            return view('balance.balance', [
                 'error' => $e->getMessage()
             ]);
         }

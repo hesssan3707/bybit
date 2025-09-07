@@ -10,27 +10,17 @@
         margin: auto;
     }
     .exchanges-header {
-        background: #ffffff;
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         margin-bottom: 20px;
         text-align: center;
+        color : #ffffff;
     }
     .exchange-card {
-        background: #ffffff;
+        padding:20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
         margin-bottom: 20px;
         overflow: hidden;
-        border-left: 5px solid var(--exchange-color, #007bff);
-    }
-    .exchange-header {
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: linear-gradient(135deg, var(--exchange-color, #007bff), rgba(255,255,255,0.1));
     }
     .exchange-info {
         display: flex;
@@ -111,11 +101,6 @@
         background-color: #17a2b8;
         color: white;
     }
-    .btn-outline {
-        background-color: transparent;
-        border: 2px solid var(--exchange-color, #007bff);
-        color: var(--exchange-color, #007bff);
-    }
     .alert {
         padding: 12px 16px;
         border-radius: 8px;
@@ -148,10 +133,9 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <div class="exchanges-header">
         <h2>مدیریت صرافی‌ها</h2>
-        <p>در اینجا می‌توانید صرافی‌های خود را مدیریت کنید و بین آنها تغییر دهید</p>
     </div>
 
     @if(session('success'))
@@ -209,18 +193,15 @@
                             @if(!$exchange->is_default)
                                 <form method="POST" action="{{ route('exchanges.switch', $exchange) }}" style="display: inline;">
                                     @csrf
-                                    <button type="submit" class="btn btn-outline">
+                                    <button type="submit" class="btn">
                                         تنظیم به عنوان پیش‌فرض
                                     </button>
                                 </form>
                             @endif
-                            <button onclick="testConnection({{ $exchange->id }})" class="btn btn-outline" id="test-btn-{{ $exchange->id }}">
-                                تست اتصال
-                            </button>
                         @endif
                     </div>
                 </div>
-                
+
                 <div class="exchange-details">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
                         <div>
@@ -232,7 +213,7 @@
                             <div>{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d H:i') : '-' }}</div>
                         </div>
                     </div>
-                    
+
                     @if($exchange->user_reason)
                         <div style="margin-bottom: 15px;">
                             <strong>دلیل درخواست:</strong>
@@ -241,7 +222,7 @@
                             </div>
                         </div>
                     @endif
-                    
+
                     @if($exchange->admin_notes)
                         <div style="margin-bottom: 15px;">
                             <strong>یادداشت مدیر:</strong>
@@ -250,14 +231,16 @@
                             </div>
                         </div>
                     @endif
-                    
+                    <button onclick="testConnection({{ $exchange->id }})" class="btn " id="test-btn-{{ $exchange->id }}">
+                        تست اتصال
+                    </button>
                     <div style="text-align: left;">
                         @if($exchange->is_active || $exchange->status === 'rejected')
                             <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
                                 ویرایش اطلاعات
                             </a>
                         @endif
-                        
+
                         @if($exchange->status === 'pending')
                             <span style="color: #666; font-style: italic;">در انتظار بررسی مدیر...</span>
                         @endif
@@ -280,10 +263,10 @@
 async function testConnection(exchangeId) {
     const btn = document.getElementById(`test-btn-${exchangeId}`);
     const originalText = btn.textContent;
-    
+
     btn.textContent = 'در حال تست...';
     btn.disabled = true;
-    
+
     try {
         const response = await fetch(`/exchanges/${exchangeId}/test-connection`, {
             method: 'POST',
@@ -292,9 +275,9 @@ async function testConnection(exchangeId) {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             btn.textContent = '✓ موفق';
             btn.style.backgroundColor = '#28a745';

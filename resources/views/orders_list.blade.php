@@ -5,7 +5,6 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
@@ -14,19 +13,19 @@
         text-align: center;
         margin-bottom: 25px;
     }
-    
+
     /* Mobile redirect buttons */
     .mobile-redirect-section {
         display: none;
         margin-bottom: 20px;
     }
-    
+
     .redirect-buttons {
         display: flex;
         gap: 10px;
         margin-bottom: 20px;
     }
-    
+
     .redirect-btn {
         flex: 1;
         padding: 15px;
@@ -39,23 +38,23 @@
         transition: all 0.3s ease;
         box-shadow: 0 4px 15px rgba(0,123,255,0.3);
     }
-    
+
     .redirect-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0,123,255,0.4);
         color: white;
         text-decoration: none;
     }
-    
+
     .redirect-btn.secondary {
         background: linear-gradient(135deg, #28a745, #20c997);
         box-shadow: 0 4px 15px rgba(40,167,69,0.3);
     }
-    
+
     .redirect-btn.secondary:hover {
         box-shadow: 0 6px 20px rgba(40,167,69,0.4);
     }
-    
+
     .table-responsive {
         overflow-x: auto;
     }
@@ -66,14 +65,14 @@
     }
     th, td {
         padding: 12px 15px;
-        border: 1px solid #dee2e6;
+        border: 1px solid rgba(222, 226, 230, 0.05);
         text-align: right;
     }
     thead {
-        background-color: #f8f9fa;
+        background-color: rgba(253, 253, 253, 0.05);
     }
     tbody tr:nth-of-type(odd) {
-        background-color: #f9f9f9;
+        background-color: rgba(249, 249, 249, 0.2);
     }
     .delete-btn {
         background-color: #dc3545;
@@ -104,12 +103,6 @@
         display: flex;
         justify-content: center;
     }
-    .alert {
-        padding: 10px;
-        border-radius: 8px;
-        text-align: center;
-        margin-bottom: 15px;
-    }
     .no-orders {
         text-align: center !important;
         direction: rtl;
@@ -121,22 +114,21 @@
         .mobile-redirect-section {
             display: block;
         }
-        
+
         .redirect-buttons {
             flex-direction: column;
             gap: 15px;
         }
-        
+
         .redirect-btn {
             padding: 18px;
             font-size: 16px;
         }
-        
+
         table thead { display: none; }
         table tr {
             display: block;
             margin-bottom: 15px;
-            border: 1px solid #dee2e6;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
@@ -146,7 +138,7 @@
             text-align: right;
             padding: 10px 15px;
             border: none;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(238, 238, 238, 0.25);
         }
         table td:last-child { border-bottom: 0; }
         table td::before {
@@ -167,9 +159,9 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <h2>تاریخچه معاملات</h2>
-    
+
     @include('partials.exchange-access-check')
 
     @if(session('success'))

@@ -7,13 +7,17 @@
 @push('styles')
 <style>
     .container {
-        background: #ffffff;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         padding: 20px;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
         max-width: 600px;
         margin: 0 auto;
+        animation: fadeIn 0.5s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
     h2 {
         text-align: center;
         margin-bottom: 25px;
@@ -25,7 +29,7 @@
         display: block;
         margin-bottom: 8px;
         font-weight: bold;
-        color: #333;
+        color: #ffffff;
     }
     .form-control {
         width: 100%;
@@ -92,14 +96,14 @@
         border-radius: 8px;
         margin-bottom: 20px;
     }
-    .alert-danger { 
-        background: #f8d7da; 
-        color: #842029; 
+    .alert-danger {
+        background: #f8d7da;
+        color: #842029;
         border: 1px solid #f5c6cb;
     }
-    .alert-success { 
-        background: #d1e7dd; 
-        color: #0f5132; 
+    .alert-success {
+        background: #d1e7dd;
+        color: #0f5132;
         border: 1px solid #badbcc;
     }
     .help-text {
@@ -154,13 +158,13 @@
         background: #dc3545;
         color: white;
     }
-    
+
     /* Searchable dropdown styles */
     .search-dropdown {
         position: relative;
         width: 100%;
     }
-    
+
     .search-input {
         width: 100%;
         padding: 12px 15px;
@@ -173,22 +177,22 @@
         justify-content: space-between;
         align-items: center;
     }
-    
+
     .search-input:focus {
         outline: none;
         border-color: var(--primary-color);
         box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
     }
-    
+
     .dropdown-arrow {
         transition: transform 0.3s;
         color: #6c757d;
     }
-    
+
     .dropdown-arrow.rotated {
         transform: rotate(180deg);
     }
-    
+
     .dropdown-list {
         position: absolute;
         top: 100%;
@@ -203,11 +207,11 @@
         z-index: 1000;
         display: none;
     }
-    
+
     .dropdown-list.active {
         display: block;
     }
-    
+
     .dropdown-item {
         padding: 10px 15px;
         cursor: pointer;
@@ -217,58 +221,57 @@
         justify-content: space-between;
         align-items: center;
     }
-    
+
     .dropdown-item:hover {
         background-color: #f8f9fa;
     }
-    
+
     .dropdown-item.selected {
         background-color: var(--primary-color);
         color: white;
     }
-    
+
     .dropdown-item.favorite {
         background-color: #fff3cd;
         border-left: 4px solid #ffc107;
     }
-    
+
     .dropdown-item.favorite:hover {
         background-color: #ffeaa7;
     }
-    
+
     .favorite-star {
         color: #ffc107;
         font-size: 14px;
     }
-    
+
     .pair-info {
         display: flex;
         flex-direction: column;
     }
-    
+
     .pair-symbol {
         font-weight: bold;
         font-size: 14px;
     }
-    
+
     .pair-details {
         font-size: 12px;
         color: #6c757d;
     }
-    
+
     .no-results {
         padding: 15px;
         text-align: center;
         color: #6c757d;
         font-style: italic;
     }
-    
+
     @media screen and (max-width: 768px) {
         .form-row {
             grid-template-columns: 1fr;
         }
         .container {
-            margin: 10px;
             max-width: calc(100% - 20px);
         }
     }
@@ -276,11 +279,11 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="glass-card container">
     <a href="{{ route('spot.orders.view') }}" class="back-btn">← بازگشت به سفارش‌ها</a>
-    
+
     <h2>سفارش اسپات جدید</h2>
-    
+
     @include('partials.exchange-access-check')
 
     @if(isset($error))
@@ -302,7 +305,7 @@
     @if($hasActiveExchange)
         <form action="{{ route('spot.order.store.web') }}" method="POST" id="spotOrderForm">
             @csrf
-        
+
         <div class="form-group">
             <label for="symbol">جفت ارز</label>
             <div class="search-dropdown">
@@ -311,10 +314,10 @@
                     <span class="dropdown-arrow" id="dropdownArrow">▼</span>
                 </div>
                 <div class="dropdown-list" id="symbolDropdown">
-                    <input type="text" id="searchBox" placeholder="جستجو در جفت‌های ارز..." 
-                           style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid #eee; outline: none;"
+                    <input type="text" id="searchBox" placeholder="جستجو در جفت‌های ارز..."
+                           style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid rgba(238, 238, 238, 0.25); outline: none;"
                            oninput="filterSymbols()" onkeydown="handleKeyNavigation(event)">
-                    
+
                     @if($hasActiveExchange)
                         @if(!empty($favoriteMarkets))
                             <div class="dropdown-section-header" style="padding: 8px 15px; background: #f8f9fa; font-weight: bold; color: #495057; font-size: 12px;">
@@ -329,14 +332,14 @@
                                     <div class="favorite-star">⭐</div>
                                 </div>
                             @endforeach
-                            
+
                             @if(!empty($tradingPairs))
                                 <div class="dropdown-section-header" style="padding: 8px 15px; background: #f8f9fa; font-weight: bold; color: #495057; font-size: 12px;">
                                     سایر جفت‌های ارز
                                 </div>
                             @endif
                         @endif
-                        
+
                         @if(!empty($tradingPairs))
                             @foreach($tradingPairs as $pair)
                                 @if(!in_array($pair['symbol'], collect($favoriteMarkets)->pluck('symbol')->toArray()))
@@ -349,7 +352,7 @@
                                 @endif
                             @endforeach
                         @endif
-                        
+
                         @if(empty($tradingPairs) && empty($favoriteMarkets))
                             <div class="no-results">هیچ جفت ارزی یافت نشد</div>
                         @endif
@@ -359,7 +362,6 @@
                 </div>
             </div>
             <input type="hidden" name="symbol" id="symbol" value="{{ old('symbol') }}" required>
-            <div class="help-text">جفت ارز مورد نظر برای معاملات اسپات را انتخاب کنید</div>
         </div>
 
         <div class="form-group">
@@ -397,18 +399,18 @@
         <div class="form-row">
             <div class="form-group">
                 <label for="qty">مقدار</label>
-                <input type="number" name="qty" id="qty" class="form-control" 
-                       step="0.00000001" min="0.00000001" 
+                <input type="number" name="qty" id="qty" class="form-control"
+                       step="0.00000001" min="0.00000001"
                        value="{{ old('qty') }}" required>
                 <div class="help-text">مقدار ارز پایه که می‌خواهید معامله کنید</div>
             </div>
 
             <div class="form-group price-field" id="priceField">
                 <label for="price">قیمت</label>
-                <input type="number" name="price" id="price" class="form-control" 
-                       step="0.0001" min="0.0001" 
+                <input type="number" name="price" id="price" class="form-control"
+                       step="0.0001" min="0.0001"
                        value="{{ old('price') }}">
-                <div class="help-text">قیمت برای سفارش محدود (اختیاری برای سفارش بازار)</div>
+                <div class="help-text">قیمت برای سفارش محدود</div>
             </div>
         </div>
 
@@ -475,7 +477,7 @@ function toggleDropdown() {
     const dropdown = document.getElementById('symbolDropdown');
     const arrow = document.getElementById('dropdownArrow');
     const searchBox = document.getElementById('searchBox');
-    
+
     if (dropdown.classList.contains('active')) {
         dropdown.classList.remove('active');
         arrow.classList.remove('rotated');
@@ -491,17 +493,17 @@ function toggleDropdown() {
 function selectSymbol(symbol, baseCoin, quoteCoin) {
     document.getElementById('symbol').value = symbol;
     document.getElementById('selectedSymbolText').textContent = `${symbol} (${baseCoin}/${quoteCoin})`;
-    
+
     const dropdown = document.getElementById('symbolDropdown');
     const arrow = document.getElementById('dropdownArrow');
     dropdown.classList.remove('active');
     arrow.classList.remove('rotated');
-    
+
     // Remove previous selections
     document.querySelectorAll('.dropdown-item').forEach(item => {
         item.classList.remove('selected');
     });
-    
+
     // Mark current selection
     const selectedItem = document.querySelector(`[data-symbol="${symbol}"]`);
     if (selectedItem) {
@@ -513,17 +515,17 @@ function filterSymbols() {
     const searchTerm = document.getElementById('searchBox').value.toLowerCase();
     const items = document.querySelectorAll('.dropdown-item');
     const sectionHeaders = document.querySelectorAll('.dropdown-section-header');
-    
+
     filteredSymbols = [];
     let favoritesVisible = false;
     let othersVisible = false;
-    
+
     items.forEach((item, index) => {
         const symbol = item.getAttribute('data-symbol');
         const baseCoin = item.getAttribute('data-base');
         const quoteCoin = item.getAttribute('data-quote');
         const isFavorite = item.classList.contains('favorite');
-        
+
         if (symbol && (
             symbol.toLowerCase().includes(searchTerm) ||
             baseCoin.toLowerCase().includes(searchTerm) ||
@@ -531,7 +533,7 @@ function filterSymbols() {
         )) {
             item.style.display = 'flex';
             filteredSymbols.push(item);
-            
+
             if (isFavorite) {
                 favoritesVisible = true;
             } else {
@@ -541,7 +543,7 @@ function filterSymbols() {
             item.style.display = 'none';
         }
     });
-    
+
     // Show/hide section headers based on content
     sectionHeaders.forEach(header => {
         if (header.textContent.includes('محبوب')) {
@@ -550,10 +552,10 @@ function filterSymbols() {
             header.style.display = othersVisible ? 'block' : 'none';
         }
     });
-    
+
     // Reset selection index
     currentSelectedIndex = -1;
-    
+
     // Show no results message if needed
     const noResults = document.querySelector('.no-results');
     if (noResults) {
@@ -563,7 +565,7 @@ function filterSymbols() {
 
 function handleKeyNavigation(event) {
     if (filteredSymbols.length === 0) return;
-    
+
     switch(event.key) {
         case 'ArrowDown':
             event.preventDefault();
@@ -617,18 +619,18 @@ document.addEventListener('click', function(event) {
 
 function setSide(side) {
     document.getElementById('side').value = side;
-    
+
     // Update button states
     document.querySelectorAll('.side-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    
+
     if (side === 'Buy') {
         document.querySelector('.side-btn.buy').classList.add('active');
     } else {
         document.querySelector('.side-btn.sell').classList.add('active');
     }
-    
+
     updateSubmitButton();
 }
 
@@ -637,7 +639,7 @@ function togglePriceField() {
     const priceField = document.getElementById('priceField');
     const priceInput = document.getElementById('price');
     const orderTypeInfo = document.getElementById('orderTypeInfo');
-    
+
     if (orderType === 'Market') {
         priceField.classList.add('hidden');
         priceInput.removeAttribute('required');
@@ -647,7 +649,7 @@ function togglePriceField() {
         priceInput.setAttribute('required', 'required');
         orderTypeInfo.innerHTML = '<strong>سفارش محدود:</strong> سفارش شما فقط در صورت رسیدن قیمت به مقدار تعیین شده اجرا می‌شود.';
     }
-    
+
     updateSubmitButton();
 }
 
@@ -655,10 +657,10 @@ function updateSubmitButton() {
     const side = document.getElementById('side').value;
     const orderType = document.getElementById('orderType').value;
     const submitBtn = document.getElementById('submitBtn');
-    
+
     const sideText = side === 'Buy' ? 'خرید' : 'فروش';
     const typeText = orderType === 'Market' ? 'بازار' : 'محدود';
-    
+
     submitBtn.textContent = `ایجاد سفارش ${sideText} ${typeText}`;
 }
 
@@ -666,12 +668,12 @@ function updateSubmitButton() {
 document.addEventListener('DOMContentLoaded', function() {
     togglePriceField();
     updateSubmitButton();
-    
+
     // Set initial side if not set
     if (!document.getElementById('side').value) {
         setSide('Buy');
     }
-    
+
     // Set initial symbol if provided in old input
     const oldSymbol = '{{ old('symbol') }}';
     if (oldSymbol) {
@@ -687,19 +689,19 @@ document.getElementById('spotOrderForm').addEventListener('submit', function(e) 
     const orderType = document.getElementById('orderType').value;
     const price = document.getElementById('price').value;
     const symbol = document.getElementById('symbol').value;
-    
+
     if (!symbol) {
         e.preventDefault();
         alert('لطفاً جفت ارز را انتخاب کنید');
         return false;
     }
-    
+
     if (orderType === 'Limit' && (!price || parseFloat(price) <= 0)) {
         e.preventDefault();
         alert('برای سفارش محدود، قیمت الزامی است');
         return false;
     }
-    
+
     // Disable submit button to prevent double submission
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;

@@ -12,7 +12,7 @@
         margin: auto;
         padding: 0;
     }
-    
+
     .doc-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -21,7 +21,7 @@
         margin-bottom: 30px;
         text-align: center;
     }
-    
+
     .doc-section {
         background: #ffffff;
         padding: 30px;
@@ -29,7 +29,7 @@
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         margin-bottom: 20px;
     }
-    
+
     .endpoint {
         background: #f8f9fa;
         border: 1px solid #e9ecef;
@@ -38,22 +38,22 @@
         margin-bottom: 20px;
         transition: all 0.3s ease;
     }
-    
+
     .endpoint:hover {
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    
+
     .doc-header h1 {
         margin: 0 0 10px 0;
         font-size: 2.5em;
     }
-    
+
     .doc-header p {
         margin: 0;
         font-size: 1.1em;
         opacity: 0.9;
     }
-    
+
     .doc-section h2 {
         color: #333;
         border-bottom: 3px solid #667eea;
@@ -61,7 +61,7 @@
         margin-bottom: 25px;
         text-align: right;
     }
-    
+
     .doc-section h3 {
         color: #555;
         margin-top: 30px;
@@ -135,7 +135,7 @@
         direction: rtl;
         text-align: right;
     }
-    
+
     .doc-nav-links h3 {
         margin-top: 0;
         margin-bottom: 15px;
@@ -175,50 +175,50 @@
         direction: ltr;
         text-align: left;
     }
-    
+
     /* Mobile-specific improvements */
     .mobile-view {
         background: #f8f9fa;
     }
-    
+
     .mobile-view .doc-section {
         background: white;
         box-shadow: none;
         border: 1px solid #e9ecef;
     }
-    
+
     .mobile-view .endpoint {
         background: white;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         margin-bottom: 10px;
     }
-    
+
     .mobile-view .doc-nav-links {
         background: white;
         border: 1px solid #e9ecef;
     }
-    
+
     /* Text Direction Styles */
     .persian-content {
         direction: rtl;
         text-align: right;
     }
-    
+
     .ltr-content {
         direction: ltr;
         text-align: left;
     }
-    
+
     .param-table th:first-child,
     .param-table td:first-child {
         text-align: left;
     }
-    
+
     .base-url code {
         direction: ltr;
         text-align: left;
     }
-    
+
     /* Mobile table wrapper */
     .table-wrapper {
         overflow-x: auto;
@@ -226,7 +226,7 @@
         border-radius: 8px;
         border: 1px solid #e9ecef;
     }
-    
+
     /* Collapsible sections for mobile */
     .endpoint-toggle {
         display: none;
@@ -242,11 +242,11 @@
         font-size: 1em;
         direction: rtl;
     }
-    
+
     .endpoint-content {
         display: block;
     }
-    
+
     /* Mobile responsive */
     @media (max-width: 768px) {
         .container {
@@ -254,7 +254,7 @@
             margin: 0;
             width: 100%;
         }
-        
+
         .doc-header {
             margin: 0;
             width: 100%;
@@ -262,16 +262,16 @@
             border-radius: 0;
             box-sizing: border-box;
         }
-        
+
         .doc-header h1 {
             font-size: 1.8em;
             margin-bottom: 8px;
         }
-        
+
         .doc-header p {
             font-size: 1em;
         }
-        
+
         .doc-section {
             margin: 0;
             width: 100%;
@@ -281,18 +281,18 @@
             box-shadow: none;
             border-bottom: 1px solid #e9ecef;
         }
-        
+
         .doc-section h2 {
             font-size: 1.4em;
             margin-bottom: 20px;
         }
-        
+
         .doc-section h3 {
             font-size: 1.2em;
             margin-top: 25px;
             margin-bottom: 12px;
         }
-        
+
         .doc-nav-links {
             margin: 0;
             width: 100%;
@@ -303,12 +303,12 @@
             border: none;
             border-bottom: 1px solid #e9ecef;
         }
-        
+
         .doc-nav-links h3 {
             text-align: center;
             margin-bottom: 15px;
         }
-        
+
         .doc-nav-links a {
             display: block;
             margin: 8px 0;
@@ -319,13 +319,13 @@
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .doc-nav-links a:hover {
             background: #007bff;
             color: white;
             border-color: #007bff;
         }
-        
+
         .endpoint {
             padding: 0;
             margin-bottom: 0;
@@ -334,18 +334,18 @@
             border-radius: 0;
             box-shadow: none;
         }
-        
+
         .endpoint + .endpoint {
             border-top: 1px solid #e9ecef;
             padding-top: 20px;
         }
-        
+
         .endpoint h3 {
             font-size: 1.1em;
             margin-bottom: 10px;
             line-height: 1.4;
         }
-        
+
         .method {
             display: inline-block;
             margin: 8px 8px 8px 0;
@@ -353,7 +353,7 @@
             padding: 6px 12px;
             font-size: 0.8em;
         }
-        
+
         .endpoint-url {
             font-size: 0.85em;
             padding: 10px;
@@ -364,23 +364,23 @@
             border: 1px solid #e9ecef;
             border-radius: 6px;
         }
-        
+
         .endpoint-toggle {
             display: block;
             margin-bottom: 15px;
             font-size: 0.9em;
             padding: 12px 15px;
         }
-        
+
         .endpoint-content {
             display: none;
             padding: 0;
         }
-        
+
         .endpoint-content.active {
             display: block;
         }
-        
+
         .param-table {
             font-size: 0.8em;
             width: 100%;
@@ -388,19 +388,19 @@
             display: table;
             border-collapse: collapse;
         }
-        
+
         .param-table th,
         .param-table td {
             padding: 8px 6px;
             border: 1px solid #dee2e6;
             word-wrap: break-word;
         }
-        
+
         .param-table th {
             background: #f8f9fa;
             font-size: 0.75em;
         }
-        
+
         .table-wrapper {
             width: 100%;
             overflow-x: auto;
@@ -409,7 +409,7 @@
             border-radius: 6px;
             background: white;
         }
-        
+
         .code-block {
             font-size: 0.75em;
             padding: 12px;
@@ -419,7 +419,7 @@
             overflow-x: auto;
             box-sizing: border-box;
         }
-        
+
         .response-example {
             width: 100%;
             padding: 12px;
@@ -427,7 +427,7 @@
             border-radius: 6px;
             box-sizing: border-box;
         }
-        
+
         .base-url {
             margin: 0;
             width: 100%;
@@ -436,90 +436,90 @@
             border-radius: 0;
             border-bottom: 1px solid #e9ecef;
         }
-        
+
         .base-url code {
             font-size: 0.85em;
             word-break: break-all;
         }
     }
-    
+
     /* Extra small screens */
     @media (max-width: 480px) {
         .doc-header {
             padding: 15px 10px;
         }
-        
+
         .doc-header h1 {
             font-size: 1.5em;
         }
-        
+
         .doc-section {
             padding: 15px 10px;
         }
-        
+
         .doc-section h2 {
             font-size: 1.2em;
         }
-        
+
         .doc-nav-links {
             padding: 10px;
         }
-        
+
         .doc-nav-links a {
             padding: 10px 12px;
             margin: 6px 0;
             font-size: 0.9em;
         }
-        
+
         .endpoint-toggle {
             padding: 10px 12px;
             font-size: 0.85em;
         }
-        
+
         .method {
             padding: 4px 8px;
             font-size: 0.75em;
         }
-        
+
         .param-table {
             font-size: 0.7em;
         }
-        
+
         .param-table th,
         .param-table td {
             padding: 6px 4px;
         }
-        
+
         .code-block {
             font-size: 0.7em;
             padding: 10px;
         }
-        
+
         .endpoint-url {
             font-size: 0.8em;
             padding: 8px;
         }
-        
+
         .base-url {
             padding: 10px;
         }
     }
-    
+
     /* Landscape tablets */
     @media (min-width: 769px) and (max-width: 1024px) {
         .container {
             max-width: 95%;
             padding: 0 15px;
         }
-        
+
         .doc-header, .doc-section {
             margin: 15px 0;
         }
-        
+
         .param-table {
             font-size: 0.9em;
         }
-        
+
         .code-block {
             font-size: 0.9em;
         }
@@ -528,7 +528,7 @@
 @endpush
 
 @section('content')
-<div class="container" id="docs-container">
+<div class="container fade-in" id="docs-container">
     <div class="doc-header">
         <h1>🔗 مستندات API</h1>
         <p>راهنمای کامل برای نحوه استفاده از API های پلتفرم Trader Bridge</p>
@@ -559,7 +559,7 @@
                 <h3>ورود به سیستم <span class="method post">POST</span></h3>
                 <div class="endpoint-url">/api/auth/login</div>
                 <p>احراز هویت کاربر و دریافت token دسترسی.</p>
-                
+
                 <h4>پارامترهای درخواست:</h4>
                 <div class="table-wrapper">
                     <table class="param-table">
@@ -623,7 +623,7 @@
                 <h3>خروج از سیستم <span class="method post">POST</span></h3>
                 <div class="endpoint-url">/api/auth/logout</div>
                 <p>لغو token جاری.</p>
-                
+
                 <h4>هدرها:</h4>
                 <div class="code-block">Authorization: Bearer your-api-token-here</div>
             </div>
@@ -640,7 +640,7 @@
                 <h3>ایجاد سفارش آتی <span class="method post">POST</span></h3>
                 <div class="endpoint-url">/api/store</div>
                 <p>ایجاد سفارش جدید معاملات آتی با stop loss و take profit.</p>
-                
+
                 <h4>هدرها:</h4>
                 <div class="code-block">Authorization: Bearer your-api-token-here
 Content-Type: application/json</div>
@@ -726,7 +726,7 @@ Content-Type: application/json</div>
             <h3>دریافت سفارشات <span class="method get">GET</span></h3>
             <div class="endpoint-url">/api/orders</div>
             <p>دریافت تمام سفارشات آتی کاربر احراز هویت شده.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
 
@@ -757,7 +757,7 @@ Content-Type: application/json</div>
             <h3>بستن سفارش <span class="method post">POST</span></h3>
             <div class="endpoint-url">/api/orders/{order_id}/close</div>
             <p>بستن دستی یک سفارش آتی.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
         </div>
@@ -766,7 +766,7 @@ Content-Type: application/json</div>
             <h3>دریافت تاریخچه سود و زیان <span class="method get">GET</span></h3>
             <div class="endpoint-url">/api/pnl-history</div>
             <p>دریافت تاریخچه سود و زیان برای معاملات بسته شده.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
         </div>
@@ -782,7 +782,7 @@ Content-Type: application/json</div>
                 <h3>ایجاد سفارش اسپات <span class="method post">POST</span></h3>
                 <div class="endpoint-url">/api/spot/orders</div>
                 <p>ایجاد یک سفارش معاملات اسپات جدید.</p>
-                
+
                 <h4>هدرها:</h4>
                 <div class="code-block">Authorization: Bearer your-api-token-here
 Content-Type: application/json</div>
@@ -847,7 +847,7 @@ Content-Type: application/json</div>
             <h3>دریافت سفارشات اسپات <span class="method get">GET</span></h3>
             <div class="endpoint-url">/api/spot/orders</div>
             <p>دریافت تمام سفارشات اسپات کاربر احراز هویت شده.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
         </div>
@@ -856,7 +856,7 @@ Content-Type: application/json</div>
             <h3>دریافت موجودی‌های اسپات <span class="method get">GET</span></h3>
             <div class="endpoint-url">/api/spot/balances</div>
             <p>دریافت موجودی‌های کیف پول اسپات.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
         </div>
@@ -870,7 +870,7 @@ Content-Type: application/json</div>
             <h3>دریافت اطلاعات کاربر <span class="method get">GET</span></h3>
             <div class="endpoint-url">/api/auth/user</div>
             <p>دریافت اطلاعات کاربر احراز هویت شده.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here</div>
         </div>
@@ -879,7 +879,7 @@ Content-Type: application/json</div>
             <h3>تغییر رمز عبور <span class="method post">POST</span></h3>
             <div class="endpoint-url">/api/auth/change-password</div>
             <p>تغییر رمز عبور کاربر.</p>
-            
+
             <h4>هدرها:</h4>
             <div class="code-block">Authorization: Bearer your-api-token-here
 Content-Type: application/json</div>
@@ -922,7 +922,7 @@ Content-Type: application/json</div>
             <h3>دریافت صرافی‌های موجود <span class="method post">POST</span></h3>
             <div class="endpoint-url">/api/auth/exchanges</div>
             <p>دریافت لیست صرافی‌های موجود برای احراز هویت.</p>
-            
+
             <h4>پارامترهای درخواست:</h4>
             <table class="param-table">
                 <tr>
@@ -979,7 +979,7 @@ Content-Type: application/json</div>
     <!-- Error Handling Section -->
     <div class="doc-section" id="errors">
         <h2>⚠️ مدیریت خطاها</h2>
-        
+
         <h3>کدهای وضعیت HTTP</h3>
         <table class="param-table">
             <tr>
@@ -1059,13 +1059,13 @@ Content-Type: application/json</div>
     <!-- Usage Tips Section -->
     <div class="doc-section">
         <h2>💡 نکات استفاده</h2>
-        
+
         <h3>محدودیت نرخ درخواست‌ها</h3>
         <p>درخواست‌های API برای جلوگیری از سوء استفاده محدود شده‌اند. اگر از حد مجاز فراتر بروید، کد وضعیت 429 دریافت خواهید کرد.</p>
-        
+
         <h3>توکن احراز هویت</h3>
         <p>توکن‌ها پس از 30 روز منقضی می‌شوند. هنگام انقضای توکن باید دوباره احراز هویت کنید.</p>
-        
+
         <h3>الزامات صرافی</h3>
         <p>اطمینان حاصل کنید که حساب صرافی شما مجوزهای لازم را دارد:</p>
         <ul>
@@ -1073,7 +1073,7 @@ Content-Type: application/json</div>
             <li>دسترسی به معاملات آتی (برای نقاط پایانی آتی)</li>
             <li>لیست سفید IP پیکربندی شده (در صورت نیاز صرافی)</li>
         </ul>
-        
+
         <h3>حالت سختگیرانه آتی</h3>
         <p>کاربرانی که حالت سختگیرانه آتی فعال دارند محدودیت‌های اضافی دارند:</p>
         <ul>
@@ -1091,7 +1091,7 @@ Content-Type: application/json</div>
 function toggleEndpoint(button) {
     const content = button.nextElementSibling;
     const isActive = content.classList.contains('active');
-    
+
     // Close all other open endpoints on mobile for cleaner view
     if (window.innerWidth <= 768) {
         document.querySelectorAll('.endpoint-content.active').forEach(el => {
@@ -1105,13 +1105,13 @@ function toggleEndpoint(button) {
             }
         });
     }
-    
+
     // Toggle current endpoint with visual feedback
     if (!isActive) {
         content.classList.add('active');
         button.style.background = '#28a745';
         button.textContent = button.textContent + ' ✓';
-        
+
         // Smooth scroll to the opened section
         if (window.innerWidth <= 768) {
             setTimeout(() => {
@@ -1129,7 +1129,7 @@ function toggleEndpoint(button) {
 function handleResize() {
     const contents = document.querySelectorAll('.endpoint-content');
     const buttons = document.querySelectorAll('.endpoint-toggle');
-    
+
     if (window.innerWidth > 768) {
         // Desktop view - show all content
         contents.forEach(content => {
@@ -1160,7 +1160,7 @@ function setupSmoothScrolling() {
             e.preventDefault();
             const targetId = this.getAttribute('href').substring(1);
             const targetElement = document.getElementById(targetId);
-            
+
             if (targetElement) {
                 const offsetTop = targetElement.offsetTop - 20;
                 window.scrollTo({
@@ -1175,7 +1175,7 @@ function setupSmoothScrolling() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('docs-container');
-    
+
     // Add mobile class for additional styling control
     function updateMobileClass() {
         if (window.innerWidth <= 768) {
@@ -1184,11 +1184,11 @@ document.addEventListener('DOMContentLoaded', function() {
             container.classList.remove('mobile-view');
         }
     }
-    
+
     updateMobileClass();
     handleResize();
     setupSmoothScrolling();
-    
+
     // Debounced resize handler for better performance
     let resizeTimeout;
     window.addEventListener('resize', function() {
