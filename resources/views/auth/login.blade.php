@@ -187,7 +187,6 @@
         </div>
     </form>
 </div>
-
 <script>
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);

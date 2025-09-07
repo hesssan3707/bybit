@@ -179,7 +179,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady); else onReady();
 })();
 </script>
-@endpush
+
 
 @section('content')
 <div class="container">

@@ -128,6 +128,7 @@
     </style>
     @stack('styles')
 </head>
+
 @php
     $bodyClass = (request()->is('login') || request()->is('register') || request()->is('password/forgot') || request()->is('password/reset*'))
         ? 'bg-auth'

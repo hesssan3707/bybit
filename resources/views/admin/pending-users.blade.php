@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('body-class', 'admin-page')
+
 @section('title', 'کاربران در انتظار تأیید')
 
 @push('styles')

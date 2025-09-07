@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('body-class', 'spot-page')
+
 @section('title', 'Spot Orders')
 
 @push('styles')

@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('body-class', 'documentation-page')
+
 @section('title', 'API Documentation')
 
 @push('styles')

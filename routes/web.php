@@ -119,7 +119,7 @@ Route::get('/schedule', function() {
     Artisan::call('futures:sync-sl');
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
-    return 'DONE';
+    return '*******************************************************************DONE************************************************************************';
     sleep(25);
     Artisan::call('exchanges:validate-active --force');
     print_r(Artisan::output());

@@ -182,12 +182,22 @@
             @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
-        <div class="form-group">
-            <label for="expire">
-                مدت انقضای سفارش (دقیقه)
-            </label>
-            <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? 999) }}" required>
-            @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        <div class="form-row" style="display: flex; gap: 15px;">
+            <div class="form-group" style="flex: 1;">
+                <label for="expire">
+                    مدت انقضای سفارش (دقیقه)
+                </label>
+                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? 999) }}" required>
+                @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="cancel_price">
+                    قیمت لغو سفارش (اختیاری)
+                </label>
+                <input id="cancel_price" type="number" name="cancel_price" step="any" value="{{ old('cancel_price') }}" placeholder="در صورت پر شدن، سفارش لغو می‌شود">
+                @error('cancel_price') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
         </div>
 
         <div class="form-group">
