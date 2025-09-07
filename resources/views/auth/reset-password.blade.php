@@ -20,7 +20,7 @@
             --error-text: #ff0016;
         }
         body {
-            font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-image:

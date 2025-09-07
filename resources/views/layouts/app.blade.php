@@ -20,7 +20,7 @@
             --glass-border: rgba(255, 255, 255, 0.18);
         }
         body {
-            font-family: 'Yekan', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 80px 20px 20px 20px; /* Add padding for header */
             direction: rtl;

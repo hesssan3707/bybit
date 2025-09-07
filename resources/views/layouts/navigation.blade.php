@@ -99,14 +99,14 @@
         align-items: center;
         text-decoration: none;
         color: #555;
-        font-size: 12px;
+        font-size: 11px;
         flex-grow: 1;
     }
     .mobile-footer-nav a.selected {
         color: var(--primary-color); /* Highlight color for selected mobile icon */
     }
     .mobile-footer-nav .icon {
-        font-size: 24px;
+        font-size: 22px;
         margin-bottom: 2px;
     }
 
