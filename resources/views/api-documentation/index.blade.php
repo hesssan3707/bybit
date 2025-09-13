@@ -539,13 +539,15 @@
         <a href="#authentication">احراز هویت</a>
         <a href="#futures-trading">معاملات آتی</a>
         <a href="#spot-trading">معاملات اسپات</a>
-        <a href="#account">مدیریت حساب</a>
-        <a href="#exchanges">تنظیمات صرافی</a>
+        <a href="#pnl-history">تاریخچه سود و زیان</a>
+        <a href="#wallet-balance">موجودی کیف پول</a>
+        <a href="#exchange-management">مدیریت صرافی</a>
+        <a href="#market">بازار</a>
         <a href="#errors">مدیریت خطاها</a>
     </div>
 
     <div class="base-url">
-        <strong>آدرس پایه:</strong> <code>{{ url('/api') }}</code>
+        <strong>آدرس پایه:</strong> <code>{{ url('/api/v1') }}</code>
     </div>
 
     <!-- Authentication Section -->
@@ -581,12 +583,6 @@
                             <td class="required">الزامی</td>
                             <td>رمز عبور کاربر</td>
                         </tr>
-                        <tr>
-                            <td>exchange_name</td>
-                            <td>string</td>
-                            <td class="required">الزامی</td>
-                            <td>صرافی مورد استفاده (bybit, binance, bingx)</td>
-                        </tr>
                     </table>
                 </div>
 
@@ -595,23 +591,20 @@
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "password": "password123",
-    "exchange_name": "bybit"
+    "password": "password123"
   }'</div>
 
             <h4>مثال پاسخ:</h4>
             <div class="code-block">{
   "success": true,
-  "message": "ورود موفق",
+  "message": "Login successful",
   "data": {
+    "access_token": "your-access-token-here",
+    "token_type": "Bearer",
+    "expires_at": "2025-09-22T15:30:00.000000Z",
     "user": {
       "id": 1,
       "email": "user@example.com"
-    },
-    "token": "your-api-token-here",
-    "exchange": {
-      "name": "Bybit",
-      "color": "#f7b500"
     }
   }
 }</div>
@@ -635,11 +628,22 @@
         <h2>📈 معاملات آتی</h2>
 
         <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">لیست سفارشات آتی</button>
+            <div class="endpoint-content">
+                <h3>لیست سفارشات آتی <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/futures/orders</div>
+                <p>دریافت لیست تمام سفارشات آتی کاربر.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+
+        <div class="endpoint">
             <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ایجاد سفارش آتی</button>
             <div class="endpoint-content">
                 <h3>ایجاد سفارش آتی <span class="method post">POST</span></h3>
-                <div class="endpoint-url">/api/store</div>
-                <p>ایجاد سفارش جدید معاملات آتی با stop loss و take profit.</p>
+                <div class="endpoint-url">/futures/orders</div>
+                <p>ایجاد سفارش جدید معاملات آتی با stop loss.</p>
 
                 <h4>هدرها:</h4>
                 <div class="code-block">Authorization: Bearer your-api-token-here
@@ -661,114 +665,95 @@ Content-Type: application/json</div>
                     <td>جفت ارز معاملاتی. بازارهای پشتیبانی شده: BTCUSDT, ETHUSDT, ADAUSDT, DOTUSDT, BNBUSDT, XRPUSDT, SOLUSDT, TRXUSDT, DOGEUSDT, LTCUSDT</td>
                 </tr>
                 <tr>
-                    <td>side</td>
-                    <td>string</td>
+                    <td>entry1</td>
+                    <td>numeric</td>
                     <td class="required">الزامی</td>
-                    <td>جهت سفارش: Buy یا Sell</td>
+                    <td>قیمت ورود اول</td>
                 </tr>
                 <tr>
-                    <td>amount</td>
-                    <td>decimal</td>
+                    <td>entry2</td>
+                    <td>numeric</td>
                     <td class="required">الزامی</td>
-                    <td>حجم موقعیت به USDT</td>
-                </tr>
-                <tr>
-                    <td>entry_price</td>
-                    <td>decimal</td>
-                    <td class="required">الزامی</td>
-                    <td>قیمت ورود</td>
+                    <td>قیمت ورود دوم</td>
                 </tr>
                 <tr>
                     <td>tp</td>
-                    <td>decimal</td>
+                    <td>numeric</td>
                     <td class="required">الزامی</td>
                     <td>قیمت Take Profit</td>
                 </tr>
                 <tr>
                     <td>sl</td>
-                    <td>decimal</td>
+                    <td>numeric</td>
                     <td class="required">الزامی</td>
                     <td>قیمت Stop Loss</td>
                 </tr>
                 <tr>
-                    <td>expire_minutes</td>
-                    <td>integer</td>
-                    <td class="optional">اختیاری</td>
-                    <td>انقضای سفارش به دقیقه (پیش‌فرض: 60)</td>
-                </tr>
-                <tr>
                     <td>steps</td>
                     <td>integer</td>
+                    <td class="required">الزامی</td>
+                    <td>تعداد مراحل ورود</td>
+                </tr>
+                <tr>
+                    <td>expire</td>
+                    <td>integer</td>
+                    <td class="required">الزامی</td>
+                    <td>انقضای سفارش به دقیقه</td>
+                </tr>
+                <tr>
+                    <td>risk_percentage</td>
+                    <td>numeric</td>
+                    <td class="required">الزامی</td>
+                    <td>درصد ریسک</td>
+                </tr>
+                 <tr>
+                    <td>cancel_price</td>
+                    <td>numeric</td>
                     <td class="optional">اختیاری</td>
-                    <td>تعداد مراحل ورود (پیش‌فرض: 1)</td>
+                    <td>قیمت کنسل شدن</td>
                 </tr>
             </table>
                 </div>
-
-            <h4>مثال درخواست:</h4>
-            <div class="code-block">curl -X POST {{ url('/api/store') }} \
-  -H "Authorization: Bearer your-api-token-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "symbol": "BTCUSDT",
-    "side": "Buy",
-    "amount": 100,
-    "entry_price": 50000,
-    "tp": 52000,
-    "sl": 48000,
-    "expire_minutes": 120,
-    "steps": 1
-  }'</div>
             </div>
         </div>
 
         <div class="endpoint">
-            <h3>دریافت سفارشات <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/orders</div>
-            <p>دریافت تمام سفارشات آتی کاربر احراز هویت شده.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
-
-            <h4>پارامترهای کوئری:</h4>
-            <table class="param-table">
-                <tr>
-                    <th>پارامتر</th>
-                    <th>نوع</th>
-                    <th>الزامی</th>
-                    <th>توضیحات</th>
-                </tr>
-                <tr>
-                    <td>status</td>
-                    <td>string</td>
-                    <td class="optional">اختیاری</td>
-                    <td>فیلتر بر اساس وضعیت: pending, filled, expired</td>
-                </tr>
-                <tr>
-                    <td>symbol</td>
-                    <td>string</td>
-                    <td class="optional">اختیاری</td>
-                    <td>فیلتر بر اساس جفت ارز معاملاتی</td>
-                </tr>
-            </table>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">بستن سفارش آتی</button>
+            <div class="endpoint-content">
+                <h3>بستن سفارش آتی <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/futures/orders/{order}/close</div>
+                <p>بستن یک سفارش آتی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
+                        <tr>
+                            <th>پارامتر</th>
+                            <th>نوع</th>
+                            <th>الزامی</th>
+                            <th>توضیحات</th>
+                        </tr>
+                        <tr>
+                            <td>price_distance</td>
+                            <td>numeric</td>
+                            <td class="required">الزامی</td>
+                            <td>فاصله قیمت</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <div class="endpoint">
-            <h3>بستن سفارش <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/orders/{order_id}/close</div>
-            <p>بستن دستی یک سفارش آتی.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
-        </div>
-
-        <div class="endpoint">
-            <h3>دریافت تاریخچه سود و زیان <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/pnl-history</div>
-            <p>دریافت تاریخچه سود و زیان برای معاملات بسته شده.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">حذف سفارش آتی</button>
+            <div class="endpoint-content">
+                <h3>حذف سفارش آتی <span class="method delete">DELETE</span></h3>
+                <div class="endpoint-url">/futures/orders/{order}</div>
+                <p>حذف یک سفارش آتی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
         </div>
     </div>
 
@@ -777,10 +762,32 @@ Content-Type: application/json</div>
         <h2>💰 معاملات اسپات</h2>
 
         <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">لیست سفارشات اسپات</button>
+            <div class="endpoint-content">
+                <h3>لیست سفارشات اسپات <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/spot/orders</div>
+                <p>دریافت تمام سفارشات اسپات کاربر احراز هویت شده.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">نمایش سفارش اسپات</button>
+            <div class="endpoint-content">
+                <h3>نمایش سفارش اسپات <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/spot/orders/{spotOrder}</div>
+                <p>دریافت اطلاعات یک سفارش اسپات.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+
+        <div class="endpoint">
             <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ایجاد سفارش اسپات</button>
             <div class="endpoint-content">
                 <h3>ایجاد سفارش اسپات <span class="method post">POST</span></h3>
-                <div class="endpoint-url">/api/spot/orders</div>
+                <div class="endpoint-url">/spot/orders</div>
                 <p>ایجاد یک سفارش معاملات اسپات جدید.</p>
 
                 <h4>هدرها:</h4>
@@ -809,7 +816,7 @@ Content-Type: application/json</div>
                     <td>جهت سفارش: Buy یا Sell</td>
                 </tr>
                 <tr>
-                    <td>order_type</td>
+                    <td>orderType</td>
                     <td>string</td>
                     <td class="required">الزامی</td>
                     <td>نوع سفارش: Market یا Limit</td>
@@ -828,153 +835,224 @@ Content-Type: application/json</div>
                 </tr>
                 </table>
                 </div>
-
-            <h4>مثال درخواست:</h4>
-            <div class="code-block">curl -X POST {{ url('/api/spot/orders') }} \
-  -H "Authorization: Bearer your-api-token-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "symbol": "ETHUSDT",
-    "side": "Buy",
-    "order_type": "Limit",
-    "qty": 0.1,
-    "price": 2000
-  }'</div>
             </div>
         </div>
 
         <div class="endpoint">
-            <h3>دریافت سفارشات اسپات <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/spot/orders</div>
-            <p>دریافت تمام سفارشات اسپات کاربر احراز هویت شده.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
-        </div>
-
-        <div class="endpoint">
-            <h3>دریافت موجودی‌های اسپات <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/spot/balances</div>
-            <p>دریافت موجودی‌های کیف پول اسپات.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">حذف سفارش اسپات</button>
+            <div class="endpoint-content">
+                <h3>حذف سفارش اسپات <span class="method delete">DELETE</span></h3>
+                <div class="endpoint-url">/spot/orders/{spotOrder}</div>
+                <p>حذف یک سفارش اسپات.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
         </div>
     </div>
 
-    <!-- Account Management Section -->
-    <div class="doc-section" id="account">
-        <h2>👤 مدیریت حساب کاربری</h2>
-
+    <!-- PNL History Section -->
+    <div class="doc-section" id="pnl-history">
+        <h2>📊 تاریخچه سود و زیان</h2>
         <div class="endpoint">
-            <h3>دریافت اطلاعات کاربر <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/auth/user</div>
-            <p>دریافت اطلاعات کاربر احراز هویت شده.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here</div>
-        </div>
-
-        <div class="endpoint">
-            <h3>تغییر رمز عبور <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/auth/change-password</div>
-            <p>تغییر رمز عبور کاربر.</p>
-
-            <h4>هدرها:</h4>
-            <div class="code-block">Authorization: Bearer your-api-token-here
-Content-Type: application/json</div>
-
-            <h4>پارامترهای درخواست:</h4>
-            <table class="param-table">
-                <tr>
-                    <th>پارامتر</th>
-                    <th>نوع</th>
-                    <th>الزامی</th>
-                    <th>توضیحات</th>
-                </tr>
-                <tr>
-                    <td>current_password</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>رمز عبور فعلی</td>
-                </tr>
-                <tr>
-                    <td>password</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>رمز عبور جدید (حداقل 8 کاراکتر)</td>
-                </tr>
-                <tr>
-                    <td>password_confirmation</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>تأیید رمز عبور جدید</td>
-                </tr>
-            </table>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">دریافت تاریخچه سود و زیان</button>
+            <div class="endpoint-content">
+                <h3>دریافت تاریخچه سود و زیان <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/pnl-history</div>
+                <p>دریافت تاریخچه سود و زیان برای معاملات بسته شده.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
         </div>
     </div>
 
-    <!-- Exchange Configuration Section -->
-    <div class="doc-section" id="exchanges">
-        <h2>🔄 تنظیمات صرافی</h2>
-
+    <!-- Wallet Balance Section -->
+    <div class="doc-section" id="wallet-balance">
+        <h2>💳 موجودی کیف پول</h2>
         <div class="endpoint">
-            <h3>دریافت صرافی‌های موجود <span class="method post">POST</span></h3>
-            <div class="endpoint-url">/api/auth/exchanges</div>
-            <p>دریافت لیست صرافی‌های موجود برای احراز هویت.</p>
-
-            <h4>پارامترهای درخواست:</h4>
-            <table class="param-table">
-                <tr>
-                    <th>پارامتر</th>
-                    <th>نوع</th>
-                    <th>الزامی</th>
-                    <th>توضیحات</th>
-                </tr>
-                <tr>
-                    <td>email</td>
-                    <td>string</td>
-                    <td class="required">الزامی</td>
-                    <td>آدرس ایمیل کاربر</td>
-                </tr>
-            </table>
-
-            <h4>مثال پاسخ:</h4>
-            <div class="code-block">{
-  "success": true,
-  "data": {
-    "available_exchanges": [
-      {
-        "name": "bybit",
-        "display_name": "Bybit",
-        "color": "#f7b500",
-        "is_active": true
-      }
-    ]
-  }
-}</div>
-        </div>
-
-        <div class="endpoint">
-            <h3>دریافت اطلاعات صرافی <span class="method get">GET</span></h3>
-            <div class="endpoint-url">/api/exchanges/{exchange_name}</div>
-            <p>دریافت اطلاعات تفصیلی درباره یک صرافی خاص.</p>
-
-            <h4>مثال پاسخ:</h4>
-            <div class="code-block">{
-  "success": true,
-  "data": {
-    "name": "bybit",
-    "display_name": "Bybit",
-    "color": "#f7b500",
-    "api_url": "https://api.bybit.com",
-    "website": "https://www.bybit.com",
-    "supported_features": ["spot", "futures", "derivatives"],
-    "min_order_size": 0.001
-  }
-}</div>
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">دریافت موجودی کیف پول</button>
+            <div class="endpoint-content">
+                <h3>دریافت موجودی کیف پول <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/balance</div>
+                <p>دریافت موجودی کیف پول اسپات و آتی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
         </div>
     </div>
+
+    <!-- Exchange Management Section -->
+    <div class="doc-section" id="exchange-management">
+        <h2>🔄 مدیریت صرافی</h2>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">لیست صرافی ها</button>
+            <div class="endpoint-content">
+                <h3>لیست صرافی ها <span class="method get">GET</span></h3>
+                <div class="endpoint-url">/exchanges</div>
+                <p>دریافت لیست صرافی های کاربر.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">ایجاد صرافی</button>
+            <div class="endpoint-content">
+                <h3>ایجاد صرافی <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/exchanges</div>
+                <p>ایجاد یک صرافی جدید برای کاربر.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
+                        <tr>
+                            <th>پارامتر</th>
+                            <th>نوع</th>
+                            <th>الزامی</th>
+                            <th>توضیحات</th>
+                        </tr>
+                        <tr>
+                            <td>exchange_name</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>نام صرافی (bybit, bingx, binance)</td>
+                        </tr>
+                        <tr>
+                            <td>api_key</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>کلید API</td>
+                        </tr>
+                        <tr>
+                            <td>api_secret</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>کلید مخفی API</td>
+                        </tr>
+                        <tr>
+                            <td>password</td>
+                            <td>string</td>
+                            <td class="optional">اختیاری</td>
+                            <td>رمز عبور (برای برخی صرافی ها)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">بروزرسانی صرافی</button>
+            <div class="endpoint-content">
+                <h3>بروزرسانی صرافی <span class="method put">PUT</span></h3>
+                <div class="endpoint-url">/exchanges/{exchange}</div>
+                <p>بروزرسانی اطلاعات یک صرافی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
+                        <tr>
+                            <th>پارامتر</th>
+                            <th>نوع</th>
+                            <th>الزامی</th>
+                            <th>توضیحات</th>
+                        </tr>
+                        <tr>
+                            <td>api_key</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>کلید API</td>
+                        </tr>
+                        <tr>
+                            <td>api_secret</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>کلید مخفی API</td>
+                        </tr>
+                        <tr>
+                            <td>password</td>
+                            <td>string</td>
+                            <td class="optional">اختیاری</td>
+                            <td>رمز عبور (برای برخی صرافی ها)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">حذف صرافی</button>
+            <div class="endpoint-content">
+                <h3>حذف صرافی <span class="method delete">DELETE</span></h3>
+                <div class="endpoint-url">/exchanges/{exchange}</div>
+                <p>حذف یک صرافی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">تغییر صرافی فعال</button>
+            <div class="endpoint-content">
+                <h3>تغییر صرافی فعال <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/exchanges/{exchange}/switch</div>
+                <p>تغییر صرافی فعال کاربر.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">تست اتصال صرافی</button>
+            <div class="endpoint-content">
+                <h3>تست اتصال صرافی <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/exchanges/{exchange}/test</div>
+                <p>تست اتصال به صرافی.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Section -->
+    <div class="doc-section" id="market">
+        <h2>📈 بازار</h2>
+        <div class="endpoint">
+            <button class="endpoint-toggle" onclick="toggleEndpoint(this)">دریافت بهترین قیمت</button>
+            <div class="endpoint-content">
+                <h3>دریافت بهترین قیمت <span class="method post">POST</span></h3>
+                <div class="endpoint-url">/best-price</div>
+                <p>دریافت بهترین قیمت برای یک یا چند بازار در صرافی های فعال کاربر.</p>
+                <h4>هدرها:</h4>
+                <div class="code-block">Authorization: Bearer your-api-token-here</div>
+                <h4>پارامترهای درخواست:</h4>
+                <div class="table-wrapper">
+                    <table class="param-table">
+                        <tr>
+                            <th>پارامتر</th>
+                            <th>نوع</th>
+                            <th>الزامی</th>
+                            <th>توضیحات</th>
+                        </tr>
+                        <tr>
+                            <td>markets</td>
+                            <td>array</td>
+                            <td class="required">الزامی</td>
+                            <td>آرایه ای از نام بازارها</td>
+                        </tr>
+                        <tr>
+                            <td>type</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>نوع بازار (spot یا futures)</td>
+                        </tr>
+                        <tr>
+                            <td>side</td>
+                            <td>string</td>
+                            <td class="required">الزامی</td>
+                            <td>جهت معامله (buy یا sell)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Error Handling Section -->
     <div class="doc-section" id="errors">
@@ -1024,65 +1102,6 @@ Content-Type: application/json</div>
     "field_name": ["پیام خطای اعتبارسنجی"]
   }
 }</div>
-
-        <h3>خطاهای رایج</h3>
-        <div class="response-example">
-            <strong>توکن نامعتبر:</strong>
-            <div class="code-block">{
-  "success": false,
-  "message": "احراز هویت نشده.",
-  "error": "توکن نامعتبر یا منقضی شده است"
-}</div>
-        </div>
-
-        <div class="response-example">
-            <strong>خطای اعتبارسنجی:</strong>
-            <div class="code-block">{
-  "success": false,
-  "message": "اعتبارسنجی ناموفق",
-  "errors": {
-    "symbol": ["فیلد symbol الزامی است."],
-    "amount": ["مقدار amount باید بیشتر از 0 باشد."]
-  }
-}</div>
-        </div>
-
-        <div class="response-example">
-            <strong>خطای دسترسی به صرافی:</strong>
-            <div class="code-block">{
-  "success": false,
-  "message": "هیچ صرافی فعالی برای این کاربر یافت نشد"
-}</div>
-        </div>
-    </div>
-
-    <!-- Usage Tips Section -->
-    <div class="doc-section">
-        <h2>💡 نکات استفاده</h2>
-
-        <h3>محدودیت نرخ درخواست‌ها</h3>
-        <p>درخواست‌های API برای جلوگیری از سوء استفاده محدود شده‌اند. اگر از حد مجاز فراتر بروید، کد وضعیت 429 دریافت خواهید کرد.</p>
-
-        <h3>توکن احراز هویت</h3>
-        <p>توکن‌ها پس از 30 روز منقضی می‌شوند. هنگام انقضای توکن باید دوباره احراز هویت کنید.</p>
-
-        <h3>الزامات صرافی</h3>
-        <p>اطمینان حاصل کنید که حساب صرافی شما مجوزهای لازم را دارد:</p>
-        <ul>
-            <li>دسترسی به معاملات اسپات (برای نقاط پایانی اسپات)</li>
-            <li>دسترسی به معاملات آتی (برای نقاط پایانی آتی)</li>
-            <li>لیست سفید IP پیکربندی شده (در صورت نیاز صرافی)</li>
-        </ul>
-
-        <h3>حالت سختگیرانه آتی</h3>
-        <p>کاربرانی که حالت سختگیرانه آتی فعال دارند محدودیت‌های اضافی دارند:</p>
-        <ul>
-            <li>حساب تحت نظارت نزدیک</li>
-            <li>نمی‌توان سفارشات stop loss را حذف یا تغییر داد</li>
-            <li>فقط می‌توان سفارشات را از طریق این سیستم ثبت کرد</li>
-            <li>حداکثر 10% ریسک در هر موقعیت</li>
-            <li>وقفه 1 ساعته پس از ضرر</li>
-        </ul>
     </div>
 </div>
 
