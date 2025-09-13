@@ -12,10 +12,13 @@
         justify-content: space-between;
         align-items: center;
         height: 60px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
     .main-header .logo {
         font-weight: bold;
         font-size: 1.5em;
+        text-shadow: white 0px 0px 10px;
     }
     .main-header .nav-links {
         display: flex;
@@ -34,6 +37,11 @@
         border-radius: 5px;
         transition: background-color 0.3s, color 0.3s;
         font-weight: 500;
+        text-shadow:
+        0.07em 0 black,
+        0 0.07em black,
+        -0.07em 0 black,
+        0 -0.07em black;
     }
     .main-header a:hover {
         text-decoration: none;
@@ -56,6 +64,7 @@
         z-index: 1001;
         margin-top:20px;
         backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
     .main-header .dropdown-list a{
         display: block;
