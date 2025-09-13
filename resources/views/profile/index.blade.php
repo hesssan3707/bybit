@@ -444,9 +444,7 @@
             <div class="current-exchange" style="--exchange-color: {{ $currentExchange->exchange_color }}">
                 <div class="exchange-header">
                     <div class="exchange-info">
-                        <div class="exchange-logo">
-                            {{ substr($currentExchange->exchange_display_name, 0, 2) }}
-                        </div>
+                        <img src="{{ asset('public/logos/' . strtolower($currentExchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($currentExchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $currentExchange->exchange_color }};">
                         <div class="exchange-details">
                             <h3>{{ $currentExchange->exchange_display_name }}</h3>
                             <div class="exchange-status">

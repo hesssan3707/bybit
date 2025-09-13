@@ -163,9 +163,7 @@
             <div class="exchange-card" style="--exchange-color: {{ $exchange->exchange_color }}">
                 <div class="exchange-header">
                     <div class="exchange-info">
-                        <div class="exchange-logo">
-                            {{ substr($exchange->exchange_display_name, 0, 2) }}
-                        </div>
+                        <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($exchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange->exchange_color }};">
                         <div>
                             <h3 style="margin: 0; color: white;">{{ $exchange->exchange_display_name }}</h3>
                             <div style="margin-top: 5px;">

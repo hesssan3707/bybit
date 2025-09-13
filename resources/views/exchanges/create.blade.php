@@ -196,9 +196,7 @@
                     @foreach($availableExchanges as $key => $exchange)
                         <div class="exchange-option" onclick="selectExchange('{{ $key }}', '{{ $exchange['color'] }}')" id="exchange-{{ $key }}">
                             <div class="exchange-info">
-                                <div class="exchange-logo" style="background-color: {{ $exchange['color'] }}">
-                                    {{ substr($exchange['name'], 0, 2) }}
-                                </div>
+                                <img src="{{ asset('public/logos/' . $key . '-logo.png') }}" alt="{{ subStr($exchange['name'] , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange['color'] }};">
                                 <div>
                                     <h4 style="margin: 0;">{{ $exchange['name'] }}</h4>
                                 </div>
