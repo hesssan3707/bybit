@@ -635,6 +635,35 @@
                 <p>دریافت لیست تمام سفارشات آتی کاربر.</p>
                 <h4>هدرها:</h4>
                 <div class="code-block">Authorization: Bearer your-api-token-here</div>
+                <h4>مثال پاسخ:</h4>
+                <div class="code-block">{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": 1,
+        "user_exchange_id": 1,
+        "order_id": "12345",
+        "order_link_id": "uuid-1",
+        "symbol": "BTCUSDT",
+        "entry_price": "50000.00",
+        "tp": "52000.00",
+        "sl": "48000.00",
+        "steps": 1,
+        "expire_minutes": 60,
+        "status": "pending",
+        "side": "buy",
+        "amount": "0.00100000",
+        "entry_low": "50000.00",
+        "entry_high": "50000.00",
+        "cancel_price": null,
+        "created_at": "2025-09-13T03:48:00.000000Z",
+        "updated_at": "2025-09-13T03:48:00.000000Z"
+      }
+    ]
+  }
+}</div>
             </div>
         </div>
 
