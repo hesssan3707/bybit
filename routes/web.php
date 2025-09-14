@@ -45,13 +45,19 @@ Route::post('password/reset', [PasswordController::class, 'resetPassword'])->nam
 Route::get('api-documentation', [ApiDocumentationController::class, 'index'])->name('api.documentation');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [FuturesController::class, 'index'])->middleware('exchange.access:futures'); // Redirect home to orders list
-    Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create')->middleware('exchange.access:futures');
-    Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store')->middleware('exchange.access:futures');
-    Route::get('/orders', [FuturesController::class, 'index'])->name('orders.index')->middleware('exchange.access:futures');
-    Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close')->middleware('exchange.access:futures');
-    Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy')->middleware('exchange.access:futures');
-    Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl.history')->middleware('exchange.access:futures');
+    Route::get('/', function () {
+        return redirect()->route('futures.orders');
+    });
+
+    Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
+        Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
+        Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
+        Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
+        Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
+        Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
+        Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl_history');
+        Route::get('/macd-strategy', [MACDStrategyController::class, 'index'])->name('macd_strategy');
+    });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
 
@@ -62,9 +68,6 @@ Route::middleware(['auth'])->group(function () {
     // Settings Routes (requires authentication)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
-
-    // MACD Strategy Route
-    Route::get('/futures/macd-strategy', [MACDStrategyController::class, 'index'])->name('futures.macd_strategy');
 
     // Exchange Management Routes (requires authentication)
     Route::prefix('exchanges')->group(function () {

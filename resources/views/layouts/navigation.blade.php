@@ -141,9 +141,9 @@
         <div style="display: inline-block; position: relative; margin: 0 15px;">
             <a href="#" style="cursor: pointer;" onclick="toggleFuturesMenu(event)">معاملات آتی ▼</a>
             <div id="futuresMenu" class="dropdown-list">
-                <a href="{{ route('orders.index') }}">تاریخچه سفارش‌ها</a>
-                <a href="{{ route('pnl.history') }}">سود و زیان</a>
-                <a href="{{ route('order.create') }}">سفارش آتی جدید</a>
+                <a href="{{ route('futures.orders') }}">تاریخچه سفارش‌ها</a>
+                <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
+                <a href="{{ route('futures.order.create') }}">سفارش آتی جدید</a>
                 @if(auth()->user()?->future_strict_mode)
                     <a href="{{ route('futures.macd_strategy') }}">MACD Strategy</a>
                 @endif
@@ -185,11 +185,11 @@
 
 <!-- Mobile Sticky Footer -->
 <nav class="mobile-footer-nav">
-    <a href="{{ route('orders.index') }}">
+    <a href="{{ route('futures.orders') }}">
         <span class="icon">📊</span>
         <span>سفارش‌ها</span>
     </a>
-    <a href="{{ route('order.create') }}">
+    <a href="{{ route('futures.order.create') }}">
         <span class="icon">➕</span>
         <span>جدید</span>
     </a>

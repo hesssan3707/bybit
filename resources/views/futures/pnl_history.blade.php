@@ -145,10 +145,10 @@
     <!-- Mobile redirect buttons (only visible on mobile) -->
     <div class="mobile-redirect-section">
         <div class="redirect-buttons">
-            <a href="{{ route('orders.index') }}" class="redirect-btn">
+            <a href="{{ route('futures.orders') }}" class="redirect-btn">
                 📊 سفارش‌های آتی
             </a>
-            <a href="{{ route('pnl.history') }}" class="redirect-btn secondary">
+            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
                 📈 سود و زیان
             </a>
         </div>

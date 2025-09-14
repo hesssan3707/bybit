@@ -14,6 +14,6 @@ class PnlHistoryController extends Controller
             ->latest('closed_at')
             ->paginate(20);
 
-        return view('pnl_history', ['positions' => $trades]);
+        return view('futures.pnl_history', ['positions' => $trades]);
     }
 }

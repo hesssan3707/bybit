@@ -121,7 +121,7 @@
         </div>
     @endif
 
-    <form action="{{ route('order.store') }}" method="POST" id="order-form">
+    <form action="{{ route('futures.order.store') }}" method="POST" id="order-form">
         @csrf
 
         @if(isset($user) && $user->future_strict_mode)
