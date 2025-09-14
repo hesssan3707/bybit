@@ -86,6 +86,35 @@ class BinanceApiService implements ExchangeApiServiceInterface
     }
 
     /**
+     * Get k-line/candlestick data.
+     */
+    public function getKlines(string $symbol, string $interval, int $limit = 50): array
+    {
+        try {
+            $response = $this->client->get('/api/v3/klines', [
+                'query' => [
+                    'symbol' => $symbol,
+                    'interval' => $interval,
+                    'limit' => $limit,
+                ]
+            ]);
+
+            $data = json_decode($response->getBody(), true);
+
+            return [
+                'success' => true,
+                'klines' => $data,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Binance get klines failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to get klines: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Create a spot order
      */
     public function createSpotOrder(array $orderData): array
@@ -159,7 +188,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
     /**
      * Get order history
      */
-    public function getOrderHistory(string $symbol = '', int $limit = 50): array
+    public function getOrderHistory(?string $symbol = null, int $limit = 50): array
     {
         try {
             if (!$this->apiKey || !$this->apiSecret) {

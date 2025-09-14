@@ -144,6 +144,9 @@
                 <a href="{{ route('orders.index') }}">تاریخچه سفارش‌ها</a>
                 <a href="{{ route('pnl.history') }}">سود و زیان</a>
                 <a href="{{ route('order.create') }}">سفارش آتی جدید</a>
+                @if(auth()->user()?->future_strict_mode)
+                    <a href="{{ route('futures.macd_strategy') }}">MACD Strategy</a>
+                @endif
             </div>
         </div>
 

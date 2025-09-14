@@ -63,6 +63,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
 
+    // MACD Strategy Route
+    Route::get('/futures/macd-strategy', [MACDStrategyController::class, 'index'])->name('futures.macd_strategy');
+
     // Exchange Management Routes (requires authentication)
     Route::prefix('exchanges')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
