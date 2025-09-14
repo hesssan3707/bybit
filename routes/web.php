@@ -57,10 +57,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
         Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl_history');
-        Route::get('/macd-strategy', [MACDStrategyController::class, 'index'])->name('macd_strategy');
     });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
+
+    Route::prefix('strategies')->name('strategies.')->group(function () {
+        Route::get('/macd', [MACDStrategyController::class, 'index'])->name('macd');
+    });
 
     // Password Change Routes (requires authentication)
     Route::get('/password/change', [PasswordController::class, 'showChangePasswordForm'])->name('password.change.form');
