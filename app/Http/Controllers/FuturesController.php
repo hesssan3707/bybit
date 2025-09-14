@@ -181,7 +181,7 @@ class FuturesController extends Controller
             ->latest('updated_at')
             ->paginate(20);
 
-        return view('orders_list', [
+        return view('futures.orders_list', [
             'orders' => $orders,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message']
@@ -232,7 +232,7 @@ class FuturesController extends Controller
         // Set default expiration based on strict mode
         $defaultExpiration = $user->future_strict_mode ? 15 : 999;
         
-        return view('set_order', [
+        return view('futures.set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message'],
@@ -489,7 +489,7 @@ class FuturesController extends Controller
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
         if (!$exchangeStatus['hasActiveExchange']) {
-            return redirect()->route('orders.index')
+            return redirect()->route('futures.orders')
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
         
@@ -498,7 +498,7 @@ class FuturesController extends Controller
         $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
         
         if (!in_array($order->user_exchange_id, $userExchangeIds)) {
-            return redirect()->route('orders.index')
+            return redirect()->route('futures.orders')
                 ->withErrors(['msg' => 'شما مجاز به حذف این سفارش نیستید.']);
         }
         
@@ -541,11 +541,11 @@ class FuturesController extends Controller
                 'status' => $status,
                 'user_exchange_id' => $order->user_exchange_id
             ]);
-            return redirect()->route('orders.index')->with('success', "سفارش {$status} با موفقیت حذف شد.");
+            return redirect()->route('futures.orders')->with('success', "سفارش {$status} با موفقیت حذف شد.");
         }
 
         // For any other status, do nothing.
-        return redirect()->route('orders.index')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
+        return redirect()->route('futures.orders')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
     }
 
     public function close(Request $request, Order $order)
@@ -553,7 +553,7 @@ class FuturesController extends Controller
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
         if (!$exchangeStatus['hasActiveExchange']) {
-            return redirect()->route('orders.index')
+            return redirect()->route('futures.orders')
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
         
@@ -562,7 +562,7 @@ class FuturesController extends Controller
         $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
         
         if (!in_array($order->user_exchange_id, $userExchangeIds)) {
-            return redirect()->route('orders.index')
+            return redirect()->route('futures.orders')
                 ->withErrors(['msg' => 'شما مجاز به بستن این سفارش نیستید.']);
         }
         
@@ -571,7 +571,7 @@ class FuturesController extends Controller
         ]);
 
         if ($order->status !== 'filled') {
-            return redirect()->route('orders.index')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
+            return redirect()->route('futures.orders')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
         }
 
         try {
@@ -625,7 +625,7 @@ class FuturesController extends Controller
 
             $exchangeService->createOrder($newTpOrderParams);
 
-            return redirect()->route('orders.index')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
+            return redirect()->route('futures.orders')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
 
         } catch (\Exception $e) {
             Log::error('Futures order close failed: ' . $e->getMessage());
@@ -633,7 +633,7 @@ class FuturesController extends Controller
             // Parse Bybit error message for user-friendly response
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
             
-            return redirect()->route('orders.index')->withErrors(['msg' => $userFriendlyMessage]);
+            return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
         }
     }
     

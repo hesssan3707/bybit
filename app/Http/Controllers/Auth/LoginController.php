@@ -56,7 +56,7 @@ class LoginController extends Controller
         Auth::login($user, $request->filled('remember'));
         $request->session()->regenerate();
         
-        return redirect()->intended(route('orders.index'));
+        return redirect()->intended(route('futures.orders'));
     }
 
     public function logout(Request $request)

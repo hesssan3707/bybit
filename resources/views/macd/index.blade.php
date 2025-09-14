@@ -1,75 +1,128 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('MACD Strategy') }}
-        </h2>
-    </x-slot>
+@extends('layouts.app')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 bg-white border-b border-gray-200">
+@section('title', 'MACD Strategy')
 
-                    <form method="GET" action="{{ route('futures.macd_strategy') }}" class="mb-4">
-                        <label for="market" class="mr-2">Select a market to compare:</label>
-                        <select name="market" id="market" class="border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm">
-                            @foreach($markets as $market)
-                                <option value="{{ $market }}" {{ $selectedMarket == $market ? 'selected' : '' }}>
-                                    {{ $market }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <button type="submit" class="ml-2 px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:ring ring-gray-300 disabled:opacity-25 transition ease-in-out duration-150">
-                            Compare
-                        </button>
-                    </form>
+@push('styles')
+    <style>
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: auto;
+        }
+        .strategy-card {
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .strategy-card h2 {
+            margin-bottom: 30px;
+            text-align: center;
+            color: var(--primary-color);
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: right;
+            border-bottom: 1px solid #ddd;
+        }
+        thead th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: bold;
+        }
+        select {
+            width: 100%;
+            max-width: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 20px;
+            margin: 5px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: opacity 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+    </style>
+@endpush
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Timeframe
-                                    </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Market
-                                    </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Normalized MACD
-                                    </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Normalized Signal
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach($timeframes as $timeframe)
-                                    @foreach(['BTCUSDT', 'ETHUSDT', $selectedMarket] as $market)
-                                        @if(isset($macdData[$timeframe][$market]))
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ $timeframe }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ $market }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ number_format($macdData[$timeframe][$market]['normalized_macd'], 4) }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ number_format($macdData[$timeframe][$market]['normalized_signal'], 4) }}</td>
-                                            </tr>
-                                        @else
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ $timeframe }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap">{{ $market }}</td>
-                                                <td colspan="2" class="px-6 py-4 whitespace-nowrap text-red-500">Not enough data</td>
-                                            </tr>
-                                        @endif
-                                    @endforeach
-                                    <tr class="bg-gray-100">
-                                        <td colspan="4" class="px-6 py-1"></td>
+@section('content')
+    <div class="glass-card container">
+        <div class="strategy-card">
+            <h2>MACD Strategy Comparison</h2>
+
+            <form method="GET" action="{{ route('futures.macd_strategy') }}" class="form-group">
+                <label for="market">Select a market to compare:</label>
+                <select name="market" id="market" onchange="this.form.submit()">
+                    @foreach($markets as $marketOption)
+                        <option value="{{ $marketOption }}" {{ $selectedMarket == $marketOption ? 'selected' : '' }}>
+                            {{ $marketOption }}
+                        </option>
+                    @endforeach
+                </select>
+            </form>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timeframe</th>
+                            <th>Market</th>
+                            <th>Normalized MACD</th>
+                            <th>Normalized Signal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($timeframes as $timeframe)
+                            @foreach(['BTCUSDT', 'ETHUSDT', $selectedMarket] as $market)
+                                @if(isset($macdData[$timeframe][$market]))
+                                    <tr>
+                                        <td>{{ $timeframe }}</td>
+                                        <td>{{ $market }}</td>
+                                        <td>{{ number_format($macdData[$timeframe][$market]['normalized_macd'], 4) }}</td>
+                                        <td>{{ number_format($macdData[$timeframe][$market]['normalized_signal'], 4) }}</td>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                </div>
+                                @else
+                                    <tr>
+                                        <td>{{ $timeframe }}</td>
+                                        <td>{{ $market }}</td>
+                                        <td colspan="2" style="color: red;">Not enough data</td>
+                                    </tr>
+                                @endif
+                            @endforeach
+                            <tr style="background-color: #e0e0e0;">
+                                <td colspan="4" style="height: 2px;"></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
+
         </div>
     </div>
-</x-app-layout>
+@endsection

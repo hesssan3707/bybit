@@ -178,10 +178,10 @@
     <!-- Mobile redirect buttons (only visible on mobile) -->
     <div class="mobile-redirect-section">
         <div class="redirect-buttons">
-            <a href="{{ route('orders.index') }}" class="redirect-btn">
+            <a href="{{ route('futures.orders') }}" class="redirect-btn">
                 📊 سفارش‌های آتی
             </a>
-            <a href="{{ route('pnl.history') }}" class="redirect-btn secondary">
+            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
                 📈 سود و زیان
             </a>
         </div>
@@ -210,7 +210,7 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
-                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از لغو این سفارش مطمئن هستید؟');">
+                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از لغو این سفارش مطمئن هستید؟');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="delete-btn">لغو کردن</button>
@@ -218,7 +218,7 @@
                             @elseif($order->status === 'filled')
                                 <button type="button" class="close-btn" data-order-id="{{ $order->id }}" data-order-side="{{ $order->side }}">بستن</button>
                             @elseif($order->status === 'expired')
-                                <form action="{{ route('orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش منقضی شده مطمئن هستید؟');">
+                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش منقضی شده مطمئن هستید؟');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="delete-btn">حذف</button>
