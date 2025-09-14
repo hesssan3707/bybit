@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FuturesController;
+use App\Http\Controllers\MACDStrategyController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
