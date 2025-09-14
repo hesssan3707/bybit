@@ -13,7 +13,6 @@ class MACDStrategyController extends Controller
     public function __construct(TechnicalAnalysisService $technicalAnalysisService)
     {
         $this->middleware('auth');
-        $this->middleware('strict-mode');
         $this->technicalAnalysisService = $technicalAnalysisService;
     }
 
@@ -38,12 +37,12 @@ class MACDStrategyController extends Controller
         return view('macd.index', compact('comparisonData', 'altcoins', 'selectedAltcoin', 'baseMarket', 'timeframes'));
     }
 
-    private function getPricesForSymbol(string $symbol, string $timeframe): array
+    private function getPricesForSymbol(string $market, string $timeframe): array
     {
-        return Price::where('symbol', $symbol)
+        return Price::where('market', $market)
             ->where('timeframe', $timeframe)
             ->orderBy('created_at', 'asc')
-            ->pluck('close')
+            ->pluck('price')
             ->toArray();
     }
 

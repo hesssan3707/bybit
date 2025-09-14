@@ -129,9 +129,7 @@
         .strategy-note {
             margin-top: 20px;
             padding: 15px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
+            color : white;
         }
     </style>
 @endpush
@@ -176,7 +174,6 @@
                             <th>هیستوگرام نرمال شده {{ $selectedAltcoin }}</th>
                             <th>مکدی نرمال شده {{ $baseMarket }}</th>
                             <th>هیستوگرام نرمال شده {{ $baseMarket }}</th>
-                            <th>تفاوت هیستوگرام</th>
                             <th>روند</th>
                         </tr>
                     </thead>
@@ -212,13 +209,6 @@
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td>
-                                    @if(isset($comparisonData[$timeframe]['histogram_diff']))
-                                        {{ number_format($comparisonData[$timeframe]['histogram_diff'], 4) }}
-                                    @else
-                                        <span style="color: red;">داده کافی نیست</span>
-                                    @endif
-                                </td>
                                 <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
                                     @if($comparisonData[$timeframe]['trend'] === 'strong_up')
                                         ⇗
@@ -239,31 +229,17 @@
             </div>
 
             <div class="strategy-note">
-                <h4>توضیح استراتژی</h4>
                 <p>
                     این استراتژی، قدرت نسبی یک آلتکوین را در برابر یک بازار پایه (BTC یا ETH) با استفاده از نشانگر MACD نرمال شده، مقایسه می‌کند.
                 </p>
                 <ul>
-                    <li><strong>مکدی نرمال شده:</strong> مقدار MACD بر قیمت بسته شدن تقسیم شده و در 100 ضرب می‌شود. این کار مقایسه بین دارایی‌هایی با قیمت‌های مختلف را ممکن می‌سازد.</li>
-                    <li><strong>هیستوگرام نرمال شده:</strong> مقدار هیستوگرام MACD (که خود تفاوت بین خط MACD و خط سیگنال است) نیز به همین روش نرمال سازی می‌شود تا قدرت و شتاب حرکت روند را نشان دهد.</li>
-                    <li><strong>روند:</strong>
-                        <ul>
-                            <li><strong>جهت روند:</strong> با مقایسه مکدی نرمال شده آلتکوین و بازار پایه تعیین می‌شود. اگر مکدی آلتکوین بالاتر باشد، جهت روند صعودی و در غیر این صورت نزولی است.</li>
-                            <li><strong>قدرت روند:</strong> با مقایسه هیستوگرام نرمال شده آلتکوین و بازار پایه تعیین می‌شود. تفاوت قابل توجه نشان دهنده یک روند قوی است.</li>
-                        </ul>
-                    </li>
-                    <li><strong>نمادها:</strong>
-                        <ul>
-                            <li>⇗: روند صعودی قوی</li>
-                            <li>↗: روند صعودی</li>
-                            <li>⇘: روند نزولی قوی</li>
-                            <li>↘: روند نزولی</li>
-                            <li>◯: خنثی</li>
-                        </ul>
-                    </li>
+                    <li>⇗: روند صعودی قوی</li>
+                    <li>↗: روند صعودی</li>
+                    <li>⇘: روند نزولی قوی</li>
+                    <li>↘: روند نزولی</li>
+                    <li>◯: خنثی</li>
                 </ul>
             </div>
-
         </div>
     </div>
 @endsection
