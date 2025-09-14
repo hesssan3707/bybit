@@ -5,10 +5,17 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Price;
-use App\Models\User;
+use App\Services\TechnicalAnalysisService;
 
 class MACDStrategyController extends Controller
 {
+    protected $technicalAnalysisService;
+
+    public function __construct(TechnicalAnalysisService $technicalAnalysisService)
+    {
+        $this->technicalAnalysisService = $technicalAnalysisService;
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -52,14 +59,14 @@ class MACDStrategyController extends Controller
             return null;
         }
 
-        $macd = trader_macd($prices, 12, 26, 9);
-        if ($macd === false) {
+        $macd = $this->technicalAnalysisService->macd($prices);
+        if ($macd === null) {
             return null;
         }
 
-        $macdLine = $macd[0];
-        $signalLine = $macd[1];
-        $histogram = $macd[2];
+        $macdLine = $macd['macd'];
+        $signalLine = $macd['signal'];
+        $histogram = $macd['histogram'];
 
         // Get the last values
         $lastMacd = end($macdLine);
@@ -70,8 +77,8 @@ class MACDStrategyController extends Controller
         $max = max(max($macdLine), max($signalLine));
         $min = min(min($macdLine), min($signalLine));
 
-        $normalizedMacd = $this->normalize(end($macdLine), $min, $max);
-        $normalizedSignal = $this->normalize(end($signalLine), $min, $max);
+        $normalizedMacd = $this->normalize($lastMacd, $min, $max);
+        $normalizedSignal = $this->normalize($lastSignal, $min, $max);
 
         return [
             'macd' => $lastMacd,
