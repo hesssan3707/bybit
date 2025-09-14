@@ -556,19 +556,14 @@ class FuturesController extends Controller
             return redirect()->route('futures.orders')
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
-        
-        // Verify order belongs to user (through user exchange relationship)
+
+        // Verify order belongs to user
         $user = auth()->user();
         $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
-        
         if (!in_array($order->user_exchange_id, $userExchangeIds)) {
             return redirect()->route('futures.orders')
                 ->withErrors(['msg' => 'شما مجاز به بستن این سفارش نیستید.']);
         }
-        
-        $validated = $request->validate([
-            'price_distance' => 'required|numeric|min:0',
-        ]);
 
         if ($order->status !== 'filled') {
             return redirect()->route('futures.orders')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
@@ -577,60 +572,40 @@ class FuturesController extends Controller
         try {
             $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
-            $priceDistance = (float)$validated['price_distance'];
 
-            // 1. Cancel the existing TP order, if it exists
-            // Note: In the new architecture, we don't have a TP order to cancel.
-            // The user is manually closing the position.
-
-            // 2. Get current market price
-            $tickerInfo = $exchangeService->getTickerInfo($symbol);
-            $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
-            if ($marketPrice === 0) {
-                throw new \Exception('امکان دریافت قیمت لحظه‌ای بازار برای ثبت سفارش بسته شدن وجود ندارد.');
-            }
-
-            // 3. Calculate the new closing price
-            $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
-            $pricePrec = (int) $instrumentInfo['list'][0]['priceScale'];
-
-            $closePrice = ($order->side === 'buy')
-                ? $marketPrice + $priceDistance
-                : $marketPrice - $priceDistance;
-            $closePrice = round($closePrice, $pricePrec);
-
-            // 4. Create the new closing order
+            // Create a market order to close the position instantly
             $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
             
             // Get proper quantity precision for this symbol
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $qtyStep = (float) $instrumentInfo['list'][0]['lotSizeFilter']['qtyStep'];
-            
-            // Use the exact amount from the order, properly formatted
+
             $closeQty = $order->amount;
             if ($qtyStep >= 1) {
+                // For whole number steps, ensure quantity is a multiple of the step
                 $closeQty = round($closeQty / $qtyStep) * $qtyStep;
+            } else {
+                // For decimal steps, round to the appropriate precision
+                $amountPrec = (strpos((string)$qtyStep, '.') !== false) ? strlen(substr((string)$qtyStep, strpos((string)$qtyStep, '.') + 1)) : 0;
+                $closeQty = round($closeQty, $amountPrec);
             }
-            
-            $newTpOrderParams = [
+
+            $marketCloseParams = [
                 'category' => 'linear',
                 'symbol' => $symbol,
                 'side' => $closeSide,
-                'orderType' => 'Limit',
+                'orderType' => 'Market',
                 'qty' => (string)$closeQty,
-                'price' => (string)$closePrice,
                 'reduceOnly' => true,
-                'timeInForce' => 'GTC',
             ];
 
-            $exchangeService->createOrder($newTpOrderParams);
+            $exchangeService->createOrder($marketCloseParams);
 
-            return redirect()->route('futures.orders')->with('success', "سفارش بسته شدن دستی با قیمت {$closePrice} ثبت شد.");
+            return redirect()->route('futures.orders')->with('success', 'سفارش شما برای بسته شدن در قیمت لحظه‌ای بازار با موفقیت ثبت شد.');
 
         } catch (\Exception $e) {
-            Log::error('Futures order close failed: ' . $e->getMessage());
+            Log::error('Futures market close failed: ' . $e->getMessage());
             
-            // Parse Bybit error message for user-friendly response
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
             
             return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);

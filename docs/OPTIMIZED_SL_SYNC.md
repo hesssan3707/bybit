@@ -116,7 +116,7 @@ Strategy 5: Success - Found existing matching SL order
 
 Run the command and you should see:
 ```bash
-php artisan futures:sync-sl --user=6
+php artisan futures:sync-sltp --user=6
 ```
 
 Expected output:

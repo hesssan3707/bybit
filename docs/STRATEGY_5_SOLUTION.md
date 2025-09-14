@@ -63,7 +63,7 @@ Strategy 5: Success - Conditional stop loss order created
 
 Run the command again:
 ```bash
-php artisan futures:sync-sl --user=6
+php artisan futures:sync-sltp --user=6
 ```
 
 Strategy 5 should now successfully create the conditional stop loss order where Strategy 4 left off.

@@ -251,15 +251,12 @@ document.addEventListener('DOMContentLoaded', function() {
     closeButtons.forEach(button => {
         button.addEventListener('click', function() {
             const orderId = this.dataset.orderId;
-            const orderSide = this.dataset.orderSide;
-            const promptMessage = `Enter price distance (X) for this ${orderSide.toUpperCase()} position. The new closing price will be Market Price ${orderSide === 'buy' ? '+' : '-'} X.`;
+            const confirmMessage = 'آیا مطمئن هستید که می‌خواهید این سفارش را با قیمت لحظه‌ای بازار ببندید؟';
 
-            const priceDistance = prompt(promptMessage, '10');
-
-            if (priceDistance !== null && !isNaN(priceDistance) && parseFloat(priceDistance) >= 0) {
+            if (confirm(confirmMessage)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = `/orders/${orderId}/close`;
+                form.action = `/futures/orders/${orderId}/close`;
 
                 const csrfToken = document.createElement('input');
                 csrfToken.type = 'hidden';
@@ -267,16 +264,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 csrfToken.value = '{{ csrf_token() }}';
                 form.appendChild(csrfToken);
 
-                const distanceInput = document.createElement('input');
-                distanceInput.type = 'hidden';
-                distanceInput.name = 'price_distance';
-                distanceInput.value = priceDistance;
-                form.appendChild(distanceInput);
+                // No price_distance input is needed for market close
 
                 document.body.appendChild(form);
                 form.submit();
-            } else if (priceDistance !== null) {
-                alert('لطفا یک عدد صحیح و بزرگتر از صفر وارد کنید');
             }
         });
     });

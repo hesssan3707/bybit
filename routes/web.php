@@ -126,7 +126,7 @@ Route::get('/schedule', function() {
     Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
-    Artisan::call('futures:sync-sl');
+    Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     return '*******************************************************************DONE************************************************************************';
@@ -140,7 +140,7 @@ Route::get('/schedule', function() {
     Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
-    Artisan::call('futures:sync-sl');
+    Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     sleep(10);
@@ -153,7 +153,7 @@ Route::get('/schedule', function() {
     Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
-    Artisan::call('futures:sync-sl');
+    Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     sleep(10);
@@ -166,7 +166,7 @@ Route::get('/schedule', function() {
     Artisan::call('futures:enforce');
     print_r(Artisan::output());
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
-    Artisan::call('futures:sync-sl');
+    Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     return 'DONE';
