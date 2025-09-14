@@ -42,14 +42,27 @@ class SavePrices extends Command
         $exchangeService = new BinanceApiService();
         $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
+        // Fetch latest timestamps for all markets and timeframes at once
+        $this->info('Fetching latest timestamps for all markets...');
+        $latestTimestamps = Price::select('market', 'timeframe', DB::raw('MAX(timestamp) as max_timestamp'))
+            ->whereIn('market', $markets)
+            ->whereIn('timeframe', $timeframes)
+            ->groupBy('market', 'timeframe')
+            ->get()
+            ->keyBy(function ($item) {
+                return $item->market . '-' . $item->timeframe;
+            });
+        $this->info('Finished fetching latest timestamps.');
+
         foreach ($markets as $market) {
             foreach ($timeframes as $timeframe) {
                 DB::beginTransaction();
                 try {
-                    $latestPrice = Price::where('market', $market)->where('timeframe', $timeframe)->orderBy('timestamp', 'desc')->first();
+                    $key = $market . '-' . $timeframe;
+                    $latestPrice = $latestTimestamps->get($key);
                     $startTime = null;
-                    if ($latestPrice && $latestPrice->timestamp instanceof \Carbon\Carbon) {
-                        $startTime = $latestPrice->timestamp->getTimestamp() * 1000 + 1;
+                    if ($latestPrice) {
+                        $startTime = Carbon::parse($latestPrice->max_timestamp)->getTimestamp() * 1000 + 1;
                     }
 
                     $this->info("Fetching k-lines for {$market} on timeframe {$timeframe}...");
@@ -95,8 +108,15 @@ class SavePrices extends Command
 
                 } catch (\Exception $e) {
                     DB::rollBack();
-                    $this->error("Failed to process {$market} on timeframe {$timeframe}: {$e->getMessage()}");
-                    Log::error("Failed to process {$market} on timeframe {$timeframe}: {$e->getMessage()}");
+                    $errorMessage = "Failed to process {$market} on timeframe {$timeframe}: {$e->getMessage()}";
+                    // Check if the exception message contains JSON, which might be the case for API errors
+                    $decodedMessage = json_decode($e->getMessage(), true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMessage)) {
+                        // If it's a JSON error from our service, log the details
+                        $errorMessage .= " | Details: " . print_r($decodedMessage, true);
+                    }
+                    $this->error($errorMessage);
+                    Log::error($errorMessage);
                 }
             }
         }
