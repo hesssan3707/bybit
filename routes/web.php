@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FuturesController;
+use App\Http\Controllers\MACDStrategyController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -126,7 +127,33 @@ Route::get('/schedule', function() {
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     return '*******************************************************************DONE************************************************************************';
-    sleep(25);
+    sleep(10);
+    Artisan::call('exchanges:validate-active --force');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    Artisan::call('futures:sync-sl');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
+    sleep(10);
+    Artisan::call('exchanges:validate-active --force');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    Artisan::call('futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    Artisan::call('futures:sync-sl');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
+    sleep(10);
     Artisan::call('exchanges:validate-active --force');
     print_r(Artisan::output());
     echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
@@ -140,7 +167,12 @@ Route::get('/schedule', function() {
     print_r(Artisan::output());
     echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
     return 'DONE';
-})->middleware('throttle:3');
+})->middleware('throttle:4');
+Route::get('/get-prices', function() {
+	Artisan::call('prices:save');
+    print_r(Artisan::output());
+    return 'DONE';
+})->middleware('throttle:4');
 
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.

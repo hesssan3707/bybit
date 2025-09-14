@@ -47,6 +47,7 @@
         }
         .form-group {
             margin-bottom: 0;
+			display : block ruby;
         }
         label {
             font-weight: bold;
@@ -62,8 +63,8 @@
         .switch {
             position: relative;
             display: inline-block;
-            width: 90px;
-            height: 34px;
+            width: 98px;
+            height: 46px;
         }
         .switch input {
             opacity: 0;
@@ -79,15 +80,15 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 34px;
+            border-radius: 40px;
         }
         .slider:before {
             position: absolute;
             content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
+            height: 40px;
+            width: 40px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
@@ -96,17 +97,17 @@
             background-color: #2196F3;
         }
         input:checked + .slider:before {
-            transform: translateX(55px);
+            transform: translateX(52px);
         }
         .slider.round {
-            border-radius: 34px;
+            border-radius: 36px;
         }
         .slider.round:before {
             border-radius: 50%;
         }
         .switch-labels {
             position: absolute;
-            top: 50%;
+            top: 49%;
             left: 0;
             right: 0;
             transform: translateY(-50%);
@@ -122,6 +123,13 @@
         }
         .trend-down {
             color: red;
+        }
+        .strategy-note {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
         }
     </style>
 @endpush
@@ -164,9 +172,10 @@
                         <tr>
                             <th>زمان</th>
                             <th>مکدی نرمال شده {{ $selectedAltcoin }}</th>
-                            <th>هیستوگرام {{ $selectedAltcoin }}</th>
+                            <th>هیستوگرام نرمال شده {{ $selectedAltcoin }}</th>
                             <th>مکدی نرمال شده {{ $baseMarket }}</th>
-                            <th>هیستوگرام {{ $baseMarket }}</th>
+                            <th>هیستوگرام نرمال شده {{ $baseMarket }}</th>
+                            <th>تفاوت هیستوگرام</th>
                             <th>روند</th>
                         </tr>
                     </thead>
@@ -183,7 +192,7 @@
                                 </td>
                                 <td>
                                     @if(isset($comparisonData[$timeframe]['altcoin']))
-                                        {{ number_format($comparisonData[$timeframe]['altcoin']['histogram_value'], 4) }}
+                                        {{ number_format($comparisonData[$timeframe]['altcoin']['normalized_histogram'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
@@ -197,24 +206,61 @@
                                 </td>
                                 <td>
                                     @if(isset($comparisonData[$timeframe]['base']))
-                                        {{ number_format($comparisonData[$timeframe]['base']['histogram_value'], 4) }}
+                                        {{ number_format($comparisonData[$timeframe]['base']['normalized_histogram'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' ? 'trend-down' : '') }}">
-                                    @if($comparisonData[$timeframe]['trend'] === 'up')
-                                        🔼
-                                    @elseif($comparisonData[$timeframe]['trend'] === 'down')
-                                        🔽
+                                <td>
+                                    @if(isset($comparisonData[$timeframe]['histogram_diff']))
+                                        {{ number_format($comparisonData[$timeframe]['histogram_diff'], 4) }}
                                     @else
-                                        ⚪
+                                        <span style="color: red;">داده کافی نیست</span>
+                                    @endif
+                                </td>
+                                <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
+                                    @if($comparisonData[$timeframe]['trend'] === 'strong_up')
+                                        ▲▲
+                                    @elseif($comparisonData[$timeframe]['trend'] === 'up')
+                                        ▲
+                                    @elseif($comparisonData[$timeframe]['trend'] === 'strong_down')
+                                        ▼▼
+                                    @elseif($comparisonData[$timeframe]['trend'] === 'down')
+                                        ▼
+                                    @else
+                                        ●
                                     @endif
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+
+            <div class="strategy-note">
+                <h4>توضیح استراتژی</h4>
+                <p>
+                    این استراتژی، قدرت نسبی یک آلتکوین را در برابر یک بازار پایه (BTC یا ETH) با استفاده از نشانگر MACD نرمال شده، مقایسه می‌کند.
+                </p>
+                <ul>
+                    <li><strong>مکدی نرمال شده:</strong> مقدار MACD بر قیمت بسته شدن تقسیم شده و در 100 ضرب می‌شود. این کار مقایسه بین دارایی‌هایی با قیمت‌های مختلف را ممکن می‌سازد.</li>
+                    <li><strong>هیستوگرام نرمال شده:</strong> مقدار هیستوگرام MACD (که خود تفاوت بین خط MACD و خط سیگنال است) نیز به همین روش نرمال سازی می‌شود تا قدرت و شتاب حرکت روند را نشان دهد.</li>
+                    <li><strong>روند:</strong>
+                        <ul>
+                            <li><strong>جهت روند:</strong> با مقایسه مکدی نرمال شده آلتکوین و بازار پایه تعیین می‌شود. اگر مکدی آلتکوین بالاتر باشد، جهت روند صعودی و در غیر این صورت نزولی است.</li>
+                            <li><strong>قدرت روند:</strong> با مقایسه هیستوگرام نرمال شده آلتکوین و بازار پایه تعیین می‌شود. تفاوت قابل توجه نشان دهنده یک روند قوی است.</li>
+                        </ul>
+                    </li>
+                    <li><strong>نمادها:</strong>
+                        <ul>
+                            <li>▲▲: روند صعودی قوی</li>
+                            <li>▲: روند صعودی</li>
+                            <li>▼▼: روند نزولی قوی</li>
+                            <li>▼: روند نزولی</li>
+                            <li>●: خنثی</li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
 
         </div>
