@@ -4,93 +4,59 @@ namespace App\Services;
 
 class TechnicalAnalysisService
 {
-    /**
-     * Calculate the Simple Moving Average (SMA).
-     *
-     * @param array $data
-     * @param int $period
-     * @return array
-     */
-    public function sma(array $data, int $period): array
+    public function calculateMACD(array $closePrices, int $fastPeriod = 12, int $slowPeriod = 26, int $signalPeriod = 9)
     {
-        $sma = [];
-        $dataCount = count($data);
-        for ($i = $period - 1; $i < $dataCount; $i++) {
-            $sum = 0;
-            for ($j = 0; $j < $period; $j++) {
-                $sum += $data[$i - $j];
-            }
-            $sma[] = $sum / $period;
+        $prices = collect($closePrices);
+
+        if ($prices->count() < $slowPeriod) {
+            return null;
         }
-        return $sma;
+
+        $fastEma = $this->calculateEMA($prices, $fastPeriod);
+        $slowEma = $this->calculateEMA($prices, $slowPeriod);
+
+        $macdLine = $fastEma->slice($slowPeriod - $fastPeriod)->values()
+            ->map(function ($item, $key) use ($slowEma) {
+                return $item - $slowEma[$key];
+            });
+
+        if ($macdLine->count() < $signalPeriod) {
+            return null;
+        }
+
+        $signalLine = $this->calculateEMA($macdLine, $signalPeriod);
+        $histogram = $macdLine->slice($signalPeriod - 1)->values()
+            ->map(function ($item, $key) use ($signalLine) {
+                return $item - $signalLine[$key];
+            });
+
+        $lastMacd = $macdLine->last();
+        $lastHistogram = $histogram->last();
+
+        $price = $prices->last();
+        $normalizedMacd = $price > 0 ? ($lastMacd / $price) * 100 : 0;
+        $normalizedHistogram = $price > 0 ? ($lastHistogram / $price) * 100 : 0;
+
+        return [
+            'normalized_macd' => $normalizedMacd,
+            'normalized_histogram' => $normalizedHistogram,
+        ];
     }
 
-    /**
-     * Calculate the Exponential Moving Average (EMA).
-     *
-     * @param array $data
-     * @param int $period
-     * @return array
-     */
-    public function ema(array $data, int $period): array
+    private function calculateEMA(\Illuminate\Support\Collection $prices, int $period)
     {
-        $ema = [];
+        $ema = collect();
         $multiplier = 2 / ($period + 1);
-        $initialSma = $this->sma(array_slice($data, 0, $period), $period);
-        $ema[] = $initialSma[0];
+        $initialSma = $prices->slice(0, $period)->avg();
+        $ema->push($initialSma);
 
-        $dataCount = count($data);
-        for ($i = $period; $i < $dataCount; $i++) {
-            $emaValue = ($data[$i] - end($ema)) * $multiplier + end($ema);
-            $ema[] = $emaValue;
+        for ($i = $period; $i < $prices->count(); $i++) {
+            $currentPrice = $prices[$i];
+            $previousEma = $ema->last();
+            $currentEma = ($currentPrice - $previousEma) * $multiplier + $previousEma;
+            $ema->push($currentEma);
         }
 
         return $ema;
-    }
-
-    /**
-     * Calculate the Moving Average Convergence Divergence (MACD).
-     *
-     * @param array $data
-     * @param int $fastPeriod
-     * @param int $slowPeriod
-     * @param int $signalPeriod
-     * @return array|null
-     */
-    public function macd(array $data, int $fastPeriod = 12, int $slowPeriod = 26, int $signalPeriod = 9): ?array
-    {
-        $dataCount = count($data);
-        if ($dataCount < $slowPeriod) {
-            return null;
-        }
-
-        $emaFast = $this->ema($data, $fastPeriod);
-        $emaSlow = $this->ema($data, $slowPeriod);
-
-        $macdLine = [];
-        $emaFastSlice = array_slice($emaFast, $slowPeriod - $fastPeriod);
-
-        foreach ($emaSlow as $key => $value) {
-            $macdLine[] = $emaFastSlice[$key] - $value;
-        }
-
-        if (count($macdLine) < $signalPeriod) {
-            return null;
-        }
-
-        $signalLine = $this->ema($macdLine, $signalPeriod);
-
-        $histogram = [];
-        $macdLineSlice = array_slice($macdLine, $signalPeriod - 1);
-
-        foreach ($signalLine as $key => $value) {
-            $histogram[] = $macdLineSlice[$key] - $value;
-        }
-
-        return [
-            'macd' => array_slice($macdLineSlice, -count($histogram)),
-            'signal' => $signalLine,
-            'histogram' => $histogram,
-        ];
     }
 }

@@ -25,14 +25,15 @@ class ExchangeApiTest extends TestCase
 
     public function test_can_get_exchanges()
     {
-        UserExchange::factory()->count(3)->create(['user_id' => $this->user->id]);
+        UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id]);
+        UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
         ])->getJson('/api/v1/exchanges');
 
         $response->assertStatus(200)
-            ->assertJsonCount(3, 'data');
+            ->assertJsonCount(2, 'data');
     }
 
     public function test_can_create_exchange()
@@ -82,8 +83,8 @@ class ExchangeApiTest extends TestCase
 
     public function test_can_switch_exchange()
     {
-        $exchange1 = UserExchange::factory()->create(['user_id' => $this->user->id, 'is_active' => true]);
-        $exchange2 = UserExchange::factory()->create(['user_id' => $this->user->id, 'is_active' => false]);
+        $exchange1 = UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id, 'is_active' => true]);
+        $exchange2 = UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id, 'is_active' => false]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
