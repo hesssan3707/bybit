@@ -233,7 +233,7 @@
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td data-label="روند" style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonD ata[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
+                                <td data-label="روند" style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
                                     @if($comparisonData[$timeframe]['trend'] === 'strong_up')
                                         ⇗
                                     @elseif($comparisonData[$timeframe]['trend'] === 'up')
