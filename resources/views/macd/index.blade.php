@@ -31,10 +31,12 @@
             padding: 12px 15px;
             text-align: right;
             border-bottom: 1px solid #ddd;
+            direction: ltr;
         }
         thead th {
             background-color: #f5f5f5;
             font-weight: bold;
+            direction: rtl;
         }
         tbody tr:nth-child(even) {
             background-color: #f9f9f9;
@@ -130,7 +132,7 @@
 @section('content')
     <div class="glass-card container">
         <div class="strategy-card">
-            <h2>مقایسه استراتژی MACD</h2>
+            <h2> استراتژی MACD</h2>
 
             <form method="GET" action="{{ route('futures.macd_strategy') }}" id="strategy-form">
                 <div class="form-container">
