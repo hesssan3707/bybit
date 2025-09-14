@@ -24,31 +24,45 @@ class MACDStrategyController extends Controller
         }
 
         $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
-        $markets = Price::distinct()->pluck('market')->toArray();
+        $altcoins = Price::where('market', '!=', 'BTCUSDT')
+            ->where('market', '!=', 'ETHUSDT')
+            ->distinct()
+            ->pluck('market')
+            ->toArray();
 
-        $selectedMarket = $request->input('market', 'BTCUSDT');
-        if (!in_array($selectedMarket, $markets)) {
-            $selectedMarket = 'BTCUSDT';
-        }
+        $selectedAltcoin = $request->input('altcoin', $altcoins[0] ?? null);
+        $baseMarket = $request->input('base_market', 'BTCUSDT');
 
-        $macdData = [];
+        $comparisonData = [];
 
         foreach ($timeframes as $timeframe) {
-            $btcPrices = Price::where('market', 'BTCUSDT')->where('timeframe', $timeframe)->orderBy('timestamp')->pluck('price')->toArray();
-            $ethPrices = Price::where('market', 'ETHUSDT')->where('timeframe', $timeframe)->orderBy('timestamp')->pluck('price')->toArray();
-            $selectedMarketPrices = Price::where('market', $selectedMarket)->where('timeframe', $timeframe)->orderBy('timestamp')->pluck('price')->toArray();
+            $altcoinPrices = Price::where('market', $selectedAltcoin)->where('timeframe', $timeframe)->orderBy('timestamp')->pluck('price')->toArray();
+            $baseMarketPrices = Price::where('market', $baseMarket)->where('timeframe', $timeframe)->orderBy('timestamp')->pluck('price')->toArray();
 
-            $macdData[$timeframe] = [
-                'BTCUSDT' => $this->calculateMACD($btcPrices),
-                'ETHUSDT' => $this->calculateMACD($ethPrices),
-                $selectedMarket => $this->calculateMACD($selectedMarketPrices),
+            $altcoinMacdData = $this->calculateMACD($altcoinPrices);
+            $baseMarketMacdData = $this->calculateMACD($baseMarketPrices);
+
+            $trend = '⚪'; // Neutral
+            if ($altcoinMacdData && $baseMarketMacdData) {
+                if ($altcoinMacdData['normalized_macd'] > $baseMarketMacdData['normalized_macd']) {
+                    $trend = '🔼'; // Up arrow for bullish
+                } elseif ($altcoinMacdData['normalized_macd'] < $baseMarketMacdData['normalized_macd']) {
+                    $trend = '🔽'; // Down arrow for bearish
+                }
+            }
+
+            $comparisonData[$timeframe] = [
+                'altcoin' => $altcoinMacdData,
+                'base' => $baseMarketMacdData,
+                'trend' => $trend,
             ];
         }
 
         return view('macd.index', [
-            'macdData' => $macdData,
-            'markets' => $markets,
-            'selectedMarket' => $selectedMarket,
+            'comparisonData' => $comparisonData,
+            'altcoins' => $altcoins,
+            'selectedAltcoin' => $selectedAltcoin,
+            'baseMarket' => $baseMarket,
             'timeframes' => $timeframes,
         ]);
     }
