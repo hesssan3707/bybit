@@ -41,6 +41,30 @@
         tbody tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+        @media screen and (max-width: 768px) {
+            table thead { display: none; }
+            table tr {
+                display: block;
+                margin-bottom: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
+            table td {
+                display: flex;
+                justify-content: space-between;
+                text-align: right;
+                padding: 10px 15px;
+                border: none;
+                border-bottom: 1px solid rgba(238, 238, 238, 0.25);
+            }
+            table td:last-child { border-bottom: 0; }
+            table td::before {
+                content: attr(data-label);
+                font-weight: bold;
+                padding-left: 10px;
+                text-align: left;
+            }
+        }
         .form-container {
             display: flex;
             justify-content: space-between;
@@ -139,7 +163,7 @@
         <div class="strategy-card">
             <h2> استراتژی MACD</h2>
 
-            <form method="GET" action="{{ route('futures.macd_strategy') }}" id="strategy-form">
+            <form method="GET" action="{{ route('strategies.macd') }}" id="strategy-form">
                 <div class="form-container">
                     <div class="form-group">
                         <label for="altcoin">آلتکوین:</label>
@@ -180,36 +204,36 @@
                     <tbody>
                         @foreach($timeframes as $timeframe)
                             <tr>
-                                <td>{{ $timeframe }}</td>
-                                <td>
+                                <td data-label="زمان">{{ $timeframe }}</td>
+                                <td data-label="مکدی نرمال شده {{ $selectedAltcoin }}">
                                     @if(isset($comparisonData[$timeframe]['altcoin']))
                                         {{ number_format($comparisonData[$timeframe]['altcoin']['normalized_macd'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td data-label="هیستوگرام نرمال شده {{ $selectedAltcoin }}">
                                     @if(isset($comparisonData[$timeframe]['altcoin']))
                                         {{ number_format($comparisonData[$timeframe]['altcoin']['normalized_histogram'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td data-label="مکدی نرمال شده {{ $baseMarket }}">
                                     @if(isset($comparisonData[$timeframe]['base']))
                                         {{ number_format($comparisonData[$timeframe]['base']['normalized_macd'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td data-label="هیستوگرام نرمال شده {{ $baseMarket }}">
                                     @if(isset($comparisonData[$timeframe]['base']))
                                         {{ number_format($comparisonData[$timeframe]['base']['normalized_histogram'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
+                                <td data-label="روند" style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonD ata[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
                                     @if($comparisonData[$timeframe]['trend'] === 'strong_up')
                                         ⇗
                                     @elseif($comparisonData[$timeframe]['trend'] === 'up')

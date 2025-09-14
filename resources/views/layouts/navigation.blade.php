@@ -144,9 +144,14 @@
                 <a href="{{ route('futures.orders') }}">تاریخچه سفارش‌ها</a>
                 <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
                 <a href="{{ route('futures.order.create') }}">سفارش آتی جدید</a>
-                @if(auth()->user()?->future_strict_mode)
-                    <a href="{{ route('futures.macd_strategy') }}">MACD Strategy</a>
-                @endif
+            </div>
+        </div>
+
+        <!-- Strategies Menu -->
+        <div style="display: inline-block; position: relative; margin: 0 15px;">
+            <a href="#" style="cursor: pointer;" onclick="toggleStrategiesMenu(event)">استراتژی‌ها ▼</a>
+            <div id="strategiesMenu" class="dropdown-list">
+                <a href="{{ route('strategies.macd') }}">MACD Strategy</a>
             </div>
         </div>
 
@@ -256,9 +261,11 @@
             const spotMenu = document.getElementById('spotMenu');
             const adminMenu = document.getElementById('adminMenu');
             const futuresMenu = document.getElementById('futuresMenu');
+            const strategiesMenu = document.getElementById('strategiesMenu');
             const spotMenuToggle = event.target.closest('[onclick*="toggleSpotMenu"]');
             const adminMenuToggle = event.target.closest('[onclick*="toggleAdminMenu"]');
             const futuresMenuToggle = event.target.closest('[onclick*="toggleFuturesMenu"]');
+            const strategiesMenuToggle = event.target.closest('[onclick*="toggleStrategiesMenu"]');
 
             if (!spotMenuToggle && spotMenu) {
                 spotMenu.style.display = 'none';
@@ -270,6 +277,10 @@
 
             if (!futuresMenuToggle && futuresMenu) {
                 futuresMenu.style.display = 'none';
+            }
+
+            if (!strategiesMenuToggle && strategiesMenu) {
+                strategiesMenu.style.display = 'none';
             }
         });
     });
@@ -292,6 +303,13 @@
         event.preventDefault();
         event.stopPropagation();
         const menu = document.getElementById('futuresMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleStrategiesMenu(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = document.getElementById('strategiesMenu');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 </script>
