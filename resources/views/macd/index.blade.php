@@ -221,15 +221,15 @@
                                 </td>
                                 <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
                                     @if($comparisonData[$timeframe]['trend'] === 'strong_up')
-                                        ▲▲
+                                        ⇗
                                     @elseif($comparisonData[$timeframe]['trend'] === 'up')
-                                        ▲
+                                        ↗
                                     @elseif($comparisonData[$timeframe]['trend'] === 'strong_down')
-                                        ▼▼
+                                        ⇘
                                     @elseif($comparisonData[$timeframe]['trend'] === 'down')
-                                        ▼
+                                        ↘
                                     @else
-                                        ●
+                                        ◯
                                     @endif
                                 </td>
                             </tr>
@@ -254,11 +254,11 @@
                     </li>
                     <li><strong>نمادها:</strong>
                         <ul>
-                            <li>▲▲: روند صعودی قوی</li>
-                            <li>▲: روند صعودی</li>
-                            <li>▼▼: روند نزولی قوی</li>
-                            <li>▼: روند نزولی</li>
-                            <li>●: خنثی</li>
+                            <li>⇗: روند صعودی قوی</li>
+                            <li>↗: روند صعودی</li>
+                            <li>⇘: روند نزولی قوی</li>
+                            <li>↘: روند نزولی</li>
+                            <li>◯: خنثی</li>
                         </ul>
                     </li>
                 </ul>
