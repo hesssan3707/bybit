@@ -47,6 +47,7 @@
         }
         .form-group {
             margin-bottom: 0;
+			display : block ruby;
         }
         label {
             font-weight: bold;
@@ -62,8 +63,8 @@
         .switch {
             position: relative;
             display: inline-block;
-            width: 90px;
-            height: 34px;
+            width: 98px;
+            height: 46px;
         }
         .switch input {
             opacity: 0;
@@ -79,15 +80,15 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 34px;
+            border-radius: 40px;
         }
         .slider:before {
             position: absolute;
             content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
+            height: 40px;
+            width: 40px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
@@ -96,17 +97,17 @@
             background-color: #2196F3;
         }
         input:checked + .slider:before {
-            transform: translateX(55px);
+            transform: translateX(52px);
         }
         .slider.round {
-            border-radius: 34px;
+            border-radius: 36px;
         }
         .slider.round:before {
             border-radius: 50%;
         }
         .switch-labels {
             position: absolute;
-            top: 50%;
+            top: 49%;
             left: 0;
             right: 0;
             transform: translateY(-50%);
@@ -144,7 +145,6 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>بازار پایه:</label>
                         <label class="switch">
                             <input type="checkbox" name="base_market_switch" id="base_market_switch" {{ $baseMarket == 'ETHUSDT' ? 'checked' : '' }}>
                             <span class="slider round"></span>
