@@ -12,7 +12,7 @@
 - Position doesn't exist or is already closed
 - Invalid parameter combinations for Partial vs Full mode
 
-**Solution:** The updated `FuturesStopLossSync` command now uses a multi-strategy approach:
+**Solution:** The updated `FuturesSlTpSync` command now uses a multi-strategy approach:
 
 1. **Strategy 1: Direct Modification** - Attempts to modify SL with proper parameters
 2. **Strategy 2: Remove and Re-set** - Removes existing SL (set to 0) then sets new value
@@ -73,7 +73,7 @@ The new implementation includes:
 
 1. **Check Position Data:**
    ```bash
-   php artisan futures:sync-sl --user=USER_ID
+   php artisan futures:sync-sltp --user=USER_ID
    ```
 
 2. **Review Logs:**
@@ -88,7 +88,7 @@ The new implementation includes:
 
 1. **Test with Single User:**
    ```bash
-   php artisan futures:sync-sl --user=6
+   php artisan futures:sync-sltp --user=6
    ```
 
 2. **Monitor Logs:**

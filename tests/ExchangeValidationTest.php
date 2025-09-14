@@ -178,7 +178,7 @@ class ExchangeValidationTest
         $commands = [
             'FuturesOrderEnforcer' => 'App\Console\Commands\FuturesOrderEnforcer',
             'FuturesLifecycleManager' => 'App\Console\Commands\FuturesLifecycleManager',
-            'FuturesStopLossSync' => 'App\Console\Commands\FuturesStopLossSync'
+            'FuturesSlTpSync' => 'App\Console\Commands\FuturesSlTpSync'
         ];
         
         foreach ($commands as $name => $className) {

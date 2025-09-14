@@ -9,14 +9,14 @@ use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
-class FuturesStopLossSync extends Command
+class FuturesSlTpSync extends Command
 {
-    protected $signature = 'futures:sync-sl {--user= : Specific user ID to sync for}';
-    protected $description = 'Sync stop loss levels between database and active exchanges using proper trading-stop endpoint';
+    protected $signature = 'futures:sync-sltp {--user= : Specific user ID to sync for}';
+    protected $description = 'Sync stop-loss and take-profit levels between database and active exchanges';
 
     public function handle(): int
     {
-        $this->info('Starting stop loss synchronization using improved method...');
+        $this->info('Starting stop-loss and take-profit synchronization...');
 
         try {
             if ($this->option('user')) {
@@ -151,20 +151,22 @@ class FuturesStopLossSync extends Command
 
                 $exchangeSl = (float)($matchingPosition['stopLoss'] ?? 0);
                 $databaseSl = (float)$dbOrder->sl;
+                $exchangeTp = (float)($matchingPosition['takeProfit'] ?? 0);
+                $databaseTp = (float)$dbOrder->tp;
 
-                // Compare SL with tolerance for floating point precision
-                if (abs($exchangeSl - $databaseSl) > 0.001) {
-                    $this->warn("    SL mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange: {$exchangeSl}, DB: {$databaseSl}. Updating using trading-stop endpoint...");
+                // Compare SL or TP with tolerance for floating point precision
+                if (abs($exchangeSl - $databaseSl) > 0.001 || abs($exchangeTp - $databaseTp) > 0.001) {
+                    $this->warn("    SL/TP mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange SL:{$exchangeSl}/TP:{$exchangeTp}, DB SL:{$databaseSl}/TP:{$databaseTp}. Updating...");
 
-                    $success = $this->updateStopLossUsingTradingStop($exchangeService, $matchingPosition, $symbol, $databaseSl, $userId, $userExchange->exchange_name, $dbOrder->id);
+                    $success = $this->updateStopLossUsingTradingStop($exchangeService, $matchingPosition, $symbol, $databaseSl, $databaseTp, $userId, $userExchange->exchange_name, $dbOrder->id);
                     
                     if ($success) {
-                        $this->info("    Successfully updated SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} to {$databaseSl}");
+                        $this->info("    Successfully updated SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} to SL:{$databaseSl}/TP:{$databaseTp}");
                     } else {
-                        $this->error("    Failed to update SL for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
+                        $this->error("    Failed to update SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
                     }
                 } else {
-                    $this->info("    SL for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}) is in sync");
+                    $this->info("    SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}) is in sync");
                 }
             }
 
@@ -191,23 +193,21 @@ class FuturesStopLossSync extends Command
      * @return bool Success status
      */
     private function updateStopLossUsingTradingStop(
-        ExchangeApiServiceInterface $exchangeService, 
-        array $position, 
-        string $symbol, 
-        float $targetSl, 
-        int $userId, 
-        string $exchangeName, 
+        ExchangeApiServiceInterface $exchangeService,
+        array $position,
+        string $symbol,
+        float $targetSl,
+        float $targetTp,
+        int $userId,
+        string $exchangeName,
         int $orderId
     ): bool {
         try {
-            $this->info("      Using POST /v5/position/trading-stop to update stop loss...");
-            
+            $this->info("      Using POST /v5/position/trading-stop to update SL/TP...");
+
             // Determine position index
             $positionIdx = $this->determinePositionIdx($position);
-            
-            // Get existing take profit to preserve it
-            $existingTp = (float)($position['takeProfit'] ?? 0);
-            
+
             // Prepare parameters for the trading-stop endpoint
             $params = [
                 'category' => 'linear', // for futures trading
@@ -217,53 +217,54 @@ class FuturesStopLossSync extends Command
                 'tpslMode' => 'Full', // Full position stop loss/take profit
             ];
 
-            // Preserve existing take profit if it exists and is not zero
-            if ($existingTp > 0) {
-                $params['takeProfit'] = (string)$existingTp;
-                $this->info("        Preserving existing take profit: {$existingTp}");
+            // Set take profit from database value if it's greater than zero
+            if ($targetTp > 0) {
+                $params['takeProfit'] = (string)$targetTp;
             }
 
-            $this->info("        Updating position stop loss to {$targetSl} for position index {$positionIdx}");
-            
+            $this->info("        Updating position SL/TP to {$targetSl}/{$targetTp} for position index {$positionIdx}");
+
             // Log the API call parameters
-            Log::info("Updating stop loss using trading-stop endpoint", [
+            Log::info("Updating SL/TP using trading-stop endpoint", [
                 'user_id' => $userId,
                 'exchange' => $exchangeName,
                 'symbol' => $symbol,
                 'positionIdx' => $positionIdx,
                 'new_stop_loss' => $targetSl,
-                'existing_take_profit' => $existingTp,
+                'new_take_profit' => $targetTp,
                 'params' => $params
             ]);
 
             // Call the setStopLossAdvanced method which uses the trading-stop endpoint
             $result = $exchangeService->setStopLossAdvanced($params);
-            
-            $this->info("      Success: Stop loss updated using trading-stop endpoint");
-            
-            Log::info("Stop loss successfully updated", [
+
+            $this->info("      Success: SL/TP updated using trading-stop endpoint");
+
+            Log::info("SL/TP successfully updated", [
                 'user_id' => $userId,
                 'exchange' => $exchangeName,
                 'symbol' => $symbol,
                 'new_stop_loss' => $targetSl,
+                'new_take_profit' => $targetTp,
                 'api_response' => $result
             ]);
-            
+
             return true;
-            
+
         } catch (\Exception $e) {
-            $this->error("      Failed to update stop loss using trading-stop endpoint: " . $e->getMessage());
-            
-            Log::error("Stop loss update failed using trading-stop endpoint", [
+            $this->error("      Failed to update SL/TP using trading-stop endpoint: " . $e->getMessage());
+
+            Log::error("SL/TP update failed using trading-stop endpoint", [
                 'user_id' => $userId,
                 'exchange' => $exchangeName,
                 'symbol' => $symbol,
                 'target_sl' => $targetSl,
+                'target_tp' => $targetTp,
                 'position_idx' => $positionIdx ?? 'unknown',
                 'error' => $e->getMessage(),
                 'params' => $params ?? []
             ]);
-            
+
             return false;
         }
     }

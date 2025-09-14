@@ -1,8 +1,8 @@
-# FuturesStopLossSync Command Improvements
+# Futures SL/TP Sync Command Improvements
 
 ## Overview
 
-The `FuturesStopLossSync` command has been completely rewritten to use the correct Bybit API approach for stop loss modification. The old version has been preserved as `OldFuturesStopLossSync` for reference.
+The `FuturesSlTpSync` command has been completely rewritten to use the correct Bybit API approach for stop loss and take profit modification. The old version has been preserved as `OldFuturesStopLossSync` for reference.
 
 ## Key Differences
 
@@ -15,8 +15,8 @@ The `FuturesStopLossSync` command has been completely rewritten to use the corre
   - Tried to treat SL/TP as editable orders (which they aren't in Bybit)
   - Often resulted in API failures with wrong endpoints
 
-### New Approach (`FuturesStopLossSync`)
-- **Command**: `php artisan futures:sync-sl`
+### New Approach (`FuturesSlTpSync`)
+- **Command**: `php artisan futures:sync-sltp`
 - **Solution**: Uses the correct Bybit API endpoint directly
 - **Benefits**:
   - Uses `POST /v5/position/trading-stop` endpoint directly
@@ -54,11 +54,11 @@ $params = [
 
 ### Running the New Command
 ```bash
-# Sync stop loss for all users with future strict mode enabled
-php artisan futures:sync-sl
+# Sync stop loss and take profit for all users with future strict mode enabled
+php artisan futures:sync-sltp
 
-# Sync stop loss for specific user
-php artisan futures:sync-sl --user=123
+# Sync for a specific user
+php artisan futures:sync-sltp --user=123
 ```
 
 ### Running the Old Command (for comparison)
@@ -77,13 +77,13 @@ The new command should:
 
 ## Files Changed
 
-1. **New**: `app/Console/Commands/FuturesStopLossSync.php` - Improved implementation
+1. **New**: `app/Console/Commands/FuturesSlTpSync.php` - Improved implementation
 2. **Preserved**: `app/Console/Commands/OldFuturesStopLossSync.php` - Original complex approach
 3. **Enhanced**: Uses existing `BybitApiService::setStopLossAdvanced()` method
 
 ## Migration Notes
 
-- The old command signature `futures:sync-sl` now runs the new implementation
+- The old command signature `futures:sync-sl` has been replaced by `futures:sync-sltp`.
 - The old command is available as `futures:old-sync-sl` for testing/comparison
 - All existing scheduling and automation should automatically use the improved version
 - No database changes required

@@ -179,11 +179,11 @@ Strategy 5: Success - Found existing matching SL order at correct price
 
 ### Usage
 
-The optimized strategies are automatically integrated into the existing `FuturesStopLossSync` command:
+The optimized strategies are automatically integrated into the existing `FuturesSlTpSync` command:
 
 ```bash
-php artisan futures:sync-sl
-php artisan futures:sync-sl --user=6
+php artisan futures:sync-sltp
+php artisan futures:sync-sltp --user=6
 ```
 
 **Execution Order (Optimized):**

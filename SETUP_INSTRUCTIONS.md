@@ -10,12 +10,12 @@
 ### Console Commands
 - `BybitEnforceOrders.php` → `FuturesOrderEnforcer.php` 
 - `BybitLifecycle.php` → `FuturesLifecycleManager.php`
-- `SyncStopLoss.php` → `FuturesStopLossSync.php`
+- `SyncStopLoss.php` → `FuturesSlTpSync.php`
 
 ### Command Signatures
 - `bybit:enforce` → `futures:enforce`
 - `bybit:lifecycle` → `futures:lifecycle` 
-- `bybit:sync-sl` → `futures:sync-sl`
+- `bybit:sync-sl` → `futures:sync-sltp`
 
 ### Tests
 - `BybitControllerTest.php` → `FuturesControllerTest.php`
@@ -103,7 +103,7 @@ php artisan futures:lifecycle --user=2
 php artisan futures:enforce
 
 # Sync stop loss for all users
-php artisan futures:sync-sl
+php artisan futures:sync-sltp
 ```
 
 ### Schedule Setup (Cron)
@@ -111,7 +111,7 @@ Update your cron entry:
 ```bash
 * * * * * cd /path/to/project && php artisan futures:lifecycle >> /dev/null 2>&1
 */5 * * * * cd /path/to/project && php artisan futures:enforce >> /dev/null 2>&1  
-*/10 * * * * cd /path/to/project && php artisan futures:sync-sl >> /dev/null 2>&1
+*/10 * * * * cd /path/to/project && php artisan futures:sync-sltp >> /dev/null 2>&1
 ```
 
 ## Key Features Now Available
