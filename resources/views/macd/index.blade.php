@@ -54,13 +54,74 @@
         }
         select {
             width: 100%;
-            max-width: 250px;
+            max-width: 400px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        .base-market-selector label {
-            margin: 0 10px;
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 90px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(55px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        .switch-labels {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+            color: white;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        .trend-up {
+            color: green;
+        }
+        .trend-down {
+            color: red;
         }
     </style>
 @endpush
@@ -74,7 +135,7 @@
                 <div class="form-container">
                     <div class="form-group">
                         <label for="altcoin">آلتکوین:</label>
-                        <select name="altcoin" id="altcoin">
+                        <select name="altcoin" id="altcoin" onchange="this.form.submit()">
                             @foreach($altcoins as $altcoin)
                                 <option value="{{ $altcoin }}" {{ $selectedAltcoin == $altcoin ? 'selected' : '' }}>
                                     {{ $altcoin }}
@@ -82,12 +143,17 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="base-market-selector">
+                    <div class="form-group">
                         <label>بازار پایه:</label>
-                        <input type="radio" id="btc" name="base_market" value="BTCUSDT" {{ $baseMarket == 'BTCUSDT' ? 'checked' : '' }}>
-                        <label for="btc">BTCUSDT</label>
-                        <input type="radio" id="eth" name="base_market" value="ETHUSDT" {{ $baseMarket == 'ETHUSDT' ? 'checked' : '' }}>
-                        <label for="eth">ETHUSDT</label>
+                        <label class="switch">
+                            <input type="checkbox" name="base_market_switch" id="base_market_switch" {{ $baseMarket == 'ETHUSDT' ? 'checked' : '' }}>
+                            <span class="slider round"></span>
+                            <div class="switch-labels">
+                                <span>BTC</span>
+                                <span>ETH</span>
+                            </div>
+                        </label>
+                        <input type="hidden" name="base_market" id="base_market" value="{{ $baseMarket }}">
                     </div>
                 </div>
             </form>
@@ -98,7 +164,9 @@
                         <tr>
                             <th>زمان</th>
                             <th>مکدی نرمال شده {{ $selectedAltcoin }}</th>
+                            <th>هیستوگرام {{ $selectedAltcoin }}</th>
                             <th>مکدی نرمال شده {{ $baseMarket }}</th>
+                            <th>هیستوگرام {{ $baseMarket }}</th>
                             <th>روند</th>
                         </tr>
                     </thead>
@@ -114,14 +182,34 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if(isset($comparisonData[$timeframe]['altcoin']))
+                                        {{ number_format($comparisonData[$timeframe]['altcoin']['histogram_value'], 4) }}
+                                    @else
+                                        <span style="color: red;">داده کافی نیست</span>
+                                    @endif
+                                </td>
+                                <td>
                                     @if(isset($comparisonData[$timeframe]['base']))
                                         {{ number_format($comparisonData[$timeframe]['base']['normalized_macd'], 4) }}
                                     @else
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td style="font-size: 1.5em;">
-                                    {{ $comparisonData[$timeframe]['trend'] }}
+                                <td>
+                                    @if(isset($comparisonData[$timeframe]['base']))
+                                        {{ number_format($comparisonData[$timeframe]['base']['histogram_value'], 4) }}
+                                    @else
+                                        <span style="color: red;">داده کافی نیست</span>
+                                    @endif
+                                </td>
+                                <td style="font-size: 1.5em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' ? 'trend-down' : '') }}">
+                                    @if($comparisonData[$timeframe]['trend'] === 'up')
+                                        🔼
+                                    @elseif($comparisonData[$timeframe]['trend'] === 'down')
+                                        🔽
+                                    @else
+                                        ⚪
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -138,11 +226,18 @@
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('strategy-form');
         const altcoinSelect = document.getElementById('altcoin');
-        const baseMarketRadios = document.querySelectorAll('input[name="base_market"]');
+        const baseMarketSwitch = document.getElementById('base_market_switch');
+        const baseMarketInput = document.getElementById('base_market');
 
         altcoinSelect.addEventListener('change', () => form.submit());
-        baseMarketRadios.forEach(radio => {
-            radio.addEventListener('change', () => form.submit());
+
+        baseMarketSwitch.addEventListener('change', () => {
+            if (baseMarketSwitch.checked) {
+                baseMarketInput.value = 'ETHUSDT';
+            } else {
+                baseMarketInput.value = 'BTCUSDT';
+            }
+            form.submit();
         });
     });
 </script>
