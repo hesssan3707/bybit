@@ -18,7 +18,11 @@ class MACDStrategyController extends Controller
 
     public function index(Request $request)
     {
-        $altcoins = ['SOLUSDT', 'LTCUSDT', 'XRPUSDT', 'DOGEUSDT', 'TRXUSDT', 'AVAXUSDT', 'MATICUSDT', 'DOTUSDT', 'SHIBUSDT', 'ADAUSDT'];
+        $altcoins = [
+            'CAKEUSDT', 'ATOMUSDT', 'SOLUSDT', 'ADAUSDT',
+            'DOTUSDT', 'DOGEUSDT', 'SHIBUSDT', 'MATICUSDT', 'LTCUSDT', 'LINKUSDT',
+            'UNIUSDT', 'AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT'
+        ];
         $selectedAltcoin = $request->input('altcoin', 'SOLUSDT');
         $baseMarket = $request->input('base_market', 'BTCUSDT');
         $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
