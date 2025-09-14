@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'MACD Strategy')
+@section('title', 'استراتژی MACD')
 
 @push('styles')
     <style>
@@ -39,34 +39,28 @@
         tbody tr:nth-child(even) {
             background-color: #f9f9f9;
         }
-        .form-group {
+        .form-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 0;
         }
         label {
             font-weight: bold;
+            margin-left: 10px;
         }
         select {
             width: 100%;
-            max-width: 300px;
+            max-width: 250px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        .btn {
-            display: inline-block;
-            padding: 12px 20px;
-            margin: 5px;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
-            transition: opacity 0.3s;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
+        .base-market-selector label {
+            margin: 0 10px;
         }
     </style>
 @endpush
@@ -74,49 +68,61 @@
 @section('content')
     <div class="glass-card container">
         <div class="strategy-card">
-            <h2>MACD Strategy Comparison</h2>
+            <h2>مقایسه استراتژی MACD</h2>
 
-            <form method="GET" action="{{ route('futures.macd_strategy') }}" class="form-group">
-                <label for="market">Select a market to compare:</label>
-                <select name="market" id="market" onchange="this.form.submit()">
-                    @foreach($markets as $marketOption)
-                        <option value="{{ $marketOption }}" {{ $selectedMarket == $marketOption ? 'selected' : '' }}>
-                            {{ $marketOption }}
-                        </option>
-                    @endforeach
-                </select>
+            <form method="GET" action="{{ route('futures.macd_strategy') }}" id="strategy-form">
+                <div class="form-container">
+                    <div class="form-group">
+                        <label for="altcoin">آلتکوین:</label>
+                        <select name="altcoin" id="altcoin">
+                            @foreach($altcoins as $altcoin)
+                                <option value="{{ $altcoin }}" {{ $selectedAltcoin == $altcoin ? 'selected' : '' }}>
+                                    {{ $altcoin }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="base-market-selector">
+                        <label>بازار پایه:</label>
+                        <input type="radio" id="btc" name="base_market" value="BTCUSDT" {{ $baseMarket == 'BTCUSDT' ? 'checked' : '' }}>
+                        <label for="btc">BTCUSDT</label>
+                        <input type="radio" id="eth" name="base_market" value="ETHUSDT" {{ $baseMarket == 'ETHUSDT' ? 'checked' : '' }}>
+                        <label for="eth">ETHUSDT</label>
+                    </div>
+                </div>
             </form>
 
             <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
-                            <th>Timeframe</th>
-                            <th>Market</th>
-                            <th>Normalized MACD</th>
-                            <th>Normalized Signal</th>
+                            <th>زمان</th>
+                            <th>مکدی نرمال شده {{ $selectedAltcoin }}</th>
+                            <th>مکدی نرمال شده {{ $baseMarket }}</th>
+                            <th>روند</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($timeframes as $timeframe)
-                            @foreach(['BTCUSDT', 'ETHUSDT', $selectedMarket] as $market)
-                                @if(isset($macdData[$timeframe][$market]))
-                                    <tr>
-                                        <td>{{ $timeframe }}</td>
-                                        <td>{{ $market }}</td>
-                                        <td>{{ number_format($macdData[$timeframe][$market]['normalized_macd'], 4) }}</td>
-                                        <td>{{ number_format($macdData[$timeframe][$market]['normalized_signal'], 4) }}</td>
-                                    </tr>
-                                @else
-                                    <tr>
-                                        <td>{{ $timeframe }}</td>
-                                        <td>{{ $market }}</td>
-                                        <td colspan="2" style="color: red;">Not enough data</td>
-                                    </tr>
-                                @endif
-                            @endforeach
-                            <tr style="background-color: #e0e0e0;">
-                                <td colspan="4" style="height: 2px;"></td>
+                            <tr>
+                                <td>{{ $timeframe }}</td>
+                                <td>
+                                    @if(isset($comparisonData[$timeframe]['altcoin']))
+                                        {{ number_format($comparisonData[$timeframe]['altcoin']['normalized_macd'], 4) }}
+                                    @else
+                                        <span style="color: red;">داده کافی نیست</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(isset($comparisonData[$timeframe]['base']))
+                                        {{ number_format($comparisonData[$timeframe]['base']['normalized_macd'], 4) }}
+                                    @else
+                                        <span style="color: red;">داده کافی نیست</span>
+                                    @endif
+                                </td>
+                                <td style="font-size: 1.5em;">
+                                    {{ $comparisonData[$timeframe]['trend'] }}
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -126,3 +132,18 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('strategy-form');
+        const altcoinSelect = document.getElementById('altcoin');
+        const baseMarketRadios = document.querySelectorAll('input[name="base_market"]');
+
+        altcoinSelect.addEventListener('change', () => form.submit());
+        baseMarketRadios.forEach(radio => {
+            radio.addEventListener('change', () => form.submit());
+        });
+    });
+</script>
+@endpush

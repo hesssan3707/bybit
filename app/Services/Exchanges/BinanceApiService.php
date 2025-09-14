@@ -88,15 +88,21 @@ class BinanceApiService implements ExchangeApiServiceInterface
     /**
      * Get k-line/candlestick data.
      */
-    public function getKlines(string $symbol, string $interval, int $limit = 50): array
+    public function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
     {
         try {
+            $query = [
+                'symbol' => $symbol,
+                'interval' => $interval,
+                'limit' => $limit,
+            ];
+
+            if ($startTime) {
+                $query['startTime'] = $startTime;
+            }
+
             $response = $this->client->get('/api/v3/klines', [
-                'query' => [
-                    'symbol' => $symbol,
-                    'interval' => $interval,
-                    'limit' => $limit,
-                ]
+                'query' => $query
             ]);
 
             $data = json_decode($response->getBody(), true);

@@ -46,8 +46,11 @@ class SavePrices extends Command
             foreach ($timeframes as $timeframe) {
                 DB::beginTransaction();
                 try {
+                    $latestPrice = Price::where('market', $market)->where('timeframe', $timeframe)->orderBy('timestamp', 'desc')->first();
+                    $startTime = $latestPrice ? ($latestPrice->timestamp->getTimestamp() * 1000) + 1 : null;
+
                     $this->info("Fetching k-lines for {$market} on timeframe {$timeframe}...");
-                    $klineData = $exchangeService->getKlines($market, $timeframe, 50);
+                    $klineData = $exchangeService->getKlines($market, $timeframe, 50, $startTime);
 
                     if (!$klineData['success']) {
                         throw new \Exception($klineData['message']);
@@ -67,8 +70,8 @@ class SavePrices extends Command
 
                     if (!empty($pricesToInsert)) {
                         Price::insert($pricesToInsert);
-                        $this->info("Saved " . count($pricesToInsert) . " k-line prices for {$market} on timeframe {$timeframe}.");
-                        Log::info("Saved " . count($pricesToInsert) . " k-line prices for {$market} on timeframe {$timeframe}.");
+                        $this->info("Saved " . count($pricesToInsert) . " new k-line prices for {$market} on timeframe {$timeframe}.");
+                        Log::info("Saved " . count($pricesToInsert) . " new k-line prices for {$market} on timeframe {$timeframe}.");
                     }
 
                     // Prune old records, keeping the last 50
