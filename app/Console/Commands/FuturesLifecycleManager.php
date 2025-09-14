@@ -76,6 +76,12 @@ class FuturesLifecycleManager extends Command
             return;
         }
 
+        // Check if user has a selected market in strict mode
+        if (empty($user->selected_market)) {
+            $this->info("User {$userId} is in strict mode but has no selected market. Skipping...");
+            return;
+        }
+
         $activeExchanges = $user->activeExchanges;
         if ($activeExchanges->isEmpty()) {
             $this->warn("No active exchanges for user {$userId}.");
@@ -253,7 +259,7 @@ class FuturesLifecycleManager extends Command
                     Trade::create([
                         'user_exchange_id' => $userExchange->id,
                         'symbol' => $pnlEvent['symbol'],
-                        'side' => $pnlEvent['side'],
+                        'side' => $order->side,
                         'order_type' => $pnlEvent['orderType'],
                         'leverage' => $pnlEvent['leverage'],
                         'qty' => $pnlEvent['qty'],
@@ -354,10 +360,14 @@ class FuturesLifecycleManager extends Command
             }
 
             foreach ($newPnlEvents->reverse() as $pnlEvent) { // Process oldest first
+                $originalOrder = Order::where('order_id', $pnlEvent['orderId'])
+                                      ->where('user_exchange_id', $userExchange->id)
+                                      ->first();
+
                 Trade::create([
                     'user_exchange_id' => $userExchange->id,
                     'symbol' => $pnlEvent['symbol'],
-                    'side' => $pnlEvent['side'],
+                    'side' => $originalOrder ? $originalOrder->side : strtolower($pnlEvent['side']),
                     'order_type' => $pnlEvent['orderType'],
                     'leverage' => $pnlEvent['leverage'],
                     'qty' => $pnlEvent['qty'],
