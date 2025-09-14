@@ -42,19 +42,22 @@ class MACDStrategyController extends Controller
             $altcoinMacdData = $this->calculateMACD($altcoinPrices);
             $baseMarketMacdData = $this->calculateMACD($baseMarketPrices);
 
-            $trend = '⚪'; // Neutral
+            $trend = 'neutral';
+            $trendPower = 0;
             if ($altcoinMacdData && $baseMarketMacdData) {
                 if ($altcoinMacdData['normalized_macd'] > $baseMarketMacdData['normalized_macd']) {
-                    $trend = '🔼'; // Up arrow for bullish
+                    $trend = 'up';
                 } elseif ($altcoinMacdData['normalized_macd'] < $baseMarketMacdData['normalized_macd']) {
-                    $trend = '🔽'; // Down arrow for bearish
+                    $trend = 'down';
                 }
+                $trendPower = $altcoinMacdData['histogram_value'];
             }
 
             $comparisonData[$timeframe] = [
                 'altcoin' => $altcoinMacdData,
                 'base' => $baseMarketMacdData,
                 'trend' => $trend,
+                'trend_power' => $trendPower,
             ];
         }
 
@@ -97,7 +100,7 @@ class MACDStrategyController extends Controller
         return [
             'macd' => $lastMacd,
             'signal' => $lastSignal,
-            'histogram' => $lastHistogram,
+            'histogram_value' => $lastHistogram,
             'normalized_macd' => $normalizedMacd,
             'normalized_signal' => $normalizedSignal,
         ];

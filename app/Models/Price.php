@@ -15,4 +15,8 @@ class Price extends Model
         'price',
         'timestamp',
     ];
+
+    protected $casts = [
+        'timestamp' => 'datetime',
+    ];
 }

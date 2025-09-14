@@ -47,7 +47,10 @@ class SavePrices extends Command
                 DB::beginTransaction();
                 try {
                     $latestPrice = Price::where('market', $market)->where('timeframe', $timeframe)->orderBy('timestamp', 'desc')->first();
-                    $startTime = $latestPrice ? ($latestPrice->timestamp->getTimestamp() * 1000) + 1 : null;
+                    $startTime = null;
+                    if ($latestPrice && $latestPrice->timestamp instanceof \Carbon\Carbon) {
+                        $startTime = $latestPrice->timestamp->getTimestamp() * 1000 + 1;
+                    }
 
                     $this->info("Fetching k-lines for {$market} on timeframe {$timeframe}...");
                     $klineData = $exchangeService->getKlines($market, $timeframe, 50, $startTime);

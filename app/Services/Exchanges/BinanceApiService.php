@@ -94,11 +94,12 @@ class BinanceApiService implements ExchangeApiServiceInterface
             $query = [
                 'symbol' => $symbol,
                 'interval' => $interval,
-                'limit' => $limit,
             ];
 
             if ($startTime) {
                 $query['startTime'] = $startTime;
+            } else {
+                $query['limit'] = $limit;
             }
 
             $response = $this->client->get('/api/v3/klines', [
