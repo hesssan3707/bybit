@@ -121,6 +121,41 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('POST', '/v5/position/set-trading-stop', $params);
     }
 
+    public function switchPositionMode(bool $hedgeMode): array
+    {
+        $mode = $hedgeMode ? 3 : 0;
+        return $this->sendRequest('POST', '/v5/position/switch-mode', [
+            'category' => 'linear',
+            'mode' => $mode,
+            'coin' => 'USDT'
+        ]);
+    }
+
+    public function getPositionIdx(array $position): int
+    {
+        // First try to get positionIdx directly from the position data
+        if (isset($position['positionIdx']) && is_numeric($position['positionIdx'])) {
+            return (int)$position['positionIdx'];
+        }
+
+        // Fallback: Try to determine from side in hedge mode
+        if (isset($position['side'])) {
+            $side = strtolower($position['side']);
+            // In hedge mode:
+            // positionIdx = 1 for Buy side (long positions)
+            // positionIdx = 2 for Sell side (short positions)
+            if ($side === 'buy') {
+                return 1;
+            } elseif ($side === 'sell') {
+                return 2;
+            }
+        }
+
+        // Default to one-way mode
+        // positionIdx = 0 for one-way mode (both buy and sell in same position)
+        return 0;
+    }
+
     public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null): array
     {
         $params = [

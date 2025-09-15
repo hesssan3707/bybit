@@ -147,6 +147,16 @@ interface ExchangeApiServiceInterface
     public function setTradingStop(array $params): array;
 
     /**
+     * Switch position mode
+     */
+    public function switchPositionMode(bool $hedgeMode): array;
+
+    /**
+     * Get position index
+     */
+    public function getPositionIdx(array $position): int;
+
+    /**
      * Get exchange name
      */
     public function getExchangeName(): string;
