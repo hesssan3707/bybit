@@ -4,10 +4,10 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Price;
-use App\Services\Exchanges\BinanceApiService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use GuzzleHttp\Client;
 
 class SavePrices extends Command
 {
@@ -39,7 +39,6 @@ class SavePrices extends Command
             'UNIUSDT', 'AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT'
         ];
 
-        $exchangeService = new BinanceApiService();
         $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
         // Fetch latest timestamps for all markets and timeframes at once
@@ -66,7 +65,7 @@ class SavePrices extends Command
                     }
 
                     $this->info("Fetching k-lines for {$market} on timeframe {$timeframe}...");
-                    $klineData = $exchangeService->getKlines($market, $timeframe, 50, $startTime);
+                    $klineData = $this->getKlines($market, $timeframe, 50, $startTime);
 
                     if (!$klineData['success']) {
                         throw new \Exception($klineData['message']);
@@ -123,5 +122,41 @@ class SavePrices extends Command
 
         $this->info('Finished saving k-line prices.');
         Log::info('prices:save command finished.');
+    }
+    private function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
+    {
+        try {
+            $query = [
+                'symbol' => $symbol,
+                'interval' => $interval,
+            ];
+
+            if ($startTime) {
+                $query['startTime'] = $startTime;
+            } else {
+                $query['limit'] = $limit;
+            }
+
+            $client = new Client([
+                'timeout' => 30,
+                'base_uri' => 'https://api.binance.com',
+            ]);
+            $response = $client->get('/api/v3/klines', [
+                'query' => $query
+            ]);
+
+            $data = json_decode($response->getBody(), true);
+
+            return [
+                'success' => true,
+                'klines' => $data,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Binance get klines failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to get klines: ' . $e->getMessage(),
+            ];
+        }
     }
 }
