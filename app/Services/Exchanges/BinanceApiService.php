@@ -2,387 +2,199 @@
 
 namespace App\Services\Exchanges;
 
-use App\Services\Exchanges\ExchangeApiServiceInterface;
-use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class BinanceApiService implements ExchangeApiServiceInterface
 {
-    protected $client;
-    protected $apiKey;
-    protected $apiSecret;
-    protected $baseUrl;
+    private $apiKey;
+    private $apiSecret;
+    private $baseUrl;
+    private $recvWindow = 5000;
 
     public function __construct()
     {
-        $this->baseUrl = 'https://fapi.binance.com';
-        $this->client = new Client([
-            'timeout' => 30,
-            'base_uri' => $this->baseUrl,
-        ]);
+        // Testnet URL: https://testnet.binancefuture.com
+        $isTestnet = env('BINANCE_TESTNET', false);
+        $this->baseUrl = $isTestnet ? 'https://testnet.binancefuture.com' : 'https://fapi.binance.com';
     }
 
-    /**
-     * Set API credentials
-     */
     public function setCredentials(string $apiKey, string $apiSecret): void
     {
         $this->apiKey = $apiKey;
         $this->apiSecret = $apiSecret;
     }
 
-    /**
-     * Get account balance
-     */
-    public function getAccountBalance(): array
+    private function generateSignature(string $query): string
     {
-        try {
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
-
-            $timestamp = time() * 1000;
-            $queryString = "timestamp={$timestamp}";
-            $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
-            
-            $response = $this->client->get('/fapi/v2/balance', [
-                'headers' => [
-                    'X-MBX-APIKEY' => $this->apiKey,
-                ],
-                'query' => [
-                    'timestamp' => $timestamp,
-                    'signature' => $signature,
-                ]
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-            
-            $balances = [];
-            foreach ($data as $balance) {
-                if ((float)$balance['balance'] > 0) {
-                    $balances[] = [
-                        'currency' => $balance['asset'],
-                        'free' => (float)$balance['availableBalance'],
-                        'locked' => (float)$balance['balance'] - (float)$balance['availableBalance'],
-                        'total' => (float)$balance['balance'],
-                    ];
-                }
-            }
-
-            return [
-                'success' => true,
-                'balances' => $balances,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance get account balance failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to get account balance: ' . $e->getMessage(),
-            ];
+        if (!$this->apiSecret) {
+            throw new \Exception('API secret is not set');
         }
+        return hash_hmac('sha256', $query, $this->apiSecret);
     }
 
-    /**
-     * Get k-line/candlestick data.
-     */
-    public function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
+    private function sendRequest(string $method, string $endpoint, array $params = [], $isPost = false)
     {
-        try {
-            $query = [
-                'symbol' => $symbol,
-                'interval' => $interval,
-            ];
-
-            if ($startTime) {
-                $query['startTime'] = $startTime;
-            } else {
-                $query['limit'] = $limit;
-            }
-
-            $response = $this->client->get('/api/v3/klines', [
-                'query' => $query
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-
-            return [
-                'success' => true,
-                'klines' => $data,
-            ];
-        } catch (\Exception $e) {
-            Log::error('Binance get klines failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to get klines: ' . $e->getMessage(),
-            ];
+        if (!$this->apiKey || !$this->apiSecret) {
+            throw new \Exception('API credentials not set. Please ensure the exchange is properly configured.');
         }
+
+        $timestamp = intval(microtime(true) * 1000);
+        $params['timestamp'] = $timestamp;
+        $params['recvWindow'] = $this->recvWindow;
+
+        $queryString = http_build_query($params, '', '&');
+        $signature = $this->generateSignature($queryString);
+        $params['signature'] = $signature;
+
+        $headers = [
+            'X-MBX-APIKEY' => $this->apiKey,
+        ];
+
+        $client = Http::withHeaders($headers)->timeout(10)->connectTimeout(5);
+
+        if ($isPost) {
+            $response = $client->post("{$this->baseUrl}{$endpoint}", $params);
+        } else if ($method === 'delete') {
+            $response = $client->delete("{$this->baseUrl}{$endpoint}", $params);
+        }
+        else {
+            $response = $client->get("{$this->baseUrl}{$endpoint}", $params);
+        }
+
+        $responseData = $response->json();
+
+        if ($response->failed() || (isset($responseData['code']) && $responseData['code'] != 200)) {
+            $errorCode = $responseData['code'] ?? 'N/A';
+            $errorMsg = $responseData['msg'] ?? 'Unknown error';
+            $requestBody = json_encode($params);
+            $fullResponse = $response->body();
+            throw new \Exception(
+                "Binance API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
+            );
+        }
+
+        return $responseData;
     }
 
-    /**
-     * Create a spot order
-     */
-    public function createSpotOrder(array $orderData): array
+    public function getInstrumentsInfo(string $symbol = null): array
     {
-        try {
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
+        $info = $this->sendRequest('get', '/fapi/v1/exchangeInfo');
+        $symbols = collect($info['symbols']);
 
-            $timestamp = time() * 1000;
-            $params = [
-                'symbol' => $orderData['symbol'],
-                'side' => strtoupper($orderData['side']),
-                'type' => strtoupper($orderData['order_type'] ?? 'MARKET'),
-                'quantity' => $orderData['qty'],
-                'timestamp' => $timestamp,
-            ];
-
-            if (isset($orderData['price']) && strtoupper($orderData['order_type']) === 'LIMIT') {
-                $params['price'] = $orderData['price'];
-                $params['timeInForce'] = 'GTC';
-            }
-
-            $queryString = http_build_query($params);
-            $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
-            $params['signature'] = $signature;
-
-            $response = $this->client->post('/api/v3/order', [
-                'headers' => [
-                    'X-MBX-APIKEY' => $this->apiKey,
-                ],
-                'form_params' => $params
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-
-            return [
-                'success' => true,
-                'order_id' => $data['orderId'],
-                'client_order_id' => $data['clientOrderId'],
-                'symbol' => $data['symbol'],
-                'status' => $data['status'],
-                'side' => $data['side'],
-                'type' => $data['type'],
-                'quantity' => $data['origQty'],
-                'price' => $data['price'] ?? null,
-                'executed_qty' => $data['executedQty'] ?? '0',
-                'executed_price' => $data['price'] ?? null,
-                'time' => $data['transactTime'],
-                'raw_response' => $data,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance create spot order failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to create spot order: ' . $e->getMessage(),
-            ];
+        if ($symbol) {
+            $symbols = $symbols->where('symbol', $symbol);
         }
+
+        return ['list' => $symbols->values()->all()];
     }
 
-    /**
-     * Create an order (legacy method for compatibility)
-     */
     public function createOrder(array $orderData): array
     {
-        // For Binance, redirect to spot order creation
-        return $this->createSpotOrder($orderData);
+        return $this->sendRequest('post', '/fapi/v1/order', $orderData, true);
     }
 
-    /**
-     * Get order history
-     */
-    public function getOrderHistory(?string $symbol = null, int $limit = 50): array
+    public function getOpenOrdersBySymbol(string $symbol): array
     {
-        try {
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
-
-            $timestamp = time() * 1000;
-            $params = [
-                'timestamp' => $timestamp,
-                'limit' => min($limit, 1000), // Binance max is 1000
-            ];
-
-            if ($symbol) {
-                $params['symbol'] = $symbol;
-            }
-
-            $queryString = http_build_query($params);
-            $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
-
-            $endpoint = $symbol ? '/api/v3/allOrders' : '/api/v3/openOrders';
-            
-            $response = $this->client->get($endpoint, [
-                'headers' => [
-                    'X-MBX-APIKEY' => $this->apiKey,
-                ],
-                'query' => array_merge($params, ['signature' => $signature])
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-
-            $orders = array_map(function ($order) {
-                return [
-                    'order_id' => $order['orderId'],
-                    'symbol' => $order['symbol'],
-                    'side' => $order['side'],
-                    'type' => $order['type'],
-                    'quantity' => $order['origQty'],
-                    'price' => $order['price'],
-                    'status' => $order['status'],
-                    'executed_qty' => $order['executedQty'],
-                    'time' => $order['time'],
-                    'raw_response' => $order,
-                ];
-            }, is_array($data) ? $data : []);
-
-            return [
-                'success' => true,
-                'orders' => $orders,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance get order history failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to get order history: ' . $e->getMessage(),
-            ];
-        }
+        return $this->sendRequest('get', '/fapi/v1/openOrders', ['symbol' => $symbol]);
     }
 
-    /**
-     * Get trading pairs
-     */
-    public function getTradingPairs(): array
+    public function getHistoryOrder(string $orderId): array
     {
-        try {
-            $response = $this->client->get('/api/v3/exchangeInfo');
-            $data = json_decode($response->getBody(), true);
-
-            $pairs = array_map(function ($symbol) {
-                return [
-                    'symbol' => $symbol['symbol'],
-                    'base_asset' => $symbol['baseAsset'],
-                    'quote_asset' => $symbol['quoteAsset'],
-                    'status' => $symbol['status'],
-                ];
-            }, $data['symbols'] ?? []);
-
-            return [
-                'success' => true,
-                'pairs' => $pairs,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance get trading pairs failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to get trading pairs: ' . $e->getMessage(),
-            ];
-        }
+        throw new \Exception('Binance requires symbol to get order history. Use getOrder with symbol.');
     }
 
-    /**
-     * Get ticker information
-     */
-    public function getTickerInfo(string $symbol): array
-    {
-        try {
-            $response = $this->client->get('/api/v3/ticker/24hr', [
-                'query' => ['symbol' => $symbol]
-            ]);
-            
-            $data = json_decode($response->getBody(), true);
-
-            return [
-                'success' => true,
-                'symbol' => $data['symbol'],
-                'price' => $data['lastPrice'],
-                'change_24h' => $data['priceChange'],
-                'change_percent_24h' => $data['priceChangePercent'],
-                'high_24h' => $data['highPrice'],
-                'low_24h' => $data['lowPrice'],
-                'volume_24h' => $data['volume'],
-                'raw_response' => $data,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance get ticker info failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to get ticker info: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
-     * Cancel an order
-     */
-    public function cancelOrder(string $orderId): array
-    {
-        // Note: Binance requires symbol for cancellation
-        throw new \Exception('Use cancelOrder with symbol parameter for Binance');
-    }
-
-    /**
-     * Cancel an order with symbol
-     */
     public function cancelOrderWithSymbol(string $orderId, string $symbol): array
     {
-        try {
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
+        return $this->sendRequest('delete', '/fapi/v1/order', ['symbol' => $symbol, 'orderId' => $orderId]);
+    }
 
-            $timestamp = time() * 1000;
-            $params = [
-                'symbol' => $symbol,
-                'orderId' => $orderId,
-                'timestamp' => $timestamp,
-            ];
-
-            $queryString = http_build_query($params);
-            $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
-            $params['signature'] = $signature;
-
-            $response = $this->client->delete('/api/v3/order', [
-                'headers' => [
-                    'X-MBX-APIKEY' => $this->apiKey,
-                ],
-                'form_params' => $params
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-
-            return [
-                'success' => true,
-                'order_id' => $data['orderId'],
-                'symbol' => $data['symbol'],
-                'status' => $data['status'],
-                'raw_response' => $data,
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Binance cancel order failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Failed to cancel order: ' . $e->getMessage(),
-            ];
+    public function getPositions(string $symbol = null): array
+    {
+        $params = [];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
         }
+        $positions = $this->sendRequest('get', '/fapi/v2/positionRisk', $params);
+        return ['list' => $positions];
     }
 
-    // Missing interface methods implementation
-    public function getWalletBalance(string $accountType = 'SPOT', ?string $coin = null): array
+    public function setTradingStop(array $params): array
     {
-        return $this->getAccountBalance();
+        // Binance uses the 'STOP_MARKET' or 'TAKE_PROFIT_MARKET' order type to set SL/TP
+        // This requires creating a new order.
+        $orderParams = [
+            'symbol' => $params['symbol'],
+            'side' => $params['side'] === 'Buy' ? 'SELL' : 'BUY', // Opposite side to close
+            'positionSide' => $params['positionSide'],
+            'type' => 'STOP_MARKET',
+            'stopPrice' => (string)$params['stopLoss'],
+            'closePosition' => 'true', // This indicates it's a SL/TP order
+        ];
+        return $this->createOrder($orderParams);
     }
 
-    public function getSpotAccountBalance(): array
+    public function switchPositionMode(bool $hedgeMode): array
     {
-        return $this->getAccountBalance();
+        return $this->sendRequest('post', '/fapi/v1/positionSide/dual', [
+            'dualSidePosition' => $hedgeMode ? 'true' : 'false'
+        ], true);
+    }
+
+    public function getPositionIdx(array $position): int
+    {
+        if (isset($position['positionSide'])) {
+            $side = strtoupper($position['positionSide']);
+            if ($side === 'LONG') {
+                return 1;
+            } elseif ($side === 'SHORT') {
+                return 2;
+            }
+        }
+        return 0; // One-way mode
+    }
+
+    public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null): array
+    {
+        $params = [
+            'symbol' => $symbol,
+            'limit' => $limit,
+        ];
+
+        if ($startTime) {
+            $params['startTime'] = $startTime;
+        }
+
+        return $this->sendRequest('get', '/fapi/v1/userTrades', $params);
+    }
+
+    public function getWalletBalance(string $accountType = 'FUTURES', ?string $coin = null): array
+    {
+        // Binance futures balance is fetched from /fapi/v2/balance
+        $balanceInfo = $this->sendRequest('get', '/fapi/v2/balance');
+        $filteredBalance = [];
+        if($coin) {
+            foreach($balanceInfo as $balance) {
+                if($balance['asset'] === $coin) {
+                    $filteredBalance[] = $balance;
+                }
+            }
+            return ['list' => $filteredBalance];
+        }
+        return ['list' => $balanceInfo];
+    }
+
+    public function getTickerInfo(string $symbol): array
+    {
+        $ticker = $this->sendRequest('get', '/fapi/v1/ticker/24hr', ['symbol' => $symbol]);
+        // Binance returns a single object for a single symbol, not a list
+        return ['list' => [$ticker]];
+    }
+
+    // Interface implementation methods that need to be adapted or implemented
+    public function getAccountBalance(): array
+    {
+        return $this->getWalletBalance();
     }
 
     public function getOrder(string $orderId): array
@@ -390,123 +202,61 @@ class BinanceApiService implements ExchangeApiServiceInterface
         throw new \Exception('Use getOrder with symbol parameter for Binance');
     }
 
-    public function getSpotOrder(string $orderId): array
+    public function cancelOrder(string $orderId): array
     {
-        throw new \Exception('Use getSpotOrder with symbol parameter for Binance');
-    }
-
-    public function cancelSpotOrder(string $orderId): array
-    {
-        throw new \Exception('Use cancelSpotOrder with symbol parameter for Binance');
-    }
-
-    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
-    {
-        return $this->cancelOrderWithSymbol($orderId, $symbol);
+        throw new \Exception('Use cancelOrder with symbol parameter for Binance');
     }
 
     public function getOpenOrders(string $symbol = null): array
     {
-        try {
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
-
-            $timestamp = time() * 1000;
-            $params = ['timestamp' => $timestamp];
-            
-            if ($symbol) {
-                $params['symbol'] = $symbol;
-            }
-
-            $queryString = http_build_query($params);
-            $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
-
-            $response = $this->client->get('/api/v3/openOrders', [
-                'headers' => ['X-MBX-APIKEY' => $this->apiKey],
-                'query' => array_merge($params, ['signature' => $signature])
-            ]);
-
-            $data = json_decode($response->getBody(), true);
-            return ['list' => $data];
-
-        } catch (\Exception $e) {
-            throw new \Exception('Failed to get open orders: ' . $e->getMessage());
+        $params = [];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
         }
+        $orders = $this->sendRequest('get', '/fapi/v1/openOrders', $params);
+        return ['list' => $orders];
     }
 
-    /**
-     * Get conditional orders (including stop loss orders) for a symbol
-     * Note: Binance handles stop-loss differently - it's typically set at position level
-     * This method returns empty for now as Binance uses different stop-loss mechanism
-     */
     public function getConditionalOrders(string $symbol): array
     {
-        // Binance doesn't have separate conditional orders like Bybit
-        // Stop-loss is typically handled at position level in futures
-        return ['list' => []];
-    }
-
-    public function getOpenSpotOrders(string $symbol = null): array
-    {
+        // Binance uses STOP_MARKET/TAKE_PROFIT_MARKET which are fetched as open orders
         return $this->getOpenOrders($symbol);
     }
 
-    public function getSpotOrderHistory(string $symbol = null, int $limit = 50): array
+    public function getOrderHistory(string $symbol = null, int $limit = 50): array
     {
-        return $this->getOrderHistory($symbol, $limit);
-    }
-
-    public function getPositions(string $symbol = null): array
-    {
-        // Binance spot doesn't have positions concept, return empty
-        return ['list' => []];
+        $params = ['limit' => $limit];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        $orders = $this->sendRequest('get', '/fapi/v1/allOrders', $params);
+        return ['list' => $orders];
     }
 
     public function closePosition(string $symbol, string $side, float $qty): array
     {
-        throw new \Exception('Binance spot does not support futures positions');
+        return $this->createOrder([
+            'symbol' => $symbol,
+            'side' => $side === 'Buy' ? 'Sell' : 'Buy', // Opposite side to close
+            'type' => 'MARKET',
+            'quantity' => (string)$qty,
+            'reduceOnly' => 'true',
+        ]);
     }
 
     public function setStopLoss(string $symbol, float $stopLoss, string $side): array
     {
-        throw new \Exception('Binance spot does not support futures stop loss');
+        return $this->setTradingStop([
+            'symbol' => $symbol,
+            'stopLoss' => (string)$stopLoss,
+            'side' => $side,
+            'positionSide' => $side === 'Buy' ? 'LONG' : 'SHORT',
+        ]);
     }
 
     public function setStopLossAdvanced(array $params): array
     {
-        throw new \Exception('Binance spot does not support futures stop loss with advanced parameters');
-    }
-
-    public function getInstrumentsInfo(string $symbol = null): array
-    {
-        return $this->getTradingPairs();
-    }
-
-    public function getSpotInstrumentsInfo(string $symbol = null): array
-    {
-        return $this->getTradingPairs();
-    }
-
-    public function getSpotTickerInfo(string $symbol): array
-    {
-        return $this->getTickerInfo($symbol);
-    }
-
-    public function getClosedPnl(string $symbol, int $limit = 50, ?int $startTime = null): array
-    {
-        // Binance spot doesn't have PnL concept for spot trading
-        return ['list' => []];
-    }
-
-    public function getHistoryOrder(string $orderId): array
-    {
-        throw new \Exception('Use getHistoryOrder with symbol parameter for Binance');
-    }
-
-    public function setTradingStop(array $params): array
-    {
-        throw new \Exception('Binance spot does not support trading stop');
+        return $this->setTradingStop($params);
     }
 
     public function getExchangeName(): string
@@ -517,8 +267,8 @@ class BinanceApiService implements ExchangeApiServiceInterface
     public function testConnection(): bool
     {
         try {
-            $response = $this->client->get('/api/v3/time');
-            return $response->getStatusCode() === 200;
+            $this->sendRequest('get', '/fapi/v1/ping');
+            return true;
         } catch (\Exception $e) {
             return false;
         }
@@ -526,155 +276,95 @@ class BinanceApiService implements ExchangeApiServiceInterface
 
     public function getRateLimits(): array
     {
+        // These are example values, refer to Binance documentation for actual limits
         return [
-            'requests_per_second' => 20,
-            'requests_per_minute' => 1200,
-            'orders_per_second' => 10,
+            'requests_per_minute' => 2400,
+            'orders_per_minute' => 1200,
+            'orders_per_10_seconds' => 300,
         ];
     }
 
-    /**
-     * Check if the API key has spot trading permissions
-     */
-    public function checkSpotAccess(): array
+    public function checkFuturesAccess(): array
     {
         try {
-            // Test account access
-            $balance = $this->getAccountBalance();
-            
-            if (!$balance['success']) {
-                throw new \Exception($balance['message']);
-            }
-            
-            // Test trading symbols access
-            $pairs = $this->getTradingPairs();
-            
-            if (!$pairs['success']) {
-                throw new \Exception($pairs['message']);
-            }
-            
-            return [
-                'success' => true,
-                'message' => 'Spot trading access confirmed',
-                'details' => [
-                    'account_access' => true,
-                    'trading_pairs_access' => true,
-                    'permissions' => ['spot_read', 'spot_trade']
-                ]
-            ];
+            $this->getWalletBalance();
+            return ['success' => true, 'message' => 'Futures access confirmed.'];
         } catch (\Exception $e) {
-            $errorMessage = $e->getMessage();
-            
-            // Parse specific Binance error codes
-            $isPermissionError = str_contains($errorMessage, 'API-key format invalid') ||
-                               str_contains($errorMessage, 'Signature for this request is not valid') ||
-                               str_contains($errorMessage, 'Invalid API-key') ||
-                               str_contains($errorMessage, 'Mandatory parameter') ||
-                               str_contains($errorMessage, 'Unauthorized');
-            
-            $isIPBlocked = str_contains($errorMessage, 'IP address not allowed') ||
-                          str_contains($errorMessage, 'Forbidden') ||
-                          str_contains($errorMessage, '403');
-            
-            return [
-                'success' => false,
-                'message' => $isIPBlocked 
-                    ? 'IP address is not whitelisted for this API key'
-                    : ($isPermissionError 
-                        ? 'API key does not have spot trading permissions'
-                        : 'Spot access validation failed: ' . $errorMessage),
-                'details' => [
-                    'error_type' => $isIPBlocked ? 'ip_blocked' : 'permission_denied',
-                    'raw_error' => $errorMessage,
-                    'permissions' => []
-                ]
-            ];
+            return ['success' => false, 'message' => 'Futures access validation failed: ' . $e->getMessage()];
         }
     }
 
-    /**
-     * Check if the API key has futures trading permissions
-     */
-    public function checkFuturesAccess(): array
+    // Spot methods - should not be used for futures, but need to exist for the interface
+    public function createSpotOrder(array $orderData): array
     {
-        // Binance spot API doesn't have futures capabilities
-        return [
-            'success' => false,
-            'message' => 'Binance spot API does not support futures trading',
-            'details' => [
-                'error_type' => 'not_supported',
-                'raw_error' => 'This is a spot-only exchange configuration',
-                'permissions' => []
-            ]
-        ];
+        throw new \Exception('This service is for futures trading, not spot.');
     }
 
-    /**
-     * Check if the current IP address is allowed by the API key
-     */
+    public function getSpotAccountBalance(): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function getSpotInstrumentsInfo(string $symbol = null): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function getSpotTickerInfo(string $symbol): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function getSpotOrderHistory(string $symbol = null, int $limit = 50): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function getSpotOrder(string $orderId): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function cancelSpotOrder(string $orderId): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function getOpenSpotOrders(string $symbol = null): array
+    {
+        throw new \Exception('This service is for futures trading, not spot.');
+    }
+
+    public function checkSpotAccess(): array
+    {
+        return ['success' => false, 'message' => 'This is a futures-only service.'];
+    }
+
     public function checkIPAccess(): array
     {
         try {
-            // Test basic API connectivity
-            $response = $this->client->get('/api/v3/time');
-            
-            if (!$this->apiKey || !$this->apiSecret) {
-                throw new \Exception('API credentials not set');
-            }
-            
-            // Test an authenticated endpoint to verify IP whitelist
-            $balance = $this->getAccountBalance();
-            
-            if (!$balance['success']) {
-                throw new \Exception($balance['message']);
-            }
-            
-            return [
-                'success' => true,
-                'message' => 'IP address is whitelisted and has API access',
-                'details' => [
-                    'ip_whitelisted' => true,
-                    'server_time' => json_decode($response->getBody(), true)['serverTime'] ?? null,
-                    'authenticated_access' => true
-                ]
-            ];
+            $this->testConnection();
+            return ['success' => true, 'message' => 'IP access confirmed.'];
         } catch (\Exception $e) {
-            $errorMessage = $e->getMessage();
-            
-            $isIPBlocked = str_contains($errorMessage, 'IP address not allowed') ||
-                          str_contains($errorMessage, 'Forbidden') ||
-                          str_contains($errorMessage, '403');
-            
-            return [
-                'success' => false,
-                'message' => $isIPBlocked 
-                    ? 'Your IP address is not in the API key whitelist'
-                    : 'IP access validation failed: ' . $errorMessage,
-                'details' => [
-                    'error_type' => $isIPBlocked ? 'ip_blocked' : 'connection_error',
-                    'raw_error' => $errorMessage,
-                    'ip_whitelisted' => false
-                ]
-            ];
+            return ['success' => false, 'message' => 'IP access validation failed: ' . $e->getMessage()];
         }
     }
 
-    /**
-     * Comprehensive API validation check (combines all checks above)
-     */
     public function validateAPIAccess(): array
     {
-        $spotCheck = $this->checkSpotAccess();
         $futuresCheck = $this->checkFuturesAccess();
         $ipCheck = $this->checkIPAccess();
         
-        $overallSuccess = $spotCheck['success'];
-        
         return [
-            'spot' => $spotCheck,
+            'spot' => ['success' => false, 'message' => 'Not applicable.'],
             'futures' => $futuresCheck,
             'ip' => $ipCheck,
-            'overall' => $overallSuccess && $ipCheck['success']
+            'overall' => $futuresCheck['success'] && $ipCheck['success']
         ];
     }
 }
