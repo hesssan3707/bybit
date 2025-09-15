@@ -117,9 +117,6 @@ Route::middleware(['auth'])->group(function () {
 
 });
 Route::get('/schedule', function() {
-	Artisan::call('exchanges:validate-active --force');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
     Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
     echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
@@ -128,12 +125,8 @@ Route::get('/schedule', function() {
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
     Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
-    return '*******************************************************************DONE************************************************************************';
+    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
     sleep(10);
-    Artisan::call('exchanges:validate-active --force');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
     Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
     echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
@@ -142,11 +135,8 @@ Route::get('/schedule', function() {
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
     Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
+    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
     sleep(10);
-    Artisan::call('exchanges:validate-active --force');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
     Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
     echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
@@ -155,11 +145,8 @@ Route::get('/schedule', function() {
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
     Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
+    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
     sleep(10);
-    Artisan::call('exchanges:validate-active --force');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
     Artisan::call('futures:lifecycle');
     print_r(Artisan::output());
     echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
@@ -168,14 +155,19 @@ Route::get('/schedule', function() {
     echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
     Artisan::call('futures:sync-sltp');
     print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl done --------------------------------------------------<br> ';
-    return 'DONE';
+    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
+    return '************************************************************DONE*******************************************************';
 })->middleware('throttle:4');
 Route::get('/get-prices', function() {
 	Artisan::call('prices:save');
     print_r(Artisan::output());
     return 'DONE';
 })->middleware('throttle:4');
+Route::get('/validate-exchanges', function() {
+	Artisan::call('exchanges:validate-active --force');
+    print_r(Artisan::output());
+    return 'DONE';
+})->middleware('throttle:2');
 
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.
