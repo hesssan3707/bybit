@@ -445,20 +445,6 @@ class FuturesController extends Controller
                     'orderLinkId' => $orderLinkId,
                 ];
 
-                if ($user->future_strict_mode) {
-                    if ($exchangeService->getExchangeName() === 'bybit') {
-                        $orderParams['positionIdx'] = $side === 'Buy' ? 1 : 2;
-                    } else {
-                        $orderParams['positionSide'] = $side === 'Buy' ? 'LONG' : 'SHORT';
-                    }
-                } else {
-                    if ($exchangeService->getExchangeName() === 'bybit') {
-                        $orderParams['positionIdx'] = 0;
-                    } else {
-                        $orderParams['positionSide'] = 'BOTH';
-                    }
-                }
-
                 $responseData = $exchangeService->createOrder($orderParams);
 
                 // Get user's current active exchange ID
