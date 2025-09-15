@@ -134,31 +134,44 @@ class FuturesSlTpSync extends Command
                 return;
             }
 
-            foreach ($filledOrders as $dbOrder) {
-                // Find matching position
-                $matchingPosition = null;
-                foreach ($positions as $pos) {
-                    if (strtolower($pos['side']) === strtolower($dbOrder->side)) {
-                        $matchingPosition = $pos;
+            foreach ($positions as $position) {
+                // Ignore positions that are not open
+                if ((float)($position['positionAmt'] ?? $position['size'] ?? 0) == 0) {
+                    continue;
+                }
+
+                // Find matching DB order
+                $matchingOrder = null;
+                foreach ($filledOrders as $order) {
+                    $positionSide = strtolower($position['side'] ?? ($position['positionSide'] ?? ''));
+                    $orderSide = strtolower($order->side);
+
+                    if ($positionSide === $orderSide) {
+                        $matchingOrder = $order;
                         break;
                     }
                 }
 
-                if (!$matchingPosition) {
-                    Log::warning("Could not find matching position for user {$userId} on {$userExchange->exchange_name}, order ID: {$dbOrder->id}");
+                if (!$matchingOrder) {
+                    Log::warning("Could not find matching DB order for position", [
+                        'user_id' => $userId,
+                        'exchange' => $userExchange->exchange_name,
+                        'symbol' => $symbol,
+                        'position' => $position
+                    ]);
                     continue;
                 }
 
-                $exchangeSl = (float)($matchingPosition['stopLoss'] ?? 0);
-                $databaseSl = (float)$dbOrder->sl;
-                $exchangeTp = (float)($matchingPosition['takeProfit'] ?? 0);
-                $databaseTp = (float)$dbOrder->tp;
+                $exchangeSl = (float)($position['stopLoss'] ?? 0);
+                $databaseSl = (float)$matchingOrder->sl;
+                $exchangeTp = (float)($position['takeProfit'] ?? 0);
+                $databaseTp = (float)$matchingOrder->tp;
 
                 // Compare SL or TP with tolerance for floating point precision
                 if (abs($exchangeSl - $databaseSl) > 0.001 || abs($exchangeTp - $databaseTp) > 0.001) {
-                    $this->warn("    SL/TP mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}). Exchange SL:{$exchangeSl}/TP:{$exchangeTp}, DB SL:{$databaseSl}/TP:{$databaseTp}. Updating...");
+                    $this->warn("    SL/TP mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$matchingOrder->side}). Exchange SL:{$exchangeSl}/TP:{$exchangeTp}, DB SL:{$databaseSl}/TP:{$databaseTp}. Updating...");
 
-                    $success = $this->updateStopLossUsingTradingStop($exchangeService, $matchingPosition, $symbol, $databaseSl, $databaseTp, $userId, $userExchange->exchange_name, $dbOrder->id);
+                    $success = $this->updateStopLossUsingTradingStop($exchangeService, $position, $symbol, $databaseSl, $databaseTp, $userId, $userExchange->exchange_name, $matchingOrder->id);
                     
                     if ($success) {
                         $this->info("    Successfully updated SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} to SL:{$databaseSl}/TP:{$databaseTp}");
@@ -166,7 +179,7 @@ class FuturesSlTpSync extends Command
                         $this->error("    Failed to update SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
                     }
                 } else {
-                    $this->info("    SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$dbOrder->side}) is in sync");
+                    $this->info("    SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$matchingOrder->side}) is in sync");
                 }
             }
 

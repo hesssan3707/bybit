@@ -121,6 +121,10 @@ class ExchangeController extends Controller
 
             $exchange->makeDefault();
 
+            $user = auth()->user();
+            $exchangeService = ExchangeFactory::createForUserExchange($exchange);
+            $exchangeService->switchPositionMode($user->future_strict_mode);
+
             return redirect()->route('exchanges.index')
                 ->with('success', "صرافی پیش‌فرض به {$exchange->exchange_display_name} تغییر یافت.");
 
