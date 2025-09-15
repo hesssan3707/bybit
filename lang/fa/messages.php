@@ -72,7 +72,7 @@ return [
     'password_reset_sent' => 'لینک بازیابی رمز عبور ارسال شد',
     'invalid_credentials' => 'نام کاربری یا رمز عبور اشتباه است',
     'account_inactive' => 'حساب کاربری شما غیرفعال است',
-    'api_disabled_strict_mode' => 'دسترسی API در حالت سخت‌گیرانه آینده غیرفعال است.',
+    'api_disabled_strict_mode' => 'دسترسی API در حالت سخت‌گیرانه غیرفعال است.',
 
     // Profile
     'profile' => 'پروفایل',
