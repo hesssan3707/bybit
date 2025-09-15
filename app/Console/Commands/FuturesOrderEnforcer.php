@@ -194,7 +194,61 @@ class FuturesOrderEnforcer extends Command
                 }
             }
 
-            // 3. Handle foreign orders (not in our DB for this user)
+            // 3. Handle local 'filled' orders (check for modifications)
+            $this->info("    Checking local filled orders for user {$userId} on {$userExchange->exchange_name}...");
+            $ourFilledOrders = Order::where('user_exchange_id', $userExchange->id)
+                ->where('status', 'filled')
+                ->get();
+
+            if (!$ourFilledOrders->isEmpty()) {
+                $positionsResult = $exchangeService->getPositions($symbol);
+                $exchangePositions = $positionsResult['list'] ?? [];
+
+                foreach ($ourFilledOrders as $dbOrder) {
+                    $matchingPosition = null;
+                    foreach ($exchangePositions as $pos) {
+                        if (strtolower($pos['side']) === strtolower($dbOrder->side)) {
+                            $matchingPosition = $pos;
+                            break;
+                        }
+                    }
+
+                    if ($matchingPosition) {
+                        $exchangeQty = (float)($matchingPosition['size'] ?? 0);
+                        $dbQty = (float)$dbOrder->amount;
+                        $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
+                        $dbPrice = (float)$dbOrder->entry_price;
+
+                        if (abs($exchangeQty - $dbQty) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
+                            $this->warn("    Closing modified filled order: {$dbOrder->order_id} (Qty/Price mismatch)");
+                            $this->warn("      DB: Qty={$dbQty}, Price={$dbPrice} | Exchange: Qty={$exchangeQty}, Price={$exchangePrice}");
+                            try {
+                                $closeSide = ($dbOrder->side === 'buy') ? 'Sell' : 'Buy';
+                                $marketCloseParams = [
+                                    'category' => 'linear',
+                                    'symbol' => $dbOrder->symbol,
+                                    'side' => $closeSide,
+                                    'orderType' => 'Market',
+                                    'qty' => (string)$exchangeQty, // Close the actual position size
+                                    'reduceOnly' => true,
+                                ];
+                                $exchangeService->createOrder($marketCloseParams);
+
+                                // Mark order as closed in DB
+                                $dbOrder->status = 'closed_by_enforcer';
+                                $dbOrder->closed_at = now();
+                                $dbOrder->save();
+
+                                $this->info("    Successfully sent market close order for position: {$dbOrder->symbol}");
+                            } catch (\Throwable $e) {
+                                $this->error("    Failed to close modified filled order {$dbOrder->order_id}: " . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Handle foreign orders (not in our DB for this user)
             // Skip SL/TP orders as they are legitimate system orders that should remain active
             $this->info("    Checking for foreign orders to cancel for user {$userId} on {$userExchange->exchange_name}...");
             $ourTrackedIds = Order::where('user_exchange_id', $userExchange->id)
