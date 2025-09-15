@@ -15,7 +15,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
 
     public function __construct()
     {
-        $this->baseUrl = 'https://api.binance.com';
+        $this->baseUrl = 'https://fapi.binance.com';
         $this->client = new Client([
             'timeout' => 30,
             'base_uri' => $this->baseUrl,
@@ -45,7 +45,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
             $queryString = "timestamp={$timestamp}";
             $signature = hash_hmac('sha256', $queryString, $this->apiSecret);
             
-            $response = $this->client->get('/api/v3/account', [
+            $response = $this->client->get('/fapi/v2/balance', [
                 'headers' => [
                     'X-MBX-APIKEY' => $this->apiKey,
                 ],
@@ -58,13 +58,13 @@ class BinanceApiService implements ExchangeApiServiceInterface
             $data = json_decode($response->getBody(), true);
             
             $balances = [];
-            foreach ($data['balances'] as $balance) {
-                if ((float)$balance['free'] > 0 || (float)$balance['locked'] > 0) {
+            foreach ($data as $balance) {
+                if ((float)$balance['balance'] > 0) {
                     $balances[] = [
                         'currency' => $balance['asset'],
-                        'free' => (float)$balance['free'],
-                        'locked' => (float)$balance['locked'],
-                        'total' => (float)$balance['free'] + (float)$balance['locked'],
+                        'free' => (float)$balance['availableBalance'],
+                        'locked' => (float)$balance['balance'] - (float)$balance['availableBalance'],
+                        'total' => (float)$balance['balance'],
                     ];
                 }
             }
@@ -72,8 +72,6 @@ class BinanceApiService implements ExchangeApiServiceInterface
             return [
                 'success' => true,
                 'balances' => $balances,
-                'total' => array_sum(array_column($balances, 'total')),
-                'available' => array_sum(array_column($balances, 'free')),
             ];
 
         } catch (\Exception $e) {
