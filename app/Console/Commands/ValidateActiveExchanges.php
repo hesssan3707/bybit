@@ -168,19 +168,16 @@ class ValidateActiveExchanges extends Command
             'overall_success' => $validation['overall'] ?? false
         ]);
         
-        // Special handling for Bybit UNIFIED accounts
-        if ($exchange->exchange_name === 'bybit') {
-            $spotDetails = $validation['spot']['details'] ?? [];
-            $futuresDetails = $validation['futures']['details'] ?? [];
-            
-            $this->line("  Bybit validation details:");
-            $this->line("    Spot: " . ($validation['spot']['success'] ? 'Success' : 'Failed') . " - " . ($validation['spot']['message'] ?? 'No message'));
-            $this->line("    Futures: " . ($validation['futures']['success'] ? 'Success' : 'Failed') . " - " . ($validation['futures']['message'] ?? 'No message'));
-            $this->line("    IP: " . ($validation['ip']['success'] ? 'Success' : 'Failed') . " - " . ($validation['ip']['message'] ?? 'No message'));
-            
-            if (isset($spotDetails['account_type'])) {
-                $this->line("    Account Type: " . $spotDetails['account_type']);
-            }
+        // Generic handling for validation details
+        $this->line("  Validation details:");
+        $this->line("    Spot: " . ($validation['spot']['success'] ? 'Success' : 'Failed') . " - " . ($validation['spot']['message'] ?? 'No message'));
+        $this->line("    Futures: " . ($validation['futures']['success'] ? 'Success' : 'Failed') . " - " . ($validation['futures']['message'] ?? 'No message'));
+        $this->line("    IP: " . ($validation['ip']['success'] ? 'Success' : 'Failed') . " - " . ($validation['ip']['message'] ?? 'No message'));
+
+        // Log extra details if they exist (e.g., account type)
+        $spotDetails = $validation['spot']['details'] ?? [];
+        if (isset($spotDetails['account_type'])) {
+            $this->line("    Account Type: " . $spotDetails['account_type']);
         }
         
         // Update validation results

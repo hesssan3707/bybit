@@ -54,6 +54,14 @@ class ApiAuthController extends Controller
                 ], 403);
             }
 
+            // Block API access for users in strict mode
+            if ($user->future_strict_mode) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('messages.api_disabled_strict_mode')
+                ], 403);
+            }
+
             // For demo: Allow login without email verification
             // In production, add email verification check:
             // if (!$user->hasVerifiedEmail()) {
