@@ -359,12 +359,44 @@ class BinanceApiService implements ExchangeApiServiceInterface
     {
         $futuresCheck = $this->checkFuturesAccess();
         $ipCheck = $this->checkIPAccess();
-        
+
         return [
             'spot' => ['success' => false, 'message' => 'Not applicable.'],
             'futures' => $futuresCheck,
             'ip' => $ipCheck,
             'overall' => $futuresCheck['success'] && $ipCheck['success']
         ];
+    }
+    public function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
+    {
+        try {
+            $query = [
+                'symbol' => $symbol,
+                'interval' => $interval,
+            ];
+
+            if ($startTime) {
+                $query['startTime'] = $startTime;
+            } else {
+                $query['limit'] = $limit;
+            }
+
+            $response = $this->client->get('/api/v3/klines', [
+                'query' => $query
+            ]);
+
+            $data = json_decode($response->getBody(), true);
+
+            return [
+                'success' => true,
+                'klines' => $data,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Binance get klines failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to get klines: ' . $e->getMessage(),
+            ];
+        }
     }
 }

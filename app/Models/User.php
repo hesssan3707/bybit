@@ -115,7 +115,7 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserExchange::class)->where('is_default', true)->where('is_active', true);
     }
-    
+
     /**
      * Get the user's current API exchange (for API token context)
      */
@@ -137,8 +137,8 @@ class User extends Authenticatable
      */
     public function isApiTokenValid()
     {
-        return $this->api_token && 
-               $this->api_token_expires_at && 
+        return $this->api_token &&
+               $this->api_token_expires_at &&
                $this->api_token_expires_at->isFuture();
     }
 
@@ -152,7 +152,7 @@ class User extends Authenticatable
         }
 
         $hashedToken = hash('sha256', $token);
-        
+
         return self::where('api_token', $hashedToken)
                   ->where('api_token_expires_at', '>', Carbon::now())
                   ->first();
@@ -165,12 +165,12 @@ class User extends Authenticatable
     {
         $token = \Illuminate\Support\Str::random(80);
         $expiresAt = Carbon::now()->addDays(30);
-        
+
         $this->update([
             'api_token' => hash('sha256', $token),
             'api_token_expires_at' => $expiresAt,
         ]);
-        
+
         return $token;
     }
 
@@ -278,12 +278,12 @@ class User extends Authenticatable
     {
         $token = \Illuminate\Support\Str::random(60);
         $expiresAt = Carbon::now()->addHours(1); // 1 hour expiry
-        
+
         $this->update([
             'password_reset_token' => $token,
             'password_reset_expires_at' => $expiresAt,
         ]);
-        
+
         return $token;
     }
 
@@ -292,8 +292,8 @@ class User extends Authenticatable
      */
     public function verifyPasswordResetToken($token)
     {
-        return $this->password_reset_token === $token && 
-               $this->password_reset_expires_at && 
+        return $this->password_reset_token === $token &&
+               $this->password_reset_expires_at &&
                $this->password_reset_expires_at->isFuture();
     }
 
@@ -362,7 +362,7 @@ class User extends Authenticatable
     /**
      * Exchange-related methods
      */
-    
+
     /**
      * Check if user has any active exchanges
      */
@@ -385,7 +385,7 @@ class User extends Authenticatable
     public function switchToExchange($exchangeName)
     {
         $exchange = $this->getExchange($exchangeName);
-        
+
         if (!$exchange) {
             throw new \Exception("Exchange {$exchangeName} not found or not active");
         }
@@ -400,7 +400,7 @@ class User extends Authenticatable
     {
         // Check if already exists
         $existing = $this->exchanges()->where('exchange_name', $exchangeName)->first();
-        
+
         if ($existing) {
             if ($existing->is_active) {
                 throw new \Exception("Exchange {$exchangeName} is already active");
@@ -424,7 +424,7 @@ class User extends Authenticatable
     /**
      * Check if user has permission to access admin features
      */
-    public function isAdmin()
+    public function isAdmin() : bool
     {
         return $this->role === 'admin';
     }

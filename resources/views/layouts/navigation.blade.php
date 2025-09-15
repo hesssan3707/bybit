@@ -18,7 +18,7 @@
     .main-header .logo {
         font-weight: bold;
         font-size: 1.5em;
-        text-shadow: white 0px 0px 10px;
+        text-shadow: white 0 0 10px;
     }
     .main-header .nav-links {
         display: flex;
