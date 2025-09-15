@@ -34,6 +34,14 @@ class ApiTokenAuth
             ], 401);
         }
 
+        // Block API access for users in strict mode
+        if ($user->future_strict_mode) {
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.api_disabled_strict_mode')
+            ], 403);
+        }
+
         // Set the authenticated user for this request
         $request->setUserResolver(function () use ($user) {
             return $user;
