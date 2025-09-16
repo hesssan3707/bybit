@@ -40,33 +40,60 @@
             margin: auto;
         }
         @media (max-width: 600px) {
-            .container {
-                max-width: 95vw;
+            body {
                 padding: 10px;
             }
+            .container {
+                max-width: 95vw;
+                padding: 5px;
+            }
             .glass-card {
-                padding: 16px;
+                padding: 20px 16px;
+                margin: 10px;
+            }
+            h1 {
+                font-size: 2.5rem;
+                margin: 10px 0;
+            }
+            p {
+                font-size: 16px;
+                margin: 15px 0;
+                line-height: 1.5;
+            }
+            a {
+                font-size: 16px;
+                padding: 14px 20px;
+                margin-top: 20px;
+                display: block;
+                width: calc(100% - 40px);
+            }
+        }
+        @media (max-width: 400px) {
+            .glass-card {
+                padding: 15px 12px;
             }
             h1 {
                 font-size: 2.2rem;
             }
-            a {
+            p {
                 font-size: 15px;
-                padding: 12px;
-                text-decoration: none;
             }
         }
         a {
+            display: inline-block;
             width: 100%;
-            padding: 14px;
+            padding: 14px 20px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             font-weight: bold;
-            margin-top: 10px;
+            margin-top: 20px;
             cursor: pointer;
-            transition: opacity 0.3s;
+            transition: all 0.3s ease;
             text-decoration: none;
+            background: var(--primary-color);
+            color: #333;
+            box-sizing: border-box;
         }
         a:hover {
             opacity: 0.9;
@@ -78,9 +105,9 @@
 </head>
 <body>
 <div class="container glass-card">
-    <h1>404</h1>
-    <p>صفحه مورد نظر یافت نشد</p>
-    <a class="back-link" href="{{route('futures.orders')}}">بازگشت به خانه</a>
+    <h1 style="direction: rtl;">404</h1>
+    <p style="direction: rtl;">متأسفانه صفحه‌ای که دنبال آن می‌گردید وجود ندارد.</p>
+    <a class="back-link" href="{{route('futures.orders')}}" style="direction: rtl;">بازگشت به خانه</a>
 </div>
 </body>
 </html>

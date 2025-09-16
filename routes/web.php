@@ -47,10 +47,15 @@ Route::post('password/reset', [PasswordController::class, 'resetPassword'])->nam
 // Public API Documentation Route
 Route::get('api-documentation', [ApiDocumentationController::class, 'index'])->name('api.documentation');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/', function () {
+// Root route - handles both authenticated and unauthenticated users
+Route::get('/', function () {
+    if (auth()->check()) {
         return redirect()->route('futures.orders');
-    });
+    }
+    return redirect()->route('login');
+})->name('home');
+
+Route::middleware('auth')->group(function () {
 
     Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
