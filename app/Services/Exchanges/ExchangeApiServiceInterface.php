@@ -194,4 +194,10 @@ interface ExchangeApiServiceInterface
      * @return array ['spot' => array, 'futures' => array, 'ip' => array, 'overall' => bool]
      */
     public function validateAPIAccess(): array;
+
+    /**
+     * Get account information including position mode status
+     * @return array ['positionMode' => string, 'hedgeMode' => bool, 'details' => array]
+     */
+    public function getAccountInfo(): array;
 }

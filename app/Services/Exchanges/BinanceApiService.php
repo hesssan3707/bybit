@@ -157,9 +157,39 @@ class BinanceApiService implements ExchangeApiServiceInterface
 
     public function switchPositionMode(bool $hedgeMode): array
     {
-        return $this->sendRequest('post', '/fapi/v1/positionSide/dual', [
+        $result = $this->sendRequest('post', '/fapi/v1/positionSide/dual', [
             'dualSidePosition' => $hedgeMode ? 'true' : 'false'
         ], true);
+        
+        // Update database position mode after successful switch
+        $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
+        
+        return $result;
+    }
+    
+    private function updateDatabasePositionMode(string $positionMode): void
+    {
+        try {
+            // Find the user exchange record for this API instance
+            $userExchange = \App\Models\UserExchange::where('api_key', $this->apiKey)
+                ->where('exchange_name', 'binance')
+                ->first();
+                
+            if ($userExchange) {
+                $userExchange->update(['position_mode' => $positionMode]);
+                \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
+                    'user_exchange_id' => $userExchange->id,
+                    'position_mode' => $positionMode,
+                    'exchange' => 'binance'
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
+                'error' => $e->getMessage(),
+                'position_mode' => $positionMode,
+                'exchange' => 'binance'
+            ]);
+        }
     }
 
     public function getPositionIdx(array $position): int
@@ -391,5 +421,59 @@ class BinanceApiService implements ExchangeApiServiceInterface
             'ip' => $ipCheck,
             'overall' => $futuresCheck['success'] && $ipCheck['success']
         ];
+    }
+
+    /**
+     * Get account information including position mode status
+     * For Binance, we check the position mode by examining existing positions
+     */
+    public function getAccountInfo(): array
+    {
+        try {
+            // Try to get positions to determine position mode
+            $positions = $this->getPositions();
+            
+            // Check if any position has positionSide indicating hedge mode
+            $hedgeMode = false;
+            $positionMode = 'one-way';
+            
+            if (isset($positions['list']) && !empty($positions['list'])) {
+                foreach ($positions['list'] as $position) {
+                    if (isset($position['positionSide']) && 
+                        in_array(strtoupper($position['positionSide']), ['LONG', 'SHORT'])) {
+                        $hedgeMode = true;
+                        $positionMode = 'hedge';
+                        break;
+                    }
+                }
+            } else {
+                // If no positions exist, we can't determine mode from positions
+                // For now, assume one-way mode as default
+                $hedgeMode = false;
+                $positionMode = 'one-way';
+            }
+            
+            // Update database with detected position mode
+            $this->updateDatabasePositionMode($positionMode);
+            
+            return [
+                'positionMode' => $positionMode,
+                'hedgeMode' => $hedgeMode,
+                'details' => [
+                    'exchange' => 'binance',
+                    'method' => 'position_analysis',
+                    'positions_checked' => count($positions['list'] ?? [])
+                ]
+            ];
+        } catch (\Exception $e) {
+            return [
+                'positionMode' => 'unknown',
+                'hedgeMode' => false,
+                'details' => [
+                    'error' => $e->getMessage(),
+                    'exchange' => 'binance'
+                ]
+            ];
+        }
     }
 }

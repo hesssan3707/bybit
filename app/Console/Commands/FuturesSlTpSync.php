@@ -175,11 +175,17 @@ class FuturesSlTpSync extends Command
                     
                     if ($success) {
                         $this->info("    Successfully updated SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} to SL:{$databaseSl}/TP:{$databaseTp}");
+                        
+                        // Additionally ensure TP is set as reduce-only order if needed
+                        $this->ensureTpAsReduceOrder($exchangeService, $position, $symbol, $databaseTp, $matchingOrder, $userId, $userExchange->exchange_name);
                     } else {
                         $this->error("    Failed to update SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
                     }
                 } else {
                     $this->info("    SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$matchingOrder->side}) is in sync");
+                    
+                    // Even if SL/TP are in sync, ensure TP is properly set as reduce-only order
+                    $this->ensureTpAsReduceOrder($exchangeService, $position, $symbol, $databaseTp, $matchingOrder, $userId, $userExchange->exchange_name);
                 }
             }
 
@@ -279,6 +285,96 @@ class FuturesSlTpSync extends Command
             ]);
 
             return false;
+        }
+    }
+
+    /**
+     * Ensure TP is set as a reduce-only order
+     * TP must always be of type reduce and function as closing the main order
+     * 
+     * @param ExchangeApiServiceInterface $exchangeService
+     * @param array $position
+     * @param string $symbol
+     * @param float $targetTp
+     * @param object $matchingOrder
+     * @param int $userId
+     * @param string $exchangeName
+     */
+    private function ensureTpAsReduceOrder(
+        ExchangeApiServiceInterface $exchangeService,
+        array $position,
+        string $symbol,
+        float $targetTp,
+        object $matchingOrder,
+        int $userId,
+        string $exchangeName
+    ): void {
+        try {
+            if ($targetTp <= 0) {
+                return; // No TP to set
+            }
+
+            // Get current open orders to check for existing TP orders
+            $openOrdersResult = $exchangeService->getOpenOrders($symbol);
+            $openOrders = $openOrdersResult['list'] ?? [];
+            
+            $positionSize = abs((float)($position['size'] ?? 0));
+            $positionSide = strtolower($position['side'] ?? '');
+            $tpSide = ($positionSide === 'buy') ? 'Sell' : 'Buy'; // Opposite side for TP
+            
+            // Check if there's already a valid TP order
+            $hasValidTpOrder = false;
+            foreach ($openOrders as $order) {
+                $orderPrice = (float)($order['price'] ?? $order['triggerPrice'] ?? 0);
+                $orderSide = strtolower($order['side'] ?? '');
+                $isReduceOnly = ($order['reduceOnly'] ?? false) === true;
+                
+                // Check if this is our TP order
+                if ($isReduceOnly && 
+                    $orderSide === strtolower($tpSide) && 
+                    abs($orderPrice - $targetTp) < 0.01) {
+                    $hasValidTpOrder = true;
+                    $this->info("      Valid TP reduce-only order already exists at {$targetTp}");
+                    break;
+                }
+            }
+            
+            if (!$hasValidTpOrder) {
+                // Create TP as reduce-only order
+                $positionIdx = $this->determinePositionIdx($position);
+                
+                $tpOrderParams = [
+                    'category' => 'linear',
+                    'symbol' => $symbol,
+                    'side' => $tpSide,
+                    'orderType' => 'Limit',
+                    'qty' => (string)$positionSize,
+                    'price' => (string)$targetTp,
+                    'reduceOnly' => true,
+                    'positionIdx' => $positionIdx,
+                    'timeInForce' => 'GTC'
+                ];
+                
+                $this->info("      Creating TP reduce-only order at {$targetTp} for {$positionSize} {$symbol}");
+                
+                $result = $exchangeService->createOrder($tpOrderParams);
+                
+                if (isset($result['orderId'])) {
+                    $this->info("      Successfully created TP reduce-only order: {$result['orderId']}");
+                } else {
+                    $this->warn("      TP order creation response: " . json_encode($result));
+                }
+            }
+            
+        } catch (\Exception $e) {
+            $this->warn("      Failed to ensure TP as reduce-only order: " . $e->getMessage());
+            Log::warning("TP reduce-only order creation failed", [
+                'user_id' => $userId,
+                'exchange' => $exchangeName,
+                'symbol' => $symbol,
+                'target_tp' => $targetTp,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 

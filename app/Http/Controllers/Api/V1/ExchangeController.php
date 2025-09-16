@@ -71,10 +71,19 @@ class ExchangeController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        auth()->user()->exchanges()->update(['is_active' => false]);
-        $exchange->update(['is_active' => true]);
-
-        return response()->json(['success' => true, 'message' => "Switched to {$exchange->exchange_name} successfully."]);
+        try {
+            auth()->user()->exchanges()->update(['is_active' => false]);
+            $exchange->update(['is_active' => true]);
+            
+            // Always switch to hedge mode when switching exchanges
+            $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($exchange);
+            $exchangeService->switchPositionMode(true);
+            
+            return response()->json(['success' => true, 'message' => "Switched to {$exchange->exchange_name} successfully and set to hedge mode."]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Exchange switch failed in API', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to switch exchange or set hedge mode.'], 500);
+        }
     }
 
     public function testConnection(UserExchange $exchange)

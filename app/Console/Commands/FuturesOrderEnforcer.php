@@ -248,13 +248,18 @@ class FuturesOrderEnforcer extends Command
             }
 
             // 4. Handle foreign orders (not in our DB for this user)
-            // Skip SL/TP orders as they are legitimate system orders that should remain active
+            // Improved logic to validate TP/SL orders against our registered orders
             $this->info("    Checking for foreign orders to cancel for user {$userId} on {$userExchange->exchange_name}...");
             $ourTrackedIds = Order::where('user_exchange_id', $userExchange->id)
                 ->whereIn('status', ['pending', 'filled'])
                 ->pluck('order_id')
                 ->filter()
                 ->all();
+
+            // Get our registered orders with their TP/SL values for validation
+            $ourRegisteredOrders = Order::where('user_exchange_id', $userExchange->id)
+                ->whereIn('status', ['pending', 'filled'])
+                ->get();
 
             $foreignOrderIds = array_diff($exchangeOpenOrderIds, $ourTrackedIds);
 
@@ -266,15 +271,58 @@ class FuturesOrderEnforcer extends Command
                     try {
                         $orderToCancel = $exchangeOpenOrdersMap[$orderId] ?? null;
 
-                        // Skip SL/TP orders - these are legitimate system orders
                         if ($orderToCancel) {
                             $isReduceOnly = ($orderToCancel['reduceOnly'] ?? false) === true;
-                            $isStopLoss = !empty($orderToCancel['stopLoss']) || $orderToCancel['orderType'] === 'Market' && $isReduceOnly;
-                            $isTakeProfit = !empty($orderToCancel['takeProfit']) || (isset($orderToCancel['triggerPrice']) && $isReduceOnly);
+                            $orderPrice = (float)($orderToCancel['price'] ?? $orderToCancel['triggerPrice'] ?? 0);
+                            $orderSide = strtolower($orderToCancel['side'] ?? '');
+                            
+                            // Check if this is a TP/SL order
+                            $isStopLoss = !empty($orderToCancel['stopLoss']) || 
+                                         ($orderToCancel['orderType'] === 'Market' && $isReduceOnly) ||
+                                         (isset($orderToCancel['triggerPrice']) && $isReduceOnly);
+                            $isTakeProfit = !empty($orderToCancel['takeProfit']) || 
+                                           (isset($orderToCancel['triggerPrice']) && $isReduceOnly);
 
                             if ($isReduceOnly || $isStopLoss || $isTakeProfit) {
-                                $this->info("  Skipping SL/TP order: {$orderId} (reduceOnly: {$isReduceOnly})");
-                                continue;
+                                // Validate TP/SL orders against our registered orders
+                                $isValidTpSl = false;
+                                
+                                foreach ($ourRegisteredOrders as $registeredOrder) {
+                                    $registeredSl = (float)$registeredOrder->sl;
+                                    $registeredTp = (float)$registeredOrder->tp;
+                                    $registeredSide = strtolower($registeredOrder->side);
+                                    
+                                    // Check if this TP/SL matches any of our registered orders
+                                    $priceMatches = false;
+                                    
+                                    // For SL orders: price should match our SL and side should be opposite
+                                    if ($isStopLoss && abs($orderPrice - $registeredSl) < 0.01) {
+                                        $expectedSlSide = ($registeredSide === 'buy') ? 'sell' : 'buy';
+                                        if ($orderSide === $expectedSlSide) {
+                                            $priceMatches = true;
+                                        }
+                                    }
+                                    
+                                    // For TP orders: price should match our TP and side should be opposite
+                                    if ($isTakeProfit && abs($orderPrice - $registeredTp) < 0.01) {
+                                        $expectedTpSide = ($registeredSide === 'buy') ? 'sell' : 'buy';
+                                        if ($orderSide === $expectedTpSide) {
+                                            $priceMatches = true;
+                                        }
+                                    }
+                                    
+                                    if ($priceMatches) {
+                                        $isValidTpSl = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if ($isValidTpSl) {
+                                    $this->info("  Keeping valid TP/SL order: {$orderId} (price: {$orderPrice})");
+                                    continue;
+                                } else {
+                                    $this->warn("  Removing invalid TP/SL order: {$orderId} (price: {$orderPrice} doesn't match any registered order)");
+                                }
                             }
                         }
 

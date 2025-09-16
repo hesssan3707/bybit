@@ -293,6 +293,27 @@ class FuturesController extends Controller
                     $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
+                
+                // Check position mode requirement for strict mode users
+                $userExchange = $user->activeExchanges()->first();
+                if ($userExchange) {
+                    $dbPositionMode = $userExchange->position_mode;
+                    
+                    // If database shows one-way mode, don't allow order placement
+                    if ($dbPositionMode === 'one-way') {
+                        return back()->withErrors(['msg' => 'در حالت سخت‌گیرانه، نمی‌توانید در حالت one-way معامله کنید. لطفاً ابتدا حالت hedge را فعال کنید.'])->withInput();
+                    }
+                    
+                    // If database shows hedge mode, verify with exchange
+                    if ($dbPositionMode === 'hedge') {
+                        $accountInfo = $exchangeService->getAccountInfo();
+                        if (!$accountInfo['hedgeMode']) {
+                            // Update database if exchange shows different mode
+                            $userExchange->update(['position_mode' => 'one-way']);
+                            return back()->withErrors(['msg' => 'حالت صرافی با پایگاه داده همخوانی ندارد. لطفاً حالت hedge را مجدداً فعال کنید.'])->withInput();
+                        }
+                    }
+                }
             }
             // Apply strict mode risk percentage cap (only in strict mode)
             if ($user->future_strict_mode) {

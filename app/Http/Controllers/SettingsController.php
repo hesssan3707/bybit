@@ -68,6 +68,7 @@ class SettingsController extends Controller
                 try {
                     $exchangeService = ExchangeFactory::createForUserExchange($exchange);
                     $exchangeService->switchPositionMode(true); // true for hedge mode
+                    // Database position mode is updated automatically in the switchPositionMode method
                 } catch (\Exception $e) {
                     Log::error("Failed to switch {$exchange->exchange_name} to hedge mode for user {$user->id}", ['error' => $e->getMessage()]);
                     // Decide if we should fail the whole process or just log the error

@@ -148,11 +148,41 @@ class BybitApiService implements ExchangeApiServiceInterface
     public function switchPositionMode(bool $hedgeMode): array
     {
         $mode = $hedgeMode ? 3 : 0;
-        return $this->sendRequest('POST', '/v5/position/switch-mode', [
+        $result = $this->sendRequest('POST', '/v5/position/switch-mode', [
             'category' => 'linear',
             'mode' => $mode,
             'coin' => 'USDT'
         ]);
+        
+        // Update database position mode after successful switch
+        $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
+        
+        return $result;
+    }
+    
+    private function updateDatabasePositionMode(string $positionMode): void
+    {
+        try {
+            // Find the user exchange record for this API instance
+            $userExchange = \App\Models\UserExchange::where('api_key', $this->apiKey)
+                ->where('exchange_name', 'bybit')
+                ->first();
+                
+            if ($userExchange) {
+                $userExchange->update(['position_mode' => $positionMode]);
+                \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
+                    'user_exchange_id' => $userExchange->id,
+                    'position_mode' => $positionMode,
+                    'exchange' => 'bybit'
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
+                'error' => $e->getMessage(),
+                'position_mode' => $positionMode,
+                'exchange' => 'bybit'
+            ]);
+        }
     }
 
     public function getPositionIdx(array $position): int
@@ -700,5 +730,59 @@ class BybitApiService implements ExchangeApiServiceInterface
             'ip' => $ipCheck,
             'overall' => $overallSuccess && $ipCheck['success']
         ];
+    }
+
+    /**
+     * Get account information including position mode status
+     * For Bybit, we check the position mode by examining existing positions
+     * or by trying to get account info that includes position mode
+     */
+    public function getAccountInfo(): array
+    {
+        try {
+            // Try to get positions to determine position mode
+            $positions = $this->getPositions();
+            
+            // Check if any position has positionIdx indicating hedge mode
+            $hedgeMode = false;
+            $positionMode = 'one-way';
+            
+            if (isset($positions['list']) && !empty($positions['list'])) {
+                foreach ($positions['list'] as $position) {
+                    if (isset($position['positionIdx']) && (int)$position['positionIdx'] > 0) {
+                        $hedgeMode = true;
+                        $positionMode = 'hedge';
+                        break;
+                    }
+                }
+            } else {
+                // If no positions exist, we can't determine mode from positions
+                // For now, assume one-way mode as default
+                $hedgeMode = false;
+                $positionMode = 'one-way';
+            }
+            
+            // Update database with detected position mode
+            $this->updateDatabasePositionMode($positionMode);
+            
+            return [
+                'positionMode' => $positionMode,
+                'hedgeMode' => $hedgeMode,
+                'details' => [
+                    'exchange' => 'bybit',
+                    'method' => 'position_analysis',
+                    'positions_checked' => count($positions['list'] ?? [])
+                ]
+            ];
+        } catch (\Exception $e) {
+            return [
+                'positionMode' => 'unknown',
+                'hedgeMode' => false,
+                'details' => [
+                    'error' => $e->getMessage(),
+                    'exchange' => 'bybit'
+                ]
+            ];
+        }
     }
 }
