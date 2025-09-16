@@ -35,7 +35,7 @@ class PasswordController extends Controller
 
         try {
             $user = User::findByEmail($request->email);
-            
+
             if (!$user) {
                 return back()->withErrors(['email' => 'این ایمیل در سیستم یافت نشد.']);
             }
@@ -43,16 +43,16 @@ class PasswordController extends Controller
             // Generate password reset token
             $token = $user->generatePasswordResetToken();
 
-            // In a real application, you would send an email here
-            // For now, we'll just return the token (for demo purposes)
-            // Mail::to($user->email)->send(new PasswordResetMail($user, $token));
-
-            // For demo/testing purposes, show token in session
-            session()->flash('reset_token', $token);
+            // Send password reset link to user's email
+            $resetUrl = route('password.reset.form', ['token' => $token, 'email' => $user->email]);
+            Mail::send('emails.password_reset_link', ['resetUrl' => $resetUrl], function($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('لینک بازیابی رمز عبور');
+            });
             session()->flash('user_email', $user->email);
 
-            return redirect()->route('password.reset.form', ['token' => $token])
-                ->with('success', 'لینک بازیابی رمز عبور ارسال شد. (در محیط تست، از لینک زیر استفاده کنید)');
+            return redirect()->route('login')
+                ->with('success', 'لینک بازیابی رمز عبور به ایمیل شما ارسال شد. لطفاً ایمیل خود را بررسی کنید.');
 
         } catch (\Exception $e) {
             Log::error('Password reset failed: ' . $e->getMessage());
@@ -88,7 +88,7 @@ class PasswordController extends Controller
 
         try {
             $user = User::findByEmail($request->email);
-            
+
             if (!$user) {
                 return back()->withErrors(['email' => 'کاربری با این ایمیل یافت نشد.']);
             }
@@ -172,7 +172,7 @@ class PasswordController extends Controller
             }
 
             $user = User::findByEmail($request->email);
-            
+
             if (!$user) {
                 return response()->json([
                     'success' => false,
@@ -224,7 +224,7 @@ class PasswordController extends Controller
             }
 
             $user = User::findByEmail($request->email);
-            
+
             if (!$user) {
                 return response()->json([
                     'success' => false,
