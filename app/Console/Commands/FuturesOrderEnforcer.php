@@ -17,7 +17,7 @@ class FuturesOrderEnforcer extends Command
     public function handle(): int
     {
         $this->info('Starting futures order enforcement...');
-        
+
         try {
             if ($this->option('user')) {
                 $this->enforceForUser($this->option('user'));
@@ -38,16 +38,16 @@ class FuturesOrderEnforcer extends Command
     {
         // Only process users with future_strict_mode enabled
         $users = User::where('future_strict_mode', true)
-                    ->whereHas('activeExchanges')
-                    ->get();
-        
+            ->whereHas('activeExchanges')
+            ->get();
+
         if ($users->isEmpty()) {
             $this->info('No users with future strict mode enabled and active exchanges found.');
             return;
         }
 
         $this->info("Found {$users->count()} users with future strict mode enabled and active exchanges.");
-        
+
         foreach ($users as $user) {
             try {
                 $this->enforceForUser($user->id);
@@ -61,7 +61,7 @@ class FuturesOrderEnforcer extends Command
     private function enforceForUser(int $userId): void
     {
         $this->info("Enforcing orders for user {$userId}...");
-        
+
         $user = User::find($userId);
         if (!$user) {
             $this->warn("User {$userId} not found.");
@@ -98,7 +98,7 @@ class FuturesOrderEnforcer extends Command
     private function enforceForUserExchange(int $userId, $userExchange): void
     {
         $this->info("  Enforcing orders for user {$userId} on {$userExchange->exchange_name}...");
-        
+
         try {
             $exchangeService = ExchangeFactory::create(
                 $userExchange->exchange_name,
@@ -128,7 +128,7 @@ class FuturesOrderEnforcer extends Command
             $ourPendingOrders = Order::where('user_exchange_id', $userExchange->id)
                 ->where('status', 'pending')
                 ->get();
-            
+
             $now = time();
 
             foreach ($ourPendingOrders as $dbOrder) {
@@ -170,16 +170,15 @@ class FuturesOrderEnforcer extends Command
                     }
                     continue;
                 }
-                
+
                 // Check if order has reached cancel price
                 if ($dbOrder->cancel_price) {
                     try {
-                        $ticker = $exchangeService->getTicker($symbol);
-                        $currentPrice = (float)$ticker['lastPrice'];
-                        
-                        $shouldCancel = ($dbOrder->side === 'buy' && $currentPrice >= $dbOrder->cancel_price) || 
-                                        ($dbOrder->side === 'sell' && $currentPrice <= $dbOrder->cancel_price);
-                        
+                        $klines = $exchangeService->getKlines($symbol , 1 , 2);
+
+                        $shouldCancel = ($dbOrder->side === 'buy' && max($klines['list'][0][2],$klines['list'][1][2]) >= $dbOrder->cancel_price) ||
+                            ($dbOrder->side === 'sell' && min($klines['list'][0][3],$klines['list'][1][3]) <= $dbOrder->cancel_price);
+
                         if ($shouldCancel) {
                             $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
                             $dbOrder->status = 'canceled';
@@ -266,19 +265,19 @@ class FuturesOrderEnforcer extends Command
                 foreach ($foreignOrderIds as $orderId) {
                     try {
                         $orderToCancel = $exchangeOpenOrdersMap[$orderId] ?? null;
-                        
+
                         // Skip SL/TP orders - these are legitimate system orders
                         if ($orderToCancel) {
                             $isReduceOnly = ($orderToCancel['reduceOnly'] ?? false) === true;
                             $isStopLoss = !empty($orderToCancel['stopLoss']) || $orderToCancel['orderType'] === 'Market' && $isReduceOnly;
                             $isTakeProfit = !empty($orderToCancel['takeProfit']) || (isset($orderToCancel['triggerPrice']) && $isReduceOnly);
-                            
+
                             if ($isReduceOnly || $isStopLoss || $isTakeProfit) {
                                 $this->info("  Skipping SL/TP order: {$orderId} (reduceOnly: {$isReduceOnly})");
                                 continue;
                             }
                         }
-                        
+
                         $exchangeService->cancelOrderWithSymbol($orderId, $symbol);
                         $this->info("  Canceled foreign order: {$orderId}");
                     } catch (\Throwable $e) {

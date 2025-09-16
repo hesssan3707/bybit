@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     use HasFactory;
-    
+
     protected $table = "orders";
     protected $guarded = [];
     protected $fillable = [
         'user_exchange_id', 'order_id', 'order_link_id', 'symbol', 'entry_price', 'tp', 'sl', 'steps',
-        'expire_minutes', 'status', 'closed_at', 'side', 'amount', 'entry_low', 'entry_high'
+        'expire_minutes', 'status', 'closed_at', 'side', 'amount', 'entry_low', 'entry_high','cancel_price'
     ];
 
     protected $casts = [

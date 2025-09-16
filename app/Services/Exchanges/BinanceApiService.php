@@ -33,6 +33,27 @@ class BinanceApiService implements ExchangeApiServiceInterface
         return hash_hmac('sha256', $query, $this->apiSecret);
     }
 
+    private function sendRequestWithoutCredentials(string $method, string $endpoint, array $params = [])
+    {
+        $client = Http::withHeaders($headers)->timeout(10)->connectTimeout(5);
+
+        $response = $client->{$method}("{$this->baseUrl}{$endpoint}", $params);
+
+        $responseData = $response->json();
+
+        if ($response->failed() || (isset($responseData['code']) && $responseData['code'] != 200)) {
+            $errorCode = $responseData['code'] ?? 'N/A';
+            $errorMsg = $responseData['msg'] ?? 'Unknown error';
+            $requestBody = json_encode($params);
+            $fullResponse = $response->body();
+            throw new \Exception(
+                "Binance API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
+            );
+        }
+
+        return $responseData;
+    }
+
     private function sendRequest(string $method, string $endpoint, array $params = [], $isPost = false)
     {
         if (!$this->apiKey || !$this->apiSecret) {
@@ -186,9 +207,13 @@ class BinanceApiService implements ExchangeApiServiceInterface
 
     public function getTickerInfo(string $symbol): array
     {
-        $ticker = $this->sendRequest('get', '/fapi/v1/ticker/24hr', ['symbol' => $symbol]);
+        $ticker = $this->sendRequestWithoutCredentials('get', '/fapi/v1/ticker/24hr', ['symbol' => $symbol]);
         // Binance returns a single object for a single symbol, not a list
         return ['list' => [$ticker]];
+    }
+    public function getKlines(string $symbol , string $interval , $limit): array
+    {
+        return $this->sendRequestWithoutCredentials('GET', '/api/v3/klines', ['interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     // Interface implementation methods that need to be adapted or implemented

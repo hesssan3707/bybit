@@ -32,6 +32,25 @@ class BingXApiService implements ExchangeApiServiceInterface
         return hash_hmac('sha256', $query, $this->apiSecret);
     }
 
+    private function sendRequestWithoutCredentials(string $method, string $endpoint, array $params = [])
+    {
+
+        $queryString = http_build_query($params, '', '&');
+
+        $response = Http::withHeaders($headers)->timeout(10)->connectTimeout(5)->{$method}("{$this->baseUrl}{$endpoint}?{$queryString}");
+
+        $responseData = $response->json();
+
+        if ($response->failed() || ($responseData['code'] ?? 0) !== 0) {
+            $errorCode = $responseData['code'] ?? 'N/A';
+            $errorMsg = $responseData['msg'] ?? 'Unknown error';
+            throw new \Exception(
+                "BingX API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}"
+            );
+        }
+
+        return $responseData['data'];
+    }
     private function sendRequest(string $method, string $endpoint, array $params = [])
     {
         if (!$this->apiKey || !$this->apiSecret) {
@@ -148,8 +167,12 @@ class BingXApiService implements ExchangeApiServiceInterface
 
     public function getTickerInfo(string $symbol): array
     {
-        $ticker = $this->sendRequest('get', '/openApi/swap/v2/quote/ticker', ['symbol' => $symbol]);
+        $ticker = $this->sendRequestWithoutCredentials('get', '/openApi/swap/v2/quote/ticker', ['symbol' => $symbol]);
         return ['list' => $ticker];
+    }
+    public function getKlines(string $symbol , string $interval , $limit): array
+    {
+        return $this->sendRequestWithoutCredentials('GET', '/openApi/spot/v1/market/kline', ['interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     public function getAccountBalance(): array
@@ -317,7 +340,7 @@ class BingXApiService implements ExchangeApiServiceInterface
     {
         $futuresCheck = $this->checkFuturesAccess();
         $ipCheck = $this->checkIPAccess();
-        
+
         return [
             'spot' => ['success' => false, 'message' => 'Not applicable.'],
             'futures' => $futuresCheck,

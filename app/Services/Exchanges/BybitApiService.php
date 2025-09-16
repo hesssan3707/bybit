@@ -2,6 +2,7 @@
 
 namespace App\Services\Exchanges;
 
+use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Http;
 
 class BybitApiService implements ExchangeApiServiceInterface
@@ -34,6 +35,29 @@ class BybitApiService implements ExchangeApiServiceInterface
         return hash_hmac('sha256', $payload, $this->apiSecret);
     }
 
+    private function sendRequestWithoutCredentials(string $method, string $endpoint, array $params = [])
+    {
+        $headers = [
+            'Content-Type' => 'application/json',
+        ];
+
+        $response = Http::withHeaders($headers)->timeout(10)->connectTimeout(5)->{$method}("{$this->baseUrl}{$endpoint}", $params);
+
+        $responseData = $response->json();
+
+        if ($response->failed() || ($responseData['retCode'] ?? 0) !== 0) {
+            $errorCode = $responseData['retCode'] ?? 'N/A';
+            $errorMsg = $responseData['retMsg'] ?? 'Unknown error';
+            $requestBody = json_encode($params);
+            // Add the full response body to the exception message for better debugging.
+            $fullResponse = $response->body();
+            throw new \Exception(
+                "Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
+            );
+        }
+
+        return $responseData['result'];
+    }
     private function sendRequest(string $method, string $endpoint, array $params = [])
     {
         // Validate API credentials are set
@@ -182,12 +206,16 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     public function getTickerInfo(string $symbol): array
     {
-        return $this->sendRequest('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
+        return $this->sendRequestWithoutCredentials('GET', '/v5/market/tickers', ['category' => 'linear', 'symbol' => $symbol]);
+    }
+    public function getKlines(string $symbol , string $interval , $limit): array
+    {
+        return $this->sendRequestWithoutCredentials('GET', '/v5/market/kline', ['category' => 'linear' , 'interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     /**
      * Create a spot trading order
-     * 
+     *
      * @param array $orderData - Order parameters including:
      *   - side: 'Buy' or 'Sell'
      *   - symbol: Trading pair (e.g., 'BTCUSDT')
@@ -259,11 +287,11 @@ class BybitApiService implements ExchangeApiServiceInterface
             'category' => 'spot',
             'limit' => $limit,
         ];
-        
+
         if ($symbol) {
             $params['symbol'] = $symbol;
         }
-        
+
         return $this->sendRequest('GET', '/v5/order/history', $params);
     }
 
@@ -393,21 +421,21 @@ class BybitApiService implements ExchangeApiServiceInterface
         if (!isset($params['symbol']) || empty($params['symbol'])) {
             throw new \Exception('Symbol is required for setStopLossAdvanced');
         }
-        
+
         if (!isset($params['positionIdx']) && !array_key_exists('positionIdx', $params)) {
             throw new \Exception('positionIdx is required for Bybit API v5 set-trading-stop endpoint');
         }
-        
+
         // Ensure required parameters are set with proper defaults
         $params['category'] = $params['category'] ?? 'linear';
         $params['tpslMode'] = $params['tpslMode'] ?? 'Full';
         $params['positionIdx'] = isset($params['positionIdx']) ? (int)$params['positionIdx'] : 0;
-        
+
         // Validate tpslMode
         if (!in_array($params['tpslMode'], ['Full', 'Partial'])) {
             throw new \Exception('tpslMode must be either "Full" or "Partial"');
         }
-        
+
         // For Partial mode, validate required parameters
         if ($params['tpslMode'] === 'Partial') {
             if (isset($params['stopLoss']) && $params['stopLoss'] !== '0' && !isset($params['slSize'])) {
@@ -421,7 +449,7 @@ class BybitApiService implements ExchangeApiServiceInterface
                 throw new \Exception('tpSize and slSize must be equal in Partial mode when both are specified');
             }
         }
-        
+
         // Log the parameters for debugging
         \Log::debug('BybitApiService setStopLossAdvanced called', [
             'symbol' => $params['symbol'],
@@ -431,7 +459,7 @@ class BybitApiService implements ExchangeApiServiceInterface
             'takeProfit' => $params['takeProfit'] ?? 'not_set',
             'all_params' => $params
         ]);
-        
+
         try {
             return $this->setTradingStop($params);
         } catch (\Exception $e) {
@@ -441,7 +469,7 @@ class BybitApiService implements ExchangeApiServiceInterface
                 'error' => $e->getMessage(),
                 'params' => $params
             ]);
-            
+
             // Re-throw with more context
             throw new \Exception(
                 "Failed to set stop loss for {$params['symbol']}: " . $e->getMessage()
@@ -482,10 +510,10 @@ class BybitApiService implements ExchangeApiServiceInterface
         try {
             // For Bybit, test UNIFIED wallet access (which includes spot trading)
             $balance = $this->getWalletBalance('UNIFIED');
-            
+
             // Test spot instruments access
             $instruments = $this->getSpotInstrumentsInfo();
-            
+
             return [
                 'success' => true,
                 'message' => 'Spot trading access confirmed via UNIFIED account',
@@ -498,7 +526,7 @@ class BybitApiService implements ExchangeApiServiceInterface
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
-            
+
             // Special handling for Bybit error 10001 with "accountType only support UNIFIED"
             // This actually indicates the user HAS UNIFIED account access
             if (str_contains($errorMessage, '10001') && str_contains($errorMessage, 'accountType only support UNIFIED')) {
@@ -530,22 +558,22 @@ class BybitApiService implements ExchangeApiServiceInterface
                     ];
                 }
             }
-            
+
             // Parse other specific Bybit error codes
             $isPermissionError = str_contains($errorMessage, '10001') || // Invalid API key
                                str_contains($errorMessage, '10003') || // Missing required parameter
                                str_contains($errorMessage, '10004') || // Invalid signature
                                str_contains($errorMessage, '10005') || // Permission denied
                                str_contains($errorMessage, '10006'); // Too many requests
-            
+
             $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
                           str_contains($errorMessage, '403');
-            
+
             return [
                 'success' => false,
-                'message' => $isIPBlocked 
+                'message' => $isIPBlocked
                     ? 'IP address is not whitelisted for this API key'
-                    : ($isPermissionError 
+                    : ($isPermissionError
                         ? 'API key does not have trading permissions'
                         : 'Spot access validation failed: ' . $errorMessage),
                 'details' => [
@@ -566,13 +594,13 @@ class BybitApiService implements ExchangeApiServiceInterface
         try {
             // Test futures wallet access via UNIFIED account
             $balance = $this->getWalletBalance('UNIFIED');
-            
+
             // Test futures instruments access
             $instruments = $this->getInstrumentsInfo();
-            
+
             // Test position list access (futures specific)
             $positions = $this->getPositions();
-            
+
             return [
                 'success' => true,
                 'message' => 'Futures trading access confirmed via UNIFIED account',
@@ -586,22 +614,22 @@ class BybitApiService implements ExchangeApiServiceInterface
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
-            
+
             // Parse specific Bybit error codes
             $isPermissionError = str_contains($errorMessage, '10001') || // Invalid API key
                                str_contains($errorMessage, '10003') || // Missing required parameter
                                str_contains($errorMessage, '10004') || // Invalid signature
                                str_contains($errorMessage, '10005') || // Permission denied
                                str_contains($errorMessage, '10006'); // Too many requests
-            
+
             $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
                           str_contains($errorMessage, '403');
-            
+
             return [
                 'success' => false,
-                'message' => $isIPBlocked 
+                'message' => $isIPBlocked
                     ? 'IP address is not whitelisted for this API key'
-                    : ($isPermissionError 
+                    : ($isPermissionError
                         ? 'API key does not have futures trading permissions'
                         : 'Futures access validation failed: ' . $errorMessage),
                 'details' => [
@@ -621,10 +649,10 @@ class BybitApiService implements ExchangeApiServiceInterface
         try {
             // Test basic API connectivity
             $serverTime = $this->sendRequest('GET', '/v5/market/time');
-            
+
             // Test an authenticated endpoint to verify IP whitelist
             $balance = $this->getWalletBalance('UNIFIED');
-            
+
             return [
                 'success' => true,
                 'message' => 'IP address is whitelisted and has API access',
@@ -636,14 +664,14 @@ class BybitApiService implements ExchangeApiServiceInterface
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
-            
+
             $isIPBlocked = str_contains($errorMessage, '10015') || // IP not in whitelist
                           str_contains($errorMessage, '403') ||
                           str_contains($errorMessage, 'Forbidden');
-            
+
             return [
                 'success' => false,
-                'message' => $isIPBlocked 
+                'message' => $isIPBlocked
                     ? 'Your IP address is not in the API key whitelist'
                     : 'IP access validation failed: ' . $errorMessage,
                 'details' => [
@@ -663,9 +691,9 @@ class BybitApiService implements ExchangeApiServiceInterface
         $spotCheck = $this->checkSpotAccess();
         $futuresCheck = $this->checkFuturesAccess();
         $ipCheck = $this->checkIPAccess();
-        
+
         $overallSuccess = $spotCheck['success'] || $futuresCheck['success'];
-        
+
         return [
             'spot' => $spotCheck,
             'futures' => $futuresCheck,

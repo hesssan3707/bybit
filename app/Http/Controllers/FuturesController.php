@@ -40,7 +40,7 @@ class FuturesController extends Controller
             return ['hasActiveExchange' => true, 'message' => null];
         } catch (\Exception $e) {
             return [
-                'hasActiveExchange' => false, 
+                'hasActiveExchange' => false,
                 'message' => 'برای استفاده از این قسمت، لطفاً ابتدا صرافی خود را فعال کنید.'
             ];
         }
@@ -48,7 +48,7 @@ class FuturesController extends Controller
 
     /**
      * Calculate order quantity with proper rounding based on exchange's quantity step
-     * 
+     *
      * @param float $rawQty Raw calculated quantity
      * @param float $qtyStep Exchange's quantity step
      * @param int $amountPrec Decimal precision for quantity
@@ -60,30 +60,30 @@ class FuturesController extends Controller
         if ($qtyStep <= 0) {
             throw new \Exception('Invalid quantity step received from exchange');
         }
-        
+
         // For whole number steps (e.g., 1, 10, 100)
         if ($qtyStep >= 1) {
             $finalQty = round($rawQty / $qtyStep) * $qtyStep;
         } else {
             // For decimal steps, use step-based rounding
             $finalQty = round($rawQty / $qtyStep) * $qtyStep;
-            
+
             // Then apply decimal precision to avoid floating point issues
             $finalQty = round($finalQty, $amountPrec);
         }
-        
+
         // Ensure we don't return 0 due to rounding issues
         if ($finalQty <= 0 && $rawQty > 0) {
             // If rounding resulted in 0 but original was positive, use minimum step
             $finalQty = $qtyStep;
         }
-        
+
         return $finalQty;
     }
 
     /**
      * Parse Bybit API error message and return user-friendly message
-     * 
+     *
      * @param string $errorMessage
      * @return string
      */
@@ -94,35 +94,35 @@ class FuturesController extends Controller
         if (preg_match('/Code: (\d+)/', $errorMessage, $matches)) {
             $errorCode = $matches[1];
         }
-        
+
         // Extract symbol if present
         $symbol = null;
         if (preg_match('/"symbol":"([^"]+)"/', $errorMessage, $matches)) {
             $symbol = $matches[1];
         }
-        
-        // Extract side if present  
+
+        // Extract side if present
         $side = null;
         if (preg_match('/"side":"([^"]+)"/', $errorMessage, $matches)) {
             $side = $matches[1] === 'Buy' ? 'خرید' : 'فروش';
         }
-        
+
         // Extract quantity if present
         $qty = null;
         if (preg_match('/"qty":"([^"]+)"/', $errorMessage, $matches)) {
             $qty = $matches[1];
         }
-        
+
         // Map specific error codes to user-friendly messages
         switch ($errorCode) {
             case '170131': // Insufficient balance
                 return "موجودی USDT شما برای این معامله آتی کافی نیست.\n" .
                        "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید.";
-                
+
             case '110007': // Available balance not enough for new order
                 return "موجودی قابل استفاده شما برای ایجاد سفارش جدید کافی نیست.\n" .
                        "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید یا سفارشات باز خود را بررسی کنید.";
-                
+
             case '10001': // Parameter error
                 if (str_contains($errorMessage, 'minimum limit')) {
                     return "مقدار سفارش ({$qty}) کمتر از حداقل مجاز است.\n" .
@@ -137,19 +137,19 @@ class FuturesController extends Controller
                     return "اطلاعات سفارش نامعتبر است.\n" .
                            "لطفاً اطلاعات وارد شده را بررسی کنید.";
                 }
-                
+
             case '110003': // Order quantity exceeds upper limit
                 return "مقدار سفارش از حد مجاز بیشتر است.\n" .
                        "لطفاً درصد ریسک را کاهش دهید.";
-                
+
             case '110012': // Order quantity is lower than the minimum
                 return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
                        "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
-                
+
             case '110025': // Order would immediately trigger
                 return "سفارش شما بلافاصله اجرا می‌شود.\n" .
                        "برای سفارش محدود، قیمت مناسب‌تری انتخاب کنید.";
-                
+
             default:
                 // Generic error handling
                 if (str_contains($errorMessage, 'Insufficient balance') || str_contains($errorMessage, 'not enough for new order')) {
@@ -170,7 +170,7 @@ class FuturesController extends Controller
     {
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
-        
+
         $threeDaysAgo = now()->subDays(3);
 
         $orders = Order::forUser(auth()->id())
@@ -192,12 +192,12 @@ class FuturesController extends Controller
     {
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
-        
+
         $user = auth()->user();
         $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
         $selectedMarket = null;
         $marketPrice = '0'; // Default value in case of an error
-        
+
         // Determine which symbol to use for price fetching
         if ($user->future_strict_mode && $user->selected_market) {
             // Strict mode: use user's selected market
@@ -207,7 +207,7 @@ class FuturesController extends Controller
             // Non-strict mode: use default market (first in list)
             $symbol = $availableMarkets[0]; // Use BTCUSDT as default instead of ETHUSDT
         }
-        
+
         if ($exchangeStatus['hasActiveExchange']) {
             try {
                 $exchangeService = $this->getExchangeService();
@@ -217,7 +217,7 @@ class FuturesController extends Controller
             } catch (\Exception $e) {
                 // Check if this is an access permission error and update validation
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-                
+
                 if ($currentExchange) {
                     try {
                         $this->handleApiException($e, $currentExchange, 'futures');
@@ -228,10 +228,10 @@ class FuturesController extends Controller
                 }
             }
         }
-        
+
         // Set default expiration based on strict mode
         $defaultExpiration = $user->future_strict_mode ? 15 : 999;
-        
+
         return view('futures.set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
@@ -251,7 +251,7 @@ class FuturesController extends Controller
         if (!$exchangeStatus['hasActiveExchange']) {
             return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
         }
-        
+
         $validated = $request->validate([
             'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
             'entry1' => 'required|numeric',
@@ -267,10 +267,10 @@ class FuturesController extends Controller
         try {
             // Get user's active exchange service
             $exchangeService = $this->getExchangeService();
-            
+
             // Get the current user
             $user = auth()->user();
-            
+
             // Validate market selection for strict mode users
             if ($user->future_strict_mode) {
                 if (!$user->selected_market) {
@@ -280,7 +280,7 @@ class FuturesController extends Controller
                     return back()->withErrors(['symbol' => "در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید."])->withInput();
                 }
             }
-            
+
             // Apply strict mode conditions only if user has strict mode enabled
             if ($user->future_strict_mode) {
                 // Check for recent loss (only in strict mode)
@@ -292,31 +292,6 @@ class FuturesController extends Controller
                 if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
                     $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
-                }
-
-                // Validate against active filled order's zones (only in strict mode)
-                $filledOrder = Order::forUser(auth()->id())->where('status', 'filled')->first();
-                if ($filledOrder) {
-                    $newAvgEntry = ($request->input('entry1') + $request->input('entry2')) / 2;
-                    $newSide = ($request->input('sl') > $newAvgEntry) ? 'Sell' : 'Buy';
-
-                    // Define the zones
-                    $lossZoneMin = min($filledOrder->entry_price, $filledOrder->sl);
-                    $lossZoneMax = max($filledOrder->entry_price, $filledOrder->sl);
-                    $profitZoneMin = min($filledOrder->entry_price, $filledOrder->tp);
-                    $profitZoneMax = max($filledOrder->entry_price, $filledOrder->tp);
-
-                    // Check Loss Zone (No-Go Zone) - only in strict mode
-                    if ($newAvgEntry >= $lossZoneMin && $newAvgEntry <= $lossZoneMax) {
-                        return back()->withErrors(['msg' => 'قیمت ورود جدید در محدوده ضرر معامله فعال قرار دارد و مجاز نیست. (حالت سخت‌گیرانه فعال)'])->withInput();
-                    }
-
-                    // Check Profit Zone (Conditional Zone) - only in strict mode
-                    if ($newAvgEntry >= $profitZoneMin && $newAvgEntry <= $profitZoneMax) {
-                        if (strtolower($newSide) === strtolower($filledOrder->side)) {
-                            return back()->withErrors(['msg' => 'ثبت سفارش هم‌جهت در محدوده سود معامله فعال مجاز نیست. (حالت سخت‌گیرانه فعال)'])->withInput();
-                        }
-                    }
                 }
             }
             // Apply strict mode risk percentage cap (only in strict mode)
@@ -356,7 +331,7 @@ class FuturesController extends Controller
             // Fetch live wallet balance instead of using a static .env variable
             $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
             $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-            
+
             if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
                 throw new \Exception('امکان دریافت موجودی کیف پول از صرافی وجود ندارد.');
             }
@@ -373,12 +348,12 @@ class FuturesController extends Controller
 
             // Get Market Precision via Service - request specific symbol to ensure accuracy
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
-            
+
             // Validate that we got instrument data
             if (empty($instrumentInfo['list'])) {
                 throw new \Exception("Unable to get instrument information for {$symbol} from exchange. Please try again.");
             }
-            
+
             // Find the specific instrument for our symbol
             $instrumentData = null;
             foreach ($instrumentInfo['list'] as $instrument) {
@@ -387,25 +362,25 @@ class FuturesController extends Controller
                     break;
                 }
             }
-            
+
             // Validate we found our specific symbol
             if (!$instrumentData) {
                 throw new \Exception("Symbol {$symbol} not found in exchange instrument list. Please check if this symbol is supported.");
             }
-            
+
             // Validate required fields exist
             if (!isset($instrumentData['lotSizeFilter']['qtyStep']) || !isset($instrumentData['lotSizeFilter']['minOrderQty'])) {
                 throw new \Exception("Incomplete instrument data received for {$symbol}. Missing lot size filter information.");
             }
-            
+
             $qtyStep = (float) $instrumentData['lotSizeFilter']['qtyStep'];
             $minQty = (float) $instrumentData['lotSizeFilter']['minOrderQty'];
             $pricePrec = (int) $instrumentData['priceScale'];
-            
+
             // Calculate decimal places for quantity precision
             $qtyStepStr = (string) $qtyStep;
             $amountPrec = (strpos($qtyStepStr, '.') !== false) ? strlen(substr($qtyStepStr, strpos($qtyStepStr, '.') + 1)) : 0;
-            
+
             // Create Orders via Service
             $amountPerStep = $amount / $steps;
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
@@ -424,15 +399,15 @@ class FuturesController extends Controller
 
                 // Calculate final quantity using improved precision
                 $finalQty = $this->calculateOrderQuantity($amountPerStep, $qtyStep, $amountPrec);
-                
+
                 // Final safety check (should not trigger due to pre-validation above)
                 if ($finalQty < $minQty) {
                     throw new \Exception("مقدار سفارش ({$finalQty}) کمتر از حداقل مجاز ({$minQty}) است. لطفاً درصد ریسک را افزایش دهید.");
                 }
-                
+
                 $finalPrice = round($price, $pricePrec);
                 $finalSL = round((float)$validated['sl'], $pricePrec);
-                
+
                 $orderParams = [
                     'category' => 'linear',
                     'symbol' => $symbol,
@@ -474,10 +449,10 @@ class FuturesController extends Controller
             }
         } catch (\Exception $e) {
             Log::error('Futures order creation failed: ' . $e->getMessage());
-            
+
             // Parse Bybit error message for user-friendly response
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
-            
+
             return back()->withErrors(['msg' => $userFriendlyMessage])->withInput();
         }
 
@@ -492,16 +467,16 @@ class FuturesController extends Controller
             return redirect()->route('futures.orders')
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
-        
+
         // Verify order belongs to user (through user exchange relationship)
         $user = auth()->user();
         $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
-        
+
         if (!in_array($order->user_exchange_id, $userExchangeIds)) {
             return redirect()->route('futures.orders')
                 ->withErrors(['msg' => 'شما مجاز به حذف این سفارش نیستید.']);
         }
-        
+
         $status = $order->status;
 
         // Logic for 'pending' orders (Revoke)
@@ -575,7 +550,7 @@ class FuturesController extends Controller
 
             // Create a market order to close the position instantly
             $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
-            
+
             // Get proper quantity precision for this symbol
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $qtyStep = (float) $instrumentInfo['list'][0]['lotSizeFilter']['qtyStep'];
@@ -605,13 +580,13 @@ class FuturesController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Futures market close failed: ' . $e->getMessage());
-            
+
             $userFriendlyMessage = $this->parseBybitError($e->getMessage());
-            
+
             return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
         }
     }
-    
+
     /**
      * API method to get market price for a symbol (requires authentication)
      */
@@ -624,37 +599,37 @@ class FuturesController extends Controller
                 'message' => 'Authentication required'
             ], 401);
         }
-        
+
         // Validate symbol is in supported markets
         $supportedMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
-        
+
         if (!in_array($symbol, $supportedMarkets)) {
             return response()->json([
                 'success' => false,
                 'message' => 'نماد ارز پشتیبانی نمی‌شود'
             ], 400);
         }
-        
+
         try {
             // Get user's exchange service (requires active exchange)
             $exchangeService = $this->getExchangeService();
             $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
-            
+
             if ($price <= 0) {
                 throw new \Exception('قیمت معتبر دریافت نشد');
             }
-            
+
             return response()->json([
                 'success' => true,
                 'symbol' => $symbol,
                 'price' => (string)$price,
                 'raw_price' => $price
             ]);
-            
+
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Market price fetch failed: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'خطا در دریافت قیمت بازار: ' . $e->getMessage()

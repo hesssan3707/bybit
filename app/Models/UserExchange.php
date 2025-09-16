@@ -32,6 +32,7 @@ class UserExchange extends Model
         'last_validation_at',
         'spot_access',
         'futures_access',
+        'position_mode',
         'ip_access',
         'validation_message',
     ];
@@ -174,7 +175,7 @@ class UserExchange extends Model
     {
         $key = $this->getApiKeyAttribute($this->attributes['api_key']);
         if (!$key) return 'N/A';
-        
+
         return substr($key, 0, 8) . '...' . substr($key, -4);
     }
 
@@ -192,7 +193,7 @@ class UserExchange extends Model
     {
         return $this->exchange_config['color'] ?? '#007bff';
     }
-    
+
     public function getExchangeColorRgbAttribute()
     {
         return $this->exchange_config['color_rgb'] ?? '0, 123, 255';
@@ -207,37 +208,37 @@ class UserExchange extends Model
     {
         return $this->exchange_config['api_url'] ?? '';
     }
-    
+
     public function getExchangeWebsiteAttribute()
     {
         return $this->exchange_config['website'] ?? '';
     }
-    
+
     public function getExchangeDocsUrlAttribute()
     {
         return $this->exchange_config['docs_url'] ?? '';
     }
-    
+
     public function getExchangeDescriptionAttribute()
     {
         return $this->exchange_config['description'] ?? '';
     }
-    
+
     public function getExchangeSupportedFeaturesAttribute()
     {
         return $this->exchange_config['supported_features'] ?? [];
     }
-    
+
     public function getExchangeApiRateLimitAttribute()
     {
         return $this->exchange_config['api_rate_limit'] ?? 60;
     }
-    
+
     public function getExchangeMinOrderSizeAttribute()
     {
         return $this->exchange_config['min_order_size'] ?? 0.001;
     }
-    
+
     public function getExchangeSupportedSymbolsAttribute()
     {
         return $this->exchange_config['supported_symbols'] ?? [];
@@ -305,7 +306,7 @@ class UserExchange extends Model
     public function deactivate($adminId, $notes = null)
     {
         $wasDefault = $this->is_default;
-        
+
         $result = $this->update([
             'is_active' => false,
             'is_default' => false,
@@ -392,43 +393,43 @@ class UserExchange extends Model
         $spotAccess = $validationData['spot']['success'] ?? null;
         $futuresAccess = $validationData['futures']['success'] ?? null;
         $ipAccess = $validationData['ip']['success'] ?? null;
-        
+
         // Special handling for Bybit UNIFIED accounts
         // If either spot or futures validation succeeds for Bybit, both should be marked as successful
         // since UNIFIED account provides access to both spot and futures trading
         if ($this->exchange_name === 'bybit') {
             // Check if either validation indicates UNIFIED account access
             $hasUnifiedAccess = false;
-            
+
             // Check spot validation for UNIFIED account indicators
-            if (isset($validationData['spot']['details']['account_type']) && 
+            if (isset($validationData['spot']['details']['account_type']) &&
                 $validationData['spot']['details']['account_type'] === 'UNIFIED') {
                 $hasUnifiedAccess = true;
             }
-            
-            // Check futures validation for UNIFIED account indicators  
-            if (isset($validationData['futures']['details']['account_type']) && 
+
+            // Check futures validation for UNIFIED account indicators
+            if (isset($validationData['futures']['details']['account_type']) &&
                 $validationData['futures']['details']['account_type'] === 'UNIFIED') {
                 $hasUnifiedAccess = true;
             }
-            
+
             // Check for successful spot access (which indicates UNIFIED access)
             if ($spotAccess === true) {
                 $hasUnifiedAccess = true;
             }
-            
+
             // Check for successful futures access (which indicates UNIFIED access)
             if ($futuresAccess === true) {
                 $hasUnifiedAccess = true;
             }
-            
+
             // If UNIFIED access is detected, set both spot and futures to true
             if ($hasUnifiedAccess) {
                 $spotAccess = true;
                 $futuresAccess = true;
             }
         }
-        
+
         return $this->update([
             'validation_results' => $validationData,
             'last_validation_at' => now(),
@@ -445,11 +446,11 @@ class UserExchange extends Model
     private function generateValidationMessage(array $validationData)
     {
         $messages = [];
-        
+
         if (!($validationData['ip']['success'] ?? true)) {
             $messages[] = 'آدرس IP مسدود است';
         }
-        
+
         if (!($validationData['spot']['success'] ?? true)) {
             if (($validationData['spot']['details']['error_type'] ?? '') === 'not_supported') {
                 $messages[] = 'معاملات اسپات پشتیبانی نمی‌شود';
@@ -457,7 +458,7 @@ class UserExchange extends Model
                 $messages[] = 'دسترسی به معاملات اسپات ندارد';
             }
         }
-        
+
         if (!($validationData['futures']['success'] ?? true)) {
             if (($validationData['futures']['details']['error_type'] ?? '') === 'not_supported') {
                 $messages[] = 'معاملات آتی پشتیبانی نمی‌شود';
@@ -465,11 +466,11 @@ class UserExchange extends Model
                 $messages[] = 'دسترسی به معاملات آتی ندارد';
             }
         }
-        
+
         if (empty($messages)) {
             return 'تمام دسترسی‌ها تأیید شده';
         }
-        
+
         return implode(' | ', $messages);
     }
 
@@ -478,7 +479,7 @@ class UserExchange extends Model
      */
     public function hasRecentValidation()
     {
-        return $this->last_validation_at && 
+        return $this->last_validation_at &&
                $this->last_validation_at->isAfter(now()->subHours(24));
     }
 
@@ -490,25 +491,25 @@ class UserExchange extends Model
         if (!$this->last_validation_at) {
             return 'هنوز اعتبارسنجی نشده';
         }
-        
+
         if (!$this->ip_access) {
             return 'آدرس IP مسدود';
         }
-        
+
         $hasAnyAccess = $this->spot_access || $this->futures_access;
-        
+
         if (!$hasAnyAccess) {
             return 'هیچ دسترسی معاملاتی ندارد';
         }
-        
+
         if ($this->spot_access && $this->futures_access) {
             return 'دسترسی کامل';
         }
-        
+
         $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
         return "دسترسی محدود ({$limitedType})";
     }
-    
+
     /**
      * Get detailed validation status with icon and class (for admin panel)
      */
@@ -522,7 +523,7 @@ class UserExchange extends Model
                 'class' => 'warning'
             ];
         }
-        
+
         if (!$this->ip_access) {
             return [
                 'status' => 'ip_blocked',
@@ -531,9 +532,9 @@ class UserExchange extends Model
                 'class' => 'danger'
             ];
         }
-        
+
         $hasAnyAccess = $this->spot_access || $this->futures_access;
-        
+
         if (!$hasAnyAccess) {
             return [
                 'status' => 'no_access',
@@ -542,7 +543,7 @@ class UserExchange extends Model
                 'class' => 'danger'
             ];
         }
-        
+
         if ($this->spot_access && $this->futures_access) {
             return [
                 'status' => 'full_access',
@@ -551,7 +552,7 @@ class UserExchange extends Model
                 'class' => 'success'
             ];
         }
-        
+
         $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
         return [
             'status' => 'limited_access',
