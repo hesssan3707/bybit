@@ -47,7 +47,7 @@ Route::post('password/reset', [PasswordController::class, 'resetPassword'])->nam
 // Public API Documentation Route
 Route::get('api-documentation', [ApiDocumentationController::class, 'index'])->name('api.documentation');
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware('auth')->group(function () {
     Route::get('/', function () {
         return redirect()->route('futures.orders');
     });
@@ -161,12 +161,12 @@ Route::get('/schedule', function() {
     return '************************************************************DONE*******************************************************';
 })->middleware('throttle:4');
 Route::get('/get-prices', function() {
-	Artisan::call('prices:save');
+    Artisan::call('prices:save');
     print_r(Artisan::output());
     return 'DONE';
 })->middleware('throttle:4');
 Route::get('/validate-exchanges', function() {
-	Artisan::call('exchanges:validate-active --force');
+    Artisan::call('exchanges:validate-active --force');
     print_r(Artisan::output());
     return 'DONE';
 })->middleware('throttle:2');
