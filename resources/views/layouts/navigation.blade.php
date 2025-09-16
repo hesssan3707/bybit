@@ -37,6 +37,7 @@
         border-radius: 5px;
         transition: background-color 0.3s, color 0.3s;
         font-weight: 500;
+        cursor: pointer;
         text-shadow:
         0.07em 0 black,
         0 0.07em black,
@@ -54,7 +55,6 @@
         font-weight: 500;
     }
     .main-header .dropdown-list {
-        display: none;
         position: absolute;
         top: 100%; left: 0;
         background: rgba(150, 150, 150, 0.6);
@@ -139,7 +139,7 @@
 
         <!-- Futures Trading Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
-            <a href="#" style="cursor: pointer;" onclick="toggleFuturesMenu(event)">معاملات آتی ▼</a>
+            <a href="#" onclick="toggleFuturesMenu(event)">معاملات آتی ▼</a>
             <div id="futuresMenu" class="dropdown-list">
                 <a href="{{ route('futures.orders') }}">تاریخچه سفارش‌ها</a>
                 <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
@@ -149,7 +149,7 @@
 
         <!-- Strategies Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
-            <a href="#" style="cursor: pointer;" onclick="toggleStrategiesMenu(event)">استراتژی‌ها ▼</a>
+            <a href="#" onclick="toggleStrategiesMenu(event)">استراتژی‌ها ▼</a>
             <div id="strategiesMenu" class="dropdown-list">
                 <a href="{{ route('strategies.macd') }}">MACD Strategy</a>
             </div>
@@ -157,7 +157,7 @@
 
         <!-- Spot Trading Menu -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
-            <a href="#" style="cursor: pointer;" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
+            <a href="#" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
             <div id="spotMenu" class="dropdown-list">
                 <a href="{{ route('spot.orders.view') }}">سفارش‌های اسپات</a>
                 <a href="{{ route('spot.order.create.view') }}">سفارش اسپات جدید</a>
@@ -170,7 +170,7 @@
         @if(auth()->user()?->isAdmin())
         <!-- Admin Menu (only for admin users) -->
         <div style="display: inline-block; position: relative; margin: 0 15px;">
-            <a href="#" style="cursor: pointer;" onclick="toggleAdminMenu(event)">مدیریت ▼</a>
+            <a href="#" onclick="toggleAdminMenu(event)">مدیریت ▼</a>
             <div id="adminMenu" class="dropdown-list">
                 <a href="{{ route('admin.all-users') }}">همه کاربران</a>
                 <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های صرافی</a>
@@ -255,6 +255,11 @@
                 link.classList.add('selected');
             }
         });
+        const dropdowns = document.getElementsByClassName('dropdown-list');
+
+        for (let i = 0; i < dropdowns.length; i++) {
+            dropdowns[i].style.display = 'none';
+        }
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
