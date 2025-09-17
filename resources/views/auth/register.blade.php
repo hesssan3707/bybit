@@ -19,6 +19,10 @@
             --error-bg: #f8d7da;
             --error-text: #ff0016;
         }
+        input, textarea, button
+        {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;

@@ -1,0 +1,2 @@
+this project is multi exchange( currently binance,bybit,bingx) soo every logic must be support all of them,for this try to check documentation of each exchange
+this project is in persian language so try to use persian messages for end user
