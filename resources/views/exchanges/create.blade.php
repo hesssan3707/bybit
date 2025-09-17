@@ -183,6 +183,7 @@
                 <li>درخواست شما نیاز به تأیید مدیر سیستم دارد</li>
                 <li>حتماً API Key دارای مجوزهای معاملات اسپات و فیوچرز باشد</li>
                 <li>از IP WhiteList استفاده نکنید یا آدرس سرور را اضافه کنید</li>
+				<li>شما میتوانید اطلاعات حساب دمو یا واقعی یا هردو را وارد کنید</li>
             </ul>
         </div>
 
@@ -218,7 +219,7 @@
                 <div id="credentials-form" class="form-group hidden">
                     <div class="form-group">
                         <label for="api_key">کلید API (API Key):</label>
-                        <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required
+                        <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}"
                                placeholder="مثال: K2IS7FEKFM3G15T4VXVUHY75QCGN4ZT6LEZJ">
                         @error('api_key')
                             <span class="invalid-feedback" role="alert">
@@ -230,7 +231,7 @@
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
                         <div class="password-field">
-                            <input id="api_secret" type="password" autocomplete="off" name="api_secret" required
+                            <input id="api_secret" type="password" autocomplete="off" name="api_secret" 
                                    placeholder="کلید محرمانه صرافی خود را وارد کنید">
                             <span class="password-toggle" onclick="togglePassword('api_secret')">
                                 <i id="api_secret-icon" class="fas fa-eye"></i>
@@ -409,7 +410,7 @@ async function testRealConnectionCreate() {
                 btn.style.backgroundColor = '#007bff';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب واقعی');
+            modernAlert(data.message || 'خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -419,7 +420,7 @@ async function testRealConnectionCreate() {
             btn.style.backgroundColor = '#007bff';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب واقعی');
+        modernAlert('خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
     }
 }
 
@@ -431,12 +432,12 @@ async function testDemoConnectionCreate() {
     const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
 
     if (!demoApiKey || !demoApiSecret) {
-        alert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.');
+        modernAlert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.', 'warning', 'اطلاعات ناقص');
         return;
     }
 
     if (!exchangeName) {
-        alert('لطفاً ابتدا یک صرافی انتخاب کنید.');
+        modernAlert('لطفاً ابتدا یک صرافی انتخاب کنید.', 'warning', 'صرافی انتخاب نشده');
         return;
     }
 
@@ -476,7 +477,7 @@ async function testDemoConnectionCreate() {
                 btn.style.backgroundColor = '#28a745';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب دمو');
+            modernAlert(data.message || 'خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -486,7 +487,7 @@ async function testDemoConnectionCreate() {
             btn.style.backgroundColor = '#28a745';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب دمو');
+        modernAlert('خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
     }
 }
 

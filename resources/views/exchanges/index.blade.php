@@ -16,90 +16,216 @@
         color : #ffffff;
     }
     .exchange-card {
-        padding:20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-        margin-bottom: 20px;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        margin-bottom: 25px;
         overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .exchange-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    }
+    .exchange-header {
+        padding: 25px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+    .exchange-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+        animation: shimmer 3s infinite;
+    }
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
     }
     .exchange-info {
         display: flex;
         align-items: center;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 1;
     }
     .exchange-logo {
-        width: 40px;
-        height: 40px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
-        margin-left: 15px;
         background: white;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
         color: var(--exchange-color, #007bff);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    .exchange-title {
+        flex: 1;
+        margin-right:20px
+    }
+    .exchange-title h3 {
+        margin: 0 0 8px 0;
+        font-size: 24px;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     .exchange-details {
-        padding: 20px;
+        padding: 25px;
+        color: #333;
+    }
+    .exchange-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    .detail-item {
+        background: rgba(248, 249, 250, 0.65);
+        padding: 15px;
+        border-radius: 12px;
+    }
+    .detail-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+    .detail-value {
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        font-family: 'Courier New', monospace;
+    }
+    .exchange-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .status-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
     }
     .status-badge {
-        display: inline-block;
         padding: 6px 12px;
         border-radius: 20px;
-        font-size: 12px;
-        font-weight: bold;
+        font-size: 11px;
+        font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .status-active {
-        background-color: #d1e7dd;
-        color: #0f5132;
+    .status-active { 
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.9), rgba(40, 167, 69, 0.7)); 
+        color: white; 
     }
-    .status-pending {
-        background-color: #fff3cd;
-        color: #664d03;
+    .status-pending { 
+        background: linear-gradient(135deg, rgba(255, 152, 0, 0.9), rgba(255, 152, 0, 0.7)); 
+        color: white; 
     }
-    .status-rejected {
-        background-color: #f8d7da;
-        color: #842029;
+    .status-rejected { 
+        background: linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(244, 67, 54, 0.7)); 
+        color: white; 
     }
     .status-suspended {
-        background-color: #e2e3e5;
-        color: #41464b;
+        background: linear-gradient(135deg, rgba(108, 117, 125, 0.9), rgba(108, 117, 125, 0.7)); 
+        color: white; 
     }
     .default-badge {
-        background-color: #cff4fc;
-        color: #055160;
+        background: linear-gradient(135deg, rgba(23, 162, 184, 0.9), rgba(23, 162, 184, 0.7)); 
+        color: white;
         margin-right: 10px;
     }
     .btn {
-        display: inline-block;
-        padding: 8px 16px;
-        margin: 4px;
-        text-decoration: none;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: bold;
-        transition: opacity 0.3s;
+        padding: 10px 20px;
         border: none;
+        border-radius: 12px;
         cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+        margin: 4px;
     }
-    .btn:hover {
-        opacity: 0.8;
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
     }
-    .btn-primary {
-        background-color: var(--primary-color);
-        color: white;
+    .btn:hover::before {
+        left: 100%;
     }
-    .btn-success {
-        background-color: #28a745;
-        color: white;
+    .btn-primary { 
+        background: linear-gradient(135deg, #007bff, #0056b3); 
+        color: white; 
     }
-    .btn-warning {
-        background-color: #ffc107;
-        color: black;
+    .btn-success { 
+        background: linear-gradient(135deg, #28a745, #1e7e34); 
+        color: white; 
     }
-    .btn-info {
-        background-color: #17a2b8;
-        color: white;
+    .btn-info { 
+        background: linear-gradient(135deg, #17a2b8, #117a8b); 
+        color: white; 
+    }
+    .btn-warning { 
+        background: linear-gradient(135deg, #ffc107, #e0a800); 
+        color: #212529; 
+    }
+    .btn-danger { 
+        background: linear-gradient(135deg, #dc3545, #c82333); 
+        color: white; 
+    }
+    .btn:hover { 
+        transform: translateY(-3px); 
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2); 
+    }
+    .btn:active {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .btn i {
+        font-size: 12px;
     }
     .alert {
         padding: 12px 16px;
@@ -214,10 +340,12 @@
             <div class="exchange-card" style="--exchange-color: {{ $exchange->exchange_color }}">
                 <div class="exchange-header">
                     <div class="exchange-info">
-                        <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($exchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange->exchange_color }};">
-                        <div>
-                            <h3 style="margin: 0; color: white;">{{ $exchange->exchange_display_name }}</h3>
-                            <div style="margin-top: 5px;">
+                        <div class="exchange-logo">
+                            <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($exchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange->exchange_color }};">
+                        </div>
+                        <div class="exchange-title">
+                            <h3>{{ $exchange->exchange_display_name }}</h3>
+                            <div class="status-badges">
                                 <span class="status-badge status-{{ $exchange->status === 'approved' && $exchange->is_active ? 'active' : $exchange->status }}">
                                     @if($exchange->status === 'approved' && $exchange->is_active)
                                         فعال
@@ -263,14 +391,14 @@
                 </div>
 
                 <div class="exchange-details">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
-                        <div>
-                            <strong>کلید API:</strong>
-                            <div class="masked-key">{{ $exchange->masked_api_key }}</div>
+                    <div class="exchange-details-grid">
+                        <div class="detail-item">
+                            <div class="detail-label">کلید API</div>
+                            <div class="detail-value">{{ $exchange->masked_api_key }}</div>
                         </div>
-                        <div>
-                            <strong>تاریخ درخواست:</strong>
-                            <div>{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d H:i') : '-' }}</div>
+                        <div class="detail-item">
+                            <div class="detail-label">تاریخ درخواست</div>
+                            <div class="detail-value">{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d H:i') : '-' }}</div>
                         </div>
                     </div>
 
@@ -291,28 +419,29 @@
                             </div>
                         </div>
                     @endif
-                    <div style="margin-bottom: 15px;">
-                        @if(!empty($exchange->api_key) && !empty($exchange->api_secret))
-                            <button onclick="testRealConnection({{ $exchange->id }})" class="btn" id="test-real-btn-{{ $exchange->id }}" style="margin-left: 10px;">
-                                تست اتصال حساب واقعی
-                            </button>
-                        @endif
+                    <div class="exchange-actions">
+                        <div class="action-buttons">
+                            @if($exchange->is_active || $exchange->status === 'rejected')
+                                <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i> ویرایش اطلاعات
+                                </a>
+                            @endif
+                            
+                            @if(!empty($exchange->api_key) && !empty($exchange->api_secret))
+                                <button onclick="testRealConnection({{ $exchange->id }})" class="btn btn-success" id="test-real-btn-{{ $exchange->id }}">
+                                    <i class="fas fa-plug"></i> تست اتصال حساب واقعی
+                                </button>
+                            @endif
+                            
+                            @if(!empty($exchange->demo_api_key) && !empty($exchange->demo_api_secret))
+                                <button onclick="testDemoConnection({{ $exchange->id }})" class="btn btn-info" id="test-demo-btn-{{ $exchange->id }}">
+                                    <i class="fas fa-vial"></i> تست اتصال حساب دمو
+                                </button>
+                            @endif
+                        </div>
                         
-                        @if(!empty($exchange->demo_api_key) && !empty($exchange->demo_api_secret))
-                            <button onclick="testDemoConnection({{ $exchange->id }})" class="btn" id="test-demo-btn-{{ $exchange->id }}">
-                                تست اتصال حساب دمو
-                            </button>
-                        @endif
-                    </div>
-                    <div style="text-align: left;">
-                        @if($exchange->is_active || $exchange->status === 'rejected')
-                            <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
-                                ویرایش اطلاعات
-                            </a>
-                        @endif
-
                         @if($exchange->status === 'pending')
-                            <span style="color: #666; font-style: italic;">در انتظار بررسی مدیر...</span>
+                            <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>
                         @endif
                     </div>
                 </div>
@@ -411,7 +540,7 @@ async function testRealConnection(exchangeId) {
             btn.style.color = '';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب واقعی');
+        modernAlert('خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
     }
 }
 
@@ -465,7 +594,7 @@ async function testDemoConnection(exchangeId) {
             btn.style.color = '';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب دمو');
+        modernAlert('خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
     }
 }
 </script>

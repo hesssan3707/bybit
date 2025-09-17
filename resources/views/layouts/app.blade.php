@@ -148,6 +148,9 @@
         @yield('content')
     </main>
 
+    {{-- Include Modern Alert Modal --}}
+    @include('partials.alert-modal')
+
     @stack('scripts')
 
     <script>

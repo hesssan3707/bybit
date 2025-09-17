@@ -34,6 +34,31 @@
         font-size: 24px;
         color: {{ $exchange->exchange_color }};
     }
+    .exchange-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    .detail-item {
+        background: rgba(248, 249, 250, 0.65);
+        padding: 15px;
+        border-radius: 12px;
+    }
+    .detail-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+    .detail-value {
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        font-family: 'Courier New', monospace;
+    }
     .form-group {
         margin-bottom: 20px;
     }
@@ -170,16 +195,14 @@
             </div>
         @endif
 
-        <div class="current-info">
-            <h4>اطلاعات فعلی:</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
-                <div>
-                    <strong>کلید API فعلی:</strong>
-                    <div class="masked-key">{{ $exchange->masked_api_key }}</div>
-                </div>
-                <div>
-                    <strong>وضعیت:</strong>
-                    <span style="color:
+        <div class="exchange-details-grid">
+            <div class="detail-item">
+                <div class="detail-label">کلید API</div>
+                <div class="detail-value">{{ $exchange->masked_api_key }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">وضعیت</div>
+                <div class="detail-value"><span style="color:
                         @if($exchange->is_active) #28a745
                         @elseif($exchange->status === 'pending') #ffc107
                         @else #dc3545 @endif">
@@ -190,8 +213,7 @@
                         @else
                             {{ $exchange->status === 'rejected' ? 'رد شده' : 'غیرفعال' }}
                         @endif
-                    </span>
-                </div>
+                    </span></div>
             </div>
         </div>
 
@@ -202,6 +224,7 @@
                 <li>تا زمان تأیید، امکان استفاده از این صرافی وجود نخواهد داشت</li>
                 <li>اطلاعات جدید به صورت امن و رمزگذاری شده ذخیره می‌شود</li>
                 <li>حتماً API Key جدید دارای مجوزهای لازم باشد</li>
+				<li>شما میتوانید اطلاعات حساب دمو یا واقعی یا هردو را وارد کنید</li>
             </ul>
         </div>
 
@@ -211,7 +234,7 @@
 
             <div class="form-group">
                 <label for="api_key">کلید API جدید (API Key):</label>
-                <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" required>
+                <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}" placeholder="کلید API جدید صرافی خود را وارد کنید">
                 @error('api_key')
                     <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>
@@ -222,7 +245,7 @@
             <div class="form-group">
                 <label for="api_secret">کلید محرمانه جدید (API Secret):</label>
                 <div class="password-field">
-                    <input id="api_secret" type="password" name="api_secret" autocomplete="off" required>
+                    <input id="api_secret" type="password" name="api_secret" autocomplete="off" placeholder="کلید محرمانه جدید صرافی خود را وارد کنید">
                     <span class="password-toggle" onclick="togglePassword('api_secret')">
                         <i id="api_secret-icon" class="fas fa-eye"></i>
                     </span>
@@ -235,11 +258,6 @@
             </div>
 
             <!-- Demo Credentials Section -->
-            <div class="form-group">
-                <div style="border-top: 1px solid #e9ecef; margin: 20px 0; padding-top: 20px;">
-                    <h4 style="margin-bottom: 15px; color: #495057;">اطلاعات حساب دمو (TestNet)</h4>
-                </div>
-            </div>
 
             <div id="demo-credentials">
                 <div class="form-group">
@@ -368,7 +386,7 @@ async function testRealConnectionEdit() {
                 btn.style.backgroundColor = '#007bff';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب واقعی');
+            modernAlert(data.message || 'خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -378,7 +396,7 @@ async function testRealConnectionEdit() {
             btn.style.backgroundColor = '#007bff';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب واقعی');
+        modernAlert('خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
     }
 }
 
@@ -390,7 +408,7 @@ async function testDemoConnectionEdit() {
     const exchangeId = {{ $exchange->id }};
 
     if (!demoApiKey || !demoApiSecret) {
-        alert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.');
+        modernAlert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.', 'warning', 'اطلاعات ناقص');
         return;
     }
 
@@ -424,7 +442,7 @@ async function testDemoConnectionEdit() {
                 btn.style.backgroundColor = '#28a745';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب دمو');
+            modernAlert(data.message || 'خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -434,7 +452,7 @@ async function testDemoConnectionEdit() {
             btn.style.backgroundColor = '#28a745';
             btn.disabled = false;
         }, 2000);
-        alert('خطا در تست اتصال حساب دمو');
+        modernAlert('خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
     }
 }
 
