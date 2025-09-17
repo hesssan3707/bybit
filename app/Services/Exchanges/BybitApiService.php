@@ -747,32 +747,57 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     /**
      * Get account information including position mode status
-     * For Bybit, we check the position mode by examining existing positions
-     * or by trying to get account info that includes position mode
+     * For Bybit, we check the position mode by querying a specific symbol position
+     * to get the actual position mode setting, regardless of position size
      */
     public function getAccountInfo(): array
     {
         try {
-            // Try to get positions to determine position mode
-            $positions = $this->getPositions();
+            // Query position for a specific symbol to determine position mode
+            // Even if there's no position, Bybit returns the position mode info
+            $response = $this->sendRequest('GET', '/v5/position/list', [
+                'category' => 'linear',
+                'symbol' => 'BTCUSDT' // Use a common symbol to check position mode
+            ]);
 
-            // Check if any position has positionIdx indicating hedge mode
             $hedgeMode = false;
             $positionMode = 'one-way';
 
-            if (isset($positions['list']) && !empty($positions['list'])) {
-                foreach ($positions['list'] as $position) {
-                    if (isset($position['positionIdx']) && (int)$position['positionIdx'] > 0) {
-                        $hedgeMode = true;
-                        $positionMode = 'hedge';
-                        break;
-                    }
+            if (!empty($response['list'])) {
+                $position = $response['list'][0];
+                // Check positionIdx to determine mode
+                // positionIdx > 0 indicates hedge mode
+                // positionIdx = 0 indicates one-way mode
+                if (isset($position['positionIdx']) && (int)$position['positionIdx'] > 0) {
+                    $hedgeMode = true;
+                    $positionMode = 'hedge';
                 }
             } else {
-                // If no positions exist, we can't determine mode from positions
-                // For now, assume one-way mode as default
-                $hedgeMode = false;
-                $positionMode = 'one-way';
+                // If no position data returned, try to get all positions
+                $allPositions = $this->getPositions();
+                if (isset($allPositions['list']) && !empty($allPositions['list'])) {
+                    foreach ($allPositions['list'] as $position) {
+                        if (isset($position['positionIdx']) && (int)$position['positionIdx'] > 0) {
+                            $hedgeMode = true;
+                            $positionMode = 'hedge';
+                            break;
+                        }
+                    }
+                }
+                // If still no positions found, don't assume mode - keep database value
+                // Only update if we have definitive information
+                if (!$hedgeMode && empty($allPositions['list'])) {
+                    // Don't update database when we can't determine the mode
+                    return [
+                        'positionMode' => 'unknown',
+                        'hedgeMode' => false,
+                        'details' => [
+                            'exchange' => 'bybit',
+                            'method' => 'no_positions_found',
+                            'note' => 'Cannot determine position mode without positions'
+                        ]
+                    ];
+                }
             }
 
             // Update database with detected position mode
@@ -783,8 +808,8 @@ class BybitApiService implements ExchangeApiServiceInterface
                 'hedgeMode' => $hedgeMode,
                 'details' => [
                     'exchange' => 'bybit',
-                    'method' => 'position_analysis',
-                    'positions_checked' => count($positions['list'] ?? [])
+                    'method' => 'symbol_position_query',
+                    'symbol_checked' => 'BTCUSDT'
                 ]
             ];
         } catch (\Exception $e) {

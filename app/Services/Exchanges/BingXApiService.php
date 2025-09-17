@@ -410,9 +410,16 @@ class BingXApiService implements ExchangeApiServiceInterface
                 }
             } else {
                 // If no positions exist, we can't determine mode from positions
-                // For now, assume one-way mode as default
-                $hedgeMode = false;
-                $positionMode = 'one-way';
+                // Don't assume mode - return unknown to avoid false validation errors
+                return [
+                    'positionMode' => 'unknown',
+                    'hedgeMode' => false,
+                    'details' => [
+                        'exchange' => 'bingx',
+                        'method' => 'no_positions_found',
+                        'note' => 'Cannot determine position mode without positions'
+                    ]
+                ];
             }
             
             // Update database with detected position mode

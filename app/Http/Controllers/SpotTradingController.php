@@ -6,139 +6,15 @@ use App\Models\SpotOrder;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use App\Traits\HandlesExchangeAccess;
+use App\Traits\ParsesExchangeErrors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class SpotTradingController extends Controller
 {
-    /**
-     * Parse Bybit API error message and return user-friendly message
-     * 
-     * @param string $errorMessage
-     * @return string
-     */
-    private function parseBybitError($errorMessage)
-    {
-        // Extract error code if present
-        $errorCode = null;
-        if (preg_match('/Code: (\d+)/', $errorMessage, $matches)) {
-            $errorCode = $matches[1];
-        }
-        
-        // Extract symbol if present
-        $symbol = null;
-        if (preg_match('/"symbol":"([^"]+)"/', $errorMessage, $matches)) {
-            $symbol = $matches[1];
-        }
-        
-        // Extract side if present  
-        $side = null;
-        if (preg_match('/"side":"([^"]+)"/', $errorMessage, $matches)) {
-            $side = $matches[1] === 'Buy' ? 'خرید' : 'فروش';
-        }
-        
-        // Extract quantity if present
-        $qty = null;
-        if (preg_match('/"qty":"([^"]+)"/', $errorMessage, $matches)) {
-            $qty = $matches[1];
-        }
-        
-        // Map specific error codes to user-friendly messages
-        switch ($errorCode) {
-            case '170131': // Insufficient balance
-                $coinName = 'USDT';
-                if ($symbol) {
-                    // Extract quote coin from symbol (e.g., ETHUSDT -> USDT)
-                    if (str_ends_with($symbol, 'USDT')) {
-                        $coinName = 'USDT';
-                    } elseif (str_ends_with($symbol, 'USDC')) {
-                        $coinName = 'USDC';
-                    } elseif (str_ends_with($symbol, 'BTC')) {
-                        $coinName = 'BTC';
-                    }
-                }
-                return "موجودی {$coinName} شما برای این معامله کافی نیست.\n" .
-                       "برای سفارش {$side} {$symbol}، ابتدا موجودی {$coinName} خود را شارژ کنید.";
-                
-            case '170130': // Order value too small
-                return "مقدار سفارش خیلی کم است.\n" .
-                       "لطفاً مقدار بیشتری وارد کنید یا با قیمت بالاتری سفارش دهید.";
-                
-            case '110001': // Order does not exist
-                return "سفارش مورد نظر یافت نشد.\n" .
-                       "احتمالاً سفارش قبلاً اجرا یا لغو شده است.";
-                
-            case '110003': // Order quantity exceeds upper limit
-                return "مقدار سفارش از حد مجاز بیشتر است.\n" .
-                       "لطفاً مقدار کمتری وارد کنید.";
-                
-            case '110004': // Order price exceeds upper limit
-                return "قیمت سفارش از حد مجاز بیشتر است.\n" .
-                       "لطفاً قیمت کمتری وارد کنید.";
-                
-            case '110005': // Order price is lower than the minimum
-                return "قیمت سفارش کمتر از حد مجاز است.\n" .
-                       "لطفاً قیمت بالاتری وارد کنید.";
-                
-            case '110012': // Order quantity is lower than the minimum
-                return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
-                       "لطفاً مقدار بیشتری وارد کنید.";
-                
-            case '10001': // Parameter error
-                if (str_contains($errorMessage, 'qty')) {
-                    return "مقدار سفارش نامعتبر است.\n" .
-                           "لطفاً مقدار صحیح وارد کنید.";
-                } elseif (str_contains($errorMessage, 'price')) {
-                    return "قیمت سفارش نامعتبر است.\n" .
-                           "لطفاً قیمت صحیح وارد کنید.";
-                } else {
-                    return "اطلاعات سفارش نامعتبر است.\n" .
-                           "لطفاً اطلاعات وارد شده را بررسی کنید.";
-                }
-                
-            case '10002': // Invalid API key
-                return "کلید API نامعتبر است.\n" .
-                       "لطفاً تنظیمات صرافی خود را بررسی کنید.";
-                
-            case '10003': // Missing required parameter
-                return "اطلاعات ضروری سفارش ناقص است.\n" .
-                       "لطفاً تمام فیلدهای مورد نیاز را پر کنید.";
-                
-            case '10015': // IP not allowed
-                return "آدرس IP شما مجاز نیست.\n" .
-                       "لطفاً IP فعلی را به لیست مجاز صرافی اضافه کنید.";
-                
-            case '110025': // Order would immediately trigger
-                return "سفارش شما بلافاصله اجرا می‌شود.\n" .
-                       "برای سفارش محدود، قیمت مناسب‌تری انتخاب کنید.";
-                
-            case '110026': // Market is closed
-                return "بازار در حال حاضر بسته است.\n" .
-                       "لطفاً در ساعات کاری بازار مجدداً تلاش کنید.";
-                
-            case '170213': // Wallet locked
-                return "کیف پول شما قفل است.\n" .
-                       "لطفاً با پشتیبانی صرافی تماس بگیرید.";
-                
-            default:
-                // Generic error handling
-                if (str_contains($errorMessage, 'Insufficient balance')) {
-                    return "موجودی حساب شما کافی نیست.\n" .
-                           "لطفاً ابتدا حساب خود را شارژ کنید.";
-                } elseif (str_contains($errorMessage, 'Invalid symbol')) {
-                    return "جفت ارز انتخاب شده معتبر نیست.\n" .
-                           "لطفاً جفت ارز صحیح را انتخاب کنید.";
-                } elseif (str_contains($errorMessage, 'Order not found')) {
-                    return "سفارش یافت نشد.\n" .
-                           "احتمالاً سفارش قبلاً اجرا یا لغو شده است.";
-                } else {
-                    // Return a generic but helpful message
-                    return "خطا در ایجاد سفارش رخ داد.\n" .
-                           "لطفاً اطلاعات وارد شده را بررسی کرده و دوباره تلاش کنید.";
-                }
-        }
-    }
+    use ParsesExchangeErrors;
+
     /**
      * Get the exchange service for the authenticated user
      */
@@ -515,8 +391,8 @@ class SpotTradingController extends Controller
         } catch (\Exception $e) {
             Log::error('Spot order creation from web failed: ' . $e->getMessage());
             
-            // Parse Bybit error message for user-friendly response
-            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            // Parse exchange error message for user-friendly response
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
             
             return back()->withErrors(['error' => $userFriendlyMessage])->withInput();
         }
@@ -590,7 +466,7 @@ class SpotTradingController extends Controller
             Log::error('Cancel spot order from web failed: ' . $e->getMessage());
             
             // Parse error for user-friendly message
-            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
             
             return back()->withErrors(['error' => $userFriendlyMessage]);
         }

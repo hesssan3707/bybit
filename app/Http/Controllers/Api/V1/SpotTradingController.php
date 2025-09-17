@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\SpotOrder;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
+use App\Traits\ParsesExchangeErrors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class SpotTradingController extends Controller
 {
+    use ParsesExchangeErrors;
     private function getExchangeService(): ExchangeApiServiceInterface
     {
         if (!auth()->check()) {
@@ -138,7 +140,11 @@ class SpotTradingController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Spot order creation failed: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            
+            // Parse exchange error message for user-friendly response
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
+            
+            return response()->json(['success' => false, 'message' => $userFriendlyMessage], 500);
         }
     }
 
@@ -155,7 +161,11 @@ class SpotTradingController extends Controller
             return response()->json(['success' => true, 'message' => 'Spot order cancelled successfully.']);
         } catch (\Exception $e) {
             Log::error('Spot order cancellation failed: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            
+            // Parse exchange error message for user-friendly response
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
+            
+            return response()->json(['success' => false, 'message' => $userFriendlyMessage], 500);
         }
     }
 

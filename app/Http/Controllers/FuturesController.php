@@ -7,13 +7,14 @@ use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use App\Traits\HandlesExchangeAccess;
+use App\Traits\ParsesExchangeErrors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class FuturesController extends Controller
 {
-    use HandlesExchangeAccess;
+    use HandlesExchangeAccess, ParsesExchangeErrors;
     /**
      * Get the exchange service for the authenticated user
      */
@@ -81,90 +82,7 @@ class FuturesController extends Controller
         return $finalQty;
     }
 
-    /**
-     * Parse Bybit API error message and return user-friendly message
-     *
-     * @param string $errorMessage
-     * @return string
-     */
-    private function parseBybitError($errorMessage)
-    {
-        // Extract error code if present
-        $errorCode = null;
-        if (preg_match('/Code: (\d+)/', $errorMessage, $matches)) {
-            $errorCode = $matches[1];
-        }
 
-        // Extract symbol if present
-        $symbol = null;
-        if (preg_match('/"symbol":"([^"]+)"/', $errorMessage, $matches)) {
-            $symbol = $matches[1];
-        }
-
-        // Extract side if present
-        $side = null;
-        if (preg_match('/"side":"([^"]+)"/', $errorMessage, $matches)) {
-            $side = $matches[1] === 'Buy' ? 'خرید' : 'فروش';
-        }
-
-        // Extract quantity if present
-        $qty = null;
-        if (preg_match('/"qty":"([^"]+)"/', $errorMessage, $matches)) {
-            $qty = $matches[1];
-        }
-
-        // Map specific error codes to user-friendly messages
-        switch ($errorCode) {
-            case '170131': // Insufficient balance
-                return "موجودی USDT شما برای این معامله آتی کافی نیست.\n" .
-                       "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید.";
-
-            case '110007': // Available balance not enough for new order
-                return "موجودی قابل استفاده شما برای ایجاد سفارش جدید کافی نیست.\n" .
-                       "برای سفارش {$side} {$symbol}، ابتدا موجودی USDT خود را شارژ کنید یا سفارشات باز خود را بررسی کنید.";
-
-            case '10001': // Parameter error
-                if (str_contains($errorMessage, 'minimum limit')) {
-                    return "مقدار سفارش ({$qty}) کمتر از حداقل مجاز است.\n" .
-                           "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
-                } elseif (str_contains($errorMessage, 'qty')) {
-                    return "مقدار سفارش نامعتبر است ({$qty}).\n" .
-                           "احتمالاً مقدار محاسبه شده خیلی کوچک است. لطفاً درصد ریسک را افزایش دهید.";
-                } elseif (str_contains($errorMessage, 'price')) {
-                    return "قیمت سفارش نامعتبر است.\n" .
-                           "لطفاً قیمت صحیح وارد کنید.";
-                } else {
-                    return "اطلاعات سفارش نامعتبر است.\n" .
-                           "لطفاً اطلاعات وارد شده را بررسی کنید.";
-                }
-
-            case '110003': // Order quantity exceeds upper limit
-                return "مقدار سفارش از حد مجاز بیشتر است.\n" .
-                       "لطفاً درصد ریسک را کاهش دهید.";
-
-            case '110012': // Order quantity is lower than the minimum
-                return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
-                       "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
-
-            case '110025': // Order would immediately trigger
-                return "سفارش شما بلافاصله اجرا می‌شود.\n" .
-                       "برای سفارش محدود، قیمت مناسب‌تری انتخاب کنید.";
-
-            default:
-                // Generic error handling
-                if (str_contains($errorMessage, 'Insufficient balance') || str_contains($errorMessage, 'not enough for new order')) {
-                    return "موجودی حساب شما کافی نیست.\n" .
-                           "لطفاً ابتدا حساب خود را شارژ کنید یا سفارشات باز خود را بررسی کنید.";
-                } elseif (str_contains($errorMessage, 'minimum limit')) {
-                    return "مقدار سفارش کمتر از حداقل مجاز است.\n" .
-                           "لطفاً درصد ریسک را افزایش دهید یا تعداد مراحل را کاهش دهید.";
-                } else {
-                    // Return a generic but helpful message
-                    return "خطا در ایجاد سفارش رخ داد.\n" .
-                           "لطفاً اطلاعات وارد شده را بررسی کرده و دوباره تلاش کنید.";
-                }
-        }
-    }
 
     public function index()
     {
@@ -307,11 +225,15 @@ class FuturesController extends Controller
                     // If database shows hedge mode, verify with exchange
                     if ($dbPositionMode === 'hedge') {
                         $accountInfo = $exchangeService->getAccountInfo();
-                        if (!$accountInfo['hedgeMode']) {
-                            // Update database if exchange shows different mode
-                            $userExchange->update(['position_mode' => 'one-way']);
-                            return back()->withErrors(['msg' => 'حالت صرافی با پایگاه داده همخوانی ندارد. لطفاً حالت hedge را مجدداً فعال کنید.'])->withInput();
+                        // Only validate if we can determine the position mode from exchange
+                        if (isset($accountInfo['positionMode']) && $accountInfo['positionMode'] !== 'unknown') {
+                            if (!$accountInfo['hedgeMode']) {
+                                // Update database if exchange shows different mode
+                                $userExchange->update(['position_mode' => 'one-way']);
+                                return back()->withErrors(['msg' => 'حالت صرافی با پایگاه داده همخوانی ندارد. لطفاً حالت hedge را مجدداً فعال کنید.'])->withInput();
+                            }
                         }
+                        // If position mode is unknown, skip validation and allow order placement
                     }
                 }
             }
@@ -472,7 +394,7 @@ class FuturesController extends Controller
             Log::error('Futures order creation failed: ' . $e->getMessage());
 
             // Parse Bybit error message for user-friendly response
-            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
 
             return back()->withErrors(['msg' => $userFriendlyMessage])->withInput();
         }
@@ -602,7 +524,7 @@ class FuturesController extends Controller
         } catch (\Exception $e) {
             Log::error('Futures market close failed: ' . $e->getMessage());
 
-            $userFriendlyMessage = $this->parseBybitError($e->getMessage());
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
 
             return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
         }
