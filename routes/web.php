@@ -88,7 +88,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
+        Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
+        Route::post('/{exchange}/test-real-connection', [ExchangeController::class, 'testRealConnection'])->name('exchanges.test-real-connection');
+        Route::post('/{exchange}/test-demo-connection', [ExchangeController::class, 'testDemoConnection'])->name('exchanges.test-demo-connection');
     });
 
     // Admin Routes (requires authentication and admin privileges)

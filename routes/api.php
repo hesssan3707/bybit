@@ -28,6 +28,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [ApiAuthController::class, 'register'])->name('api.auth.register');
 });
 
+// Test connection route (requires authentication)
+Route::middleware(['api.auth'])->group(function () {
+    Route::post('/test-connection', [\App\Http\Controllers\ExchangeController::class, 'testConnectionApi'])->name('api.test-connection');
+});
+
 // Protected routes (require authentication)
 Route::middleware(['api.auth'])->group(function () {
     // Auth routes for authenticated users

@@ -383,11 +383,28 @@ class UserManagementController extends Controller
                 ], 400);
             }
 
+            $testType = $request->input('test_type', 'real');
+            
+            // Determine which credentials to use
+            if ($testType === 'demo') {
+                if (!$exchange->hasDemoCredentials()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'اطلاعات حساب دمو برای این صرافی موجود نیست.'
+                    ], 400);
+                }
+                $apiKey = $exchange->demo_api_key;
+                $apiSecret = $exchange->demo_api_secret;
+            } else {
+                $apiKey = $exchange->api_key;
+                $apiSecret = $exchange->api_secret;
+            }
+
             // Create exchange service instance
             $exchangeService = ExchangeFactory::create(
                 $exchange->exchange_name,
-                $exchange->api_key,
-                $exchange->api_secret
+                $apiKey,
+                $apiSecret
             );
 
             // Run comprehensive validation
@@ -455,19 +472,21 @@ class UserManagementController extends Controller
             $overallSuccess = $validation['overall'];
             $hasAnyTrading = $validation['spot']['success'] || $validation['futures']['success'];
             
+            $credentialType = $testType === 'demo' ? 'حساب دمو' : 'حساب واقعی';
+            
             if (!$validation['ip']['success']) {
                 $recommendation = 'reject';
-                $responseMessage = 'توصیه: این درخواست را رد کنید. آدرس IP سرور در لیست مجاز نیست.';
+                $responseMessage = "توصیه: این درخواست را رد کنید. آدرس IP سرور در لیست مجاز {$credentialType} نیست.";
             } elseif (!$hasAnyTrading) {
                 $recommendation = 'reject';
-                $responseMessage = 'توصیه: این درخواست را رد کنید. کلید API هیچ مجوز معاملاتی ندارد.';
+                $responseMessage = "توصیه: این درخواست را رد کنید. کلید API {$credentialType} هیچ مجوز معاملاتی ندارد.";
             } elseif ($validation['spot']['success'] && $validation['futures']['success']) {
                 $recommendation = 'approve';
-                $responseMessage = 'توصیه: این درخواست را تأیید کنید. تمام دسترسی‌ها موجود است.';
+                $responseMessage = "توصیه: این درخواست را تأیید کنید. تمام دسترسی‌های {$credentialType} موجود است.";
             } else {
                 $recommendation = 'approve_with_warning';
                 $limitedAccess = $validation['spot']['success'] ? 'فقط معاملات اسپات' : 'فقط معاملات آتی';
-                $responseMessage = "توصیه: می‌توانید تأیید کنید اما کاربر {$limitedAccess} خواهد داشت.";
+                $responseMessage = "توصیه: می‌توانید تأیید کنید اما کاربر در {$credentialType} {$limitedAccess} خواهد داشت.";
             }
             
             return response()->json([

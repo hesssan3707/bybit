@@ -129,6 +129,57 @@
         border-radius: 4px;
         font-size: 12px;
     }
+    
+    /* Mode Switch Styles */
+    .mode-switch {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .mode-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: relative;
+        width: 40px;
+        height: 20px;
+        background-color: #ccc;
+        border-radius: 20px;
+        transition: .4s;
+        margin-left: 8px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        border-radius: 50%;
+        transition: .4s;
+    }
+    
+    .mode-switch input:checked + .slider {
+        background-color: #2196F3;
+    }
+    
+    .mode-switch input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+    
+    .mode-label {
+        color: white;
+        font-weight: bold;
+        margin-left: 5px;
+    }
 </style>
 @endpush
 
@@ -183,6 +234,17 @@
                                 @if($exchange->is_default)
                                     <span class="status-badge default-badge">پیش‌فرض</span>
                                 @endif
+                                @if($exchange->is_active && ($exchange->demo_api_key || $exchange->api_key))
+                                    <div style="margin-top: 10px;">
+                                        <label class="mode-switch">
+                                            <input type="checkbox" id="mode-toggle-{{ $exchange->id }}" 
+                                                   {{ $exchange->is_demo_mode ? 'checked' : '' }}
+                                                   onchange="switchMode({{ $exchange->id }}, this.checked)">
+                                            <span class="slider"></span>
+                                            <span class="mode-label">{{ $exchange->is_demo_mode ? 'دمو' : 'واقعی' }}</span>
+                                        </label>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -229,9 +291,19 @@
                             </div>
                         </div>
                     @endif
-                    <button onclick="testConnection({{ $exchange->id }})" class="btn " id="test-btn-{{ $exchange->id }}">
-                        تست اتصال
-                    </button>
+                    <div style="margin-bottom: 15px;">
+                        @if(!empty($exchange->api_key) && !empty($exchange->api_secret))
+                            <button onclick="testRealConnection({{ $exchange->id }})" class="btn" id="test-real-btn-{{ $exchange->id }}" style="margin-left: 10px;">
+                                تست اتصال حساب واقعی
+                            </button>
+                        @endif
+                        
+                        @if(!empty($exchange->demo_api_key) && !empty($exchange->demo_api_secret))
+                            <button onclick="testDemoConnection({{ $exchange->id }})" class="btn" id="test-demo-btn-{{ $exchange->id }}">
+                                تست اتصال حساب دمو
+                            </button>
+                        @endif
+                    </div>
                     <div style="text-align: left;">
                         @if($exchange->is_active || $exchange->status === 'rejected')
                             <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
@@ -258,15 +330,46 @@
 </div>
 
 <script>
-async function testConnection(exchangeId) {
-    const btn = document.getElementById(`test-btn-${exchangeId}`);
+async function switchMode(exchangeId, isDemoMode) {
+    try {
+        const response = await fetch(`/exchanges/${exchangeId}/switch-mode`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                is_demo_mode: isDemoMode
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update the label
+            const label = document.querySelector(`#mode-toggle-${exchangeId}`).parentElement.querySelector('.mode-label');
+            label.textContent = isDemoMode ? 'دمو' : 'واقعی';
+        } else {
+            // Revert the toggle if failed
+            document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
+            alert('خطا در تغییر حالت');
+        }
+    } catch (error) {
+        // Revert the toggle if failed
+        document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
+        alert('خطا در تغییر حالت');
+    }
+}
+
+async function testRealConnection(exchangeId) {
+    const btn = document.getElementById(`test-real-btn-${exchangeId}`);
     const originalText = btn.textContent;
 
     btn.textContent = 'در حال تست...';
     btn.disabled = true;
 
     try {
-        const response = await fetch(`/exchanges/${exchangeId}/test-connection`, {
+        const response = await fetch(`/exchanges/${exchangeId}/test-real-connection`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -296,6 +399,7 @@ async function testConnection(exchangeId) {
                 btn.style.color = '';
                 btn.disabled = false;
             }, 2000);
+            alert(data.message || 'خطا در تست اتصال حساب واقعی');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -307,6 +411,61 @@ async function testConnection(exchangeId) {
             btn.style.color = '';
             btn.disabled = false;
         }, 2000);
+        alert('خطا در تست اتصال حساب واقعی');
+    }
+}
+
+async function testDemoConnection(exchangeId) {
+    const btn = document.getElementById(`test-demo-btn-${exchangeId}`);
+    const originalText = btn.textContent;
+
+    btn.textContent = 'در حال تست...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`/exchanges/${exchangeId}/test-demo-connection`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            btn.textContent = '✓ موفق';
+            btn.style.backgroundColor = '#28a745';
+            btn.style.color = 'white';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            btn.textContent = '✗ خطا';
+            btn.style.backgroundColor = '#dc3545';
+            btn.style.color = 'white';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 2000);
+            alert(data.message || 'خطا در تست اتصال حساب دمو');
+        }
+    } catch (error) {
+        btn.textContent = '✗ خطا';
+        btn.style.backgroundColor = '#dc3545';
+        btn.style.color = 'white';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+            btn.style.color = '';
+            btn.disabled = false;
+        }, 2000);
+        alert('خطا در تست اتصال حساب دمو');
     }
 }
 </script>

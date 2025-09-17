@@ -243,6 +243,42 @@
                         @enderror
                     </div>
 
+                    <!-- Demo Credentials Section -->
+                    <div class="form-group">
+                        <div style="border-top: 1px solid #e9ecef; margin: 20px 0; padding-top: 20px;">
+                            <h4 style="margin-bottom: 15px; color: #495057;">اطلاعات حساب دمو (TestNet)</h4>
+                        </div>
+                    </div>
+
+                    <div id="demo-credentials">
+                        <div class="form-group">
+                            <label for="demo_api_key">کلید API دمو (Demo API Key):</label>
+                            <input id="demo_api_key" type="text" name="demo_api_key" autocomplete="off" value="{{ old('demo_api_key') }}"
+                                   placeholder="کلید API حساب دمو خود را وارد کنید" oninput="checkDemoInputs()">
+                            @error('demo_api_key')
+                                <span class="invalid-feedback" role="alert">
+                                    <strong>{{ $message }}</strong>
+                                </span>
+                            @enderror
+                        </div>
+
+                        <div class="form-group">
+                            <label for="demo_api_secret">کلید محرمانه دمو (Demo API Secret):</label>
+                            <div class="password-field">
+                                <input id="demo_api_secret" type="password" autocomplete="off" name="demo_api_secret"
+                                       placeholder="کلید محرمانه حساب دمو خود را وارد کنید" oninput="checkDemoInputs()">
+                                <span class="password-toggle" onclick="togglePassword('demo_api_secret')">
+                                    <i id="demo_api_secret-icon" class="fas fa-eye"></i>
+                                </span>
+                            </div>
+                            @error('demo_api_secret')
+                                <span class="invalid-feedback" role="alert">
+                                    <strong>{{ $message }}</strong>
+                                </span>
+                            @enderror
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="reason">دلیل درخواست (اختیاری):</label>
                         <textarea id="reason" name="reason" rows="3"
@@ -252,6 +288,16 @@
                                 <strong>{{ $message }}</strong>
                             </span>
                         @enderror
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <button type="button" onclick="testRealConnectionCreate()" class="btn" id="test-real-btn-create" style="margin-left: 10px; background-color: #007bff; color: white;">
+                            تست اتصال حساب واقعی
+                        </button>
+                        
+                        <button type="button" onclick="testDemoConnectionCreate()" class="btn" id="test-demo-btn-create" style="background-color: #28a745; color: white; display: none;">
+                            تست اتصال حساب دمو
+                        </button>
                     </div>
 
                     <button type="submit">
@@ -287,5 +333,171 @@ function selectExchange(exchangeName, color) {
     // Update form styling to match exchange color
     document.documentElement.style.setProperty('--primary-color', color);
 }
+
+function checkDemoInputs() {
+    const demoApiKey = document.getElementById('demo_api_key').value.trim();
+    const demoApiSecret = document.getElementById('demo_api_secret').value.trim();
+    const demoTestBtn = document.getElementById('test-demo-btn-create');
+    
+    if (demoApiKey && demoApiSecret) {
+        demoTestBtn.style.display = 'inline-block';
+    } else {
+        demoTestBtn.style.display = 'none';
+    }
+}
+
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const icon = document.getElementById(fieldId + '-icon');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        field.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+async function testRealConnectionCreate() {
+    const btn = document.getElementById('test-real-btn-create');
+    const originalText = btn.textContent;
+    const apiKey = document.getElementById('api_key').value;
+    const apiSecret = document.getElementById('api_secret').value;
+    const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
+
+    if (!apiKey || !apiSecret) {
+        alert('لطفاً ابتدا کلید API و کلید محرمانه را وارد کنید.');
+        return;
+    }
+
+    if (!exchangeName) {
+        alert('لطفاً ابتدا یک صرافی انتخاب کنید.');
+        return;
+    }
+
+    btn.textContent = 'در حال تست...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                exchange_name: exchangeName,
+                api_key: apiKey,
+                api_secret: apiSecret,
+                is_demo: false
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            btn.textContent = '✓ موفق';
+            btn.style.backgroundColor = '#28a745';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '#007bff';
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            btn.textContent = '✗ خطا';
+            btn.style.backgroundColor = '#dc3545';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '#007bff';
+                btn.disabled = false;
+            }, 2000);
+            alert(data.message || 'خطا در تست اتصال حساب واقعی');
+        }
+    } catch (error) {
+        btn.textContent = '✗ خطا';
+        btn.style.backgroundColor = '#dc3545';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '#007bff';
+            btn.disabled = false;
+        }, 2000);
+        alert('خطا در تست اتصال حساب واقعی');
+    }
+}
+
+async function testDemoConnectionCreate() {
+    const btn = document.getElementById('test-demo-btn-create');
+    const originalText = btn.textContent;
+    const demoApiKey = document.getElementById('demo_api_key').value;
+    const demoApiSecret = document.getElementById('demo_api_secret').value;
+    const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
+
+    if (!demoApiKey || !demoApiSecret) {
+        alert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.');
+        return;
+    }
+
+    if (!exchangeName) {
+        alert('لطفاً ابتدا یک صرافی انتخاب کنید.');
+        return;
+    }
+
+    btn.textContent = 'در حال تست...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                exchange_name: exchangeName,
+                api_key: demoApiKey,
+                api_secret: demoApiSecret,
+                is_demo: true
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            btn.textContent = '✓ موفق';
+            btn.style.backgroundColor = '#198754';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '#28a745';
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            btn.textContent = '✗ خطا';
+            btn.style.backgroundColor = '#dc3545';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '#28a745';
+                btn.disabled = false;
+            }, 2000);
+            alert(data.message || 'خطا در تست اتصال حساب دمو');
+        }
+    } catch (error) {
+        btn.textContent = '✗ خطا';
+        btn.style.backgroundColor = '#dc3545';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '#28a745';
+            btn.disabled = false;
+        }, 2000);
+        alert('خطا در تست اتصال حساب دمو');
+    }
+}
+
+// Check demo inputs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkDemoInputs();
+});
 </script>
 @endsection

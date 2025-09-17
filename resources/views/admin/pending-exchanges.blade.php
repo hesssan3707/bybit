@@ -431,8 +431,12 @@
                                 <strong>کاربر:</strong> <span style="color: #dc3545;">کاربر حذف شده (ID: {{ $exchange->user_id }})</span><br>
                             @endif
                             <strong>تاریخ درخواست:</strong> {{ $exchange->activation_requested_at->format('Y-m-d H:i') }}<br>
-                            <strong>کلید API:</strong>
+                            <strong>کلید API واقعی:</strong>
                             <div class="masked-key">{{ $exchange->masked_api_key }}</div>
+                            @if($exchange->hasDemoCredentials())
+                                <strong>کلید API دمو:</strong>
+                                <div class="masked-key">{{ $exchange->masked_demo_api_key }}</div>
+                            @endif
                         </div>
                         
                         @if($exchange->user_reason)
@@ -447,10 +451,18 @@
                         <div class="approval-form">
                             <!-- Test Connection Section -->
                             <div class="test-connection-section" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <button type="button" class="btn btn-info" onclick="testConnection({{ $exchange->id }})" id="test-btn-{{ $exchange->id }}">
-                                    تست اتصال
+                                <button type="button" class="btn btn-info" onclick="testRealConnection({{ $exchange->id }})" id="test-real-btn-{{ $exchange->id }}">
+                                    تست اتصال حساب واقعی
                                 </button>
-                                <div id="test-result-{{ $exchange->id }}" class="test-result" style="margin-top: 10px; display: none;"></div>
+                                @if($exchange->hasDemoCredentials())
+                                    <button type="button" class="btn btn-info" onclick="testDemoConnection({{ $exchange->id }})" id="test-demo-btn-{{ $exchange->id }}" style="margin-right: 10px;">
+                                        تست اتصال حساب دمو
+                                    </button>
+                                @endif
+                                <div id="test-real-result-{{ $exchange->id }}" class="test-result" style="margin-top: 10px; display: none;"></div>
+                                @if($exchange->hasDemoCredentials())
+                                    <div id="test-demo-result-{{ $exchange->id }}" class="test-result" style="margin-top: 10px; display: none;"></div>
+                                @endif
                             </div>
                             
                             <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" style="display: inline;">
@@ -495,16 +507,16 @@
 // CSRF token for AJAX requests
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-function testConnection(exchangeId) {
-    const button = document.getElementById(`test-btn-${exchangeId}`);
-    const resultDiv = document.getElementById(`test-result-${exchangeId}`);
+function testRealConnection(exchangeId) {
+    const button = document.getElementById(`test-real-btn-${exchangeId}`);
+    const resultDiv = document.getElementById(`test-real-result-${exchangeId}`);
     
     // Show loading state
     button.disabled = true;
     button.textContent = 'در حال تست...';
     resultDiv.style.display = 'block';
     resultDiv.className = 'test-result loading';
-    resultDiv.innerHTML = 'در حال بررسی اتصال و اعتبارسنجی کلید API...';
+    resultDiv.innerHTML = 'در حال بررسی اتصال و اعتبارسنجی کلید API واقعی...';
     
     // Make AJAX request
     fetch(`/admin/exchanges/${exchangeId}/test`, {
@@ -513,12 +525,13 @@ function testConnection(exchangeId) {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrfToken,
             'Accept': 'application/json'
-        }
+        },
+        body: JSON.stringify({ test_type: 'real' })
     })
     .then(response => response.json())
     .then(data => {
         button.disabled = false;
-        button.textContent = 'تست اتصال';
+        button.textContent = 'تست اتصال حساب واقعی';
         
         if (data.success) {
             // Determine result class based on recommendation
@@ -574,10 +587,97 @@ function testConnection(exchangeId) {
     })
     .catch(error => {
         button.disabled = false;
-        button.textContent = 'تست اتصال';
+        button.textContent = 'تست اتصال حساب واقعی';
         resultDiv.className = 'test-result error';
         resultDiv.innerHTML = `<div><strong>خطا در ارتباط:</strong> لطفاً دوباره تلاش کنید</div>`;
-        console.error('Test connection error:', error);
+        console.error('Test real connection error:', error);
+    });
+}
+
+function testDemoConnection(exchangeId) {
+    const button = document.getElementById(`test-demo-btn-${exchangeId}`);
+    const resultDiv = document.getElementById(`test-demo-result-${exchangeId}`);
+    
+    // Show loading state
+    button.disabled = true;
+    button.textContent = 'در حال تست...';
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'test-result loading';
+    resultDiv.innerHTML = 'در حال بررسی اتصال و اعتبارسنجی کلید API دمو...';
+    
+    // Make AJAX request
+    fetch(`/admin/exchanges/${exchangeId}/test`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ test_type: 'demo' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.textContent = 'تست اتصال حساب دمو';
+        
+        if (data.success) {
+            // Determine result class based on recommendation
+            let resultClass = 'success';
+            if (data.recommendation === 'reject') {
+                resultClass = 'error';
+            } else if (data.recommendation === 'approve_with_warning') {
+                resultClass = 'warning';
+            }
+            
+            resultDiv.className = `test-result ${resultClass}`;
+            
+            let html = `<div><strong>${data.message}</strong></div>`;
+            
+            if (data.details) {
+                html += '<div class="validation-details">';
+                
+                if (data.details.ip) {
+                    const ipIcon = data.details.ip.status === 'allowed' ? '✓' : '✗';
+                    const ipClass = `status-${data.details.ip.status}`;
+                    html += `<div class="validation-item">
+                        <span>دسترسی IP:</span>
+                        <span class="status-icon ${ipClass}">${ipIcon} ${data.details.ip.message}</span>
+                    </div>`;
+                }
+                
+                if (data.details.spot) {
+                    const spotIcon = data.details.spot.status === 'allowed' ? '✓' : (data.details.spot.status === 'not_supported' ? '!' : '✗');
+                    const spotClass = `status-${data.details.spot.status}`;
+                    html += `<div class="validation-item">
+                        <span>معاملات اسپات:</span>
+                        <span class="status-icon ${spotClass}">${spotIcon} ${data.details.spot.message}</span>
+                    </div>`;
+                }
+                
+                if (data.details.futures) {
+                    const futuresIcon = data.details.futures.status === 'allowed' ? '✓' : (data.details.futures.status === 'not_supported' ? '!' : '✗');
+                    const futuresClass = `status-${data.details.futures.status}`;
+                    html += `<div class="validation-item">
+                        <span>معاملات آتی:</span>
+                        <span class="status-icon ${futuresClass}">${futuresIcon} ${data.details.futures.message}</span>
+                    </div>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.className = 'test-result error';
+            resultDiv.innerHTML = `<div><strong>خطا:</strong> ${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.textContent = 'تست اتصال حساب دمو';
+        resultDiv.className = 'test-result error';
+        resultDiv.innerHTML = `<div><strong>خطا در ارتباط:</strong> لطفاً دوباره تلاش کنید</div>`;
+        console.error('Test demo connection error:', error);
     });
 }
 </script>

@@ -467,7 +467,16 @@
                                 </span>
                             </td>
                             <td data-label="کلید API">
-                                <div class="masked-key">{{ $exchange->masked_api_key }}</div>
+                                <div style="margin-bottom: 5px;">
+                                    <strong>واقعی:</strong>
+                                    <div class="masked-key">{{ $exchange->masked_api_key }}</div>
+                                </div>
+                                @if($exchange->hasDemoCredentials())
+                                    <div>
+                                        <strong>دمو:</strong>
+                                        <div class="masked-key">{{ $exchange->masked_demo_api_key }}</div>
+                                    </div>
+                                @endif
                             </td>
                             <td data-label="تاریخ درخواست">{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d') : '-' }}</td>
                             <td data-label="فعال شده توسط">
@@ -494,9 +503,14 @@
                                         رد
                                     </button>
 
-                                    <button type="button" class="btn btn-info" onclick="testConnection({{ $exchange->id }})" id="test-btn-{{ $exchange->id }}">
-                                        تست اتصال
+                                    <button type="button" class="btn btn-info" onclick="testRealConnection({{ $exchange->id }})" id="test-real-btn-{{ $exchange->id }}">
+                                        تست واقعی
                                     </button>
+                                    @if($exchange->hasDemoCredentials())
+                                        <button type="button" class="btn btn-info" onclick="testDemoConnection({{ $exchange->id }})" id="test-demo-btn-{{ $exchange->id }}">
+                                            تست دمو
+                                        </button>
+                                    @endif
                                 @elseif($exchange->is_active)
                                     <button onclick="showDeactivateModal({{ $exchange->id }})" class="btn btn-warning">
                                         غیرفعال‌سازی
@@ -569,8 +583,8 @@
 // CSRF token for AJAX requests
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-function testConnection(exchangeId) {
-    const button = document.getElementById(`test-btn-${exchangeId}`);
+function testRealConnection(exchangeId) {
+    const button = document.getElementById(`test-real-btn-${exchangeId}`);
 
     if (!button) return;
 
@@ -586,7 +600,8 @@ function testConnection(exchangeId) {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrfToken,
             'Accept': 'application/json'
-        }
+        },
+        body: JSON.stringify({ test_type: 'real' })
     })
     .then(response => response.json())
     .then(data => {
@@ -594,16 +609,55 @@ function testConnection(exchangeId) {
         button.textContent = originalText;
 
         if (data.success) {
-            alert(`نتیجه تست: ${data.message}`);
+            alert(`نتیجه تست حساب واقعی: ${data.message}`);
         } else {
-            alert(`خطا: ${data.message}`);
+            alert(`خطا در تست حساب واقعی: ${data.message}`);
         }
     })
     .catch(error => {
         button.disabled = false;
         button.textContent = originalText;
         alert('خطا در ارتباط: لطفاً دوباره تلاش کنید');
-        console.error('Test connection error:', error);
+        console.error('Test real connection error:', error);
+    });
+}
+
+function testDemoConnection(exchangeId) {
+    const button = document.getElementById(`test-demo-btn-${exchangeId}`);
+
+    if (!button) return;
+
+    // Show loading state
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = 'در حال تست...';
+
+    // Make AJAX request
+    fetch(`/admin/exchanges/${exchangeId}/test`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ test_type: 'demo' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.textContent = originalText;
+
+        if (data.success) {
+            alert(`نتیجه تست حساب دمو: ${data.message}`);
+        } else {
+            alert(`خطا در تست حساب دمو: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.textContent = originalText;
+        alert('خطا در ارتباط: لطفاً دوباره تلاش کنید');
+        console.error('Test demo connection error:', error);
     });
 }
 

@@ -86,23 +86,57 @@ class ExchangeController extends Controller
         }
     }
 
-    public function testConnection(UserExchange $exchange)
+    public function testConnection(Request $request, UserExchange $exchange)
     {
         if ($exchange->user_id !== auth()->id()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
+        $testType = $request->input('test_type', 'real');
+        
+        // Determine which credentials to use
+        if ($testType === 'demo') {
+            if (!$exchange->hasDemoCredentials()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Demo credentials are not configured for this exchange.'
+                ], 400);
+            }
+            $apiKey = $exchange->demo_api_key;
+            $apiSecret = $exchange->demo_api_secret;
+            $credentialType = 'demo';
+        } else {
+            if (!$exchange->hasRealCredentials()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Real credentials are not configured for this exchange.'
+                ], 400);
+            }
+            $apiKey = $exchange->api_key;
+            $apiSecret = $exchange->api_secret;
+            $credentialType = 'real';
+        }
+
         try {
-            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $exchange->api_key, $exchange->api_secret, $exchange->password);
+            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $apiKey, $apiSecret, $exchange->password);
             $balance = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
             if (isset($balance['list'][0])) {
-                return response()->json(['success' => true, 'message' => 'Connection successful.']);
+                return response()->json([
+                    'success' => true, 
+                    'message' => "Connection successful using {$credentialType} credentials."
+                ]);
             } else {
-                return response()->json(['success' => false, 'message' => 'Connection failed: Could not retrieve balance.']);
+                return response()->json([
+                    'success' => false, 
+                    'message' => "Connection failed: Could not retrieve balance using {$credentialType} credentials."
+                ]);
             }
         } catch (\Exception $e) {
-            Log::error('Exchange connection test failed: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()], 500);
+            Log::error("Exchange {$credentialType} connection test failed: " . $e->getMessage());
+            return response()->json([
+                'success' => false, 
+                'message' => "Connection failed using {$credentialType} credentials: " . $e->getMessage()
+            ], 500);
         }
     }
 }

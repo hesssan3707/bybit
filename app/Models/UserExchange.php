@@ -18,6 +18,9 @@ class UserExchange extends Model
         'exchange_name',
         'api_key',
         'api_secret',
+        'demo_api_key',
+        'demo_api_secret',
+        'is_demo_active',
         'is_active',
         'is_default',
         'status',
@@ -40,6 +43,7 @@ class UserExchange extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+        'is_demo_active' => 'boolean',
         'activation_requested_at' => 'datetime',
         'activated_at' => 'datetime',
         'deactivated_at' => 'datetime',
@@ -53,6 +57,8 @@ class UserExchange extends Model
     protected $hidden = [
         'api_key',
         'api_secret',
+        'demo_api_key',
+        'demo_api_secret',
     ];
 
     // Exchange configurations
@@ -164,6 +170,36 @@ class UserExchange extends Model
 
     public function getApiSecretAttribute($value)
     {
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function setDemoApiKeyAttribute($value)
+    {
+        $this->attributes['demo_api_key'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getDemoApiKeyAttribute($value)
+    {
+        if (!$value) return null;
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function setDemoApiSecretAttribute($value)
+    {
+        $this->attributes['demo_api_secret'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getDemoApiSecretAttribute($value)
+    {
+        if (!$value) return null;
         try {
             return Crypt::decryptString($value);
         } catch (\Exception $e) {
@@ -372,13 +408,15 @@ class UserExchange extends Model
         return self::$exchanges;
     }
 
-    public static function createExchangeRequest($userId, $exchangeName, $apiKey, $apiSecret, $reason = null)
+    public static function createExchangeRequest($userId, $exchangeName, $apiKey, $apiSecret, $reason = null, $demoApiKey = null, $demoApiSecret = null)
     {
         return self::create([
             'user_id' => $userId,
             'exchange_name' => $exchangeName,
             'api_key' => $apiKey,
             'api_secret' => $apiSecret,
+            'demo_api_key' => $demoApiKey,
+            'demo_api_secret' => $demoApiSecret,
             'status' => 'pending',
             'activation_requested_at' => now(),
             'user_reason' => $reason,
@@ -576,5 +614,65 @@ class UserExchange extends Model
     public function canAccessFutures()
     {
         return $this->is_active && $this->ip_access && $this->futures_access;
+    }
+
+    /**
+     * Get current active API credentials (demo or real)
+     */
+    public function getCurrentApiCredentials()
+    {
+        if ($this->is_demo_active) {
+            return [
+                'api_key' => $this->demo_api_key,
+                'api_secret' => $this->demo_api_secret,
+                'is_demo' => true
+            ];
+        }
+
+        return [
+            'api_key' => $this->api_key,
+            'api_secret' => $this->api_secret,
+            'is_demo' => false
+        ];
+    }
+
+    /**
+     * Check if demo credentials are available
+     */
+    public function hasDemoCredentials()
+    {
+        return !empty($this->demo_api_key) && !empty($this->demo_api_secret);
+    }
+
+    /**
+     * Check if real credentials are available
+     */
+    public function hasRealCredentials()
+    {
+        return !empty($this->api_key) && !empty($this->api_secret);
+    }
+
+    /**
+     * Switch to demo mode
+     */
+    public function switchToDemo()
+    {
+        if (!$this->hasDemoCredentials()) {
+            throw new \Exception('Demo credentials are not configured for this exchange.');
+        }
+        
+        $this->update(['is_demo_active' => true]);
+    }
+
+    /**
+     * Switch to real mode
+     */
+    public function switchToReal()
+    {
+        if (!$this->hasRealCredentials()) {
+            throw new \Exception('Real credentials are not configured for this exchange.');
+        }
+        
+        $this->update(['is_demo_active' => false]);
     }
 }
