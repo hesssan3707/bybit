@@ -244,11 +244,6 @@
                     </div>
 
                     <!-- Demo Credentials Section -->
-                    <div class="form-group">
-                        <div style="border-top: 1px solid #e9ecef; margin: 20px 0; padding-top: 20px;">
-                            <h4 style="margin-bottom: 15px; color: #495057;">اطلاعات حساب دمو (TestNet)</h4>
-                        </div>
-                    </div>
 
                     <div id="demo-credentials">
                         <div class="form-group">
