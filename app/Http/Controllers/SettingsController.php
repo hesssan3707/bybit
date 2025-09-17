@@ -63,6 +63,13 @@ class SettingsController extends Controller
                 }
             }
 
+            // Activate Future Strict Mode with selected market
+            $user->update([
+                'future_strict_mode' => true,
+                'future_strict_mode_activated_at' => now(),
+                'selected_market' => $request->selected_market
+            ]);
+            
             // Switch all active exchanges to hedge mode
             foreach ($user->activeExchanges as $exchange) {
                 try {
@@ -78,20 +85,6 @@ class SettingsController extends Controller
                     ], 500);
                 }
             }
-            
-            // Activate Future Strict Mode with selected market
-            $user->update([
-                'future_strict_mode' => true,
-                'future_strict_mode_activated_at' => now(),
-                'selected_market' => $request->selected_market
-            ]);
-            
-            Log::info('Future Strict Mode activated with market selection', [
-                'user_id' => $user->id,
-                'user_email' => $user->email,
-                'selected_market' => $request->selected_market,
-                'activated_at' => now()
-            ]);
             
             return response()->json([
                 'success' => true,

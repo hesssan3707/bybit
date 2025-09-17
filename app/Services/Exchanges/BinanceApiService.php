@@ -170,19 +170,25 @@ class BinanceApiService implements ExchangeApiServiceInterface
     private function updateDatabasePositionMode(string $positionMode): void
     {
         try {
-            // Find the user exchange record for this API instance
-            $userExchange = \App\Models\UserExchange::where('api_key', $this->apiKey)
-                ->where('exchange_name', 'binance')
-                ->first();
-                
-            if ($userExchange) {
-                $userExchange->update(['position_mode' => $positionMode]);
-                \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
-                    'user_exchange_id' => $userExchange->id,
-                    'position_mode' => $positionMode,
-                    'exchange' => 'binance'
-                ]);
+            // Find UserExchange by decrypted api_key comparison
+            $userExchanges = \App\Models\UserExchange::where('exchange_name', 'binance')->get();
+            
+            foreach ($userExchanges as $userExchange) {
+                if ($userExchange->api_key === $this->apiKey) {
+                    $userExchange->update(['position_mode' => $positionMode]);
+                    \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
+                        'user_exchange_id' => $userExchange->id,
+                        'position_mode' => $positionMode,
+                        'exchange' => 'binance'
+                    ]);
+                    return;
+                }
             }
+            
+            \Illuminate\Support\Facades\Log::warning('UserExchange not found for position mode update', [
+                'position_mode' => $positionMode,
+                'exchange' => 'binance'
+            ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
                 'error' => $e->getMessage(),

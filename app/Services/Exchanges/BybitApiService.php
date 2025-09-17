@@ -153,29 +153,30 @@ class BybitApiService implements ExchangeApiServiceInterface
             'mode' => $mode,
             'coin' => 'USDT'
         ]);
-        
+
         // Update database position mode after successful switch
         $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
-        
+
         return $result;
     }
-    
+
     private function updateDatabasePositionMode(string $positionMode): void
     {
         try {
-            // Find the user exchange record for this API instance
-            $userExchange = \App\Models\UserExchange::where('api_key', $this->apiKey)
-                ->where('exchange_name', 'bybit')
-                ->first();
-                
-            if ($userExchange) {
-                $userExchange->update(['position_mode' => $positionMode]);
-                \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
-                    'user_exchange_id' => $userExchange->id,
-                    'position_mode' => $positionMode,
-                    'exchange' => 'bybit'
-                ]);
+            // Find UserExchange by decrypted api_key comparison
+            $userExchanges = \App\Models\UserExchange::where('exchange_name', 'bybit')->get();
+
+            foreach ($userExchanges as $userExchange) {
+                if ($userExchange->api_key === $this->apiKey) {
+                    $userExchange->update(['position_mode' => $positionMode]);
+                    return;
+                }
             }
+
+            \Illuminate\Support\Facades\Log::warning('UserExchange not found for position mode update', [
+                'position_mode' => $positionMode,
+                'exchange' => 'bybit'
+            ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
                 'error' => $e->getMessage(),
@@ -370,6 +371,10 @@ class BybitApiService implements ExchangeApiServiceInterface
         $params = ['category' => 'linear'];
         if ($symbol) {
             $params['symbol'] = $symbol;
+        } else {
+            // Bybit API requires either symbol, baseCoin, or settleCoin for linear category
+            // Using USDT as default settleCoin to get all USDT-settled orders
+            $params['settleCoin'] = 'USDT';
         }
         return $this->sendRequest('GET', '/v5/order/realtime', $params);
     }
@@ -405,6 +410,10 @@ class BybitApiService implements ExchangeApiServiceInterface
         ];
         if ($symbol) {
             $params['symbol'] = $symbol;
+        } else {
+            // Adding settleCoin for consistency with other methods
+            // to ensure we get USDT-settled orders when no symbol is specified
+            $params['settleCoin'] = 'USDT';
         }
         return $this->sendRequest('GET', '/v5/order/history', $params);
     }
@@ -414,6 +423,10 @@ class BybitApiService implements ExchangeApiServiceInterface
         $params = ['category' => 'linear'];
         if ($symbol) {
             $params['symbol'] = $symbol;
+        } else {
+            // Bybit API requires either symbol or settleCoin for linear category
+            // Using USDT as default settleCoin to get all USDT-settled positions
+            $params['settleCoin'] = 'USDT';
         }
         return $this->sendRequest('GET', '/v5/position/list', $params);
     }
@@ -742,11 +755,11 @@ class BybitApiService implements ExchangeApiServiceInterface
         try {
             // Try to get positions to determine position mode
             $positions = $this->getPositions();
-            
+
             // Check if any position has positionIdx indicating hedge mode
             $hedgeMode = false;
             $positionMode = 'one-way';
-            
+
             if (isset($positions['list']) && !empty($positions['list'])) {
                 foreach ($positions['list'] as $position) {
                     if (isset($position['positionIdx']) && (int)$position['positionIdx'] > 0) {
@@ -761,10 +774,10 @@ class BybitApiService implements ExchangeApiServiceInterface
                 $hedgeMode = false;
                 $positionMode = 'one-way';
             }
-            
+
             // Update database with detected position mode
             $this->updateDatabasePositionMode($positionMode);
-            
+
             return [
                 'positionMode' => $positionMode,
                 'hedgeMode' => $hedgeMode,
