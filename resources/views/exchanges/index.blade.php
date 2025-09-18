@@ -503,14 +503,27 @@ async function switchMode(exchangeId, checkbox) {
                 if (data.success) {
                     // Update checkbox to reflect the actual database state
                     checkbox.checked = data.is_demo_mode;
+                    // Success is silent - no modal shown
                 } else {
                     // Revert checkbox state if the switch failed
-                    checkbox.checked = !originalState;
+                    checkbox.checked = originalState;
+                    // Show error modal with server message
+                    modernAlert(
+                        data.message || 'خطا در تغییر حالت صرافی',
+                        'error',
+                        'خطا در تغییر حالت'
+                    );
                 }
             } catch (error) {
                 console.error('Error switching mode:', error);
                 // Revert checkbox state on error
-                checkbox.checked = !originalState;
+                checkbox.checked = originalState;
+                // Show error modal for network/connection errors
+                modernAlert(
+                    'خطا در برقراری ارتباط با سرور. لطفاً دوباره تلاش کنید.',
+                    'error',
+                    'خطا در اتصال'
+                );
             }
         }
 
