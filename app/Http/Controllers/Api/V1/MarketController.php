@@ -36,7 +36,7 @@ class MarketController extends Controller
 
             foreach ($exchanges as $exchange) {
                 try {
-                    $exchangeService = ExchangeFactory::create($exchange->exchange_name, $exchange->api_key, $exchange->api_secret, $exchange->password);
+                    $exchangeService = ExchangeFactory::create($exchange->exchange_name, $exchange->api_key, $exchange->api_secret, $exchange->is_demo_active);
 
                     if ($type === 'spot') {
                         $tickerInfo = $exchangeService->getTickerInfo($market, 'spot');

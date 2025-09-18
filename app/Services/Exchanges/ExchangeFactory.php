@@ -13,19 +13,19 @@ class ExchangeFactory
     /**
      * Create an exchange API service instance based on exchange name
      */
-    public static function create(string $exchangeName, ?string $apiKey = null, ?string $apiSecret = null): ExchangeApiServiceInterface
+    public static function create(string $exchangeName, ?string $apiKey = null, ?string $apiSecret = null, ?bool $isDemo = null): ExchangeApiServiceInterface
     {
         switch (strtolower($exchangeName)) {
             case 'bybit':
-                $service = new BybitApiService();
+                $service = new BybitApiService($isDemo);
                 break;
                 
             case 'binance':
-                $service = new BinanceApiService();
+                $service = new BinanceApiService($isDemo);
                 break;
                 
             case 'bingx':
-                $service = new BingXApiService();
+                $service = new BingXApiService($isDemo);
                 break;
                 
             default:
@@ -52,7 +52,8 @@ class ExchangeFactory
         $service = self::create(
             $userExchange->exchange_name,
             $userExchange->api_key,
-            $userExchange->api_secret
+            $userExchange->api_secret,
+            $userExchange->is_demo_active
         );
 
         return $service;

@@ -27,9 +27,16 @@ class FuturesController extends Controller
 
     public function index()
     {
-        $orders = Order::forUser(auth()->id())
-            ->latest('updated_at')
-            ->paginate(20);
+        $ordersQuery = Order::forUser(auth()->id());
+        
+        // Filter by current account type (demo/real)
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        if ($currentExchange) {
+            $ordersQuery->accountType($currentExchange->is_demo_active);
+        }
+        
+        $orders = $ordersQuery->latest('updated_at')->paginate(20);
 
         return response()->json(['success' => true, 'data' => $orders]);
     }
@@ -122,6 +129,7 @@ class FuturesController extends Controller
 
                 $order = Order::create([
                     'user_exchange_id' => $currentExchange->id,
+                    'is_demo'          => $currentExchange->is_demo_active,
                     'order_id'         => $responseData['orderId'] ?? null,
                     'order_link_id'    => $orderLinkId,
                     'symbol'           => $symbol,

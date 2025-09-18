@@ -276,7 +276,7 @@ function validateConfiguration()
     // Check .env variables
     $requiredEnvVars = [
         'SERVER_IP',
-        'SITE_URL', 
+        'APP_URL', 
         'EXCHANGE_VALIDATION_ENABLED'
     ];
     

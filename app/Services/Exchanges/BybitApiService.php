@@ -12,13 +12,16 @@ class BybitApiService implements ExchangeApiServiceInterface
     private $baseUrl;
     private $recvWindow = 5000;
 
-    public function __construct()
+    public function __construct(?bool $isDemo = null)
     {
         // Don't initialize API credentials from .env - they will be set via setCredentials()
         $this->apiKey = null;
         $this->apiSecret = null;
-        $isTestnet = env('BYBIT_TESTNET', false);
-        $this->baseUrl = $isTestnet ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
+        
+        // Use parameter if provided, otherwise default to false (real account)
+        $isDemo = $isDemo ?? false;
+        
+        $this->baseUrl = $isDemo ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
     }
 
     public function setCredentials(string $apiKey, string $apiSecret): void

@@ -7,9 +7,8 @@ All API endpoints are prefixed with `/api/spot/`
 
 ## Authentication
 The API uses the same Bybit API credentials configured in your `.env` file:
-- `BYBIT_API_KEY`
-- `BYBIT_API_SECRET`
-- `BYBIT_TESTNET` (true/false)
+- API credentials are managed through the user interface
+- Demo/Real account switching is handled per user exchange configuration
 
 ## Endpoints
 

@@ -481,12 +481,22 @@ async function switchMode(exchangeId, isDemoMode) {
         } else {
             // Revert the toggle if failed
             document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
-            alert('خطا در تغییر حالت');
+            const modeText = isDemoMode ? 'دمو' : 'واقعی';
+            modernAlert(
+                `امکان تغییر به حالت ${modeText} وجود ندارد. لطفاً اطمینان حاصل کنید که کلیدهای API مربوطه تنظیم شده باشند.`,
+                'error',
+                'خطا در تغییر حالت'
+            );
         }
     } catch (error) {
         // Revert the toggle if failed
         document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
-        alert('خطا در تغییر حالت');
+        const modeText = isDemoMode ? 'دمو' : 'واقعی';
+        modernAlert(
+            `خطا در ارتباط با سرور هنگام تغییر به حالت ${modeText}. لطفاً اتصال اینترنت خود را بررسی کنید و مجدداً تلاش کنید.`,
+            'error',
+            'خطا در اتصال'
+        );
     }
 }
 
@@ -528,7 +538,11 @@ async function testRealConnection(exchangeId) {
                 btn.style.color = '';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب واقعی');
+            modernAlert(
+                data.message || 'تست اتصال حساب واقعی ناموفق بود. لطفاً کلیدهای API و تنظیمات شبکه خود را بررسی کنید.',
+                'error',
+                'خطا در تست اتصال واقعی'
+            );
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
@@ -582,7 +596,11 @@ async function testDemoConnection(exchangeId) {
                 btn.style.color = '';
                 btn.disabled = false;
             }, 2000);
-            alert(data.message || 'خطا در تست اتصال حساب دمو');
+            modernAlert(
+                data.message || 'تست اتصال حساب دمو ناموفق بود. لطفاً کلیدهای API دمو و تنظیمات شبکه خود را بررسی کنید.',
+                'error',
+                'خطا در تست اتصال دمو'
+            );
         }
     } catch (error) {
         btn.textContent = '✗ خطا';

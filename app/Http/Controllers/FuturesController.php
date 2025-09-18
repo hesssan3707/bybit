@@ -91,8 +91,18 @@ class FuturesController extends Controller
 
         $threeDaysAgo = now()->subDays(3);
 
-        $orders = Order::forUser(auth()->id())
-            ->where(function ($query) use ($threeDaysAgo) {
+        // Get current exchange to filter by account type
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        
+        $ordersQuery = Order::forUser(auth()->id());
+        
+        // Filter by current account type (demo/real) if exchange is available
+        if ($currentExchange) {
+            $ordersQuery->accountType($currentExchange->is_demo_active);
+        }
+        
+        $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
                 $query->whereIn('status', ['pending', 'filled'])
                       ->orWhere('updated_at', '>=', $threeDaysAgo);
             })
@@ -202,8 +212,15 @@ class FuturesController extends Controller
             // Apply strict mode conditions only if user has strict mode enabled
             if ($user->future_strict_mode) {
                 // Check for recent loss (only in strict mode)
-                $lastLoss = Trade::forUser(auth()->id())
-                    ->where('pnl', '<', 0)
+                $lastLossQuery = Trade::forUser(auth()->id());
+                
+                // Filter by current account type (demo/real)
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if ($currentExchange) {
+                    $lastLossQuery->accountType($currentExchange->is_demo_active);
+                }
+                
+                $lastLoss = $lastLossQuery->where('pnl', '<', 0)
                     ->latest('closed_at')
                     ->first();
 
@@ -374,6 +391,7 @@ class FuturesController extends Controller
 
                 Order::create([
                     'user_exchange_id' => $currentExchange->id,
+                    'is_demo'          => $currentExchange->is_demo_active,
                     'order_id'         => $responseData['orderId'] ?? null,
                     'order_link_id'    => $orderLinkId,
                     'symbol'           => $symbol,

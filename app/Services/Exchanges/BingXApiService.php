@@ -12,10 +12,12 @@ class BingXApiService implements ExchangeApiServiceInterface
     private $baseUrl;
     private $recvWindow = 5000;
 
-    public function __construct()
+    public function __construct(?bool $isDemo = null)
     {
-        $isTestnet = env('BINGX_TESTNET', false);
-        $this->baseUrl = $isTestnet ? 'https://open-api-vst.bingx.com' : 'https://open-api.bingx.com';
+        // Use parameter if provided, otherwise default to false (real account)
+        $isDemo = $isDemo ?? false;
+        
+        $this->baseUrl = $isDemo ? 'https://open-api-vst.bingx.com' : 'https://open-api.bingx.com';
     }
 
     public function setCredentials(string $apiKey, string $apiSecret): void

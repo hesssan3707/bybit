@@ -128,9 +128,18 @@ class SpotTradingController extends Controller
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
         
-        $orders = SpotOrder::forUser(auth()->id())
-            ->latest('created_at')
-            ->paginate(20);
+        // Get current exchange to filter by account type
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        
+        $ordersQuery = SpotOrder::forUser(auth()->id());
+        
+        // Filter by current account type (demo/real) if exchange is available
+        if ($currentExchange) {
+            $ordersQuery->accountType($currentExchange->is_demo_active);
+        }
+        
+        $orders = $ordersQuery->latest('created_at')->paginate(20);
 
         return view('spot.orders', [
             'orders' => $orders,
@@ -368,6 +377,7 @@ class SpotTradingController extends Controller
 
             SpotOrder::create([
                 'user_exchange_id' => $currentExchange->id,
+                'is_demo' => $currentExchange->is_demo_active,
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],

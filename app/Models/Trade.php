@@ -13,6 +13,7 @@ class Trade extends Model
 
     protected $fillable = [
         'user_exchange_id',
+        'is_demo',
         'symbol',
         'side',
         'order_type',
@@ -89,5 +90,29 @@ class Trade extends Model
     public function scopeRecent($query, $days = 30)
     {
         return $query->where('created_at', '>=', now()->subDays($days));
+    }
+
+    /**
+     * Scope a query to only include demo account trades
+     */
+    public function scopeDemo($query)
+    {
+        return $query->where('is_demo', true);
+    }
+
+    /**
+     * Scope a query to only include real account trades
+     */
+    public function scopeReal($query)
+    {
+        return $query->where('is_demo', false);
+    }
+
+    /**
+     * Scope a query to filter by account type (demo/real)
+     */
+    public function scopeAccountType($query, $isDemo)
+    {
+        return $query->where('is_demo', $isDemo);
     }
 }

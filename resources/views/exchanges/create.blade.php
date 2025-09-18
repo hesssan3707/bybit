@@ -365,12 +365,12 @@ async function testRealConnectionCreate() {
     const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
 
     if (!apiKey || !apiSecret) {
-        alert('لطفاً ابتدا کلید API و کلید محرمانه را وارد کنید.');
+        modernAlert('لطفاً ابتدا کلید API و کلید محرمانه را وارد کنید.', 'warning', 'اطلاعات ناقص');
         return;
     }
 
     if (!exchangeName) {
-        alert('لطفاً ابتدا یک صرافی انتخاب کنید.');
+        modernAlert('لطفاً ابتدا یک صرافی انتخاب کنید.', 'warning', 'صرافی انتخاب نشده');
         return;
     }
 
@@ -420,7 +420,7 @@ async function testRealConnectionCreate() {
             btn.style.backgroundColor = '#007bff';
             btn.disabled = false;
         }, 2000);
-        modernAlert('خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
+        modernAlert('خطا در برقراری ارتباط با سرور', 'error', 'خطا در تست اتصال');
     }
 }
 
@@ -487,7 +487,7 @@ async function testDemoConnectionCreate() {
             btn.style.backgroundColor = '#28a745';
             btn.disabled = false;
         }, 2000);
-        modernAlert('خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
+        modernAlert('خطا در برقراری ارتباط با سرور', 'error', 'خطا در تست اتصال');
     }
 }
 

@@ -40,6 +40,13 @@ class SpotTradingController extends Controller
 
             $query = SpotOrder::forUser($request->user()->id);
 
+            // Filter by current account type (demo/real)
+            $user = $request->user();
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            if ($currentExchange) {
+                $query->accountType($currentExchange->is_demo_active);
+            }
+
             if ($symbol) {
                 $query->where('symbol', $symbol);
             }
@@ -121,6 +128,7 @@ class SpotTradingController extends Controller
 
             $spotOrder = SpotOrder::create([
                 'user_exchange_id' => $currentExchange->id,
+                'is_demo' => $currentExchange->is_demo_active,
                 'order_id' => $result['orderId'] ?? null,
                 'order_link_id' => $orderParams['orderLinkId'],
                 'symbol' => $orderParams['symbol'],

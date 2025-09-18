@@ -12,11 +12,13 @@ class BinanceApiService implements ExchangeApiServiceInterface
     private $baseUrl;
     private $recvWindow = 5000;
 
-    public function __construct()
+    public function __construct(?bool $isDemo = null)
     {
+        // Use parameter if provided, otherwise default to false (real account)
+        $isDemo = $isDemo ?? false;
+        
         // Testnet URL: https://testnet.binancefuture.com
-        $isTestnet = env('BINANCE_TESTNET', false);
-        $this->baseUrl = $isTestnet ? 'https://testnet.binancefuture.com' : 'https://fapi.binance.com';
+        $this->baseUrl = $isDemo ? 'https://testnet.binancefuture.com' : 'https://fapi.binance.com';
     }
 
     public function setCredentials(string $apiKey, string $apiSecret): void

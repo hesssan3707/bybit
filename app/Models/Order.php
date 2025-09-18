@@ -12,7 +12,7 @@ class Order extends Model
     protected $table = "orders";
     protected $guarded = [];
     protected $fillable = [
-        'user_exchange_id', 'order_id', 'order_link_id', 'symbol', 'entry_price', 'tp', 'sl', 'steps',
+        'user_exchange_id', 'is_demo', 'order_id', 'order_link_id', 'symbol', 'entry_price', 'tp', 'sl', 'steps',
         'expire_minutes', 'status', 'closed_at', 'side', 'amount', 'entry_low', 'entry_high','cancel_price'
     ];
 
@@ -74,5 +74,29 @@ class Order extends Model
     public function scopeRecent($query, $days = 30)
     {
         return $query->where('created_at', '>=', now()->subDays($days));
+    }
+
+    /**
+     * Scope a query to only include demo account orders
+     */
+    public function scopeDemo($query)
+    {
+        return $query->where('is_demo', true);
+    }
+
+    /**
+     * Scope a query to only include real account orders
+     */
+    public function scopeReal($query)
+    {
+        return $query->where('is_demo', false);
+    }
+
+    /**
+     * Scope a query to filter by account type (demo/real)
+     */
+    public function scopeAccountType($query, $isDemo)
+    {
+        return $query->where('is_demo', $isDemo);
     }
 }

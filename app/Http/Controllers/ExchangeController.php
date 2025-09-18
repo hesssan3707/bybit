@@ -199,7 +199,7 @@ class ExchangeController extends Controller
     /**
      * Test real account connection
      */
-    public function testRealConnection(UserExchange $exchange)
+    public function testRealConnection(Request $request, UserExchange $exchange)
     {
         try {
             if ($exchange->user_id !== auth()->id()) {
@@ -213,26 +213,38 @@ class ExchangeController extends Controller
                 ]);
             }
 
-            if (empty($exchange->api_key) || empty($exchange->api_secret)) {
+            // Get real credentials from request body (for testing new credentials) or from database (for saved credentials)
+            $apiKey = $request->input('api_key') ?: $exchange->api_key;
+            $apiSecret = $request->input('api_secret') ?: $exchange->api_secret;
+
+            if (empty($apiKey) || empty($apiSecret)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'اطلاعات حساب واقعی وارد نشده است'
                 ]);
             }
 
-            // Test with real credentials
-            $isConnected = ExchangeFactory::testUserExchangeConnection($exchange, false);
-
-            return response()->json([
-                'success' => $isConnected,
-                'message' => $isConnected ? 'اتصال حساب واقعی موفق' : 'خطا در اتصال حساب واقعی'
-            ]);
+            // Test with real credentials using ExchangeFactory
+            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $apiKey, $apiSecret, false);
+            $balance = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+            
+            if (isset($balance['list'][0])) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'اتصال حساب واقعی موفق'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'خطا در اتصال حساب واقعی - نتوانست موجودی را دریافت کند'
+                ]);
+            }
 
         } catch (\Exception $e) {
             Log::error('Real exchange connection test failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'خطا در تست اتصال حساب واقعی'
+                'message' => 'خطا در تست اتصال حساب واقعی: ' . $e->getMessage()
             ]);
         }
     }
@@ -240,7 +252,7 @@ class ExchangeController extends Controller
     /**
      * Test demo account connection
      */
-    public function testDemoConnection(UserExchange $exchange)
+    public function testDemoConnection(Request $request, UserExchange $exchange)
     {
         try {
             if ($exchange->user_id !== auth()->id()) {
@@ -254,26 +266,38 @@ class ExchangeController extends Controller
                 ]);
             }
 
-            if (empty($exchange->demo_api_key) || empty($exchange->demo_api_secret)) {
+            // Get demo credentials from request body (for testing new credentials) or from database (for saved credentials)
+            $demoApiKey = $request->input('demo_api_key') ?: $exchange->demo_api_key;
+            $demoApiSecret = $request->input('demo_api_secret') ?: $exchange->demo_api_secret;
+
+            if (empty($demoApiKey) || empty($demoApiSecret)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'اطلاعات حساب دمو وارد نشده است'
                 ]);
             }
 
-            // Test with demo credentials
-            $isConnected = ExchangeFactory::testUserExchangeConnection($exchange, true);
-
-            return response()->json([
-                'success' => $isConnected,
-                'message' => $isConnected ? 'اتصال حساب دمو موفق' : 'خطا در اتصال حساب دمو'
-            ]);
+            // Test with demo credentials using ExchangeFactory
+            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $demoApiKey, $demoApiSecret, true);
+            $balance = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+            
+            if (isset($balance['list'][0])) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'اتصال حساب دمو موفق'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'خطا در اتصال حساب دمو - نتوانست موجودی را دریافت کند'
+                ]);
+            }
 
         } catch (\Exception $e) {
             Log::error('Demo exchange connection test failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'خطا در تست اتصال حساب دمو'
+                'message' => 'خطا در تست اتصال حساب دمو: ' . $e->getMessage()
             ]);
         }
     }
@@ -303,31 +327,59 @@ class ExchangeController extends Controller
             $apiKey = $request->api_key;
             $apiSecret = $request->api_secret;
 
-            // Create a temporary exchange instance for testing
-            $tempExchange = new UserExchange([
-                'exchange_name' => $exchangeName,
-                'api_key' => $apiKey,
-                'api_secret' => $apiSecret,
-                'demo_api_key' => $isDemo ? $apiKey : null,
-                'demo_api_secret' => $isDemo ? $apiSecret : null,
-                'is_demo_mode' => $isDemo,
-                'user_id' => auth()->id()
-            ]);
-
-            $isConnected = ExchangeFactory::testUserExchangeConnection($tempExchange, $isDemo);
-
-            return response()->json([
-                'success' => $isConnected,
-                'message' => $isConnected 
-                    ? ($isDemo ? 'اتصال حساب دمو موفق' : 'اتصال حساب واقعی موفق')
-                    : ($isDemo ? 'خطا در اتصال حساب دمو' : 'خطا در اتصال حساب واقعی')
-            ]);
+            // Use ExchangeFactory::create for proper connection testing
+            $exchangeService = ExchangeFactory::create($exchangeName, $apiKey, $apiSecret, $isDemo);
+            
+            // Test connection by checking wallet balance
+            // Different exchanges use different account types
+            $accountType = strtolower($exchangeName) === 'bybit' ? 'UNIFIED' : 'FUTURES';
+            $balance = $exchangeService->getWalletBalance($accountType, 'USDT');
+            
+            // Validate balance response based on exchange type
+            $isValidBalance = false;
+            if ($balance !== null) {
+                if (strtolower($exchangeName) === 'bybit') {
+                    // Bybit returns data in 'list' array
+                    $isValidBalance = isset($balance['list']) && !empty($balance['list']);
+                } else {
+                    // Binance and BingX return array directly or in 'list'
+                    $isValidBalance = (isset($balance['list']) && !empty($balance['list'])) || 
+                                     (is_array($balance) && !empty($balance));
+                }
+            }
+            
+            if ($isValidBalance) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $isDemo ? 'اتصال حساب دمو موفق' : 'اتصال حساب واقعی موفق'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $isDemo ? 'خطا در اتصال حساب دمو - نتوانست موجودی را دریافت کند' : 'خطا در اتصال حساب واقعی - نتوانست موجودی را دریافت کند'
+                ]);
+            }
 
         } catch (\Exception $e) {
             Log::error('API connection test failed: ' . $e->getMessage());
+            
+            // Extract meaningful error message from exchange API
+            $errorMessage = $e->getMessage();
+            if (strpos($errorMessage, 'API key is invalid') !== false) {
+                $errorMessage = 'کلید API نامعتبر است';
+            } elseif (strpos($errorMessage, 'Invalid signature') !== false) {
+                $errorMessage = 'امضای API نامعتبر است';
+            } elseif (strpos($errorMessage, 'IP not allowed') !== false) {
+                $errorMessage = 'IP شما مجاز نیست';
+            } elseif (strpos($errorMessage, 'Permission denied') !== false) {
+                $errorMessage = 'دسترسی مجاز نیست';
+            } else {
+                $errorMessage = $isDemo ? 'خطا در تست اتصال حساب دمو: ' . $errorMessage : 'خطا در تست اتصال حساب واقعی: ' . $errorMessage;
+            }
+            
             return response()->json([
                 'success' => false,
-                'message' => 'خطا در تست اتصال'
+                'message' => $errorMessage
             ]);
         }
     }
@@ -361,12 +413,18 @@ class ExchangeController extends Controller
             'reason' => 'nullable|string|max:500',
         ]);
 
-        // Custom validation: user must provide either real or demo credentials (or both)
-        $validator->after(function ($validator) use ($request) {
+        // Custom validation: user must provide either real or demo credentials (or both), or have existing credentials
+        $validator->after(function ($validator) use ($request, $exchange) {
             $hasRealCredentials = !empty($request->api_key) && !empty($request->api_secret);
             $hasDemoCredentials = !empty($request->demo_api_key) && !empty($request->demo_api_secret);
+            $hasExistingRealCredentials = $exchange->hasRealCredentials();
+            $hasExistingDemoCredentials = $exchange->hasDemoCredentials();
             
-            if (!$hasRealCredentials && !$hasDemoCredentials) {
+            // Check if user will have at least one set of credentials after update
+            $willHaveRealCredentials = $hasRealCredentials || ($hasExistingRealCredentials && !$hasRealCredentials);
+            $willHaveDemoCredentials = $hasDemoCredentials || ($hasExistingDemoCredentials && !$hasDemoCredentials);
+            
+            if (!$willHaveRealCredentials && !$willHaveDemoCredentials && !$hasRealCredentials && !$hasDemoCredentials) {
                 $validator->errors()->add('credentials', 'حداقل یکی از اطلاعات حساب واقعی یا دمو باید وارد شود.');
             }
             
@@ -388,19 +446,32 @@ class ExchangeController extends Controller
         }
 
         try {
-            // Deactivate exchange and request new approval
-            $exchange->update([
-                'api_key' => $request->api_key,
-                'api_secret' => $request->api_secret,
-                'demo_api_key' => $request->demo_api_key,
-                'demo_api_secret' => $request->demo_api_secret,
+            // Prepare update data - only include fields that user provided
+            $updateData = [
                 'is_active' => false,
                 'is_default' => false,
                 'status' => 'pending',
                 'activation_requested_at' => now(),
                 'user_reason' => $request->reason,
                 'admin_notes' => null,
-            ]);
+            ];
+
+            // Only update real credentials if provided
+            $hasRealCredentials = !empty($request->api_key) && !empty($request->api_secret);
+            if ($hasRealCredentials) {
+                $updateData['api_key'] = $request->api_key;
+                $updateData['api_secret'] = $request->api_secret;
+            }
+
+            // Only update demo credentials if provided
+            $hasDemoCredentials = !empty($request->demo_api_key) && !empty($request->demo_api_secret);
+            if ($hasDemoCredentials) {
+                $updateData['demo_api_key'] = $request->demo_api_key;
+                $updateData['demo_api_secret'] = $request->demo_api_secret;
+            }
+
+            // Deactivate exchange and request new approval
+            $exchange->update($updateData);
 
             return redirect()->route('exchanges.index')
                 ->with('success', 'درخواست به‌روزرسانی اطلاعات صرافی ارسال شد.');

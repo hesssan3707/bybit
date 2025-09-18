@@ -44,14 +44,82 @@ class ExchangeController extends Controller
         }
 
         $validated = $request->validate([
-            'api_key' => 'required|string',
-            'api_secret' => 'required|string',
+            'api_key' => 'nullable|string|min:8',
+            'api_secret' => 'nullable|string|min:8',
+            'demo_api_key' => 'nullable|string|min:8',
+            'demo_api_secret' => 'nullable|string|min:8',
             'password' => 'nullable|string',
         ]);
 
-        $exchange->update($validated);
+        // Custom validation: ensure complete credential pairs and at least one set exists
+        $hasRealCredentials = !empty($validated['api_key']) && !empty($validated['api_secret']);
+        $hasDemoCredentials = !empty($validated['demo_api_key']) && !empty($validated['demo_api_secret']);
+        $hasExistingRealCredentials = $exchange->hasRealCredentials();
+        $hasExistingDemoCredentials = $exchange->hasDemoCredentials();
 
-        return response()->json(['success' => true, 'message' => 'Exchange updated successfully.', 'data' => $exchange]);
+        // Check if user will have at least one set of credentials after update
+        $willHaveRealCredentials = $hasRealCredentials || ($hasExistingRealCredentials && !$hasRealCredentials);
+        $willHaveDemoCredentials = $hasDemoCredentials || ($hasExistingDemoCredentials && !$hasDemoCredentials);
+
+        if (!$willHaveRealCredentials && !$willHaveDemoCredentials && !$hasRealCredentials && !$hasDemoCredentials) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least one set of credentials (real or demo) must be provided.',
+                'errors' => ['credentials' => ['At least one set of credentials (real or demo) must be provided.']]
+            ], 422);
+        }
+
+        // Validate credential pairs
+        if ((!empty($validated['api_key']) && empty($validated['api_secret'])) || 
+            (empty($validated['api_key']) && !empty($validated['api_secret']))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Both API key and secret are required for real account credentials.',
+                'errors' => ['api_credentials' => ['Both API key and secret are required for real account credentials.']]
+            ], 422);
+        }
+
+        if ((!empty($validated['demo_api_key']) && empty($validated['demo_api_secret'])) || 
+            (empty($validated['demo_api_key']) && !empty($validated['demo_api_secret']))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Both API key and secret are required for demo account credentials.',
+                'errors' => ['demo_credentials' => ['Both API key and secret are required for demo account credentials.']]
+            ], 422);
+        }
+
+        try {
+            // Prepare update data - only include fields that user provided
+            $updateData = [];
+
+            // Only update real credentials if provided
+            if ($hasRealCredentials) {
+                $updateData['api_key'] = $validated['api_key'];
+                $updateData['api_secret'] = $validated['api_secret'];
+            }
+
+            // Only update demo credentials if provided
+            if ($hasDemoCredentials) {
+                $updateData['demo_api_key'] = $validated['demo_api_key'];
+                $updateData['demo_api_secret'] = $validated['demo_api_secret'];
+            }
+
+            // Always update password if provided
+            if (isset($validated['password'])) {
+                $updateData['password'] = $validated['password'];
+            }
+
+            $exchange->update($updateData);
+
+            return response()->json(['success' => true, 'message' => 'Exchange updated successfully.', 'data' => $exchange]);
+
+        } catch (\Exception $e) {
+            Log::error('API Exchange update failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update exchange credentials.'
+            ], 500);
+        }
     }
 
     public function destroy(UserExchange $exchange)
@@ -118,7 +186,8 @@ class ExchangeController extends Controller
         }
 
         try {
-            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $apiKey, $apiSecret, $exchange->password);
+            $isDemo = ($testType === 'demo');
+            $exchangeService = ExchangeFactory::create($exchange->exchange_name, $apiKey, $apiSecret, $isDemo);
             $balance = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
             if (isset($balance['list'][0])) {
                 return response()->json([

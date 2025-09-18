@@ -260,7 +260,7 @@ echo "API Tests Completed!\n";
  * 1. Make sure your Laravel application is running (php artisan serve)
  * 2. Update the $baseUrl variable to match your application URL
  * 3. Ensure your .env file has valid Bybit API credentials
- * 4. Use BYBIT_TESTNET=true for testing with testnet
+ * 4. Demo/testnet usage is controlled through user exchange settings
  * 5. Be careful with order creation tests - they will place real orders!
  * 6. The limit order example uses a low price (30000) to avoid accidental execution
  * 7. Always test on testnet first before using mainnet

@@ -352,7 +352,7 @@ async function testRealConnectionEdit() {
     const exchangeId = {{ $exchange->id }};
 
     if (!apiKey || !apiSecret) {
-        alert('لطفاً ابتدا کلید API و کلید محرمانه را وارد کنید.');
+        modernAlert('لطفاً ابتدا کلید API و کلید محرمانه را وارد کنید.', 'warning', 'اطلاعات ناقص');
         return;
     }
 
@@ -365,7 +365,11 @@ async function testRealConnectionEdit() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            }
+            },
+            body: JSON.stringify({
+                api_key: apiKey,
+                api_secret: apiSecret
+            })
         });
 
         const data = await response.json();
@@ -421,7 +425,11 @@ async function testDemoConnectionEdit() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            }
+            },
+            body: JSON.stringify({
+                demo_api_key: demoApiKey,
+                demo_api_secret: demoApiSecret
+            })
         });
 
         const data = await response.json();

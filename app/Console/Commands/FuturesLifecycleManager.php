@@ -258,6 +258,7 @@ class FuturesLifecycleManager extends Command
                     // Create new trade record for the closed position
                     Trade::create([
                         'user_exchange_id' => $userExchange->id,
+                        'is_demo' => $order->is_demo ?? $userExchange->is_demo_active,
                         'symbol' => $pnlEvent['symbol'],
                         'side' => $order->side,
                         'order_type' => $pnlEvent['orderType'],
@@ -366,6 +367,7 @@ class FuturesLifecycleManager extends Command
 
                 Trade::create([
                     'user_exchange_id' => $userExchange->id,
+                    'is_demo' => $originalOrder ? ($originalOrder->is_demo ?? $userExchange->is_demo_active) : $userExchange->is_demo_active,
                     'symbol' => $pnlEvent['symbol'],
                     'side' => $originalOrder ? $originalOrder->side : strtolower($pnlEvent['side']),
                     'order_type' => $pnlEvent['orderType'],

@@ -13,7 +13,7 @@ return [
     'validation' => [
         'enabled' => env('EXCHANGE_VALIDATION_ENABLED', true),
         'server_ip' => env('SERVER_IP', ''),
-        'site_url' => env('SITE_URL', env('APP_URL', 'http://localhost')),
+        'site_url' => env('APP_URL', 'http://localhost'),
         'timeout' => 30, // seconds for API validation calls
         'retry_attempts' => 2,
     ],
