@@ -507,9 +507,29 @@ async function switchMode(exchangeId, checkbox) {
                 } else {
                     // Revert checkbox state if the switch failed
                     checkbox.checked = originalState;
-                    // Show error modal with server message
+                    
+                    // Translate English error messages to Persian
+                    let errorMessage = data.message || 'خطا در تغییر حالت صرافی';
+                    
+                    // Common English error messages and their Persian translations
+                    const errorTranslations = {
+                        'Demo credentials are not configured for this exchange.': 'اطلاعات حساب آزمایشی برای این صرافی تنظیم نشده است.',
+                        'Demo credentials are not configured for this exchange': 'اطلاعات حساب آزمایشی برای این صرافی تنظیم نشده است.',
+                        'Invalid API credentials': 'اطلاعات API نامعتبر است',
+                        'API credentials not found': 'اطلاعات API یافت نشد',
+                        'Exchange connection failed': 'اتصال به صرافی ناموفق بود',
+                        'Unauthorized': 'عدم دسترسی',
+                        'Forbidden': 'دسترسی مجاز نیست'
+                    };
+                    
+                    // Check if the error message matches any known English messages
+                    if (errorTranslations[errorMessage]) {
+                        errorMessage = errorTranslations[errorMessage];
+                    }
+                    
+                    // Show error modal with translated message
                     modernAlert(
-                        data.message || 'خطا در تغییر حالت صرافی',
+                        errorMessage,
                         'error',
                         'خطا در تغییر حالت'
                     );

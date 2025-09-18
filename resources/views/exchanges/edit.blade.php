@@ -262,7 +262,7 @@
             <div id="demo-credentials">
                 <div class="form-group">
                     <label for="demo_api_key">کلید API دمو (Demo API Key):</label>
-                    <input id="demo_api_key" type="text" name="demo_api_key" autocomplete="off" value="{{ old('demo_api_key', $exchange->demo_api_key) }}"
+                    <input id="demo_api_key" type="text" name="demo_api_key" autocomplete="off" value="{{ old('demo_api_key') }}"
                            placeholder="کلید API حساب دمو خود را وارد کنید" oninput="checkDemoInputs()">
                     @error('demo_api_key')
                         <span class="invalid-feedback" role="alert">
