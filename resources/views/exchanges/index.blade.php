@@ -257,54 +257,72 @@
     }
     
     /* Mode Switch Styles */
-    .mode-switch {
+    .switch {
         position: relative;
-        display: inline-flex;
-        align-items: center;
-        cursor: pointer;
-        font-size: 12px;
+        display: inline-block;
+        width: 98px;
+        height: 46px;
     }
-    
-    .mode-switch input {
+
+    .switch input {
         opacity: 0;
         width: 0;
         height: 0;
     }
-    
+
     .slider {
-        position: relative;
-        width: 40px;
-        height: 20px;
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         background-color: #ccc;
-        border-radius: 20px;
         transition: .4s;
-        margin-left: 8px;
+        border-radius: 40px;
     }
-    
+
     .slider:before {
         position: absolute;
         content: "";
-        height: 16px;
-        width: 16px;
-        left: 2px;
-        bottom: 2px;
+        height: 40px;
+        width: 40px;
+        left: 3px;
+        bottom: 3px;
         background-color: white;
-        border-radius: 50%;
         transition: .4s;
+        border-radius: 50%;
     }
-    
-    .mode-switch input:checked + .slider {
+
+    input:checked + .slider {
         background-color: #2196F3;
     }
-    
-    .mode-switch input:checked + .slider:before {
-        transform: translateX(20px);
+
+    input:checked + .slider:before {
+        transform: translateX(52px);
     }
-    
-    .mode-label {
+
+    .slider.round {
+        border-radius: 36px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+
+    .switch-labels {
+        position: absolute;
+        top: 49%;
+        left: 0;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        justify-content: space-between;
+        padding: 0 10px;
         color: white;
         font-weight: bold;
-        margin-left: 5px;
+        pointer-events: none;
+        font-size: 12px;
     }
 </style>
 @endpush
@@ -364,13 +382,19 @@
                                 @endif
                                 @if($exchange->is_active && ($exchange->demo_api_key || $exchange->api_key))
                                     <div style="margin-top: 10px;">
-                                        <label class="mode-switch">
-                                            <input type="checkbox" id="mode-toggle-{{ $exchange->id }}" 
-                                                   {{ $exchange->is_demo_mode ? 'checked' : '' }}
-                                                   onchange="switchMode({{ $exchange->id }}, this.checked)">
-                                            <span class="slider"></span>
-                                            <span class="mode-label">{{ $exchange->is_demo_mode ? 'دمو' : 'واقعی' }}</span>
-                                        </label>
+                                        <div class="mode-switch">
+                                            <label class="switch">
+                                                <input type="checkbox" 
+                                                       id="mode-switch-{{ $exchange->id }}" 
+                                                       {{ $exchange->is_demo_active ? 'checked' : '' }}
+                                                       onchange="switchMode({{ $exchange->id }}, this)">
+                                                <span class="slider round"></span>
+                                                <div class="switch-labels">
+                                                    <span>واقعی</span>
+                                                    <span>دمو</span>
+                                                </div>
+                                            </label>
+                                        </div>
                                     </div>
                                 @endif
                             </div>
@@ -459,46 +483,36 @@
 </div>
 
 <script>
-async function switchMode(exchangeId, isDemoMode) {
-    try {
-        const response = await fetch(`/exchanges/${exchangeId}/switch-mode`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({
-                is_demo_mode: isDemoMode
-            })
-        });
+async function switchMode(exchangeId, checkbox) {
+            const originalState = checkbox.checked;
+            
+            try {
+                const response = await fetch(`/exchanges/${exchangeId}/switch-mode`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        is_demo_mode: checkbox.checked
+                    })
+                });
 
-        const data = await response.json();
-        
-        if (data.success) {
-            // Update the label
-            const label = document.querySelector(`#mode-toggle-${exchangeId}`).parentElement.querySelector('.mode-label');
-            label.textContent = isDemoMode ? 'دمو' : 'واقعی';
-        } else {
-            // Revert the toggle if failed
-            document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
-            const modeText = isDemoMode ? 'دمو' : 'واقعی';
-            modernAlert(
-                `امکان تغییر به حالت ${modeText} وجود ندارد. لطفاً اطمینان حاصل کنید که کلیدهای API مربوطه تنظیم شده باشند.`,
-                'error',
-                'خطا در تغییر حالت'
-            );
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update checkbox to reflect the actual database state
+                    checkbox.checked = data.is_demo_mode;
+                } else {
+                    // Revert checkbox state if the switch failed
+                    checkbox.checked = !originalState;
+                }
+            } catch (error) {
+                console.error('Error switching mode:', error);
+                // Revert checkbox state on error
+                checkbox.checked = !originalState;
+            }
         }
-    } catch (error) {
-        // Revert the toggle if failed
-        document.querySelector(`#mode-toggle-${exchangeId}`).checked = !isDemoMode;
-        const modeText = isDemoMode ? 'دمو' : 'واقعی';
-        modernAlert(
-            `خطا در ارتباط با سرور هنگام تغییر به حالت ${modeText}. لطفاً اتصال اینترنت خود را بررسی کنید و مجدداً تلاش کنید.`,
-            'error',
-            'خطا در اتصال'
-        );
-    }
-}
 
 async function testRealConnection(exchangeId) {
     const btn = document.getElementById(`test-real-btn-${exchangeId}`);

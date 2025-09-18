@@ -488,13 +488,18 @@ class ExchangeController extends Controller
     public function switchMode(Request $request, UserExchange $exchange)
     {
         if ($exchange->user_id !== auth()->id()) {
-            abort(403, 'دسترسی غیرمجاز');
+            return response()->json([
+                'success' => false,
+                'message' => 'دسترسی غیرمجاز',
+                'is_demo_mode' => $exchange->is_demo_active
+            ], 403);
         }
 
         if (!$exchange->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'صرافی فعال نیست'
+                'message' => 'صرافی فعال نیست',
+                'is_demo_mode' => $exchange->is_demo_active
             ]);
         }
 
@@ -503,21 +508,23 @@ class ExchangeController extends Controller
         try {
             if ($isDemoMode) {
                 $exchange->switchToDemo();
-                $message = 'به حالت دمو تغییر یافت';
             } else {
                 $exchange->switchToReal();
-                $message = 'به حالت واقعی تغییر یافت';
             }
+
+            // Refresh the model to get the latest state from database
+            $exchange->refresh();
 
             return response()->json([
                 'success' => true,
-                'message' => $message
+                'is_demo_mode' => $exchange->is_demo_active
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+                'is_demo_mode' => $exchange->is_demo_active
             ]);
         }
     }
