@@ -179,9 +179,9 @@
         <div class="form-row" style="display: flex; gap: 15px;">
             <div class="form-group" style="flex: 1;">
                 <label for="expire">
-                    مدت انقضای سفارش (دقیقه) - (اختیاری)
+                    مدت انقضای سفارش (اختیاری)
                 </label>
-                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" >
+                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="دقیقه" >
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
 

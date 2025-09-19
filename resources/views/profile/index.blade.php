@@ -321,6 +321,102 @@
         flex-wrap: wrap;
     }
 
+    .actions-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+    }
+
+    .actions-box .info-box-header {
+        color: white;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .actions-box .info-box-header i {
+        color: white;
+    }
+
+    .actions-box .info-box-content {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+    }
+
+    .action-buttons-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        padding: 10px 0;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        text-decoration: none;
+    }
+
+    .action-btn.btn-primary {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+    }
+
+    .action-btn.btn-primary:hover {
+        background: linear-gradient(135deg, #0056b3, #004085);
+        color: white;
+    }
+
+    .action-btn.btn-success {
+        background: linear-gradient(135deg, #28a745, #1e7e34);
+        color: white;
+    }
+
+    .action-btn.btn-success:hover {
+        background: linear-gradient(135deg, #1e7e34, #155724);
+        color: white;
+    }
+
+    .action-btn.btn-admin {
+        background: linear-gradient(135deg, #6f42c1, #5a32a3);
+        color: white;
+    }
+
+    .action-btn.btn-admin:hover {
+        background: linear-gradient(135deg, #5a32a3, #4c2a85);
+        color: white;
+    }
+
+    .action-btn.btn-danger {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        color: white;
+    }
+
+    .action-btn.btn-danger:hover {
+        background: linear-gradient(135deg, #c82333, #bd2130);
+        color: white;
+    }
+
+    .action-btn i {
+        font-size: 16px;
+        min-width: 16px;
+    }
+
+    .action-btn span {
+        font-size: 14px;
+    }
+
     /* Hide admin panel button on desktop */
     .admin-panel-btn {
         display: none;
@@ -496,6 +592,24 @@
             flex: none;
         }
 
+        .action-buttons-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .action-btn i {
+            font-size: 14px;
+        }
+
+        .action-btn span {
+            font-size: 13px;
+        }
+
         /* Show admin panel button on mobile */
         .admin-panel-btn {
             display: inline-block !important;
@@ -634,47 +748,35 @@
                 </div>
             </div>
         @endif
-    </div>
 
-    <div class="profile-card">
-        <h2>پروفایل کاربری</h2>
-
-        @if(session('success'))
-            <div class="alert alert-success">
-                {{ session('success') }}
+        <div class="info-box actions-box">
+            <div class="info-box-header">
+                <i class="fas fa-cogs"></i>
+                <h3>عملیات حساب کاربری</h3>
             </div>
-        @endif
-
-        <div class="username">{{ $user->email }}</div>
-
-        @if($currentExchange)
-            <div class="equity">
-                <p>موجودی لحظه ای حساب ({{ $currentExchange->exchange_display_name }}): <strong>${{ $totalEquity }}</strong></p>
-                <p>موجودی کیف پول({{ $currentExchange->exchange_display_name }}): <strong>${{ $totalBalance }}</strong></p>
+            <div class="info-box-content">
+                <div class="action-buttons-grid">
+                    <a href="{{ route('password.change.form') }}" class="action-btn btn-primary">
+                        <i class="fas fa-key"></i>
+                        <span>تغییر رمز عبور</span>
+                    </a>
+                    <a href="{{ route('account-settings.index') }}" class="action-btn btn-success">
+                        <i class="fas fa-cog"></i>
+                        <span>تنظیمات</span>
+                    </a>
+                    @if(auth()->user()->isAdmin())
+                        <a href="{{ route('admin.all-users') }}" class="action-btn btn-admin">
+                            <i class="fas fa-user-shield"></i>
+                            <span>پنل مدیریت</span>
+                        </a>
+                    @endif
+                    <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="action-btn btn-danger">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>خروج از حساب</span>
+                    </a>
+                </div>
             </div>
-        @else
-            <div class="equity">
-                <p style="color: #dc3545;">هیچ صرافی فعالی تنظیم نشده است</p>
-            </div>
-        @endif
-
-        <div class="profile-buttons">
-            <a href="{{ route('password.change.form') }}" class="btn btn-primary">
-                تغییر رمز عبور
-            </a>
-            <a href="{{ route('account-settings.index') }}" class="btn btn-success">
-                تنظیمات
-            </a>
-            @if(auth()->user()->isAdmin())
-                <a href="{{ route('admin.all-users') }}" class="btn admin-panel-btn" style="background-color: #6f42c1; color: white;">
-                    پنل مدیریت
-                </a>
-            @endif
         </div>
-
-        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger">
-            خروج از حساب
-        </a>
     </div>
 
     <!-- Current Exchange Display -->
@@ -745,22 +847,27 @@
 <script>
 function switchExchange(exchangeId) {
     modernConfirm(
-        'تغییر صرافی',
         'آیا می‌خواهید به این صرافی تغییر دهید؟',
         function() {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/exchanges/${exchangeId}/switch`;
+            try {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/exchanges/${exchangeId}/switch`;
 
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_token';
+                csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-            form.appendChild(csrfInput);
-            document.body.appendChild(form);
-            form.submit();
-        }
+                form.appendChild(csrfInput);
+                document.body.appendChild(form);
+                form.submit();
+            } catch (error) {
+                console.error('Error switching exchange:', error);
+                modernAlert('خطا در تغییر صرافی. لطفاً دوباره تلاش کنید.', 'error');
+            }
+        },
+        'تغییر صرافی'
     );
 }
 </script>

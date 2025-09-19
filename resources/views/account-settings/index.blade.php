@@ -138,19 +138,22 @@
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .container {
-                padding: 0;
-                margin: 0 auto;
+                padding: 10px;
+                margin: 0;
                 width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
             .setting-item {
-                padding: 0;
-                border-radius: 0;
-                margin-bottom: 20px;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 15px;
+                box-sizing: border-box;
             }
             .settings-card {
-                padding: 20px;
-                margin: 10px;
-                width: calc(100% - 20px);
+                padding: 15px;
+                margin: 0 0 15px 0;
+                width: 100%;
                 box-sizing: border-box;
             }
             .setting-header {
@@ -372,28 +375,29 @@
             font-size: 14px;
         }
 
-        /* Mobile Responsive */
+        /* Additional Mobile Responsive */
         @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            .settings-card {
-                padding: 20px;
-                margin-bottom: 15px;
-            }
-            .setting-item {
-                padding: 15px;
-            }
             .button-group {
                 flex-direction: column;
+                gap: 10px;
             }
             .btn {
                 width: 100%;
-                margin-bottom: 10px;
+                margin: 0;
+                box-sizing: border-box;
             }
             .input-group {
                 flex-direction: column;
                 align-items: stretch;
+                gap: 8px;
+            }
+            .form-control {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .input-suffix {
+                text-align: center;
+                margin-top: 5px;
             }
         }
     </style>
@@ -423,7 +427,6 @@
             <!-- Default Settings Form -->
             <form action="{{ route('account-settings.update') }}" method="POST">
                 @csrf
-                @method('PUT')
 
                 <div class="setting-item">
                     <div class="form-group">
