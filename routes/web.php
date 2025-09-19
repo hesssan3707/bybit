@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\MACDStrategyController;
-use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AccountSettingsController;
@@ -64,7 +63,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
-        Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('pnl_history');
+        Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('pnl_history');
     });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');

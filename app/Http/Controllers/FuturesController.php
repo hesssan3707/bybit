@@ -162,12 +162,8 @@ class FuturesController extends Controller
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id);
         
-        // Apply strict mode limitations
+        // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
-            // In strict mode, limit expiration to 15 minutes if user's default is higher
-            if ($defaultExpirationMinutes !== null) {
-                $defaultExpirationMinutes = min($defaultExpirationMinutes, 15);
-            }
             // In strict mode, limit risk to 10% if user's default is higher
             if ($defaultRisk !== null) {
                 $defaultRisk = min($defaultRisk, 10);
@@ -202,7 +198,7 @@ class FuturesController extends Controller
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
-            'expire' => 'nullable|integer|min:1',
+            'expire' => 'nullable|integer|min:1|max:999',
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
         ]);
@@ -611,5 +607,24 @@ class FuturesController extends Controller
                 'message' => 'خطا در دریافت قیمت بازار: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Display P&L history for the authenticated user
+     */
+    public function pnlHistory()
+    {
+        $tradesQuery = Trade::forUser(auth()->id());
+        
+        // Filter by current account type (demo/real)
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        if ($currentExchange) {
+            $tradesQuery->accountType($currentExchange->is_demo_active);
+        }
+        
+        $trades = $tradesQuery->latest('closed_at')->paginate(20);
+
+        return view('futures.pnl_history', compact('trades'));
     }
 }

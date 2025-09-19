@@ -47,6 +47,13 @@ class UserAccountSetting extends Model
      */
     public static function setUserSetting($userId, $key, $value, $type = 'string')
     {
+        // If value is null, remove the setting entirely
+        if ($value === null) {
+            return static::where('user_id', $userId)
+                         ->where('key', $key)
+                         ->delete();
+        }
+
         return static::updateOrCreate(
             ['user_id' => $userId, 'key' => $key],
             ['value' => $value, 'type' => $type]
@@ -108,11 +115,14 @@ class UserAccountSetting extends Model
      */
     public static function setDefaultRisk($userId, $risk)
     {
-        $user = User::find($userId);
-        
-        // Validate risk percentage in strict mode
-        if ($user && $user->future_strict_mode && $risk > 10) {
-            throw new \InvalidArgumentException('در حالت سخت‌گیرانه نمی‌توانید ریسک بیش از ۱۰ درصد تنظیم کنید.');
+        // If risk is null, we're removing the default value, no validation needed
+        if ($risk !== null) {
+            $user = User::find($userId);
+            
+            // Validate risk percentage in strict mode
+            if ($user && $user->future_strict_mode && $risk > 10) {
+                throw new \InvalidArgumentException('در حالت سخت‌گیرانه نمی‌توانید ریسک بیش از ۱۰ درصد تنظیم کنید.');
+            }
         }
 
         return static::setUserSetting($userId, 'default_risk', $risk, 'decimal');

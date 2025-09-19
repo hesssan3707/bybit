@@ -30,7 +30,7 @@ class AccountSettingsController extends Controller
     {
         $user = Auth::user();
         
-        // Validate input
+        // Validate input - allow empty strings to remove default values
         $validatedData = $request->validate([
             'default_risk' => 'nullable|numeric|min:1|max:80',
             'default_expiration_time' => 'nullable|integer|min:1|max:1000',
@@ -38,14 +38,27 @@ class AccountSettingsController extends Controller
 
         try {
             // Update default risk with strict mode validation
-            if ($request->has('default_risk') && $request->default_risk !== null) {
-                UserAccountSetting::setDefaultRisk($user->id, $validatedData['default_risk']);
+            // If field is present in request, process it (even if empty)
+            if ($request->has('default_risk')) {
+                $riskValue = $request->default_risk;
+                // Empty string or null means remove default value
+                if ($riskValue === '' || $riskValue === null) {
+                    UserAccountSetting::setDefaultRisk($user->id, null);
+                } else {
+                    UserAccountSetting::setDefaultRisk($user->id, $validatedData['default_risk']);
+                }
             }
 
             // Update default expiration time
+            // If field is present in request, process it (even if empty)
             if ($request->has('default_expiration_time')) {
-                $expirationTime = $request->default_expiration_time ?: null;
-                UserAccountSetting::setDefaultExpirationTime($user->id, $expirationTime);
+                $expirationTime = $request->default_expiration_time;
+                // Empty string or null means remove default value
+                if ($expirationTime === '' || $expirationTime === null) {
+                    UserAccountSetting::setDefaultExpirationTime($user->id, null);
+                } else {
+                    UserAccountSetting::setDefaultExpirationTime($user->id, $validatedData['default_expiration_time']);
+                }
             }
 
             return redirect()->route('account-settings.index')
@@ -57,51 +70,7 @@ class AccountSettingsController extends Controller
         }
     }
 
-    /**
-     * Update strict mode setting
-     */
-    public function updateStrictMode(Request $request)
-    {
-        $user = Auth::user();
-        
-        $request->validate([
-            'future_strict_mode' => 'required|boolean'
-        ]);
 
-        // If enabling strict mode, auto-update risk if it's > 10%
-        if ($request->future_strict_mode) {
-            $currentRisk = UserAccountSetting::getDefaultRisk($user->id);
-            if ($currentRisk && $currentRisk > 10) {
-                UserAccountSetting::setUserSetting($user->id, 'default_risk', 10, 'decimal');
-            }
-        }
-
-        $user->update([
-            'future_strict_mode' => $request->future_strict_mode
-        ]);
-
-        $message = $request->future_strict_mode 
-            ? 'حالت سخت‌گیرانه آتی فعال شد.' 
-            : 'حالت سخت‌گیرانه آتی غیرفعال شد.';
-
-        return redirect()->route('account-settings.index')
-                        ->with('success', $message);
-    }
-
-    /**
-     * Reset settings to default
-     */
-    public function reset()
-    {
-        $user = Auth::user();
-        
-        // Reset to default values
-        UserAccountSetting::setUserSetting($user->id, 'default_risk', null, 'decimal');
-        UserAccountSetting::setDefaultExpirationTime($user->id, null);
-
-        return redirect()->route('account-settings.index')
-                        ->with('success', 'تنظیمات به حالت پیش‌فرض بازگردانده شد.');
-    }
 
     /**
      * Get user settings for API/AJAX calls

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
@@ -57,7 +58,7 @@ class FuturesController extends Controller
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
-            'expire' => 'nullable|integer|min:1',
+            'expire' => 'nullable|integer|min:1|max:999',
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
         ]);
@@ -241,5 +242,24 @@ class FuturesController extends Controller
             Log::error('Futures order close failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Get P&L history for the authenticated user
+     */
+    public function pnlHistory()
+    {
+        $tradesQuery = Trade::forUser(auth()->id());
+        
+        // Filter by current account type (demo/real)
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        if ($currentExchange) {
+            $tradesQuery->accountType($currentExchange->is_demo_active);
+        }
+        
+        $trades = $tradesQuery->latest('closed_at')->paginate(20);
+
+        return response()->json(['success' => true, 'data' => $trades]);
     }
 }

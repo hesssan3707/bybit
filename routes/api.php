@@ -4,7 +4,6 @@ use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\Api\V1\ExchangeController;
 use App\Http\Controllers\Api\V1\FuturesController;
 use App\Http\Controllers\Api\V1\MarketController;
-use App\Http\Controllers\Api\V1\PnlHistoryController;
 use App\Http\Controllers\Api\V1\SpotTradingController;
 use App\Http\Controllers\Api\V1\WalletBalanceController;
 use App\Http\Controllers\Api\ExchangeConfigController;
@@ -61,7 +60,7 @@ Route::middleware(['api.auth'])->group(function () {
         });
 
         // PNL History
-        Route::get('/pnl-history', [PnlHistoryController::class, 'index'])->name('api.v1.pnl-history.index');
+        Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('api.v1.pnl-history.index');
 
         // Wallet Balance
         Route::get('/balance', [WalletBalanceController::class, 'balance'])->name('api.v1.balance.index');

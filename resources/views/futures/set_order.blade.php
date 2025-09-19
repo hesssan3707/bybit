@@ -181,7 +181,7 @@
                 <label for="expire">
                     مدت انقضای سفارش (اختیاری)
                 </label>
-                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="دقیقه" >
+                <input id="expire" type="number" name="expire" min="1" max="999" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="دقیقه" >
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
 

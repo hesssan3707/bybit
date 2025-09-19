@@ -444,7 +444,7 @@
                             <span class="input-suffix">%</span>
                         </div>
                         @if($user->future_strict_mode)
-                            <small style="color: #aaa;">در حالت سخت‌گیرانه حداکثر ۱۰ درصد مجاز است</small>
+                            <small style="color: #aaa;">در حالت سخت‌گیرانه حداکثر 10 درصد مجاز است</small>
                         @endif
                     </div>
 
@@ -461,7 +461,7 @@
                                    placeholder="خالی بگذارید برای عدم تنظیم">
                             <span class="input-suffix">دقیقه</span>
                         </div>
-                        <small style="color: #aaa;">حداکثر ۱۰۰۰ دقیقه - خالی بگذارید اگر نمی‌خواهید زمان انقضا تنظیم شود</small>
+                        <small style="color: #aaa;">حداکثر 999 دقیقه - خالی بگذارید اگر نمی‌خواهید زمان انقضا تنظیم شود</small>
                     </div>
 
                     <div class="button-group">

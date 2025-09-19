@@ -54,72 +54,98 @@
     .redirect-btn.secondary:hover {
         box-shadow: 0 6px 20px rgba(40,167,69,0.4);
     }
+
     .table-responsive {
         overflow-x: auto;
+        margin-top: 20px;
     }
+
     table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 20px;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
+
     th, td {
-        padding: 12px 15px;
-        border: 1px solid rgba(222, 226, 230, 0.05);
+        padding: 15px;
         text-align: right;
+        border-bottom: 1px solid #eee;
     }
-    thead {
-        background-color: rgba(253, 253, 253, 0.05);
+
+    th {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white;
+        font-weight: bold;
     }
-    tbody tr:nth-of-type(odd) {
-        background-color: rgba(249, 249, 249, 0.2);
+
+    tr:hover {
+        background-color: #f8f9fa;
     }
+
+    .no-orders {
+        text-align: center;
+        color: #666;
+        font-style: italic;
+        padding: 40px;
+    }
+
     .pagination {
         margin-top: 20px;
         display: flex;
         justify-content: center;
     }
-    .no-orders {
-        text-align: center !important;
-        direction: rtl;
-    }
-    @media screen and (max-width: 768px) {
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
         .mobile-redirect-section {
             display: block;
         }
 
-        .redirect-buttons {
-            flex-direction: column;
-            gap: 15px;
+        .container {
+            padding: 15px;
+            margin: 10px;
+        }
+
+        table, thead, tbody, th, td, tr {
+            display: block;
+        }
+
+        thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
+
+        tr {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        td {
+            border: none;
+            position: relative;
+            padding-right: 50%;
+            text-align: left;
+        }
+
+        td:before {
+            content: attr(data-label) ": ";
+            position: absolute;
+            right: 6px;
+            width: 45%;
+            padding-right: 10px;
+            white-space: nowrap;
+            font-weight: bold;
+            color: var(--primary-color);
         }
 
         .redirect-btn {
-            padding: 18px;
-            font-size: 16px;
-        }
-
-        table thead { display: none; }
-        table tr {
-            display: block;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        table td {
-            display: flex;
-            justify-content: space-between;
-            text-align: right;
-            padding: 10px 15px;
-            border: none;
-            border-bottom: 1px solid rgba(238, 238, 238, 0.25);
-        }
-        table td:last-child { border-bottom: 0; }
-        table td::before {
-            content: attr(data-label);
-            font-weight: bold;
-            padding-left: 10px;
-            text-align: left;
-        }
-        .no-orders {
             display: block;
             width: 100%;
             padding: 15px 0;
