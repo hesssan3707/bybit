@@ -809,6 +809,7 @@
 
             console.log('Sending request data:', requestData);
             console.log('CSRF Token:', '{{ csrf_token() }}');
+            console.log('Route URL:', '{{ route("settings.activate-future-strict-mode") }}');
 
             fetch('{{ route("settings.activate-future-strict-mode") }}', {
                 method: 'POST',

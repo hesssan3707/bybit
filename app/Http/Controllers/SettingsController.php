@@ -72,12 +72,23 @@ class SettingsController extends Controller
             }
 
             // Check for open positions or pending orders
+            $skippedExchanges = [];
             foreach ($user->activeExchanges as $exchange) {
                 Log::info('Checking exchange for open positions/orders', [
                     'user_id' => $user->id,
                     'exchange_id' => $exchange->id,
-                    'exchange_name' => $exchange->exchange_name
+                    'exchange_name' => $exchange->exchange_name,
+                    'is_demo_active' => $exchange->is_demo_active
                 ]);
+
+                // Skip API checks for demo accounts since they don't have real positions/orders
+                if ($exchange->is_demo_active) {
+                    Log::info('Skipping API checks for demo account', [
+                        'user_id' => $user->id,
+                        'exchange_name' => $exchange->exchange_name
+                    ]);
+                    continue;
+                }
 
                 try {
                     $exchangeService = ExchangeFactory::createForUserExchange($exchange);
@@ -112,17 +123,14 @@ class SettingsController extends Controller
                         }
                     }
                 } catch (\Exception $e) {
-                    Log::error('Error checking exchange status', [
+                    Log::warning('Skipping exchange due to connection error', [
                         'user_id' => $user->id,
                         'exchange_id' => $exchange->id,
                         'exchange_name' => $exchange->exchange_name,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'error' => $e->getMessage()
                     ]);
-                    return response()->json([
-                        'success' => false,
-                        'message' => "خطا در بررسی وضعیت صرافی {$exchange->exchange_name}. لطفاً اتصال اینترنت و تنظیمات API را بررسی کنید."
-                    ], 500);
+                    $skippedExchanges[] = $exchange->exchange_name;
+                    continue; // Skip this exchange and continue with others
                 }
             }
 
@@ -141,6 +149,15 @@ class SettingsController extends Controller
             // Switch all active exchanges to hedge mode
             $hedgeModeErrors = [];
             foreach ($user->activeExchanges as $exchange) {
+                // Skip hedge mode switching for demo accounts
+                if ($exchange->is_demo_active) {
+                    Log::info('Skipping hedge mode switch for demo account', [
+                        'user_id' => $user->id,
+                        'exchange_name' => $exchange->exchange_name
+                    ]);
+                    continue;
+                }
+
                 try {
                     Log::info('Switching exchange to hedge mode', [
                         'user_id' => $user->id,
@@ -164,9 +181,15 @@ class SettingsController extends Controller
                 }
             }
 
-            // If there were hedge mode errors, warn the user but don't fail the activation
+            // Build success message with warnings for any issues
             $message = "حالت سخت‌گیرانه آتی با موفقیت فعال شد. شما تنها می‌توانید در بازار {$request->selected_market} معامله کنید. این حالت غیرقابل بازگشت است.";
             
+            // Add warning for skipped exchanges during validation
+            if (!empty($skippedExchanges)) {
+                $message .= " توجه: بررسی وضعیت صرافی‌های " . implode(', ', $skippedExchanges) . " به دلیل مشکل اتصال امکان‌پذیر نبود و نادیده گرفته شد.";
+            }
+            
+            // Add warning for hedge mode errors
             if (!empty($hedgeModeErrors)) {
                 $message .= " توجه: تغییر حالت به Hedge Mode در صرافی‌های " . implode(', ', $hedgeModeErrors) . " با مشکل مواجه شد. لطفاً به صورت دستی این تنظیم را در صرافی انجام دهید.";
             }
@@ -174,6 +197,7 @@ class SettingsController extends Controller
             Log::info('Strict mode activation completed successfully', [
                 'user_id' => $user->id,
                 'selected_market' => $request->selected_market,
+                'skipped_exchanges' => $skippedExchanges,
                 'hedge_mode_errors' => $hedgeModeErrors
             ]);
 
