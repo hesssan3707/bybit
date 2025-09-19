@@ -113,7 +113,7 @@ class User extends Authenticatable
      */
     public function defaultExchange()
     {
-        return $this->hasOne(UserExchange::class)->where('is_default', true)->where('is_active', true);
+        return $this->hasOne(UserExchange::class)->where('is_default', true)->where('is_active', true)->where('status', 'approved');
     }
 
     /**

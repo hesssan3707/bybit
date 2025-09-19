@@ -24,16 +24,17 @@ class TradeFactory extends Factory
     {
         return [
             'user_exchange_id' => UserExchange::factory(),
-            'symbol' => 'BTC/USDT',
-            'trade_id' => $this->faker->uuid,
+            'is_demo' => false,
+            'symbol' => 'BTCUSDT',
+            'side' => 'Buy',
+            'order_type' => 'Market',
+            'leverage' => $this->faker->randomFloat(2, 1, 10),
+            'qty' => $this->faker->randomFloat(8, 0.001, 0.1),
+            'avg_entry_price' => $this->faker->randomFloat(2, 20000, 30000),
+            'avg_exit_price' => $this->faker->randomFloat(2, 20000, 30000),
+            'pnl' => $this->faker->randomFloat(2, -100, 100),
             'order_id' => $this->faker->uuid,
-            'price' => $this->faker->randomFloat(2, 20000, 30000),
-            'quantity' => $this->faker->randomFloat(8, 0.001, 0.1),
-            'commission' => $this->faker->randomFloat(8, 0.0001, 0.001),
-            'commission_asset' => 'USDT',
-            'side' => 'buy',
-            'taker_or_maker' => 'taker',
-            'timestamp' => now(),
+            'closed_at' => now(),
         ];
     }
 }

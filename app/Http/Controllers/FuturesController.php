@@ -187,7 +187,7 @@ class FuturesController extends Controller
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
-            'expire' => 'required|integer|min:1',
+            'expire' => 'nullable|integer|min:1',
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
         ]);
@@ -399,7 +399,7 @@ class FuturesController extends Controller
                     'tp'               => (float)$validated['tp'],
                     'sl'               => (float)$validated['sl'],
                     'steps'            => $steps,
-                    'expire_minutes'   => (int)$validated['expire'],
+                    'expire_minutes'   => isset($validated['expire']) ? (int)$validated['expire'] : null,
                     'status'           => 'pending',
                     'side'             => strtolower($side),
                     'amount'           => $finalQty, // Use the rounded quantity that was sent to Bybit

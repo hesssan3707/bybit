@@ -26,8 +26,11 @@ class UserExchangeFactory extends Factory
         return [
             'user_id' => User::factory()->create()->id,
             'exchange_name' => $this->faker->randomElement(['bybit', 'binance', 'bingx']),
-            'api_key' => $this->faker->password,
-            'api_secret' => $this->faker->password,
+            'api_key' => 'test_api_key_' . $this->faker->uuid,
+            'api_secret' => 'test_api_secret_' . $this->faker->uuid,
+            'demo_api_key' => 'demo_test_key_' . $this->faker->uuid,
+            'demo_api_secret' => 'demo_test_secret_' . $this->faker->uuid,
+            'is_demo_active' => true, // Use demo mode for testing
         ];
     }
 

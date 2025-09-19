@@ -156,19 +156,21 @@ class FuturesOrderEnforcer extends Command
                     }
                 }
 
-                // Check for expiration
-                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
-                if ($now >= $expireAt) {
-                    try {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'expired';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
-                        $this->info("    Canceled expired order: {$dbOrder->order_id}");
-                    } catch (\Throwable $e) {
-                        $this->warn("    Failed to cancel expired order {$dbOrder->order_id}: " . $e->getMessage());
+                // Check for expiration (skip if expire_minutes is null)
+                if ($dbOrder->expire_minutes !== null) {
+                    $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                    if ($now >= $expireAt) {
+                        try {
+                            $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                            $dbOrder->status = 'expired';
+                            $dbOrder->closed_at = now();
+                            $dbOrder->save();
+                            $this->info("    Canceled expired order: {$dbOrder->order_id}");
+                        } catch (\Throwable $e) {
+                            $this->warn("    Failed to cancel expired order {$dbOrder->order_id}: " . $e->getMessage());
+                        }
+                        continue;
                     }
-                    continue;
                 }
 
                 // Check if order has reached cancel price

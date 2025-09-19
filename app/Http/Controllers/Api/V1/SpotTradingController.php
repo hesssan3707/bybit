@@ -65,7 +65,10 @@ class SpotTradingController extends Controller
 
     public function show(SpotOrder $spotOrder)
     {
-        if ($spotOrder->user_exchange->user_id !== auth()->id()) {
+        // Load the user_exchange relationship to avoid N+1 queries
+        $spotOrder->load('userExchange');
+        
+        if ($spotOrder->userExchange->user_id !== auth()->id()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -158,7 +161,10 @@ class SpotTradingController extends Controller
 
     public function destroy(SpotOrder $spotOrder)
     {
-        if ($spotOrder->user_exchange->user_id !== auth()->id()) {
+        // Load the user_exchange relationship to avoid N+1 queries
+        $spotOrder->load('userExchange');
+        
+        if ($spotOrder->userExchange->user_id !== auth()->id()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 

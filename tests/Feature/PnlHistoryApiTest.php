@@ -21,17 +21,24 @@ class PnlHistoryApiTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->token = $this->user->generateApiToken();
 
         UserExchange::factory()->create([
             'user_id' => $this->user->id,
             'is_active' => true,
+            'status' => 'approved',
+            'is_default' => true,
         ]);
     }
 
     public function test_can_get_pnl_history()
     {
-        Trade::factory()->count(3)->create(['user_id' => $this->user->id]);
+        $userExchange = UserExchange::where('user_id', $this->user->id)->first();
+        
+        Trade::factory()->count(3)->create([
+            'user_exchange_id' => $userExchange->id,
+            'is_demo' => $userExchange->is_demo_active
+        ]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,

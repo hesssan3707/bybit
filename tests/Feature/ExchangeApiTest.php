@@ -20,13 +20,13 @@ class ExchangeApiTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->token = $this->user->generateApiToken();
     }
 
     public function test_can_get_exchanges()
     {
-        UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id]);
-        UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id]);
+        UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved', 'is_default' => true]);
+        UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved']);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -49,12 +49,18 @@ class ExchangeApiTest extends TestCase
         ])->postJson('/api/v1/exchanges', $exchangeData);
 
         $response->assertStatus(200);
-        $this->assertDatabaseHas('user_exchanges', ['api_key' => 'test_key']);
+        
+        // Check that the exchange was created and API key is properly encrypted/decrypted
+        $exchange = UserExchange::where('user_id', $this->user->id)
+            ->where('exchange_name', 'bybit')
+            ->first();
+        $this->assertNotNull($exchange);
+        $this->assertEquals('test_key', $exchange->api_key);
     }
 
     public function test_can_update_exchange()
     {
-        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id]);
+        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved', 'is_default' => true]);
 
         $updateData = [
             'api_key' => 'updated_key',
@@ -66,12 +72,15 @@ class ExchangeApiTest extends TestCase
         ])->putJson("/api/v1/exchanges/{$exchange->id}", $updateData);
 
         $response->assertStatus(200);
-        $this->assertDatabaseHas('user_exchanges', ['api_key' => 'updated_key']);
+        
+        // Check that the exchange was updated and API key is properly encrypted/decrypted
+        $exchange->refresh();
+        $this->assertEquals('updated_key', $exchange->api_key);
     }
 
     public function test_can_delete_exchange()
     {
-        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id]);
+        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved', 'is_default' => true]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -83,8 +92,8 @@ class ExchangeApiTest extends TestCase
 
     public function test_can_switch_exchange()
     {
-        $exchange1 = UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id, 'is_active' => true]);
-        $exchange2 = UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id, 'is_active' => false]);
+        $exchange1 = UserExchange::factory()->withExchangeName('bybit')->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved', 'is_default' => true]);
+        $exchange2 = UserExchange::factory()->withExchangeName('binance')->create(['user_id' => $this->user->id, 'is_active' => false, 'status' => 'approved']);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -97,7 +106,7 @@ class ExchangeApiTest extends TestCase
 
     public function test_can_test_exchange_connection()
     {
-        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id]);
+        $exchange = UserExchange::factory()->create(['user_id' => $this->user->id, 'is_active' => true, 'status' => 'approved', 'is_default' => true]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,

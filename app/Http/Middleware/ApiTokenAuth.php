@@ -46,6 +46,9 @@ class ApiTokenAuth
         $request->setUserResolver(function () use ($user) {
             return $user;
         });
+        
+        // Also set the user in the auth guard so auth()->user() works
+        auth()->setUser($user);
 
         // Load current exchange for API context
         $user->load('currentExchange');

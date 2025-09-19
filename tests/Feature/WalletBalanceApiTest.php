@@ -20,11 +20,13 @@ class WalletBalanceApiTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        $this->token = $this->user->generateApiToken();
 
         UserExchange::factory()->create([
             'user_id' => $this->user->id,
             'is_active' => true,
+            'status' => 'approved',
+            'is_default' => true,
         ]);
     }
 

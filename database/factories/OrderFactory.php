@@ -31,7 +31,7 @@ class OrderFactory extends Factory
             'tp' => $this->faker->randomFloat(4, 30000, 40000),
             'sl' => $this->faker->randomFloat(4, 10000, 20000),
             'steps' => 1,
-            'expire_minutes' => 15,
+            'expire_minutes' => $this->faker->optional(0.7)->randomElement([15, 30, 60, 120]),
             'status' => 'pending',
             'side' => 'buy',
             'amount' => $this->faker->randomFloat(8, 0.001, 0.1),
