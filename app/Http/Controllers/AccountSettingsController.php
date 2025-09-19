@@ -15,11 +15,11 @@ class AccountSettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
+
         // Get current settings
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id);
-        
+
         return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime'));
     }
 
@@ -29,7 +29,7 @@ class AccountSettingsController extends Controller
     public function update(Request $request)
     {
         $user = Auth::user();
-        
+
         // Validate input - allow empty strings to remove default values
         $validatedData = $request->validate([
             'default_risk' => 'nullable|numeric|min:1|max:80',
@@ -78,7 +78,7 @@ class AccountSettingsController extends Controller
     public function getSettings()
     {
         $user = Auth::user();
-        
+
         return response()->json([
             'default_risk' => UserAccountSetting::getDefaultRisk($user->id),
             'default_expiration_time' => UserAccountSetting::getDefaultExpirationTime($user->id),

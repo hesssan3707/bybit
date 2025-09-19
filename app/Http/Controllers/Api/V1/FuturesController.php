@@ -29,7 +29,7 @@ class FuturesController extends Controller
     public function index()
     {
         $ordersQuery = Order::forUser(auth()->id());
-        
+
         // Filter by current account type (demo/real)
         $user = auth()->user();
         if (!$user) {
@@ -38,12 +38,12 @@ class FuturesController extends Controller
                 'message' => 'User not authenticated'
             ], 401);
         }
-        
+
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
         if ($currentExchange) {
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
-        
+
         $orders = $ordersQuery->latest('updated_at')->paginate(20);
 
         return response()->json(['success' => true, 'data' => $orders]);
@@ -250,14 +250,14 @@ class FuturesController extends Controller
     public function pnlHistory()
     {
         $tradesQuery = Trade::forUser(auth()->id());
-        
+
         // Filter by current account type (demo/real)
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
         if ($currentExchange) {
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
-        
+
         $trades = $tradesQuery->latest('closed_at')->paginate(20);
 
         return response()->json(['success' => true, 'data' => $trades]);

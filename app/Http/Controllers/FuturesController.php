@@ -95,14 +95,14 @@ class FuturesController extends Controller
         // Get current exchange to filter by account type
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-        
+
         $ordersQuery = Order::forUser(auth()->id());
-        
+
         // Filter by current account type (demo/real) if exchange is available
         if ($currentExchange) {
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
-        
+
         $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
                 $query->whereIn('status', ['pending', 'filled'])
                       ->orWhere('updated_at', '>=', $threeDaysAgo);
@@ -161,7 +161,7 @@ class FuturesController extends Controller
         // Get user's default settings
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id);
-        
+
         // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
             // In strict mode, limit risk to 10% if user's default is higher
@@ -224,13 +224,13 @@ class FuturesController extends Controller
             if ($user->future_strict_mode) {
                 // Check for recent loss (only in strict mode)
                 $lastLossQuery = Trade::forUser(auth()->id());
-                
+
                 // Filter by current account type (demo/real)
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
                 if ($currentExchange) {
                     $lastLossQuery->accountType($currentExchange->is_demo_active);
                 }
-                
+
                 $lastLoss = $lastLossQuery->where('pnl', '<', 0)
                     ->latest('closed_at')
                     ->first();
@@ -239,17 +239,17 @@ class FuturesController extends Controller
                     $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
-                
+
                 // Check position mode requirement for strict mode users
                 $userExchange = $user->activeExchanges()->first();
                 if ($userExchange) {
                     $dbPositionMode = $userExchange->position_mode;
-                    
+
                     // If database shows one-way mode, don't allow order placement
                     if ($dbPositionMode === 'one-way') {
                         return back()->withErrors(['msg' => 'در حالت سخت‌گیرانه، نمی‌توانید در حالت one-way معامله کنید. لطفاً ابتدا حالت hedge را فعال کنید.'])->withInput();
                     }
-                    
+
                     // If database shows hedge mode, verify with exchange
                     if ($dbPositionMode === 'hedge') {
                         $accountInfo = $exchangeService->getAccountInfo();
@@ -615,14 +615,14 @@ class FuturesController extends Controller
     public function pnlHistory()
     {
         $tradesQuery = Trade::forUser(auth()->id());
-        
+
         // Filter by current account type (demo/real)
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
         if ($currentExchange) {
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
-        
+
         $trades = $tradesQuery->latest('closed_at')->paginate(20);
 
         return view('futures.pnl_history', compact('trades'));

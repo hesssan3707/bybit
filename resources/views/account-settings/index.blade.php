@@ -334,11 +334,8 @@
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 15px;
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid var(--primary-color);
         }
         .warning-box h4 {
-            color: var(--primary-color);
             margin-bottom: 10px;
         }
         .warning-box p {
@@ -398,6 +395,179 @@
             .input-suffix {
                 text-align: center;
                 margin-top: 5px;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid #444;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.2em;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .modal-body {
+            padding: 20px;
+            color: #ffffff;
+        }
+
+        .modal-body .alert-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 15px;
+        }
+
+        .modal-body label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .modal-body select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #2a2a3e;
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        .modal-body select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .confirmation-text {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .confirmation-text ul {
+            margin: 10px 0 0 20px;
+            padding: 0;
+        }
+
+        .confirmation-text li {
+            margin-bottom: 5px;
+            color: #cccccc;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #444;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Mobile Responsive for Modal */
+        @media (max-width: 768px) {
+            .modal-content {
+                margin: 10% auto;
+                width: 95%;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            .modal-header h3 {
+                font-size: 1.1em;
+            }
+
+            .modal-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .modal-buttons .btn {
+                width: 100%;
+                margin: 0;
+            }
+
+            .close {
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal-content {
+                margin: 5% auto;
+                width: 98%;
+            }
+
+            .modal-header,
+            .modal-body,
+            .modal-footer {
+                padding: 15px;
             }
         }
     </style>
@@ -535,6 +705,55 @@
             </div>
         </div>
     </div>
+
+    <!-- Confirmation Modal for Strict Mode Activation -->
+    <div id="confirmationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>تأیید فعال‌سازی حالت سخت‌گیرانه</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>هشدار:</strong> این عمل غیرقابل بازگشت است!
+                </div>
+                
+                <p>لطفاً بازار مورد نظر خود را انتخاب کنید. پس از فعال‌سازی، تنها می‌توانید در این بازار معامله کنید:</p>
+                
+                <div class="form-group">
+                    <label for="selectedMarket">انتخاب بازار:</label>
+                    <select id="selectedMarket" class="form-control" required>
+                        <option value="">-- انتخاب کنید --</option>
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="ADAUSDT">ADA/USDT</option>
+                        <option value="DOTUSDT">DOT/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                        <option value="XRPUSDT">XRP/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="TRXUSDT">TRX/USDT</option>
+                        <option value="DOGEUSDT">DOGE/USDT</option>
+                        <option value="LTCUSDT">LTC/USDT</option>
+                    </select>
+                </div>
+
+                <div class="confirmation-text">
+                    <p><strong>با فعال‌سازی این حالت:</strong></p>
+                    <ul>
+                        <li>حداکثر ریسک هر معامله به ۱۰ درصد محدود می‌شود</li>
+                        <li>تنها در بازار انتخابی می‌توانید معامله کنید</li>
+                        <li>این تنظیمات غیرقابل تغییر خواهد بود</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">انصراف</button>
+                    <button type="button" class="btn btn-danger" onclick="activateFutureStrictMode()">تأیید و فعال‌سازی</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -571,9 +790,11 @@
             // Validate market selection
             const selectedMarket = document.getElementById('selectedMarket').value;
             if (!selectedMarket) {
-                showAlert('لطفاً ابتدا بازار مورد نعر را انتخاب کنید', 'danger');
+                showAlert('لطفاً ابتدا بازار مورد نظر را انتخاب کنید', 'danger');
                 return;
             }
+
+            console.log('Activating strict mode with market:', selectedMarket);
 
             // Show loading state
             const button = document.querySelector('.modal-buttons .btn-danger');
@@ -581,35 +802,63 @@
             button.textContent = 'در حال پردازش...';
             button.disabled = true;
 
+            // Prepare request data
+            const requestData = {
+                selected_market: selectedMarket
+            };
+
+            console.log('Sending request data:', requestData);
+            console.log('CSRF Token:', '{{ csrf_token() }}');
+
             fetch('{{ route("settings.activate-future-strict-mode") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                    selected_market: selectedMarket
-                })
+                body: JSON.stringify(requestData)
             })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Response data:', data);
+                    
                     if (data.success) {
                         // Show success message and reload page
                         showAlert(data.message, 'success');
                         setTimeout(() => {
                             window.location.reload();
-                        }, 2000);
+                        }, 3000);
                     } else {
                         // Show error message
-                        showAlert(data.message, 'danger');
+                        showAlert(data.message || 'خطای نامشخص رخ داده است', 'danger');
                         button.textContent = originalText;
                         button.disabled = false;
                     }
                     closeModal();
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    showAlert('خطا در برقراری ارتباط با سرور', 'danger');
+                    console.error('Fetch error details:', error);
+                    console.error('Error stack:', error.stack);
+                    
+                    let errorMessage = 'خطا در برقراری ارتباط با سرور';
+                    
+                    if (error.message.includes('HTTP error')) {
+                        errorMessage = 'خطا در پردازش درخواست. لطفاً دوباره تلاش کنید.';
+                    } else if (error.message.includes('Failed to fetch')) {
+                        errorMessage = 'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
+                    }
+                    
+                    showAlert(errorMessage, 'danger');
                     button.textContent = originalText;
                     button.disabled = false;
                     closeModal();
