@@ -154,8 +154,7 @@ class ExchangeController extends Controller
             // Always switch to hedge mode when switching exchanges
             $exchangeService->switchPositionMode(true);
 
-            return redirect()->route('exchanges.index')
-                ->with('success', "صرافی پیش‌فرض به {$exchange->exchange_display_name} تغییر یافت.");
+            return redirect()->route('profile.index');
 
         } catch (\Exception $e) {
             Log::error('Exchange switch failed: ' . $e->getMessage());

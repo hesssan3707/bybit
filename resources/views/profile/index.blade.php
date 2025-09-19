@@ -8,6 +8,7 @@
         width: 100%;
         max-width: 800px;
         margin: auto;
+        padding:20px;
     }
     .profile-card {
         padding: 20px;
@@ -16,6 +17,7 @@
     }
     .profile-card h2 {
         margin-bottom: 10px;
+        color : white;
     }
     .profile-card .username {
         font-size: 1.5em;
@@ -102,21 +104,15 @@
     }
 
     .exchange-option {
-        border: 2px solid #e9ecef;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         border-radius: 10px;
         padding: 15px;
         transition: all 0.3s;
         cursor: pointer;
-        background: white;
     }
 
     .exchange-option:hover {
-        border-color: var(--exchange-color, #007bff);
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-
-    .exchange-option.current {
-        border-color: var(--exchange-color, #007bff);
     }
 
     .exchange-option .mini-logo {
@@ -285,6 +281,11 @@
             text-align: center;
         }
 
+        .exchange-option .current
+        {
+            border: #8c8a8a47 2px solid;
+        }
+
         .exchange-option .mini-logo {
             width: 25px;
             height: 25px;
@@ -421,11 +422,8 @@
             <a href="{{ route('password.change.form') }}" class="btn btn-primary">
                 تغییر رمز عبور
             </a>
-            <a href="{{ route('settings.index') }}" class="btn btn-success">
+            <a href="{{ route('account-settings.index') }}" class="btn btn-success">
                 تنظیمات
-            </a>
-            <a href="{{ route('account-settings.index') }}" class="btn btn-info">
-                تنظیمات حساب
             </a>
             @if(auth()->user()->isAdmin())
                 <a href="{{ route('admin.all-users') }}" class="btn admin-panel-btn" style="background-color: #6f42c1; color: white;">
@@ -456,8 +454,8 @@
                         </div>
                     </div>
                     <div>
-                        <a href="{{ route('exchanges.index') }}" class="btn btn-primary">
-                            مدیریت صرافی‌ها
+                        <a href="{{ route('exchanges.edit', $currentExchange) }}" class="btn btn-primary">
+                            <i class="fas fa-edit"></i> ویرایش اطلاعات
                         </a>
                     </div>
                 </div>
@@ -477,26 +475,25 @@
 
     <!-- Quick Exchange Switching -->
     @if($activeExchanges->count() > 1)
-        <div class="exchange-section">
+        <div>
             <div class="quick-switch">
-                <h4>تغییر سریع صرافی</h4>
                 <div class="exchange-grid">
                     @foreach($activeExchanges as $exchange)
                         <div class="exchange-option {{ $exchange->is_default ? 'current' : '' }}"
-                             style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }}; {{ $exchange->is_default ? 'background: linear-gradient(135deg, rgba(' . ($exchange->exchange_color_rgb ?? '0, 123, 255') . ', 0.15), #ffffff);' : '' }}"
+                             style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }};"
                              onclick="switchExchange({{ $exchange->id }})">
                             <div class="mini-logo">
-                                {{ substr($exchange->exchange_display_name, 0, 2) }}
+                                <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($exchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange->exchange_color }};">
                             </div>
                             <div class="name">{{ $exchange->exchange_display_name }}</div>
                             <div class="status">
-                                {{ $exchange->is_default ? 'فعال' : 'کلیک برای تغییر' }}
+                                {{ $exchange->is_default ? 'فعال' : 'انتخاب به عنوان صرافی فعال' }}
                             </div>
                         </div>
                     @endforeach
                 </div>
                 <a href="{{ route('exchanges.index') }}" class="btn btn-primary">
-                    مشاهده همه صرافی‌ها
+                    مدیریت صرافی‌ها
                 </a>
             </div>
         </div>
