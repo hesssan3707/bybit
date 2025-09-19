@@ -180,7 +180,6 @@
             <div class="form-group" style="flex: 1;">
                 <label for="expire">
                     مدت انقضای سفارش (اختیاری)
-                    <small style="color: #888; font-weight: normal;">(۱ تا ۹۹۹ دقیقه)</small>
                 </label>
                 <input id="expire" type="number" name="expire" min="1" max="999" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="دقیقه" >
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
