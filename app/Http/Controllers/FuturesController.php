@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Trade;
+use App\Models\UserAccountSetting;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use App\Traits\HandlesExchangeAccess;
@@ -157,8 +158,21 @@ class FuturesController extends Controller
             }
         }
 
-        // Set default expiration based on strict mode
-        $defaultExpiration = $user->future_strict_mode ? 15 : 999;
+        // Get user's default settings
+        $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
+        $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id);
+        
+        // Apply strict mode limitations
+        if ($user->future_strict_mode) {
+            // In strict mode, limit expiration to 15 minutes if user's default is higher
+            if ($defaultExpirationMinutes !== null) {
+                $defaultExpirationMinutes = min($defaultExpirationMinutes, 15);
+            }
+            // In strict mode, limit risk to 10% if user's default is higher
+            if ($defaultRisk !== null) {
+                $defaultRisk = min($defaultRisk, 10);
+            }
+        }
 
         return view('futures.set_order', [
             'marketPrice' => $marketPrice,
@@ -167,7 +181,8 @@ class FuturesController extends Controller
             'user' => $user,
             'availableMarkets' => $availableMarkets,
             'selectedMarket' => $selectedMarket,
-            'defaultExpiration' => $defaultExpiration,
+            'defaultExpiration' => $defaultExpirationMinutes,
+            'defaultRisk' => $defaultRisk,
             'currentSymbol' => $symbol // Pass the current symbol for proper price display
         ]);
     }

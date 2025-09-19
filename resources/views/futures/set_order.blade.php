@@ -181,7 +181,7 @@
                 <label for="expire">
                     مدت انقضای سفارش (دقیقه) - (اختیاری)
                 </label>
-                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire') }}" placeholder="در صورت خالی بودن، سفارش منقضی نمی‌شود">
+                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="در صورت خالی بودن، سفارش منقضی نمی‌شود">
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
 
@@ -198,7 +198,7 @@
             <label for="risk_percentage">
                 درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪ - حالت سخت‌گیرانه)@else(حداکثر ۱۰٪)@endif:
             </label>
-            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', 10) }}" required>
+            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', $defaultRisk ?? 10) }}" required>
             @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 

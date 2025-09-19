@@ -424,6 +424,9 @@
             <a href="{{ route('settings.index') }}" class="btn btn-success">
                 تنظیمات
             </a>
+            <a href="{{ route('account-settings.index') }}" class="btn btn-info">
+                تنظیمات حساب
+            </a>
             @if(auth()->user()->isAdmin())
                 <a href="{{ route('admin.all-users') }}" class="btn admin-panel-btn" style="background-color: #6f42c1; color: white;">
                     پنل مدیریت

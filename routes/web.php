@@ -5,6 +5,7 @@ use App\Http\Controllers\MACDStrategyController;
 use App\Http\Controllers\PnlHistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\SpotTradingController;
 use App\Http\Controllers\ApiDocumentationController;
 use App\Http\Controllers\Auth\LoginController;
@@ -79,6 +80,14 @@ Route::middleware('auth')->group(function () {
     // Settings Routes (requires authentication)
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/activate-future-strict-mode', [SettingsController::class, 'activateFutureStrictMode'])->name('settings.activate-future-strict-mode');
+
+    // Account Settings Routes (requires authentication)
+    Route::prefix('account-settings')->name('account-settings.')->group(function () {
+        Route::get('/', [AccountSettingsController::class, 'index'])->name('index');
+        Route::post('/update', [AccountSettingsController::class, 'update'])->name('update');
+        Route::post('/reset', [AccountSettingsController::class, 'reset'])->name('reset');
+        Route::get('/settings', [AccountSettingsController::class, 'getSettings'])->name('settings');
+    });
 
     // Exchange Management Routes (requires authentication)
     Route::prefix('exchanges')->group(function () {

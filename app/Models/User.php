@@ -109,6 +109,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's account settings
+     */
+    public function accountSettings()
+    {
+        return $this->hasOne(UserAccountSetting::class);
+    }
+
+    /**
      * Get the user's default/current exchange
      */
     public function defaultExchange()
