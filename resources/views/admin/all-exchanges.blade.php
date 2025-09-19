@@ -489,10 +489,10 @@
                             <td data-label="یادداشت مدیر" class="notes-cell">{{ $exchange->admin_notes ?: '-' }}</td>
                             <td data-label="عملیات">
                                 @if($exchange->status === 'pending')
-                                    <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form">
+                                    <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form" id="approve-form-{{ $exchange->id }}">
                                         @csrf
-                                        <button type="submit" class="btn btn-success"
-                                                onclick="return confirm('آیا مطمئن هستید؟')"
+                                        <button type="button" class="btn btn-success"
+                                                onclick="confirmApproveExchange({{ $exchange->id }})"
                                                 {{ !$exchange->user ? 'disabled title="کاربر حذف شده"' : '' }}>
                                             تأیید
                                         </button>
@@ -518,10 +518,10 @@
                                 @endif
 
                                 @if($exchange->status === 'rejected')
-                                    <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form">
+                                    <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" class="action-form" id="reactivate-form-{{ $exchange->id }}">
                                         @csrf
-                                        <button type="submit" class="btn btn-info"
-                                                onclick="return confirm('آیا مطمئن هستید؟')">
+                                        <button type="button" class="btn btn-info"
+                                                onclick="confirmReactivateExchange({{ $exchange->id }})">
                                             فعال‌سازی مجدد
                                         </button>
                                     </form>
@@ -609,15 +609,15 @@ function testRealConnection(exchangeId) {
         button.textContent = originalText;
 
         if (data.success) {
-            alert(`نتیجه تست حساب واقعی: ${data.message}`);
+            modernAlert('موفقیت', `نتیجه تست حساب واقعی: ${data.message}`, 'success');
         } else {
-            alert(`خطا در تست حساب واقعی: ${data.message}`);
+            modernAlert('خطا', `خطا در تست حساب واقعی: ${data.message}`, 'error');
         }
     })
     .catch(error => {
         button.disabled = false;
         button.textContent = originalText;
-        alert('خطا در ارتباط: لطفاً دوباره تلاش کنید');
+        modernAlert('خطا', 'خطا در ارتباط: لطفاً دوباره تلاش کنید', 'error');
         console.error('Test real connection error:', error);
     });
 }
@@ -648,15 +648,15 @@ function testDemoConnection(exchangeId) {
         button.textContent = originalText;
 
         if (data.success) {
-            alert(`نتیجه تست حساب دمو: ${data.message}`);
+            modernAlert('موفقیت', `نتیجه تست حساب دمو: ${data.message}`, 'success');
         } else {
-            alert(`خطا در تست حساب دمو: ${data.message}`);
+            modernAlert('خطا', `خطا در تست حساب دمو: ${data.message}`, 'error');
         }
     })
     .catch(error => {
         button.disabled = false;
         button.textContent = originalText;
-        alert('خطا در ارتباط: لطفاً دوباره تلاش کنید');
+        modernAlert('خطا', 'خطا در ارتباط: لطفاً دوباره تلاش کنید', 'error');
         console.error('Test demo connection error:', error);
     });
 }
@@ -690,5 +690,27 @@ window.onclick = function(event) {
         hideDeactivateModal();
     }
 }
+
+function confirmApproveExchange(exchangeId) {
+    modernConfirm(
+        'تأیید صرافی',
+        'آیا مطمئن هستید که می‌خواهید این صرافی را تأیید کنید؟',
+        function() {
+            document.getElementById('approve-form-' + exchangeId).submit();
+        }
+    );
+}
+
+function confirmReactivateExchange(exchangeId) {
+    modernConfirm(
+        'فعال‌سازی مجدد صرافی',
+        'آیا مطمئن هستید که می‌خواهید این صرافی را مجدداً فعال کنید؟',
+        function() {
+            document.getElementById('reactivate-form-' + exchangeId).submit();
+        }
+    );
+}
 </script>
+
+@include('partials.alert-modal')
 @endsection

@@ -181,7 +181,7 @@
                 <label for="expire">
                     مدت انقضای سفارش (دقیقه) - (اختیاری)
                 </label>
-                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="در صورت خالی بودن، سفارش منقضی نمی‌شود">
+                <input id="expire" type="number" name="expire" min="1" value="{{ old('expire', $defaultExpiration ?? '') }}" >
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
 
@@ -189,7 +189,7 @@
                 <label for="cancel_price">
                     قیمت لغو سفارش (اختیاری)
                 </label>
-                <input id="cancel_price" type="number" name="cancel_price" step="any" value="{{ old('cancel_price') }}" placeholder="در صورت پر شدن، سفارش لغو می‌شود">
+                <input id="cancel_price" type="number" name="cancel_price" step="any" value="{{ old('cancel_price') }}">
                 @error('cancel_price') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
         </div>

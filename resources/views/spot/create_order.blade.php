@@ -692,13 +692,13 @@ document.getElementById('spotOrderForm').addEventListener('submit', function(e) 
 
     if (!symbol) {
         e.preventDefault();
-        alert('لطفاً جفت ارز را انتخاب کنید');
+        modernAlert('خطا', 'لطفاً جفت ارز را انتخاب کنید', 'error');
         return false;
     }
 
     if (orderType === 'Limit' && (!price || parseFloat(price) <= 0)) {
         e.preventDefault();
-        alert('برای سفارش محدود، قیمت الزامی است');
+        modernAlert('خطا', 'برای سفارش محدود، قیمت الزامی است', 'error');
         return false;
     }
 
@@ -709,3 +709,5 @@ document.getElementById('spotOrderForm').addEventListener('submit', function(e) 
 });
 </script>
 @endpush
+
+@include('partials.alert-modal')

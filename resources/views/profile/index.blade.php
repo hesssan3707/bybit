@@ -17,7 +17,6 @@
     }
     .profile-card h2 {
         margin-bottom: 10px;
-        color : white;
     }
     .profile-card .username {
         font-size: 1.5em;
@@ -154,6 +153,133 @@
     .btn:hover {
         opacity: 0.8;
     }
+
+    /* Profile Information Boxes */
+    .profile-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .info-box {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .info-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .info-box-header {
+        background: linear-gradient(135deg, rgba(0, 123, 255, 0.8), rgba(0, 86, 179, 0.8));
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .info-box-header i {
+        font-size: 24px;
+        color: white;
+    }
+
+    .info-box-header h3 {
+        color: white;
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .info-box-content {
+        padding: 25px;
+    }
+
+    .profile-detail {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .profile-detail:last-child {
+        margin-bottom: 0;
+        border-bottom: none;
+    }
+
+    .profile-detail .label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .profile-detail .value {
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        direction: ltr;
+        text-align: left;
+    }
+
+    .balance-amount {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        margin-bottom: 15px;
+    }
+
+    .balance-amount .currency {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 18px;
+        font-weight: 500;
+    }
+
+    .balance-amount .amount {
+        color: #28a745;
+        font-size: 28px;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+    }
+
+    .balance-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .balance-status i {
+        font-size: 12px;
+    }
+
+    .balance-status span {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .text-success {
+        color: #28a745 !important;
+    }
+
+    .text-primary {
+        color: #007bff !important;
+    }
+
+    .text-danger {
+        color: #dc3545 !important;
+    }
     .btn-primary {
         background-color: var(--primary-color);
         color: white;
@@ -198,6 +324,56 @@
     /* Hide admin panel button on desktop */
     .admin-panel-btn {
         display: none;
+    }
+
+    /* Responsive Design for Profile Info Boxes */
+    @media (max-width: 768px) {
+        .profile-info-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-box-header {
+            padding: 15px;
+        }
+
+        .info-box-header h3 {
+            font-size: 14px;
+        }
+
+        .info-box-content {
+            padding: 20px;
+        }
+
+        .balance-amount .amount {
+            font-size: 24px;
+        }
+
+        .profile-detail {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+
+        .profile-detail .value {
+            text-align: right;
+            direction: rtl;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .info-box-header {
+            padding: 12px;
+        }
+
+        .info-box-content {
+            padding: 15px;
+        }
+
+        .balance-amount .amount {
+            font-size: 20px;
+        }
     }
 
     /* Mobile Responsive Styles */
@@ -279,11 +455,6 @@
         .exchange-option {
             padding: 12px;
             text-align: center;
-        }
-
-        .exchange-option .current
-        {
-            border: #8c8a8a47 2px solid;
         }
 
         .exchange-option .mini-logo {
@@ -396,6 +567,75 @@
 
 @section('content')
 <div class="glass-card container">
+    <!-- Profile Information Boxes -->
+    <div class="profile-info-grid">
+        <div class="info-box user-profile-box">
+            <div class="info-box-header">
+                <i class="fas fa-user-circle"></i>
+                <h3>پروفایل کاربری</h3>
+            </div>
+            <div class="info-box-content">
+                <div class="profile-detail">
+                    <span class="label">نام کاربری:</span>
+                    <span class="value">{{ $user->username ?? 'کاربر' }}</span>
+                </div>
+                <div class="profile-detail">
+                    <span class="label">ایمیل:</span>
+                    <span class="value">{{ $user->email }}</span>
+                </div>
+            </div>
+        </div>
+
+        @if($currentExchange)
+            <div class="info-box balance-box">
+                <div class="info-box-header">
+                    <i class="fas fa-wallet"></i>
+                    <h3>موجودی لحظه‌ای حساب ({{ $currentExchange->exchange_display_name }})</h3>
+                </div>
+                <div class="info-box-content">
+                    <div class="balance-amount">
+                        <span class="currency">$</span>
+                        <span class="amount">{{ $totalEquity }}</span>
+                    </div>
+                    <div class="balance-status">
+                        <i class="fas fa-circle text-success"></i>
+                        <span>آنلاین</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box wallet-box">
+                <div class="info-box-header">
+                    <i class="fas fa-coins"></i>
+                    <h3>موجودی کیف پول ({{ $currentExchange->exchange_display_name }})</h3>
+                </div>
+                <div class="info-box-content">
+                    <div class="balance-amount">
+                        <span class="currency">$</span>
+                        <span class="amount">{{ $totalBalance }}</span>
+                    </div>
+                    <div class="balance-status">
+                        <i class="fas fa-sync-alt text-primary"></i>
+                        <span>به‌روزرسانی شده</span>
+                    </div>
+                </div>
+            </div>
+        @else
+            <div class="info-box balance-box">
+                <div class="info-box-header">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>وضعیت صرافی</h3>
+                </div>
+                <div class="info-box-content">
+                    <div class="balance-status">
+                        <i class="fas fa-times-circle text-danger"></i>
+                        <span style="color: #dc3545;">هیچ صرافی فعالی تنظیم نشده است</span>
+                    </div>
+                </div>
+            </div>
+        @endif
+    </div>
+
     <div class="profile-card">
         <h2>پروفایل کاربری</h2>
 
@@ -480,7 +720,7 @@
                 <div class="exchange-grid">
                     @foreach($activeExchanges as $exchange)
                         <div class="exchange-option {{ $exchange->is_default ? 'current' : '' }}"
-                             style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }};"
+                             style="--exchange-color: {{ $exchange->exchange_color ?? '#007bff' }}; {{ $exchange->is_default ? 'background: linear-gradient(135deg, rgba(' . ($exchange->exchange_color_rgb ?? '0, 123, 255') . ', 0.15), #ffffff);' : '' }}"
                              onclick="switchExchange({{ $exchange->id }})">
                             <div class="mini-logo">
                                 <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" alt="{{ subStr($exchange->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange->exchange_color }};">
@@ -500,22 +740,28 @@
     @endif
 </div>
 
+@include('partials.alert-modal')
+
 <script>
 function switchExchange(exchangeId) {
-    if (confirm('آیا می‌خواهید به این صرافی تغییر دهید؟')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/exchanges/${exchangeId}/switch`;
+    modernConfirm(
+        'تغییر صرافی',
+        'آیا می‌خواهید به این صرافی تغییر دهید؟',
+        function() {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/exchanges/${exchangeId}/switch`;
 
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-        form.appendChild(csrfInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
+            form.appendChild(csrfInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    );
 }
 </script>
 @endsection

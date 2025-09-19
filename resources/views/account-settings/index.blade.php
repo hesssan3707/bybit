@@ -399,6 +399,8 @@
     </style>
 @endpush
 
+@include('partials.alert-modal')
+
 @section('content')
     <div class="container glass-card">
         <!-- Success/Error Messages -->
@@ -461,8 +463,8 @@
 
                     <div class="button-group">
                         <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
-                        <a href="{{ route('account-settings.reset') }}" class="btn btn-secondary"
-                           onclick="return confirm('آیا مطمئن هستید که می‌خواهید تنظیمات را به حالت پیش‌فرض بازگردانید؟')">
+                        <a href="#" class="btn btn-secondary"
+                           onclick="confirmResetSettings(); return false;">
                             بازگردانی به پیش‌فرض
                         </a>
                     </div>
@@ -637,6 +639,16 @@
             if (event.target === modal) {
                 closeModal();
             }
+        }
+
+        function confirmResetSettings() {
+            modernConfirm(
+                'تأیید بازگردانی تنظیمات',
+                'آیا مطمئن هستید که می‌خواهید تنظیمات را به حالت پیش‌فرض بازگردانید؟',
+                function() {
+                    window.location.href = '{{ route("account-settings.reset") }}';
+                }
+            );
         }
 
     </script>

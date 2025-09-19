@@ -306,19 +306,19 @@
                             <td data-label="ایمیل">{{ $user->email }}</td>
                             <td data-label="تاریخ ثبت‌نام">{{ $user->created_at->format('Y-m-d H:i') }}</td>
                             <td data-label="عملیات">
-                                <form method="POST" action="{{ route('admin.activate-user', $user) }}" style="display: inline;">
+                                <form method="POST" action="{{ route('admin.activate-user', $user) }}" style="display: inline;" id="activate-form-{{ $user->id }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-success" 
-                                            onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را فعال کنید؟')">
+                                    <button type="button" class="btn btn-success" 
+                                            onclick="confirmActivateUser({{ $user->id }})">
                                         فعال‌سازی
                                     </button>
                                 </form>
                                 
-                                <form method="POST" action="{{ route('admin.delete-user', $user) }}" style="display: inline;">
+                                <form method="POST" action="{{ route('admin.delete-user', $user) }}" style="display: inline;" id="delete-form-{{ $user->id }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-danger" 
-                                            onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟')">
+                                    <button type="button" class="btn btn-danger" 
+                                            onclick="confirmDeleteUser({{ $user->id }})">
                                         حذف
                                     </button>
                                 </form>
@@ -339,4 +339,28 @@
         @endif
     </div>
 </div>
+
+@include('partials.alert-modal')
+
+<script>
+function confirmActivateUser(userId) {
+    modernConfirm(
+        'فعال‌سازی کاربر',
+        'آیا مطمئن هستید که می‌خواهید این کاربر را فعال کنید؟',
+        function() {
+            document.getElementById('activate-form-' + userId).submit();
+        }
+    );
+}
+
+function confirmDeleteUser(userId) {
+    modernConfirm(
+        'حذف کاربر',
+        'آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟',
+        function() {
+            document.getElementById('delete-form-' + userId).submit();
+        }
+    );
+}
+</script>
 @endsection

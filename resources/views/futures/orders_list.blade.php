@@ -253,24 +253,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const orderId = this.dataset.orderId;
             const confirmMessage = 'آیا مطمئن هستید که می‌خواهید این سفارش را با قیمت لحظه‌ای بازار ببندید؟';
 
-            if (confirm(confirmMessage)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = `/futures/orders/${orderId}/close`;
+            modernConfirm(
+                'بستن سفارش',
+                confirmMessage,
+                function() {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/futures/orders/${orderId}/close`;
 
-                const csrfToken = document.createElement('input');
-                csrfToken.type = 'hidden';
-                csrfToken.name = '_token';
-                csrfToken.value = '{{ csrf_token() }}';
-                form.appendChild(csrfToken);
+                    const csrfToken = document.createElement('input');
+                    csrfToken.type = 'hidden';
+                    csrfToken.name = '_token';
+                    csrfToken.value = '{{ csrf_token() }}';
+                    form.appendChild(csrfToken);
 
-                // No price_distance input is needed for market close
+                    // No price_distance input is needed for market close
 
-                document.body.appendChild(form);
-                form.submit();
-            }
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            );
         });
     });
 });
 </script>
 @endpush
+
+@include('partials.alert-modal')

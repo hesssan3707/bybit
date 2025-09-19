@@ -465,23 +465,23 @@
                                 @endif
                             </div>
                             
-                            <form method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" style="display: inline;">
+                            <form id="approve-form-{{ $exchange->id }}" method="POST" action="{{ route('admin.approve-exchange', $exchange) }}" style="display: inline;">
                                 @csrf
                                 <textarea name="admin_notes" placeholder="یادداشت تأیید (اختیاری)..."></textarea>
                                 <div class="approval-actions">
-                                    <button type="submit" class="btn btn-success" 
-                                            onclick="return confirm('آیا مطمئن هستید که می‌خواهید این درخواست را تأیید کنید؟')">
+                                    <button type="button" class="btn btn-success" 
+                                            onclick="confirmApproveExchange({{ $exchange->id }})">
                                         ✓ تأیید
                                     </button>
                                 </div>
                             </form>
                             
-                            <form method="POST" action="{{ route('admin.reject-exchange', $exchange) }}" style="margin-top: 10px;">
+                            <form id="reject-form-{{ $exchange->id }}" method="POST" action="{{ route('admin.reject-exchange', $exchange) }}" style="margin-top: 10px;">
                                 @csrf
                                 <textarea name="admin_notes" placeholder="دلیل رد (الزامی)..." required></textarea>
                                 <div class="approval-actions">
-                                    <button type="submit" class="btn btn-danger" 
-                                            onclick="return confirm('آیا مطمئن هستید که می‌خواهید این درخواست را رد کنید؟')">
+                                    <button type="button" class="btn btn-danger" 
+                                            onclick="confirmRejectExchange({{ $exchange->id }})">
                                         ✗ رد
                                     </button>
                                 </div>
@@ -680,5 +680,27 @@ function testDemoConnection(exchangeId) {
         console.error('Test demo connection error:', error);
     });
 }
+
+function confirmApproveExchange(exchangeId) {
+    modernConfirm(
+        'تأیید درخواست صرافی',
+        'آیا مطمئن هستید که می‌خواهید این درخواست صرافی را تأیید کنید؟',
+        function() {
+            document.getElementById('approve-form-' + exchangeId).submit();
+        }
+    );
+}
+
+function confirmRejectExchange(exchangeId) {
+    modernConfirm(
+        'رد درخواست صرافی',
+        'آیا مطمئن هستید که می‌خواهید این درخواست صرافی را رد کنید؟',
+        function() {
+            document.getElementById('reject-form-' + exchangeId).submit();
+        }
+    );
+}
 </script>
+
+@include('partials.alert-modal')
 @endsection

@@ -330,10 +330,10 @@
                             <td data-label="عملیات">
                                 @if($user->is_active)
                                     @if($user->id !== auth()->id())
-                                        <form method="POST" action="{{ route('admin.deactivate-user', $user) }}" style="display: inline;">
+                                        <form method="POST" action="{{ route('admin.deactivate-user', $user) }}" style="display: inline;" id="deactivate-form-{{ $user->id }}">
                                             @csrf
-                                            <button type="submit" class="btn btn-warning"
-                                                    onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را غیرفعال کنید؟')">
+                                            <button type="button" class="btn btn-warning"
+                                                    onclick="confirmDeactivateUser({{ $user->id }})">
                                                 غیرفعال‌سازی
                                             </button>
                                         </form>
@@ -341,21 +341,21 @@
                                         <span style="color: #999; font-size: 11px;">حساب شما</span>
                                     @endif
                                 @else
-                                    <form method="POST" action="{{ route('admin.activate-user', $user) }}" style="display: inline;">
+                                    <form method="POST" action="{{ route('admin.activate-user', $user) }}" style="display: inline;" id="activate-form-{{ $user->id }}">
                                         @csrf
-                                        <button type="submit" class="btn btn-success"
-                                                onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را فعال کنید؟')">
+                                        <button type="button" class="btn btn-success"
+                                                onclick="confirmActivateUser({{ $user->id }})">
                                             فعال‌سازی
                                         </button>
                                     </form>
                                 @endif
 
                                 @if($user->id !== auth()->id())
-                                    <form method="POST" action="{{ route('admin.delete-user', $user) }}" style="display: inline;">
+                                    <form method="POST" action="{{ route('admin.delete-user', $user) }}" style="display: inline;" id="delete-form-{{ $user->id }}">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-danger"
-                                                onclick="return confirm('آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟ این عمل غیرقابل برگشت است.')">
+                                        <button type="button" class="btn btn-danger"
+                                                onclick="confirmDeleteUser({{ $user->id }})">
                                             حذف
                                         </button>
                                     </form>
@@ -376,4 +376,38 @@
         @endif
     </div>
 </div>
+
+@include('partials.alert-modal')
+
+<script>
+function confirmDeactivateUser(userId) {
+    modernConfirm(
+        'غیرفعال‌سازی کاربر',
+        'آیا مطمئن هستید که می‌خواهید این کاربر را غیرفعال کنید؟',
+        function() {
+            document.getElementById('deactivate-form-' + userId).submit();
+        }
+    );
+}
+
+function confirmActivateUser(userId) {
+    modernConfirm(
+        'فعال‌سازی کاربر',
+        'آیا مطمئن هستید که می‌خواهید این کاربر را فعال کنید؟',
+        function() {
+            document.getElementById('activate-form-' + userId).submit();
+        }
+    );
+}
+
+function confirmDeleteUser(userId) {
+    modernConfirm(
+        'حذف کاربر',
+        'آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟ این عمل غیرقابل برگشت است.',
+        function() {
+            document.getElementById('delete-form-' + userId).submit();
+        }
+    );
+}
+</script>
 @endsection
