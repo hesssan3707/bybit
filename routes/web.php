@@ -85,7 +85,6 @@ Route::middleware('auth')->group(function () {
     Route::prefix('account-settings')->name('account-settings.')->group(function () {
         Route::get('/', [AccountSettingsController::class, 'index'])->name('index');
         Route::post('/update', [AccountSettingsController::class, 'update'])->name('update');
-        Route::post('/reset', [AccountSettingsController::class, 'reset'])->name('reset');
         Route::get('/settings', [AccountSettingsController::class, 'getSettings'])->name('settings');
     });
 

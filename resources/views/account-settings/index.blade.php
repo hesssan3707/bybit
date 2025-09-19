@@ -466,10 +466,6 @@
 
                     <div class="button-group">
                         <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
-                        <a href="#" class="btn btn-secondary"
-                           onclick="confirmResetSettings(); return false;">
-                            بازگردانی به پیش‌فرض
-                        </a>
                     </div>
                 </div>
             </form>
@@ -644,15 +640,7 @@
             }
         }
 
-        function confirmResetSettings() {
-            modernConfirm(
-                'تأیید بازگردانی تنظیمات',
-                'آیا مطمئن هستید که می‌خواهید تنظیمات را به حالت پیش‌فرض بازگردانید؟',
-                function() {
-                    window.location.href = '{{ route("account-settings.reset") }}';
-                }
-            );
-        }
+
 
     </script>
 @endpush

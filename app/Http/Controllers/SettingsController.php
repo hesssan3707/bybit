@@ -15,11 +15,8 @@ class SettingsController extends Controller
      */
     public function index()
     {
-        $user = Auth::user();
-        
-        return view('settings.index', [
-            'user' => $user
-        ]);
+        // Redirect to account-settings since all settings are now consolidated there
+        return redirect()->route('account-settings.index');
     }
     
     /**

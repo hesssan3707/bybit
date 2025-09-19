@@ -4,33 +4,52 @@
 
 @push('styles')
     <style>
+        /* Base Styles */
         .container {
             width: 100%;
             max-width: 800px;
             margin: auto;
-            padding:20px;
-        }
-        .profile-card {
             padding: 20px;
-            text-align: center;
-            margin-bottom: 20px;
         }
-        .profile-card h2 {
-            margin-bottom: 10px;
-        }
-        .profile-card .username {
-            font-size: 1.5em;
+
+        /* Common Button Styles */
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            text-decoration: none;
+            border-radius: 8px;
             font-weight: bold;
-            color: var(--primary-color);
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+        /* Button Color Variants */
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+
+        /* Text Color Utilities */
+        .text-success { color: #28a745 !important; }
+        .text-primary { color: #007bff !important; }
+        .text-danger { color: #dc3545 !important; }
+
+        /* Alert Styles */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
             margin-bottom: 20px;
+            text-align: center;
         }
-        .profile-card .equity {
-            font-size: 1.2em;
-            margin-bottom: 30px;
-        }
-        .profile-card .equity strong {
-            font-size: 1.5em;
-            color: #28a745;
+        .alert-success {
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
         }
 
         /* Exchange section styles */
@@ -683,21 +702,42 @@
         <!-- Profile Information Boxes -->
         <div class="profile-info-grid">
             <div class="info-box user-profile-box">
-                <div class="info-box-header">
-                    <i class="fas fa-user-circle"></i>
-                    <h3>پروفایل کاربری</h3>
-                </div>
-                <div class="info-box-content">
-                    <div class="profile-detail">
-                        <span class="label">نام کاربری:</span>
-                        <span class="value">{{ $user->username ?? 'کاربر' }}</span>
-                    </div>
-                    <div class="profile-detail">
-                        <span class="label">ایمیل:</span>
-                        <span class="value">{{ $user->email }}</span>
-                    </div>
-                </div>
-            </div>
+                 <div class="info-box-header">
+                     <i class="fas fa-user-circle"></i>
+                     <h3>پروفایل کاربری</h3>
+                 </div>
+                 <div class="info-box-content">
+                     <div class="profile-detail">
+                         <span class="label">ایمیل:</span>
+                         <span class="value">{{ $user->email }}</span>
+                     </div>
+                     
+                     <div class="action-buttons-grid" style="margin-top: 20px;">
+                         <a href="{{ route('password.change.form') }}" class="action-btn btn-primary">
+                             <i class="fas fa-key"></i>
+                             <span>تغییر رمز عبور</span>
+                         </a>
+                         <a href="{{ route('account-settings.index') }}" class="action-btn btn-success">
+                             <i class="fas fa-cog"></i>
+                             <span>تنظیمات</span>
+                         </a>
+                         <a href="{{ route('exchanges.index') }}" class="action-btn btn-primary">
+                             <i class="fas fa-exchange-alt"></i>
+                             <span>مدیریت صرافی‌ها</span>
+                         </a>
+                         @if(auth()->user()->isAdmin())
+                             <a href="{{ route('admin.all-users') }}" class="action-btn btn-admin">
+                                 <i class="fas fa-user-shield"></i>
+                                 <span>پنل مدیریت</span>
+                             </a>
+                         @endif
+                         <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="action-btn btn-danger">
+                             <i class="fas fa-sign-out-alt"></i>
+                             <span>خروج از حساب</span>
+                         </a>
+                     </div>
+                 </div>
+             </div>
 
             @if($currentExchange)
                 <div class="info-box balance-box">
@@ -747,36 +787,7 @@
                     </div>
                 </div>
             @endif
-
-            <div class="info-box actions-box">
-                <div class="info-box-header">
-                    <i class="fas fa-cogs"></i>
-                    <h3>عملیات حساب کاربری</h3>
-                </div>
-                <div class="info-box-content">
-                    <div class="action-buttons-grid">
-                        <a href="{{ route('password.change.form') }}" class="action-btn btn-primary">
-                            <i class="fas fa-key"></i>
-                            <span>تغییر رمز عبور</span>
-                        </a>
-                        <a href="{{ route('account-settings.index') }}" class="action-btn btn-success">
-                            <i class="fas fa-cog"></i>
-                            <span>تنظیمات</span>
-                        </a>
-                        @if(auth()->user()->isAdmin())
-                            <a href="{{ route('admin.all-users') }}" class="action-btn btn-admin">
-                                <i class="fas fa-user-shield"></i>
-                                <span>پنل مدیریت</span>
-                            </a>
-                        @endif
-                        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="action-btn btn-danger">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>خروج از حساب</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+         </div>
 
         <!-- Current Exchange Display -->
         @if($activeExchanges->count() == 1)
@@ -793,11 +804,6 @@
                                     صرافی پیش‌فرض شما • کلید API: {{ $currentExchange->masked_api_key }}
                                 </div>
                             </div>
-                        </div>
-                        <div>
-                            <a href="{{ route('exchanges.index') }}" class="btn btn-primary">
-                                مدیریت صرافی‌ها
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -818,11 +824,8 @@
                             </div>
                         </div>
                     @endforeach
-                </div>
-                <a href="{{ route('exchanges.index') }}" class="btn btn-primary">
-                    مدیریت صرافی‌ها
-                </a>
-            </div>
+                 </div>
+             </div>
         @else
             <div class="exchange-section">
                 <div class="no-exchange">
@@ -838,7 +841,12 @@
 
     @include('partials.alert-modal')
 
-    <script>
+     <!-- Logout Form -->
+     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+         @csrf
+     </form>
+
+     <script>
         function switchExchange(exchangeId) {
             modernConfirm(
                 'آیا می‌خواهید به این صرافی تغییر دهید؟',
