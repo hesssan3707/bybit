@@ -378,7 +378,7 @@ async function testRealConnectionCreate() {
     btn.disabled = true;
 
     try {
-        const response = await fetch('/api/test-connection', {
+        const response = await fetch('/exchanges/test-real-connection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -425,27 +425,22 @@ async function testRealConnectionCreate() {
 }
 
 async function testDemoConnectionCreate() {
-    const btn = document.getElementById('test-demo-btn-create');
-    const originalText = btn.textContent;
+    const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
     const demoApiKey = document.getElementById('demo_api_key').value;
     const demoApiSecret = document.getElementById('demo_api_secret').value;
-    const exchangeName = document.querySelector('input[name="exchange_name"]:checked')?.value;
+    const button = document.getElementById('test-demo-btn-create');
+    const originalText = button.textContent;
 
-    if (!demoApiKey || !demoApiSecret) {
-        modernAlert('لطفاً ابتدا کلید API و کلید محرمانه دمو را وارد کنید.', 'warning', 'اطلاعات ناقص');
+    if (!exchangeName || !demoApiKey || !demoApiSecret) {
+        modernAlert('لطفاً تمام فیلدهای مورد نیاز را پر کنید', 'warning', 'اطلاعات ناقص');
         return;
     }
 
-    if (!exchangeName) {
-        modernAlert('لطفاً ابتدا یک صرافی انتخاب کنید.', 'warning', 'صرافی انتخاب نشده');
-        return;
-    }
-
-    btn.textContent = 'در حال تست...';
-    btn.disabled = true;
+    button.disabled = true;
+    button.textContent = 'در حال تست...';
 
     try {
-        const response = await fetch('/api/test-connection', {
+        const response = await fetch('/exchanges/test-demo-connection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -462,30 +457,31 @@ async function testDemoConnectionCreate() {
         const data = await response.json();
 
         if (data.success) {
-            btn.textContent = '✓ موفق';
-            btn.style.backgroundColor = '#198754';
+            button.textContent = '✓ موفق';
+            button.style.backgroundColor = '#28a745';
             setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.backgroundColor = '#28a745';
-                btn.disabled = false;
+                button.textContent = originalText;
+                button.style.backgroundColor = '#28a745';
+                button.disabled = false;
             }, 2000);
+            modernAlert(data.message || 'تست اتصال حساب دمو موفق بود', 'success', 'تست اتصال موفق');
         } else {
-            btn.textContent = '✗ خطا';
-            btn.style.backgroundColor = '#dc3545';
+            button.textContent = '✗ خطا';
+            button.style.backgroundColor = '#dc3545';
             setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.backgroundColor = '#28a745';
-                btn.disabled = false;
+                button.textContent = originalText;
+                button.style.backgroundColor = '#28a745';
+                button.disabled = false;
             }, 2000);
             modernAlert(data.message || 'خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
-        btn.textContent = '✗ خطا';
-        btn.style.backgroundColor = '#dc3545';
+        button.textContent = '✗ خطا';
+        button.style.backgroundColor = '#dc3545';
         setTimeout(() => {
-            btn.textContent = originalText;
-            btn.style.backgroundColor = '#28a745';
-            btn.disabled = false;
+            button.textContent = originalText;
+            button.style.backgroundColor = '#28a745';
+            button.disabled = false;
         }, 2000);
         modernAlert('خطا در برقراری ارتباط با سرور', 'error', 'خطا در تست اتصال');
     }

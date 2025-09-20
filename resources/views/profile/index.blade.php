@@ -377,7 +377,6 @@
         }
 
         .exchange-api {
-            margin: 0 0 10px 0;
             color: #888;
             font-size: 0.9em;
         }
@@ -498,6 +497,7 @@
         .exchange-info {
             display: flex;
             align-items: center;
+            gap:10px;
         }
 
         .exchange-logo {
@@ -1051,7 +1051,7 @@
                             </div>
                             <div class="exchange-info">
                                 <h4>{{ $currentExchange->exchange_display_name }}</h4>
-                                <p class="exchange-api">کلید API: {{ $currentExchange->masked_api_key }}</p>
+                                <p class="exchange-api">API Key: {{ $currentExchange->masked_api_key }}</p>
                                 <div class="exchange-status-indicator">
                                     <i class="fas fa-check-circle"></i>
                                     <span>صرافی پیش‌فرض شما</span>

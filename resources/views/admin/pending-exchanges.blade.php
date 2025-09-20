@@ -692,15 +692,14 @@ function testRealConnection(exchangeId) {
 
 function testDemoConnection(exchangeId) {
     const button = document.getElementById(`test-demo-btn-${exchangeId}`);
-    const resultDiv = document.getElementById(`test-demo-result-${exchangeId}`);
-    
+
+    if (!button) return;
+
     // Show loading state
     button.disabled = true;
+    const originalText = button.textContent;
     button.textContent = 'در حال تست...';
-    resultDiv.style.display = 'block';
-    resultDiv.className = 'test-result loading';
-    resultDiv.innerHTML = 'در حال بررسی اتصال و اعتبارسنجی کلید API دمو...';
-    
+
     // Make AJAX request
     fetch(`/admin/exchanges/${exchangeId}/test`, {
         method: 'POST',
@@ -714,65 +713,18 @@ function testDemoConnection(exchangeId) {
     .then(response => response.json())
     .then(data => {
         button.disabled = false;
-        button.textContent = 'تست اتصال حساب دمو';
-        
+        button.textContent = originalText;
+
         if (data.success) {
-            // Determine result class based on recommendation
-            let resultClass = 'success';
-            if (data.recommendation === 'reject') {
-                resultClass = 'error';
-            } else if (data.recommendation === 'approve_with_warning') {
-                resultClass = 'warning';
-            }
-            
-            resultDiv.className = `test-result ${resultClass}`;
-            
-            let html = `<div><strong>${data.message}</strong></div>`;
-            
-            if (data.details) {
-                html += '<div class="validation-details">';
-                
-                if (data.details.ip) {
-                    const ipIcon = data.details.ip.status === 'allowed' ? '✓' : '✗';
-                    const ipClass = `status-${data.details.ip.status}`;
-                    html += `<div class="validation-item">
-                        <span>دسترسی IP:</span>
-                        <span class="status-icon ${ipClass}">${ipIcon} ${data.details.ip.message}</span>
-                    </div>`;
-                }
-                
-                if (data.details.spot) {
-                    const spotIcon = data.details.spot.status === 'allowed' ? '✓' : (data.details.spot.status === 'not_supported' ? '!' : '✗');
-                    const spotClass = `status-${data.details.spot.status}`;
-                    html += `<div class="validation-item">
-                        <span>معاملات اسپات:</span>
-                        <span class="status-icon ${spotClass}">${spotIcon} ${data.details.spot.message}</span>
-                    </div>`;
-                }
-                
-                if (data.details.futures) {
-                    const futuresIcon = data.details.futures.status === 'allowed' ? '✓' : (data.details.futures.status === 'not_supported' ? '!' : '✗');
-                    const futuresClass = `status-${data.details.futures.status}`;
-                    html += `<div class="validation-item">
-                        <span>معاملات آتی:</span>
-                        <span class="status-icon ${futuresClass}">${futuresIcon} ${data.details.futures.message}</span>
-                    </div>`;
-                }
-                
-                html += '</div>';
-            }
-            
-            resultDiv.innerHTML = html;
+            modernAlert('موفقیت', `نتیجه تست حساب دمو: ${data.message}`, 'success');
         } else {
-            resultDiv.className = 'test-result error';
-            resultDiv.innerHTML = `<div><strong>خطا:</strong> ${data.message}</div>`;
+            modernAlert('خطا', `خطا در تست حساب دمو: ${data.message}`, 'error');
         }
     })
     .catch(error => {
         button.disabled = false;
-        button.textContent = 'تست اتصال حساب دمو';
-        resultDiv.className = 'test-result error';
-        resultDiv.innerHTML = `<div><strong>خطا در ارتباط:</strong> لطفاً دوباره تلاش کنید</div>`;
+        button.textContent = originalText;
+        modernAlert('خطا', 'خطا در ارتباط: لطفاً دوباره تلاش کنید', 'error');
         console.error('Test demo connection error:', error);
     });
 }

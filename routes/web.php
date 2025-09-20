@@ -99,6 +99,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
         Route::post('/{exchange}/test-real-connection', [ExchangeController::class, 'testRealConnection'])->name('exchanges.test-real-connection');
         Route::post('/{exchange}/test-demo-connection', [ExchangeController::class, 'testDemoConnection'])->name('exchanges.test-demo-connection');
+        
+        // Routes for testing connections during creation (without existing exchange)
+        Route::post('/test-real-connection', [ExchangeController::class, 'testConnectionApi'])->name('exchanges.test-real-connection-create');
+        Route::post('/test-demo-connection', [ExchangeController::class, 'testConnectionApi'])->name('exchanges.test-demo-connection-create');
     });
 
     // Admin Routes (requires authentication and admin privileges)
