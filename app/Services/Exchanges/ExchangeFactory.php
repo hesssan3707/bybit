@@ -49,11 +49,14 @@ class ExchangeFactory
             throw new \Exception("Exchange account is not active");
         }
 
+        // Get the correct credentials based on demo mode status
+        $credentials = $userExchange->getCurrentApiCredentials();
+
         $service = self::create(
             $userExchange->exchange_name,
-            $userExchange->api_key,
-            $userExchange->api_secret,
-            $userExchange->is_demo_active
+            $credentials['api_key'],
+            $credentials['api_secret'],
+            $credentials['is_demo']
         );
 
         return $service;
