@@ -6,24 +6,91 @@
 
 @push('styles')
 <style>
-    .container {
-        width: 100%;
-        max-width: 1200px;
-        margin: auto;
+    * {
+        box-sizing: border-box;
     }
-    .admin-header {
-        background: #ffffff;
+    
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-        text-align: center;
     }
-    .exchanges-table {
-        background: #ffffff;
+    
+    .admin-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 30px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .admin-header h1 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .admin-nav {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .nav-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        text-decoration: none;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .nav-btn.active {
+        background: linear-gradient(135deg, #764ba2, #667eea);
+        box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+    }
+    
+    .content-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .table-container {
+        overflow-x: auto;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        overflow: hidden;
+        background: white;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
     .exchange-row {
         border-bottom: 1px solid #eee;
@@ -71,29 +138,49 @@
     }
     .btn {
         display: inline-block;
-        padding: 8px 16px;
-        margin: 4px;
+        padding: 10px 20px;
+        margin: 3px;
         text-decoration: none;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: bold;
-        transition: opacity 0.3s;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
         border: none;
         cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     .btn:hover {
-        opacity: 0.8;
+        transform: translateY(-2px);
+        text-decoration: none;
     }
     .btn-success {
-        background-color: #28a745;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .btn-success:hover {
+        background: linear-gradient(135deg, #20c997, #28a745);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
         color: white;
     }
     .btn-danger {
-        background-color: #dc3545;
+        background: linear-gradient(135deg, #dc3545, #e74c3c);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .btn-danger:hover {
+        background: linear-gradient(135deg, #e74c3c, #dc3545);
+        box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
         color: white;
     }
     .btn-primary {
-        background-color: var(--primary-color);
+        background: linear-gradient(135deg, var(--primary-color), #764ba2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #764ba2, var(--primary-color));
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
         color: white;
     }
     .alert {
@@ -384,16 +471,25 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="admin-container">
     <div class="admin-header">
-        <h2>مدیریت صرافی‌ها - درخواست‌های در انتظار تأیید</h2>
+        <h1>پنل مدیریت</h1>
+        <nav class="admin-nav">
+            <a href="{{ route('admin.pending-exchanges') }}" class="nav-btn active">درخواست‌های در انتظار</a>
+            <a href="{{ route('admin.all-exchanges') }}" class="nav-btn">همه صرافی‌ها</a>
+            <a href="{{ route('admin.all-users') }}" class="nav-btn">همه کاربران</a>
+            <a href="{{ route('admin.pending-users') }}" class="nav-btn">کاربران در انتظار</a>
+        </nav>
     </div>
 
-    <div class="admin-nav-links">
-        <a href="{{ route('admin.pending-exchanges') }}" class="active">درخواست‌های در انتظار</a>
-        <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
-        <a href="{{ route('admin.all-users') }}">همه کاربران</a>
-    </div>
+    @if($pendingExchanges->count() > 0)
+        <div class="content-card" style="margin-bottom: 20px;">
+            <div style="text-align: center; padding: 20px;">
+                <h3 style="margin: 0; color: #2c3e50;">درخواست‌های در انتظار تأیید</h3>
+                <p style="margin: 10px 0 0 0; color: #6c757d;">{{ $pendingExchanges->count() }} درخواست</p>
+            </div>
+        </div>
+    @endif
 
     @if(session('success'))
         <div class="alert alert-success">
@@ -409,7 +505,7 @@
         </div>
     @endif
 
-    <div class="exchanges-table">
+    <div class="content-card">
         @if($pendingExchanges->count() > 0)
             @foreach($pendingExchanges as $exchange)
                 <div class="exchange-row">

@@ -6,98 +6,227 @@
 
 @push('styles')
 <style>
-    .container {
-        width: 100%;
-        max-width: 1200px;
-        margin: auto;
+    * {
+        box-sizing: border-box;
     }
-    .admin-header {
-        background: #ffffff;
+    
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-        text-align: center;
     }
-    .users-table {
-        background: #ffffff;
+    
+    .admin-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 30px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .admin-header h1 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .admin-nav {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .nav-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        text-decoration: none;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .nav-btn.active {
+        background: linear-gradient(135deg, #764ba2, #667eea);
+        box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+    }
+    
+    .content-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .table-container {
+        overflow-x: auto;
         border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        overflow: hidden;
+        background: white;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
     table {
         width: 100%;
         border-collapse: collapse;
+        background: white;
     }
-    th, td {
-        padding: 12px;
-        text-align: right;
-        border-bottom: 1px solid rgba(238, 238, 238, 0.25);
-    }
+    
     th {
-        background-color: #f8f9fa;
-        font-weight: bold;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        color: #495057;
+        font-weight: 700;
+        padding: 20px 15px;
+        text-align: right;
+        border: none;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
+    
+    td {
+        padding: 20px 15px;
+        border-bottom: 1px solid #f1f3f4;
+        color: #495057;
+        vertical-align: middle;
+        text-align: right;
+    }
+    
+    tr:hover {
+        background: rgba(102, 126, 234, 0.05);
+    }
+    
     .btn {
         display: inline-block;
-        padding: 6px 12px;
-        margin: 2px;
+        padding: 10px 20px;
+        margin: 5px;
         text-decoration: none;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-        transition: opacity 0.3s;
+        border-radius: 25px;
+        font-size: 0.85rem;
+        font-weight: 600;
         border: none;
         cursor: pointer;
-    }
-    .btn:hover {
-        opacity: 0.8;
-    }
-    .btn-success {
-        background-color: #28a745;
-        color: white;
-    }
-    .btn-warning {
-        background-color: #ffc107;
-        color: black;
-    }
-    .btn-danger {
-        background-color: #dc3545;
-        color: white;
-    }
-    .btn-primary {
-        background-color: var(--primary-color);
-        color: white;
-    }
-    .alert {
-        padding: 12px 16px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        transition: all 0.3s ease;
         text-align: center;
     }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #ffc107, #ffb300);
+        color: #212529;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+    }
+    
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 193, 7, 0.4);
+        color: #212529;
+        text-decoration: none;
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #dc3545, #e74c3c);
+        color: white;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    }
+    
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .alert {
+        padding: 20px;
+        margin-bottom: 25px;
+        border: none;
+        border-radius: 15px;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+        text-align: center;
+    }
+    
     .alert-success {
-        background-color: #d1e7dd;
-        color: #0f5132;
-        border: 1px solid #badbcc;
+        color: #155724;
+        background: rgba(212, 237, 218, 0.9);
+        border-left: 4px solid #28a745;
     }
+    
     .alert-error {
-        background-color: #f8d7da;
-        color: #842029;
-        border: 1px solid #f5c2c7;
+        color: #721c24;
+        background: rgba(248, 215, 218, 0.9);
+        border-left: 4px solid #dc3545;
     }
+    
     .status-badge {
         display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: bold;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
+    
     .status-active {
-        background-color: #d1e7dd;
+        background: linear-gradient(135deg, #d1e7dd, #c3e6cb);
         color: #0f5132;
     }
+    
     .status-inactive {
-        background-color: #f8d7da;
+        background: linear-gradient(135deg, #f8d7da, #fab1a0);
         color: #842029;
     }
     .admin-nav-links {
@@ -275,16 +404,23 @@
 @endpush
 
 @section('content')
-<div class="container">
+<div class="admin-container">
     <div class="admin-header">
-        <h2>مدیریت کاربران - همه کاربران</h2>
+        <h1>پنل مدیریت</h1>
+        <div class="admin-nav">
+            <a href="{{ route('admin.pending-users') }}" class="nav-btn">کاربران در انتظار تأیید</a>
+            <a href="{{ route('admin.all-users') }}" class="nav-btn active">همه کاربران</a>
+            <a href="{{ route('admin.pending-exchanges') }}" class="nav-btn">درخواست‌های فعال‌سازی صرافی</a>
+            <a href="{{ route('admin.all-exchanges') }}" class="nav-btn">همه صرافی‌ها</a>
+        </div>
     </div>
 
-    <div class="admin-nav-links">
-        <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های صرافی</a>
-        <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
-        <a href="{{ route('admin.all-users') }}" class="active">همه کاربران</a>
+    @if(isset($users) && $users->count() > 0)
+    <div class="stats-card">
+        <div class="stats-number">{{ $users->count() }}</div>
+        <div class="stats-label">کل کاربران</div>
     </div>
+    @endif
 
     @if(session('success'))
         <div class="alert alert-success">
@@ -300,21 +436,22 @@
         </div>
     @endif
 
-    <div class="users-table">
+    <div class="content-card">
         @if($users->count() > 0)
-            <table>
-                <thead>
-                    <tr>
-                        <th>نام کاربری</th>
-                        <th>ایمیل</th>
-                        <th>وضعیت</th>
-                        <th>تاریخ ثبت‌نام</th>
-                        <th>فعال‌شده در</th>
-                        <th>فعال‌شده توسط</th>
-                        <th>عملیات</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>نام کاربری</th>
+                            <th>ایمیل</th>
+                            <th>وضعیت</th>
+                            <th>تاریخ ثبت‌نام</th>
+                            <th>فعال‌شده در</th>
+                            <th>فعال‌شده توسط</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                     @foreach($users as $user)
                         <tr>
                             <td data-label="نام کاربری">{{ $user->username }}</td>
@@ -363,8 +500,9 @@
                             </td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
 
             <div style="padding: 20px;">
                 {{ $users->links() }}

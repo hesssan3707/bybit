@@ -46,9 +46,12 @@ class BingXApiService implements ExchangeApiServiceInterface
         if ($response->failed() || ($responseData['code'] ?? 0) !== 0) {
             $errorCode = $responseData['code'] ?? 'N/A';
             $errorMsg = $responseData['msg'] ?? 'Unknown error';
-            throw new \Exception(
-                "BingX API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}"
-            );
+            
+            // Provide better error messages for demo account issues
+            $isDemoMode = strpos($this->baseUrl, 'vst') !== false;
+            $userFriendlyMessage = $this->getUserFriendlyErrorMessage($errorCode, $errorMsg, $isDemoMode);
+            
+            throw new \Exception($userFriendlyMessage);
         }
 
         return $responseData['data'];
@@ -445,6 +448,45 @@ class BingXApiService implements ExchangeApiServiceInterface
                     'exchange' => 'bingx'
                 ]
             ];
+        }
+    }
+
+    /**
+     * Get user-friendly error message for demo account issues
+     */
+    private function getUserFriendlyErrorMessage(string $errorCode, string $errorMsg, bool $isDemoMode): string
+    {
+        // Common BingX error codes and their meanings
+        $errorMappings = [
+            '100001' => 'کلید API نامعتبر است',
+            '100002' => 'امضای API نامعتبر است',
+            '100003' => 'مجوز دسترسی کافی نیست',
+            '100004' => 'زمان درخواست منقضی شده است',
+            '100005' => 'آدرس IP مجاز نیست',
+            '100006' => 'حساب کاربری محدود شده است'
+        ];
+
+        // Check for specific demo account issues
+        if ($isDemoMode) {
+            if (in_array($errorCode, ['100001', '100002', '100003'])) {
+                return 'اطلاعات حساب دمو نامعتبر است. لطفاً از کلیدهای API تست‌نت BingX استفاده کنید که از پنل تست BingX ایجاد شده‌اند.';
+            }
+            
+            if ($errorMsg === 'Unknown error' || empty($errorMsg)) {
+                return 'خطا در اتصال به حساب دمو. لطفاً اطمینان حاصل کنید که از کلیدهای API تست‌نت BingX استفاده می‌کنید، نه کلیدهای حساب واقعی.';
+            }
+        }
+
+        // Return mapped error or original message
+        if (isset($errorMappings[$errorCode])) {
+            return $errorMappings[$errorCode];
+        }
+
+        // For unmapped errors, provide context
+        if ($isDemoMode) {
+            return "خطا در حساب دمو: {$errorMsg} (کد: {$errorCode})";
+        } else {
+            return "خطا در API BingX: {$errorMsg} (کد: {$errorCode})";
         }
     }
 }

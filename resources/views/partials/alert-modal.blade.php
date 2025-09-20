@@ -371,7 +371,7 @@ function modernAlert(message, type = 'info', title = null) {
     });
 }
 
-function modernConfirm(message, onConfirm, title = 'تأیید') {
+function modernConfirm(title, message, onConfirm) {
     showAlertModal({
         title: title,
         message: message,

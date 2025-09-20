@@ -21,7 +21,7 @@ class BybitApiService implements ExchangeApiServiceInterface
         // Use parameter if provided, otherwise default to false (real account)
         $isDemo = $isDemo ?? false;
         
-        $this->baseUrl = $isDemo ? 'https://api-testnet.bybit.com' : 'https://api.bybit.com';
+        $this->baseUrl = $isDemo ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
     }
 
     public function setCredentials(string $apiKey, string $apiSecret): void
@@ -52,8 +52,8 @@ class BybitApiService implements ExchangeApiServiceInterface
             $errorCode = $responseData['retCode'] ?? 'N/A';
             $errorMsg = $responseData['retMsg'] ?? 'Unknown error';
             $requestBody = json_encode($params);
-            // Add the full response body to the exception message for better debugging.
             $fullResponse = $response->body();
+            
             throw new \Exception(
                 "Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
             );
@@ -99,11 +99,13 @@ class BybitApiService implements ExchangeApiServiceInterface
             $errorCode = $responseData['retCode'] ?? 'N/A';
             $errorMsg = $responseData['retMsg'] ?? 'Unknown error';
             $requestBody = json_encode($params);
-            // Add the full response body to the exception message for better debugging.
             $fullResponse = $response->body();
-            throw new \Exception(
-                "Bybit API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
-            );
+            
+            // Provide better error messages for demo account issues
+            $isDemoMode = strpos($this->baseUrl, 'testnet') !== false;
+            $userFriendlyMessage = $this->getUserFriendlyErrorMessage($errorCode, $errorMsg, $isDemoMode);
+            
+            throw new \Exception($userFriendlyMessage);
         }
 
         return $responseData['result'];
@@ -824,6 +826,56 @@ class BybitApiService implements ExchangeApiServiceInterface
                     'exchange' => 'bybit'
                 ]
             ];
+        }
+    }
+
+    /**
+     * Get user-friendly error message for demo account issues
+     */
+    private function getUserFriendlyErrorMessage(string $errorCode, string $errorMsg, bool $isDemoMode): string
+    {
+        // Common error codes and their meanings
+        $errorMappings = [
+            '10003' => 'کلید API نامعتبر است',
+            '10004' => 'امضای API نامعتبر است',
+            '10005' => 'مجوز دسترسی کافی نیست',
+            '10006' => 'زمان درخواست منقضی شده است',
+            '10007' => 'آدرس IP مجاز نیست',
+            '10009' => 'کلید API غیرفعال است',
+            '10016' => 'سرویس در دسترس نیست',
+            '10018' => 'حساب کاربری محدود شده است'
+        ];
+
+        // Check for specific demo account issues
+        if ($isDemoMode) {
+            if (in_array($errorCode, ['10003', '10004', '10005'])) {
+                return 'اطلاعات حساب دمو نامعتبر است. لطفاً از کلیدهای API تست‌نت Bybit استفاده کنید که از https://testnet.bybit.com ایجاد شده‌اند.';
+            }
+            
+            if ($errorCode === '10009') {
+                return 'کلید API حساب دمو غیرفعال است. لطفاً کلیدهای جدید از پنل تست‌نت Bybit ایجاد کنید.';
+            }
+            
+            // Handle cases where mainnet API keys are used with testnet
+            if (in_array($errorCode, ['10001', '10002', '10010'])) {
+                return 'کلیدهای API حساب واقعی با تست‌نت سازگار نیستند. لطفاً کلیدهای API مخصوص تست‌نت را از https://testnet.bybit.com ایجاد کنید.';
+            }
+            
+            if ($errorMsg === 'Unknown error' || empty($errorMsg) || $errorCode === 'N/A') {
+                return 'خطا در اتصال به حساب دمو. احتمالاً کلیدهای API حساب واقعی با تست‌نت استفاده شده‌اند. لطفاً کلیدهای API مخصوص تست‌نت را از https://testnet.bybit.com ایجاد کنید.';
+            }
+        }
+
+        // Return mapped error or original message
+        if (isset($errorMappings[$errorCode])) {
+            return $errorMappings[$errorCode];
+        }
+
+        // For unmapped errors, provide context
+        if ($isDemoMode) {
+            return "خطا در حساب دمو: {$errorMsg} (کد: {$errorCode})";
+        } else {
+            return "خطا در API Bybit: {$errorMsg} (کد: {$errorCode})";
         }
     }
 }

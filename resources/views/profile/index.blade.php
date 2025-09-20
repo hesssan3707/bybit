@@ -1111,14 +1111,20 @@
                 'آیا می‌خواهید به این صرافی تغییر دهید؟',
                 function() {
                     try {
+                        // Check if CSRF token exists
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                        if (!csrfToken) {
+                            throw new Error('CSRF token not found');
+                        }
+
                         const form = document.createElement('form');
                         form.method = 'POST';
-                        form.action = `/exchanges/${exchangeId}/switch`;
+                        form.action = `{{ url('/exchanges') }}/${exchangeId}/switch`;
 
                         const csrfInput = document.createElement('input');
                         csrfInput.type = 'hidden';
                         csrfInput.name = '_token';
-                        csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                        csrfInput.value = csrfToken.getAttribute('content');
 
                         form.appendChild(csrfInput);
                         document.body.appendChild(form);
