@@ -179,6 +179,61 @@ Route::get('/schedule', function() {
     echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
     return '************************************************************DONE*******************************************************';
 })->middleware('throttle:4');
+
+Route::get('/demo-schedule', function() {
+    Artisan::call('demo:futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ demo lifecycle done----------------------------------------- <br>';
+    Artisan::call('demo:futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- demo enforce done -------------------------------------------------<br>';
+    Artisan::call('demo:futures:sync-sltp');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo sync sl tp done --------------------------------------------------<br> ';
+    Artisan::call('demo:spot:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
+    sleep(10);
+    Artisan::call('demo:futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ demo lifecycle done----------------------------------------- <br>';
+    Artisan::call('demo:futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- demo enforce done -------------------------------------------------<br>';
+    Artisan::call('demo:futures:sync-sltp');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo sync sl tp done --------------------------------------------------<br> ';
+    Artisan::call('demo:spot:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
+    sleep(10);
+    Artisan::call('demo:futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ demo lifecycle done----------------------------------------- <br>';
+    Artisan::call('demo:futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- demo enforce done -------------------------------------------------<br>';
+    Artisan::call('demo:futures:sync-sltp');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo sync sl tp done --------------------------------------------------<br> ';
+    Artisan::call('demo:spot:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
+    sleep(10);
+    Artisan::call('demo:futures:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------------------ demo lifecycle done----------------------------------------- <br>';
+    Artisan::call('demo:futures:enforce');
+    print_r(Artisan::output());
+    echo '<br>-------------------------------------- demo enforce done -------------------------------------------------<br>';
+    Artisan::call('demo:futures:sync-sltp');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo sync sl tp done --------------------------------------------------<br> ';
+    Artisan::call('demo:spot:lifecycle');
+    print_r(Artisan::output());
+    echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
+    return '************************************************************DEMO DONE*******************************************************';
+})->middleware('throttle:4');
 Route::get('/get-prices', function() {
     Artisan::call('prices:save');
     print_r(Artisan::output());
@@ -188,6 +243,12 @@ Route::get('/validate-exchanges', function() {
     Artisan::call('exchanges:validate-active --force');
     print_r(Artisan::output());
     return 'DONE';
+})->middleware('throttle:2');
+
+Route::get('/demo-validate-exchanges', function() {
+    Artisan::call('demo:exchanges:validate-active --force');
+    print_r(Artisan::output());
+    return 'DEMO VALIDATION DONE';
 })->middleware('throttle:2');
 
 // Non-protected utility routes if needed, but it's better to protect them.

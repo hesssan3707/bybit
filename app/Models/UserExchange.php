@@ -637,6 +637,38 @@ class UserExchange extends Model
     }
 
     /**
+     * Get specific API credentials (real or demo) regardless of is_demo_active setting
+     */
+    public function getApiCredentials(string $type = 'auto')
+    {
+        switch ($type) {
+            case 'demo':
+                if (!$this->hasDemoCredentials()) {
+                    throw new \Exception('Demo credentials are not configured for this exchange.');
+                }
+                return [
+                    'api_key' => $this->demo_api_key,
+                    'api_secret' => $this->demo_api_secret,
+                    'is_demo' => true
+                ];
+                
+            case 'real':
+                if (!$this->hasRealCredentials()) {
+                    throw new \Exception('Real credentials are not configured for this exchange.');
+                }
+                return [
+                    'api_key' => $this->api_key,
+                    'api_secret' => $this->api_secret,
+                    'is_demo' => false
+                ];
+                
+            case 'auto':
+            default:
+                return $this->getCurrentApiCredentials();
+        }
+    }
+
+    /**
      * Check if demo credentials are available
      */
     public function hasDemoCredentials()

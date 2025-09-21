@@ -63,6 +63,28 @@ class ExchangeFactory
     }
 
     /**
+     * Create an exchange API service instance for a user's exchange account with forced credential type
+     */
+    public static function createForUserExchangeWithCredentialType(UserExchange $userExchange, string $credentialType = 'auto'): ExchangeApiServiceInterface
+    {
+        if (!$userExchange->is_active) {
+            throw new \Exception("Exchange account is not active");
+        }
+
+        // Get the specific credentials based on credential type
+        $credentials = $userExchange->getApiCredentials($credentialType);
+
+        $service = self::create(
+            $userExchange->exchange_name,
+            $credentials['api_key'],
+            $credentials['api_secret'],
+            $credentials['is_demo']
+        );
+
+        return $service;
+    }
+
+    /**
      * Create an exchange API service instance for a user's active exchange
      */
     public static function createForUser(int $userId, ?string $exchangeName = null): ExchangeApiServiceInterface
@@ -86,7 +108,7 @@ class ExchangeFactory
             }
         }
 
-        return self::createForUserExchange($userExchange);
+        return self::createForUserExchangeWithCredentialType($userExchange, 'auto');
     }
 
     /**
@@ -111,7 +133,7 @@ class ExchangeFactory
     public static function testUserExchangeConnection(UserExchange $userExchange): bool
     {
         try {
-            $service = self::createForUserExchange($userExchange);
+            $service = self::createForUserExchangeWithCredentialType($userExchange, 'auto');
             return $service->testConnection();
         } catch (\Exception $e) {
             Log::error("Exchange connection test failed", [

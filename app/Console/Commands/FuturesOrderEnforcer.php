@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class FuturesOrderEnforcer extends Command
 {
     protected $signature = 'futures:enforce {--user= : Specific user ID to enforce orders for}';
-    protected $description = 'Enforce order consistency between database and active exchanges for all users';
+    protected $description = 'Enforce order consistency between database and active exchanges for real accounts only';
 
     public function handle(): int
     {
@@ -36,10 +36,10 @@ class FuturesOrderEnforcer extends Command
 
     private function enforceForAllUsers(): void
     {
-        // Only process users with future_strict_mode enabled
+        // Only process users with future_strict_mode enabled and active exchanges
         $users = User::where('future_strict_mode', true)
-            ->whereHas('activeExchanges')
-            ->get();
+                    ->whereHas('activeExchanges')
+                    ->get();
 
         if ($users->isEmpty()) {
             $this->info('No users with future strict mode enabled and active exchanges found.');
@@ -74,6 +74,7 @@ class FuturesOrderEnforcer extends Command
             return;
         }
 
+        // Get all active exchanges for this user
         $activeExchanges = $user->activeExchanges;
         if ($activeExchanges->isEmpty()) {
             $this->warn("No active exchanges for user {$userId}.");
@@ -100,11 +101,8 @@ class FuturesOrderEnforcer extends Command
         $this->info("  Enforcing orders for user {$userId} on {$userExchange->exchange_name}...");
 
         try {
-            $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange_name,
-                $userExchange->api_key,
-                $userExchange->api_secret
-            );
+            // Force real mode (not demo) for exchange service
+            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
         } catch (\Exception $e) {
             $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;

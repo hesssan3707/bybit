@@ -1106,35 +1106,75 @@
      </form>
 
      <script>
+        /**
+         * Switch between exchanges by submitting a form with CSRF token
+         * @param {number} exchangeId - The ID of the exchange to switch to
+         */
         function switchExchange(exchangeId) {
             modernConfirm(
+                'تغییر صرافی',
                 'آیا می‌خواهید به این صرافی تغییر دهید؟',
                 function() {
                     try {
-                        // Check if CSRF token exists
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]');
-                        if (!csrfToken) {
-                            throw new Error('CSRF token not found');
+                        // Verify the presence of CSRF token in the document
+                        const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                        if (!csrfTokenMeta) {
+                            throw new Error('CSRF token meta tag not found in document');
                         }
 
+                        const csrfTokenValue = csrfTokenMeta.getAttribute('content');
+                        if (!csrfTokenValue || csrfTokenValue.trim() === '') {
+                            throw new Error('CSRF token value is empty');
+                        }
+
+                        // Validate exchangeId parameter
+                        if (!exchangeId || isNaN(exchangeId)) {
+                            throw new Error('Invalid exchange ID provided');
+                        }
+
+                        // Create dynamic form with POST method
                         const form = document.createElement('form');
                         form.method = 'POST';
                         form.action = `{{ url('/exchanges') }}/${exchangeId}/switch`;
+                        form.style.display = 'none'; // Hide the form
 
+                        // Create hidden input field containing the CSRF token
                         const csrfInput = document.createElement('input');
                         csrfInput.type = 'hidden';
                         csrfInput.name = '_token';
-                        csrfInput.value = csrfToken.getAttribute('content');
+                        csrfInput.value = csrfTokenValue;
 
+                        // Append CSRF token to form
                         form.appendChild(csrfInput);
+                        
+                        // Append form to document body and submit
                         document.body.appendChild(form);
+                        
+                        // Submit the form
                         form.submit();
+                        
+                        // Clean up - remove form after submission
+                        setTimeout(() => {
+                            if (form.parentNode) {
+                                form.parentNode.removeChild(form);
+                            }
+                        }, 100);
+
                     } catch (error) {
                         console.error('Error switching exchange:', error);
-                        modernAlert('خطا در تغییر صرافی. لطفاً دوباره تلاش کنید.', 'error');
+                        
+                        // Handle different types of errors appropriately
+                        let errorMessage = 'خطا در تغییر صرافی. لطفاً دوباره تلاش کنید.';
+                        
+                        if (error.message.includes('CSRF')) {
+                            errorMessage = 'خطای امنیتی. لطفاً صفحه را تازه‌سازی کنید و دوباره تلاش کنید.';
+                        } else if (error.message.includes('exchange ID')) {
+                            errorMessage = 'شناسه صرافی نامعتبر است.';
+                        }
+                        
+                        modernAlert(errorMessage, 'error');
                     }
-                },
-                'تغییر صرافی'
+                }
             );
         }
     </script>

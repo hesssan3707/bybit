@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class FuturesSlTpSync extends Command
 {
     protected $signature = 'futures:sync-sltp {--user= : Specific user ID to sync for}';
-    protected $description = 'Sync stop-loss and take-profit levels between database and active exchanges';
+    protected $description = 'Sync stop-loss and take-profit levels between database and active exchanges for real accounts only';
 
     public function handle(): int
     {
@@ -36,7 +36,7 @@ class FuturesSlTpSync extends Command
 
     private function syncForAllUsers(): void
     {
-        // Only process users with future_strict_mode enabled
+        // Only process users with future_strict_mode enabled and active exchanges
         $users = User::where('future_strict_mode', true)
                     ->whereHas('activeExchanges')
                     ->get();
@@ -74,6 +74,7 @@ class FuturesSlTpSync extends Command
             return;
         }
 
+        // Get all active exchanges for this user
         $activeExchanges = $user->activeExchanges;
         if ($activeExchanges->isEmpty()) {
             $this->warn("No active exchanges for user {$userId}.");
@@ -100,11 +101,8 @@ class FuturesSlTpSync extends Command
         $this->info("  Syncing stop loss for user {$userId} on {$userExchange->exchange_name}...");
         
         try {
-            $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange_name,
-                $userExchange->api_key,
-                $userExchange->api_secret
-            );
+            // Force real mode (not demo) for stop loss sync
+            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
         } catch (\Exception $e) {
             $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;

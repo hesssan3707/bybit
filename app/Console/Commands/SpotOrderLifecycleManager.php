@@ -109,11 +109,7 @@ class SpotOrderLifecycleManager extends Command
         $this->info("  Managing spot orders for user {$userId} on {$userExchange->exchange_name}...");
         
         try {
-            $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange_name,
-                $userExchange->api_key,
-                $userExchange->api_secret
-            );
+            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
         } catch (\Exception $e) {
             $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;

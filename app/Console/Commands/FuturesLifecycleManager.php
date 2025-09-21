@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 class FuturesLifecycleManager extends Command
 {
     protected $signature = 'futures:lifecycle {--user= : Specific user ID to sync for}';
-    protected $description = 'Sync local order statuses and PnL records with active exchanges for all users';
+    protected $description = 'Sync futures order lifecycle for real accounts only (users with strict mode enabled)';
 
     public function handle(): int
     {
@@ -38,7 +38,7 @@ class FuturesLifecycleManager extends Command
 
     private function syncForAllUsers(): void
     {
-        // Only process users with future_strict_mode enabled
+        // Only process users with future_strict_mode enabled and active exchanges
         $users = User::where('future_strict_mode', true)
                     ->whereHas('activeExchanges')
                     ->get();
@@ -82,6 +82,7 @@ class FuturesLifecycleManager extends Command
             return;
         }
 
+        // Get all active exchanges for this user
         $activeExchanges = $user->activeExchanges;
         if ($activeExchanges->isEmpty()) {
             $this->warn("No active exchanges for user {$userId}.");
@@ -108,11 +109,8 @@ class FuturesLifecycleManager extends Command
         $this->info("  Syncing lifecycle for user {$userId} on {$userExchange->exchange_name}...");
         
         try {
-            $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange_name,
-                $userExchange->api_key,
-                $userExchange->api_secret
-            );
+            // Force real mode (not demo) for exchange service
+            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
         } catch (\Exception $e) {
             $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
             return;

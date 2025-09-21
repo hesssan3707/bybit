@@ -7,14 +7,14 @@ use App\Models\UserExchange;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Support\Facades\Log;
 
-class ValidateActiveExchanges extends Command
+class DemoValidateActiveExchanges extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'exchanges:validate-active 
+    protected $signature = 'demo:exchanges:validate-active 
                             {--force : Force re-validation even for recently validated exchanges}
                             {--exchange= : Validate specific exchange by name (bybit, binance, bingx)}
                             {--user= : Validate exchanges for specific user ID}';
@@ -24,20 +24,20 @@ class ValidateActiveExchanges extends Command
      *
      * @var string
      */
-    protected $description = 'Validate all active exchanges and update their access permissions in the database';
+    protected $description = 'Validate all active demo exchanges and update their access permissions in the database';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $this->info('Starting validation of active exchanges...');
+        $this->info('Starting validation of active demo exchanges...');
         
         $force = $this->option('force');
         $exchangeFilter = $this->option('exchange');
         $userFilter = $this->option('user');
         
-        // Build query
+        // Get all active exchanges - demo validation uses demo credentials
         $query = UserExchange::where('is_active', true);
         
         if ($exchangeFilter) {
@@ -59,11 +59,11 @@ class ValidateActiveExchanges extends Command
         $exchanges = $query->with('user')->get();
         
         if ($exchanges->isEmpty()) {
-            $this->info('No exchanges found that need validation.');
+            $this->info('No demo exchanges found that need validation.');
             return 0;
         }
         
-        $this->info("Found {$exchanges->count()} exchanges to validate");
+        $this->info("Found {$exchanges->count()} demo exchanges to validate");
         
         $progressBar = $this->output->createProgressBar($exchanges->count());
         $progressBar->start();
@@ -93,7 +93,7 @@ class ValidateActiveExchanges extends Command
                     'error' => $e->getMessage()
                 ];
                 
-                Log::error('Exchange validation failed', [
+                Log::error('Demo exchange validation failed', [
                     'exchange_id' => $exchange->id,
                     'exchange_name' => $exchange->exchange_name,
                     'user_exchange_id' => $exchange->id,
@@ -109,7 +109,7 @@ class ValidateActiveExchanges extends Command
         $this->newLine(2);
         
         // Display results
-        $this->info("Validation completed:");
+        $this->info("Demo validation completed:");
         $this->info("✓ Successful: {$successCount}");
         $this->error("✗ Failed: {$failureCount}");
         
@@ -136,24 +136,25 @@ class ValidateActiveExchanges extends Command
         }
         
         $this->newLine();
-        $this->info('All validation results have been saved to the database.');
+        $this->info('All demo validation results have been saved to the database.');
         
         return 0;
     }
     
     /**
-     * Validate a single exchange
+     * Validate a single demo exchange
      */
     private function validateExchange(UserExchange $exchange)
     {
-        $this->line("\nValidating {$exchange->exchange_display_name} for {$exchange->user->email}...");
+        $this->line("\nValidating demo {$exchange->exchange_display_name} for {$exchange->user->email}...");
         
-        $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($exchange, 'real');
+        // Force demo mode for exchange service
+        $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($exchange, 'demo');
         
         $validation = $exchangeService->validateAPIAccess();
         
         // Log the validation attempt
-        Log::info('Exchange validation performed', [
+        Log::info('Demo exchange validation performed', [
             'exchange_id' => $exchange->id,
             'exchange_name' => $exchange->exchange_name,
             'user_exchange_id' => $exchange->id,
@@ -161,11 +162,12 @@ class ValidateActiveExchanges extends Command
             'spot_success' => $validation['spot']['success'] ?? false,
             'futures_success' => $validation['futures']['success'] ?? false,
             'ip_success' => $validation['ip']['success'] ?? false,
-            'overall_success' => $validation['overall'] ?? false
+            'overall_success' => $validation['overall'] ?? false,
+            'is_demo' => true
         ]);
         
         // Generic handling for validation details
-        $this->line("  Validation details:");
+        $this->line("  Demo validation details:");
         $this->line("    Spot: " . ($validation['spot']['success'] ? 'Success' : 'Failed') . " - " . ($validation['spot']['message'] ?? 'No message'));
         $this->line("    Futures: " . ($validation['futures']['success'] ? 'Success' : 'Failed') . " - " . ($validation['futures']['message'] ?? 'No message'));
         $this->line("    IP: " . ($validation['ip']['success'] ? 'Success' : 'Failed') . " - " . ($validation['ip']['message'] ?? 'No message'));
@@ -181,6 +183,6 @@ class ValidateActiveExchanges extends Command
         
         // Refresh and show final access status
         $exchange->refresh();
-        $this->line("  Final access: Spot={$exchange->spot_access}, Futures={$exchange->futures_access}, IP={$exchange->ip_access}");
+        $this->line("  Final demo access: Spot={$exchange->spot_access}, Futures={$exchange->futures_access}, IP={$exchange->ip_access}");
     }
 }
