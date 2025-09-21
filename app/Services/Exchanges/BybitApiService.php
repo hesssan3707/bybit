@@ -159,19 +159,12 @@ class BybitApiService implements ExchangeApiServiceInterface
             'coin' => 'USDT'
         ]);
 
-        // Update database position mode after successful switch
-        $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
-
-        return $result;
-    }
-
-    private function updateDatabasePositionMode(string $positionMode): void
-    {
-        // Position mode switching completed successfully
         \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'position_mode' => $positionMode,
+            'hedge_mode' => $hedgeMode,
             'exchange' => 'bybit'
         ]);
+
+        return $result;
     }
 
     public function getPositionIdx(array $position): int
@@ -787,9 +780,6 @@ class BybitApiService implements ExchangeApiServiceInterface
                     ];
                 }
             }
-
-            // Update database with detected position mode
-            $this->updateDatabasePositionMode($positionMode);
 
             return [
                 'positionMode' => $positionMode,

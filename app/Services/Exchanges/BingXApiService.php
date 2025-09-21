@@ -131,24 +131,18 @@ class BingXApiService implements ExchangeApiServiceInterface
     public function switchPositionMode(bool $hedgeMode): array
     {
         // Based on research, this endpoint is for setting position mode.
-        // The parameter is likely 'dualSidePosition' or similar, following Binance's lead.
-        $result = $this->sendRequest('post', '/openApi/swap/v1/positionSide/dual', [
+        // BingX uses dualSidePosition parameter similar to Binance
+        $result = $this->sendRequest('post', '/openApi/swap/v2/user/setPositionMode', [
             'dualSidePosition' => $hedgeMode ? 'true' : 'false'
         ]);
-        
-        // Update database position mode after successful switch
-        $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
-        
-        return $result;
-    }
-    
-    private function updateDatabasePositionMode(string $positionMode): void
-    {
-        // Position mode switching completed successfully
+
         \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'position_mode' => $positionMode,
-            'exchange' => 'bingx'
+            'hedge_mode' => $hedgeMode,
+            'exchange' => 'bingx',
+            'user_exchange_id' => $this->userExchange->id
         ]);
+
+        return $result;
     }
 
     public function getPositionIdx(array $position): int
@@ -417,10 +411,8 @@ class BingXApiService implements ExchangeApiServiceInterface
                 ];
             }
             
-            // Update database with detected position mode
-            $this->updateDatabasePositionMode($positionMode);
-            
             return [
+                'positionMode' => $positionMode,
                 'hedgeMode' => $hedgeMode,
                 'details' => [
                     'exchange' => 'bingx',

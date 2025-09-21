@@ -356,6 +356,13 @@ class FuturesController extends Controller
                 $finalPrice = round($price, $pricePrec);
                 $finalSL = round((float)$validated['sl'], $pricePrec);
 
+                // Get user's current active exchange
+                $user = auth()->user();
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if (!$currentExchange) {
+                    throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
+                }
+
                 $orderParams = [
                     'category' => 'linear',
                     'symbol' => $symbol,
@@ -368,14 +375,10 @@ class FuturesController extends Controller
                     'orderLinkId' => $orderLinkId,
                 ];
 
-                $responseData = $exchangeService->createOrder($orderParams);
+                // Always add hedge mode parameters based on exchange
+                $this->addHedgeModeParameters($orderParams, $currentExchange->exchange_name, $side);
 
-                // Get user's current active exchange ID
-                $user = auth()->user();
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-                if (!$currentExchange) {
-                    throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
-                }
+                $responseData = $exchangeService->createOrder($orderParams);
 
                 Order::create([
                     'user_exchange_id' => $currentExchange->id,
@@ -603,5 +606,28 @@ class FuturesController extends Controller
         $trades = $tradesQuery->latest('closed_at')->paginate(20);
 
         return view('futures.pnl_history', compact('trades'));
+    }
+
+    /**
+     * Add hedge mode parameters to order based on exchange
+     */
+    private function addHedgeModeParameters(array &$orderParams, string $exchangeName, string $side)
+    {
+        switch (strtolower($exchangeName)) {
+            case 'bybit':
+                // Bybit requires positionIdx: 1 for Buy side, 2 for Sell side in hedge mode
+                $orderParams['positionIdx'] = ($side === 'Buy') ? 1 : 2;
+                break;
+                
+            case 'binance':
+                // Binance requires positionSide: LONG for Buy, SHORT for Sell in hedge mode
+                $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
+                break;
+                
+            case 'bingx':
+                // BingX requires positionSide: LONG for Buy, SHORT for Sell in hedge mode
+                $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
+                break;
+        }
     }
 }

@@ -166,20 +166,14 @@ class BinanceApiService implements ExchangeApiServiceInterface
         $result = $this->sendRequest('post', '/fapi/v1/positionSide/dual', [
             'dualSidePosition' => $hedgeMode ? 'true' : 'false'
         ], true);
-        
-        // Update database position mode after successful switch
-        $this->updateDatabasePositionMode($hedgeMode ? 'hedge' : 'one-way');
-        
-        return $result;
-    }
-    
-    private function updateDatabasePositionMode(string $positionMode): void
-    {
-        // Position mode switching completed successfully
+
         \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'position_mode' => $positionMode,
-            'exchange' => 'binance'
+            'hedge_mode' => $hedgeMode,
+            'exchange' => 'binance',
+            'user_exchange_id' => $this->userExchange->id
         ]);
+
+        return $result;
     }
 
     public function getPositionIdx(array $position): int
@@ -472,10 +466,8 @@ class BinanceApiService implements ExchangeApiServiceInterface
                 ];
             }
             
-            // Update database with detected position mode
-            $this->updateDatabasePositionMode($positionMode);
-            
             return [
+                'positionMode' => $positionMode,
                 'hedgeMode' => $hedgeMode,
                 'details' => [
                     'exchange' => 'binance',
