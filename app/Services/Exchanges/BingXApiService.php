@@ -502,4 +502,31 @@ class BingXApiService implements ExchangeApiServiceInterface
             return "خطا در API BingX: {$errorMsg} (کد: {$errorCode})";
         }
     }
+
+    public function checkIPAccess(): array
+    {
+        try {
+            $result = $this->testConnection();
+            if ($result) {
+                return ['success' => true, 'message' => 'IP access confirmed.'];
+            } else {
+                return ['success' => false, 'message' => 'IP access validation failed.'];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'IP access validation failed: ' . $e->getMessage()];
+        }
+    }
+
+    public function validateAPIAccess(): array
+    {
+        $futuresCheck = $this->checkFuturesAccess();
+        $ipCheck = $this->checkIPAccess();
+
+        return [
+            'spot' => ['success' => false, 'message' => 'Not applicable.'],
+            'futures' => $futuresCheck,
+            'ip' => $ipCheck,
+            'overall' => $futuresCheck['success'] && $ipCheck['success']
+        ];
+    }
 }

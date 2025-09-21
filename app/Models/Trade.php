@@ -51,6 +51,14 @@ class Trade extends Model
     }
 
     /**
+     * Get the order associated with this trade
+     */
+    public function order()
+    {
+        return $this->belongsTo(Order::class, 'order_id', 'order_id');
+    }
+
+    /**
      * Scope a query to only include trades for a specific user exchange
      */
     public function scopeForUserExchange($query, $userExchangeId)

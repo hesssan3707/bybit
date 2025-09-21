@@ -163,8 +163,8 @@ class DemoFuturesLifecycleManager extends Command
             if (!in_array($order->order_id, $exchangeOpenOrderIds)) {
                 try {
                     // Check order history to see what happened
-                    $orderHistoryResult = $exchangeService->getOrderHistory($symbol, $order->order_id);
-                    $orderHistory = $orderHistoryResult['list'] ?? [];
+                    $orderHistoryResult = $exchangeService->getHistoryOrder($order->order_id);
+                    $orderHistory = isset($orderHistoryResult['list']) ? $orderHistoryResult['list'] : [$orderHistoryResult];
                     
                     if (!empty($orderHistory)) {
                         $exchangeOrder = $orderHistory[0];
@@ -209,8 +209,8 @@ class DemoFuturesLifecycleManager extends Command
         foreach ($filledOrders as $order) {
             try {
                 // Get order details from exchange to confirm fill
-                $orderHistoryResult = $exchangeService->getOrderHistory($symbol, $order->order_id);
-                $orderHistory = $orderHistoryResult['list'] ?? [];
+                $orderHistoryResult = $exchangeService->getHistoryOrder($order->order_id);
+                $orderHistory = isset($orderHistoryResult['list']) ? $orderHistoryResult['list'] : [$orderHistoryResult];
                 
                 if (!empty($orderHistory)) {
                     $exchangeOrder = $orderHistory[0];

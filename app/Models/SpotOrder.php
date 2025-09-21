@@ -33,6 +33,8 @@ class SpotOrder extends Model
         'commission_asset',
         'order_created_at',
         'order_updated_at',
+        'filled_at',
+        'cancelled_at',
         'raw_response',
     ];
 
@@ -44,6 +46,8 @@ class SpotOrder extends Model
         'commission' => 'decimal:10',
         'order_created_at' => 'datetime',
         'order_updated_at' => 'datetime',
+        'filled_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'raw_response' => 'array',
     ];
 

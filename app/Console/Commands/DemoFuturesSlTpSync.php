@@ -116,8 +116,8 @@ class DemoFuturesSlTpSync extends Command
             $filledOrdersWithSl = Order::where('user_exchange_id', $userExchange->id)
                 ->where('status', 'filled')
                 ->where('is_demo', true) // Only demo orders
-                ->whereNotNull('stop_loss')
-                ->where('stop_loss', '>', 0)
+                ->whereNotNull('sl')
+                ->where('sl', '>', 0)
                 ->get();
 
             if ($filledOrdersWithSl->isEmpty()) {
@@ -196,7 +196,7 @@ class DemoFuturesSlTpSync extends Command
         }
 
         // Create stop loss order
-        $targetSl = (float)$order->stop_loss;
+        $targetSl = (float)$order->sl;
         
         try {
             $orderParams = [

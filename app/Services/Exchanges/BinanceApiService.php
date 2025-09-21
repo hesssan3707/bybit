@@ -372,7 +372,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
         throw new \Exception('This service is for futures trading, not spot.');
     }
 
-    public function getSpotInstrumentsInfo()
+    public function getSpotInstrumentsInfo(string $symbol = null): array
     {
         $endpoint = '/api/v3/exchangeInfo';
         $response = $this->sendRequestWithoutCredentials('GET', $endpoint);

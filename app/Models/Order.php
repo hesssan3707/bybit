@@ -13,11 +13,12 @@ class Order extends Model
     protected $guarded = [];
     protected $fillable = [
         'user_exchange_id', 'is_demo', 'order_id', 'order_link_id', 'symbol', 'entry_price', 'tp', 'sl', 'steps',
-        'expire_minutes', 'status', 'closed_at', 'side', 'amount', 'entry_low', 'entry_high','cancel_price'
+        'expire_minutes', 'status', 'closed_at', 'filled_at', 'side', 'amount', 'entry_low', 'entry_high','cancel_price'
     ];
 
     protected $casts = [
         'closed_at' => 'datetime',
+        'filled_at' => 'datetime',
         'entry_price' => 'decimal:10',
         'tp' => 'decimal:10',
         'sl' => 'decimal:10',
@@ -40,6 +41,14 @@ class Order extends Model
     public function user()
     {
         return $this->hasOneThrough(User::class, UserExchange::class, 'id', 'id', 'user_exchange_id', 'user_id');
+    }
+
+    /**
+     * Get the trade associated with this order
+     */
+    public function trade()
+    {
+        return $this->hasOne(Trade::class, 'order_id', 'order_id');
     }
 
     /**
