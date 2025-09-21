@@ -149,10 +149,24 @@ class ExchangeController extends Controller
 
             $exchange->makeDefault();
 
-            $user = auth()->user();
-            $exchangeService = ExchangeFactory::createForUserExchange($exchange);
-            // Always switch to hedge mode when switching exchanges
-            $exchangeService->switchPositionMode(true);
+            // Switch to hedge mode after making exchange default
+            try {
+                $exchangeService = ExchangeFactory::create($exchange);
+                $exchangeService->switchPositionMode(true);
+                Log::info('Hedge mode activated during exchange switch', [
+                    'user_id' => auth()->id(),
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('Failed to activate hedge mode during exchange switch', [
+                    'user_id' => auth()->id(),
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name,
+                    'error' => $e->getMessage()
+                ]);
+                // Continue with exchange switch even if hedge mode fails
+            }
 
             return redirect()->route('profile.index');
 

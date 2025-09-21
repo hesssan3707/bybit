@@ -398,7 +398,28 @@ class User extends Authenticatable
             throw new \Exception("Exchange {$exchangeName} not found or not active");
         }
 
-        return $exchange->makeDefault();
+        $result = $exchange->makeDefault();
+
+        // Switch to hedge mode after making exchange default
+        try {
+            $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($exchange);
+            $exchangeService->switchPositionMode(true);
+            \Illuminate\Support\Facades\Log::info('Hedge mode activated during model exchange switch', [
+                'user_id' => $this->id,
+                'exchange_id' => $exchange->id,
+                'exchange_name' => $exchange->exchange_name
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to activate hedge mode during model exchange switch', [
+                'user_id' => $this->id,
+                'exchange_id' => $exchange->id,
+                'exchange_name' => $exchange->exchange_name,
+                'error' => $e->getMessage()
+            ]);
+            // Continue with exchange switch even if hedge mode fails
+        }
+
+        return $result;
     }
 
     /**

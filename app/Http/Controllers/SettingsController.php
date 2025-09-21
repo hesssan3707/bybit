@@ -145,43 +145,8 @@ class SettingsController extends Controller
                 'future_strict_mode_activated_at' => now(),
                 'selected_market' => $request->selected_market
             ]);
-            
-            // Switch all active exchanges to hedge mode
-            $hedgeModeErrors = [];
-            foreach ($user->activeExchanges as $exchange) {
-                // Skip hedge mode switching for demo accounts
-                if ($exchange->is_demo_active) {
-                    Log::info('Skipping hedge mode switch for demo account', [
-                        'user_id' => $user->id,
-                        'exchange_name' => $exchange->exchange_name
-                    ]);
-                    continue;
-                }
 
-                try {
-                    Log::info('Switching exchange to hedge mode', [
-                        'user_id' => $user->id,
-                        'exchange_id' => $exchange->id,
-                        'exchange_name' => $exchange->exchange_name
-                    ]);
-
-                    $exchangeService = ExchangeFactory::createForUserExchange($exchange);
-                    $exchangeService->switchPositionMode(true); // true for hedge mode
-                    
-                    Log::info('Successfully switched to hedge mode', [
-                        'user_id' => $user->id,
-                        'exchange_name' => $exchange->exchange_name
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("Failed to switch {$exchange->exchange_name} to hedge mode for user {$user->id}", [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    $hedgeModeErrors[] = $exchange->exchange_name;
-                }
-            }
-
-            // Build success message with warnings for any issues
+            // Build success message
             $message = "حالت سخت‌گیرانه آتی با موفقیت فعال شد. شما تنها می‌توانید در بازار {$request->selected_market} معامله کنید. این حالت غیرقابل بازگشت است.";
             
             // Add warning for skipped exchanges during validation
@@ -189,16 +154,10 @@ class SettingsController extends Controller
                 $message .= " توجه: بررسی وضعیت صرافی‌های " . implode(', ', $skippedExchanges) . " به دلیل مشکل اتصال امکان‌پذیر نبود و نادیده گرفته شد.";
             }
             
-            // Add warning for hedge mode errors
-            if (!empty($hedgeModeErrors)) {
-                $message .= " توجه: تغییر حالت به Hedge Mode در صرافی‌های " . implode(', ', $hedgeModeErrors) . " با مشکل مواجه شد. لطفاً به صورت دستی این تنظیم را در صرافی انجام دهید.";
-            }
-            
             Log::info('Strict mode activation completed successfully', [
                 'user_id' => $user->id,
                 'selected_market' => $request->selected_market,
-                'skipped_exchanges' => $skippedExchanges,
-                'hedge_mode_errors' => $hedgeModeErrors
+                'skipped_exchanges' => $skippedExchanges
             ]);
 
             return response()->json([

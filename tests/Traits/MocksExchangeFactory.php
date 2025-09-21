@@ -10,24 +10,36 @@ trait MocksExchangeFactory
 {
     protected $mockExchangeService;
 
-    protected function setUpExchangeMocking()
+    protected function mockExchangeFactory()
     {
         $this->mockExchangeService = Mockery::mock(ExchangeApiServiceInterface::class);
         
-        // Override the ExchangeFactory methods using a custom approach
-        $originalFactory = ExchangeFactory::class;
-        
-        // Create a mock that will be returned by the factory
-        $this->app->bind('exchange.service.mock', function () {
-            return $this->mockExchangeService;
+        // Mock the basic exchange service methods that might be called
+        $this->mockExchangeService->shouldReceive('setCredentials')
+            ->andReturn($this->mockExchangeService);
+            
+        $this->mockExchangeService->shouldReceive('getAccountInfo')
+            ->andReturn(['success' => true, 'data' => []]);
+            
+        $this->mockExchangeService->shouldReceive('testConnection')
+            ->andReturn(['success' => true]);
+
+        // Mock the ExchangeFactory static methods
+        $this->partialMock(ExchangeFactory::class, function ($mock) {
+            $mock->shouldReceive('create')
+                ->andReturn($this->mockExchangeService);
+                
+            $mock->shouldReceive('createForUserExchange')
+                ->andReturn($this->mockExchangeService);
+                
+            $mock->shouldReceive('createForUser')
+                ->andReturn($this->mockExchangeService);
         });
-        
-        // We'll need to modify the controllers to use dependency injection instead
-        // For now, let's try a different approach
     }
 
-    protected function tearDownExchangeMocking()
+    protected function tearDown(): void
     {
         Mockery::close();
+        parent::tearDown();
     }
 }

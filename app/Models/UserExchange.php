@@ -35,7 +35,6 @@ class UserExchange extends Model
         'last_validation_at',
         'spot_access',
         'futures_access',
-        'position_mode',
         'ip_access',
         'validation_message',
     ];
@@ -346,7 +345,7 @@ class UserExchange extends Model
         $result = $this->update([
             'is_active' => false,
             'is_default' => false,
-            'status' => 'suspended',
+            'status' => 'deactivated',
             'deactivated_at' => now(),
             'deactivated_by' => $adminId,
             'admin_notes' => $notes,
@@ -361,6 +360,27 @@ class UserExchange extends Model
 
             if ($nextExchange) {
                 $nextExchange->update(['is_default' => true]);
+                
+                // Switch new default exchange to hedge mode
+                try {
+                    $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($nextExchange);
+                    $exchangeService->switchPositionMode(true);
+                    \Illuminate\Support\Facades\Log::info('Hedge mode activated for new default exchange during deactivation', [
+                        'user_id' => $this->user_id,
+                        'new_default_exchange_id' => $nextExchange->id,
+                        'new_default_exchange_name' => $nextExchange->exchange_name,
+                        'deactivated_exchange_id' => $this->id
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to activate hedge mode for new default exchange during deactivation', [
+                        'user_id' => $this->user_id,
+                        'new_default_exchange_id' => $nextExchange->id,
+                        'new_default_exchange_name' => $nextExchange->exchange_name,
+                        'deactivated_exchange_id' => $this->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue even if hedge mode fails
+                }
             }
         }
 

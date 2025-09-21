@@ -143,15 +143,26 @@ class ExchangeController extends Controller
             auth()->user()->exchanges()->update(['is_active' => false]);
             $exchange->update(['is_active' => true]);
             
-            // Skip hedge mode switching in test environment to avoid API key validation issues
-            if (!app()->environment('testing')) {
-                // Always switch to hedge mode when switching exchanges
-                $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($exchange);
+            // Switch to hedge mode after making exchange default
+            try {
+                $exchangeService = \App\Services\Exchanges\ExchangeFactory::create($exchange);
                 $exchangeService->switchPositionMode(true);
-                $message = "Switched to {$exchange->exchange_name} successfully and set to hedge mode.";
-            } else {
-                $message = "Switched to {$exchange->exchange_name} successfully.";
+                \Illuminate\Support\Facades\Log::info('Hedge mode activated during API exchange switch', [
+                    'user_id' => auth()->id(),
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to activate hedge mode during API exchange switch', [
+                    'user_id' => auth()->id(),
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name,
+                    'error' => $e->getMessage()
+                ]);
+                // Continue with exchange switch even if hedge mode fails
             }
+            
+            $message = "Switched to {$exchange->exchange_name} successfully.";
             
             return response()->json(['success' => true, 'message' => $message]);
         } catch (\Exception $e) {

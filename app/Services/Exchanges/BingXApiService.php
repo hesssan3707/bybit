@@ -144,33 +144,11 @@ class BingXApiService implements ExchangeApiServiceInterface
     
     private function updateDatabasePositionMode(string $positionMode): void
     {
-        try {
-            // Find UserExchange by decrypted api_key comparison
-            $userExchanges = \App\Models\UserExchange::where('exchange_name', 'bingx')->get();
-            
-            foreach ($userExchanges as $userExchange) {
-                if ($userExchange->api_key === $this->apiKey) {
-                    $userExchange->update(['position_mode' => $positionMode]);
-                    \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
-                        'user_exchange_id' => $userExchange->id,
-                        'position_mode' => $positionMode,
-                        'exchange' => 'bingx'
-                    ]);
-                    return;
-                }
-            }
-            
-            \Illuminate\Support\Facades\Log::warning('UserExchange not found for position mode update', [
-                'position_mode' => $positionMode,
-                'exchange' => 'bingx'
-            ]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
-                'error' => $e->getMessage(),
-                'position_mode' => $positionMode,
-                'exchange' => 'bingx'
-            ]);
-        }
+        // Position mode switching completed successfully
+        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
+            'position_mode' => $positionMode,
+            'exchange' => 'bingx'
+        ]);
     }
 
     public function getPositionIdx(array $position): int
@@ -430,7 +408,6 @@ class BingXApiService implements ExchangeApiServiceInterface
                 // If no positions exist, we can't determine mode from positions
                 // Don't assume mode - return unknown to avoid false validation errors
                 return [
-                    'positionMode' => 'unknown',
                     'hedgeMode' => false,
                     'details' => [
                         'exchange' => 'bingx',
@@ -444,7 +421,6 @@ class BingXApiService implements ExchangeApiServiceInterface
             $this->updateDatabasePositionMode($positionMode);
             
             return [
-                'positionMode' => $positionMode,
                 'hedgeMode' => $hedgeMode,
                 'details' => [
                     'exchange' => 'bingx',
@@ -454,7 +430,6 @@ class BingXApiService implements ExchangeApiServiceInterface
             ];
         } catch (\Exception $e) {
             return [
-                'positionMode' => 'unknown',
                 'hedgeMode' => false,
                 'details' => [
                     'error' => $e->getMessage(),

@@ -167,28 +167,11 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     private function updateDatabasePositionMode(string $positionMode): void
     {
-        try {
-            // Find UserExchange by decrypted api_key comparison
-            $userExchanges = \App\Models\UserExchange::where('exchange_name', 'bybit')->get();
-
-            foreach ($userExchanges as $userExchange) {
-                if ($userExchange->api_key === $this->apiKey) {
-                    $userExchange->update(['position_mode' => $positionMode]);
-                    return;
-                }
-            }
-
-            \Illuminate\Support\Facades\Log::warning('UserExchange not found for position mode update', [
-                'position_mode' => $positionMode,
-                'exchange' => 'bybit'
-            ]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
-                'error' => $e->getMessage(),
-                'position_mode' => $positionMode,
-                'exchange' => 'bybit'
-            ]);
-        }
+        // Position mode switching completed successfully
+        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
+            'position_mode' => $positionMode,
+            'exchange' => 'bybit'
+        ]);
     }
 
     public function getPositionIdx(array $position): int

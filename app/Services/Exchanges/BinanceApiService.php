@@ -175,33 +175,11 @@ class BinanceApiService implements ExchangeApiServiceInterface
     
     private function updateDatabasePositionMode(string $positionMode): void
     {
-        try {
-            // Find UserExchange by decrypted api_key comparison
-            $userExchanges = \App\Models\UserExchange::where('exchange_name', 'binance')->get();
-            
-            foreach ($userExchanges as $userExchange) {
-                if ($userExchange->api_key === $this->apiKey) {
-                    $userExchange->update(['position_mode' => $positionMode]);
-                    \Illuminate\Support\Facades\Log::info('Updated position mode in database', [
-                        'user_exchange_id' => $userExchange->id,
-                        'position_mode' => $positionMode,
-                        'exchange' => 'binance'
-                    ]);
-                    return;
-                }
-            }
-            
-            \Illuminate\Support\Facades\Log::warning('UserExchange not found for position mode update', [
-                'position_mode' => $positionMode,
-                'exchange' => 'binance'
-            ]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to update position mode in database', [
-                'error' => $e->getMessage(),
-                'position_mode' => $positionMode,
-                'exchange' => 'binance'
-            ]);
-        }
+        // Position mode switching completed successfully
+        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
+            'position_mode' => $positionMode,
+            'exchange' => 'binance'
+        ]);
     }
 
     public function getPositionIdx(array $position): int
@@ -485,7 +463,6 @@ class BinanceApiService implements ExchangeApiServiceInterface
                 // If no positions exist, we can't determine mode from positions
                 // Don't assume mode - return unknown to avoid false validation errors
                 return [
-                    'positionMode' => 'unknown',
                     'hedgeMode' => false,
                     'details' => [
                         'exchange' => 'binance',
@@ -499,7 +476,6 @@ class BinanceApiService implements ExchangeApiServiceInterface
             $this->updateDatabasePositionMode($positionMode);
             
             return [
-                'positionMode' => $positionMode,
                 'hedgeMode' => $hedgeMode,
                 'details' => [
                     'exchange' => 'binance',
@@ -509,7 +485,6 @@ class BinanceApiService implements ExchangeApiServiceInterface
             ];
         } catch (\Exception $e) {
             return [
-                'positionMode' => 'unknown',
                 'hedgeMode' => false,
                 'details' => [
                     'error' => $e->getMessage(),

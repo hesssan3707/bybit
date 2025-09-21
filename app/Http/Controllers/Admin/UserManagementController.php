@@ -303,8 +303,29 @@ class UserManagementController extends Controller
 
             $exchange->activate(auth()->id(), $request->admin_notes);
 
+            // Switch exchange to hedge mode after activation
+            $hedgeModeWarning = '';
+            try {
+                $exchangeService = ExchangeFactory::createForUserExchange($exchange);
+                $exchangeService->switchPositionMode(true); // true for hedge mode
+                
+                Log::info('Successfully switched exchange to hedge mode during approval', [
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name,
+                    'user_id' => $exchange->user_id
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('Failed to switch exchange to hedge mode during approval', [
+                    'exchange_id' => $exchange->id,
+                    'exchange_name' => $exchange->exchange_name,
+                    'user_id' => $exchange->user_id,
+                    'error' => $e->getMessage()
+                ]);
+                $hedgeModeWarning = ' (توجه: تنظیم Hedge Mode با مشکل مواجه شد)';
+            }
+
             $userEmail = $exchange->user ? $exchange->user->email : 'کاربر حذف شده';
-            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$userEmail} تأیید شد.");
+            return back()->with('success', "درخواست فعال‌سازی صرافی {$exchange->exchange_display_name} برای کاربر {$userEmail} تأیید شد{$hedgeModeWarning}.");
 
         } catch (\Exception $e) {
             Log::error('Exchange approval failed: ' . $e->getMessage());
