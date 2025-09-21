@@ -193,7 +193,7 @@
         transform: rotate(180deg);
     }
 
-    .dropdown-list {
+    ._dropdown-list {
         position: absolute;
         top: 100%;
         left: 0;
@@ -208,7 +208,7 @@
         display: none;
     }
 
-    .dropdown-list.active {
+    ._dropdown-list.active {
         display: block;
     }
 
@@ -313,7 +313,7 @@
                     <span id="selectedSymbolText">انتخاب جفت ارز</span>
                     <span class="dropdown-arrow" id="dropdownArrow">▼</span>
                 </div>
-                <div class="dropdown-list" id="symbolDropdown">
+                <div class="_dropdown-list" id="symbolDropdown">
                     <input type="text" id="searchBox" placeholder="جستجو در جفت‌های ارز..."
                            style="width: 100%; padding: 8px; border: none; border-bottom: 1px solid rgba(238, 238, 238, 0.25); outline: none;"
                            oninput="filterSymbols()" onkeydown="handleKeyNavigation(event)">

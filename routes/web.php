@@ -234,11 +234,13 @@ Route::get('/demo-schedule', function() {
     echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
     return '************************************************************DEMO DONE*******************************************************';
 })->middleware('throttle:4');
+
 Route::get('/get-prices', function() {
     Artisan::call('prices:save');
     print_r(Artisan::output());
     return 'DONE';
 })->middleware('throttle:4');
+
 Route::get('/validate-exchanges', function() {
     Artisan::call('exchanges:validate-active --force');
     print_r(Artisan::output());
@@ -249,6 +251,17 @@ Route::get('/demo-validate-exchanges', function() {
     Artisan::call('demo:exchanges:validate-active --force');
     print_r(Artisan::output());
     return 'DEMO VALIDATION DONE';
+})->middleware('throttle:2');
+
+Route::get('/spot-lifecycle', function() {
+    Artisan::call('spot:lifecycle');
+    print_r(Artisan::output());
+    return 'DONE';
+})->middleware('throttle:2');
+
+Route::get('/demo-spot-lifecycle', function() {
+    Artisan::call('demo:spot:lifecycle');
+    print_r(Artisan::output());
 })->middleware('throttle:2');
 
 // Non-protected utility routes if needed, but it's better to protect them.
