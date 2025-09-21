@@ -36,7 +36,7 @@ class BingXApiService implements ExchangeApiServiceInterface
 
     private function sendRequestWithoutCredentials(string $method, string $endpoint, array $params = [])
     {
-
+        $headers = [];
         $queryString = http_build_query($params, '', '&');
 
         $response = Http::withHeaders($headers)->timeout(10)->connectTimeout(5)->{$method}("{$this->baseUrl}{$endpoint}?{$queryString}");
@@ -319,75 +319,88 @@ class BingXApiService implements ExchangeApiServiceInterface
 
     public function createSpotOrder(array $orderData): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        return $this->sendRequest('post', '/openApi/spot/v1/trade/order', $orderData);
     }
 
     public function getSpotAccountBalance(): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        $balance = $this->sendRequest('get', '/openApi/spot/v1/account/balance');
+        return $balance['balances'] ?? [];
     }
 
     public function getSpotInstrumentsInfo(string $symbol = null): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        $params = [];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        $info = $this->sendRequestWithoutCredentials('get', '/openApi/spot/v1/common/symbols', $params);
+        return ['list' => $info['symbols'] ?? []];
     }
 
     public function getSpotTickerInfo(string $symbol): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        return $this->sendRequestWithoutCredentials('get', '/openApi/spot/v1/ticker/24hr', ['symbol' => $symbol]);
     }
 
     public function getSpotOrderHistory(string $symbol = null, int $limit = 50): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        $params = ['limit' => $limit];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        $orders = $this->sendRequest('get', '/openApi/spot/v1/trade/historyOrders', $params);
+        return ['list' => $orders ?? []];
     }
 
     public function cancelSpotOrderWithSymbol(string $orderId, string $symbol): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        return $this->sendRequest('post', '/openApi/spot/v1/trade/cancel', ['symbol' => $symbol, 'orderId' => $orderId]);
     }
 
     public function getSpotOrder(string $orderId): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        // BingX requires symbol for spot order lookup
+        throw new \Exception('بینگ ایکس برای دریافت اطلاعات سفارش نقدی نیاز به نماد دارد. از getSpotOrderWithSymbol استفاده کنید.');
+    }
+
+    public function getSpotOrderWithSymbol(string $orderId, string $symbol): array
+    {
+        return $this->sendRequest('get', '/openApi/spot/v1/trade/query', ['symbol' => $symbol, 'orderId' => $orderId]);
     }
 
     public function cancelSpotOrder(string $orderId): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        // BingX requires symbol for spot order cancellation
+        throw new \Exception('بینگ ایکس برای لغو سفارش نقدی نیاز به نماد دارد. از cancelSpotOrderWithSymbol استفاده کنید.');
     }
 
     public function getOpenSpotOrders(string $symbol = null): array
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        $params = [];
+        if ($symbol) {
+            $params['symbol'] = $symbol;
+        }
+        $orders = $this->sendRequest('get', '/openApi/spot/v1/trade/openOrders', $params);
+        return ['list' => $orders ?? []];
     }
 
     public function checkSpotAccess(): array
     {
-        return ['success' => false, 'message' => 'This is a futures-only service.'];
-    }
-
-    public function checkIPAccess(): array
-    {
         try {
-            $this->testConnection();
-            return ['success' => true, 'message' => 'IP access confirmed.'];
+            $this->getSpotAccountBalance();
+            return [
+                'success' => true,
+                'message' => 'دسترسی به معاملات نقدی تأیید شد',
+                'details' => []
+            ];
         } catch (\Exception $e) {
-            return ['success' => false, 'message' => 'IP access validation failed: ' . $e->getMessage()];
+            return [
+                'success' => false,
+                'message' => 'خطا در دسترسی به معاملات نقدی: ' . $e->getMessage(),
+                'details' => ['error' => $e->getMessage()]
+            ];
         }
-    }
-
-    public function validateAPIAccess(): array
-    {
-        $futuresCheck = $this->checkFuturesAccess();
-        $ipCheck = $this->checkIPAccess();
-
-        return [
-            'spot' => ['success' => false, 'message' => 'Not applicable.'],
-            'futures' => $futuresCheck,
-            'ip' => $ipCheck,
-            'overall' => $futuresCheck['success'] && $ipCheck['success']
-        ];
     }
 
     /**

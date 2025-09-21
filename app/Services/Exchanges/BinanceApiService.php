@@ -37,6 +37,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
 
     private function sendRequestWithoutCredentials(string $method, string $endpoint, array $params = [])
     {
+        $headers = [];
         $client = Http::withHeaders($headers)->timeout(10)->connectTimeout(5);
 
         $response = $client->{$method}("{$this->baseUrl}{$endpoint}", $params);
@@ -371,9 +372,32 @@ class BinanceApiService implements ExchangeApiServiceInterface
         throw new \Exception('This service is for futures trading, not spot.');
     }
 
-    public function getSpotInstrumentsInfo(string $symbol = null): array
+    public function getSpotInstrumentsInfo()
     {
-        throw new \Exception('This service is for futures trading, not spot.');
+        $endpoint = '/api/v3/exchangeInfo';
+        $response = $this->sendRequestWithoutCredentials('GET', $endpoint);
+        
+        if (!isset($response['symbols'])) {
+            throw new \Exception('خطا در دریافت اطلاعات نمادهای معاملاتی');
+        }
+        
+        $instruments = [];
+        foreach ($response['symbols'] as $symbol) {
+            if ($symbol['status'] === 'TRADING' && $symbol['isSpotTradingAllowed']) {
+                $instruments[] = [
+                    'symbol' => $symbol['symbol'],
+                    'baseAsset' => $symbol['baseAsset'],
+                    'quoteAsset' => $symbol['quoteAsset'],
+                    'status' => $symbol['status'],
+                    'baseAssetPrecision' => $symbol['baseAssetPrecision'],
+                    'quoteAssetPrecision' => $symbol['quoteAssetPrecision'],
+                    'orderTypes' => $symbol['orderTypes'],
+                    'filters' => $symbol['filters']
+                ];
+            }
+        }
+        
+        return $instruments;
     }
 
     public function getSpotTickerInfo(string $symbol): array
