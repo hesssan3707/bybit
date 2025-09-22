@@ -101,11 +101,11 @@ class FuturesOrderEnforcer extends Command
     private function enforceForUserExchange(User $user, UserExchange $userExchange)
     {
         try {
-            $this->info("پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}");
+            $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}");
 
             // Create exchange service (real mode)
             $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange,
+                $userExchange->exchange_name,
                 $userExchange->api_key,
                 $userExchange->api_secret,
                 $userExchange->api_passphrase,
@@ -133,10 +133,10 @@ class FuturesOrderEnforcer extends Command
             $this->checkForeignOrders($exchangeService, $userExchange, $symbol, $exchangeOpenOrders);
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}: " . $e->getMessage());
-            Log::error("Order enforcement failed", [
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}: " . $e->getMessage());
+            Log::error('FuturesOrderEnforcer error', [
                 'user_id' => $user->id,
-                'exchange' => $userExchange->exchange,
+                'exchange' => $userExchange->exchange_name,
                 'error' => $e->getMessage()
             ]);
         }

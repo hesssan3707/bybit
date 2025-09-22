@@ -88,11 +88,11 @@ class DemoSpotOrderLifecycleManager extends Command
     private function syncForUserExchange(User $user, UserExchange $userExchange)
     {
         try {
-            $this->info("پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}");
+            $this->info("پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}");
 
             // Create exchange service (demo mode)
             $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange,
+                $userExchange->exchange_name,
                 $userExchange->demo_api_key,
                 $userExchange->demo_api_secret,
                 $userExchange->demo_api_passphrase,
@@ -103,15 +103,15 @@ class DemoSpotOrderLifecycleManager extends Command
             try {
                 $exchangeService->getAccountInfo();
             } catch (Exception $e) {
-                $this->warn("صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
+                $this->warn("صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
                 return;
             }
 
-            // Sync order statuses
-            $this->syncOrderStatuses($exchangeService, $userExchange);
+            // Sync spot orders for this exchange
+            $this->syncSpotOrdersForExchange($exchangeService, $user, $userExchange);
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
         }
     }
 

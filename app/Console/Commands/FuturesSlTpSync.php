@@ -87,11 +87,11 @@ class FuturesSlTpSync extends Command
     private function syncForUserExchange(User $user, UserExchange $userExchange)
     {
         try {
-            $this->info("پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}");
+            $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}");
 
             // Create exchange service (real mode)
             $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange,
+                $userExchange->exchange_name,
                 $userExchange->api_key,
                 $userExchange->api_secret,
                 $userExchange->api_passphrase,
@@ -105,7 +105,7 @@ class FuturesSlTpSync extends Command
                 ->get();
 
             if ($filledOrders->isEmpty()) {
-                $this->info("هیچ سفارش تکمیل شده‌ای برای کاربر {$user->email} در صرافی {$userExchange->exchange} یافت نشد");
+                $this->info("هیچ سفارش تکمیل شده‌ای برای کاربر {$user->email} در صرافی {$userExchange->exchange_name} یافت نشد");
                 return;
             }
 
@@ -128,7 +128,7 @@ class FuturesSlTpSync extends Command
             }
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}: " . $e->getMessage());
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}: " . $e->getMessage());
         }
     }
 

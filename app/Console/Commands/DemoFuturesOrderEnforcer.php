@@ -101,11 +101,11 @@ class DemoFuturesOrderEnforcer extends Command
     private function enforceForUserExchange(User $user, UserExchange $userExchange)
     {
         try {
-            $this->info("پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}");
+            $this->info("پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}");
 
             // Create exchange service (demo mode)
             $exchangeService = ExchangeFactory::create(
-                $userExchange->exchange,
+                $userExchange->exchange_name,
                 $userExchange->demo_api_key,
                 $userExchange->demo_api_secret,
                 $userExchange->demo_api_passphrase,
@@ -133,10 +133,10 @@ class DemoFuturesOrderEnforcer extends Command
             $this->checkForeignOrders($exchangeService, $userExchange, $symbol, $exchangeOpenOrders);
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
             Log::error("Demo order enforcement failed", [
                 'user_id' => $user->id,
-                'exchange' => $userExchange->exchange,
+                'exchange' => $userExchange->exchange_name,
                 'error' => $e->getMessage()
             ]);
         }
