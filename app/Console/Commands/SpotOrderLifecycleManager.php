@@ -2,12 +2,12 @@
 
 namespace App\Console\Commands;
 
-use App\Models\SpotOrder;
-use App\Models\User;
-use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\UserExchange;
+use App\Models\SpotOrder;
+use App\Services\Exchanges\ExchangeFactory;
+use Exception;
 
 class SpotOrderLifecycleManager extends Command
 {
@@ -16,228 +16,175 @@ class SpotOrderLifecycleManager extends Command
      *
      * @var string
      */
-    protected $signature = 'spot:lifecycle {--user= : Specific user ID to manage spot orders for}';
+    protected $signature = 'spot:lifecycle {--user=}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Manage spot order lifecycle for all users (not affected by strict mode)';
+    protected $description = 'مدیریت چرخه حیات سفارشات نقدی برای تمام کاربران تایید شده';
 
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle()
     {
-        $this->info('Starting spot order lifecycle management...');
-        
-        try {
-            if ($this->option('user')) {
-                $this->manageForUser($this->option('user'));
-            } else {
-                $this->manageForAllUsers();
+        $this->info('شروع مدیریت چرخه حیات سفارشات نقدی...');
+
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Spot order lifecycle management failed: " . $e->getMessage());
-            Log::error('Spot order lifecycle management failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished spot order lifecycle management.');
-        return self::SUCCESS;
+        $this->info('مدیریت چرخه حیات سفارشات نقدی با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function manageForAllUsers(): void
+    /**
+     * Sync lifecycle for all verified users
+     */
+    private function syncForAllUsers()
     {
-        // Process ALL users with active exchanges - strict mode does NOT affect spot orders
-        $users = User::whereHas('activeExchanges')->get();
+        $users = User::whereNotNull('email_verified_at')->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر تایید شده...");
 
-        $this->info("Found {$users->count()} users with active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->manageForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to manage spot orders for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to manage spot orders for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function manageForUser(int $userId): void
+    /**
+     * Sync lifecycle for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Managing spot orders for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Note: Spot order management is NOT affected by future_strict_mode
-        $this->info("Processing spot orders for user {$userId} (strict mode does not affect spot orders)");
-
-        $activeExchanges = $user->activeExchanges;
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->manageForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to manage spot orders for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Spot order lifecycle management failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function manageForUserExchange(int $userId, $userExchange): void
-    {
-        $this->info("  Managing spot orders for user {$userId} on {$userExchange->exchange_name}...");
-        
-        try {
-            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
-
-        try {
-            // 1. Sync pending spot orders
-            $this->syncPendingSpotOrders($userId, $userExchange, $exchangeService);
-            
-            // 2. Update order statuses
-            $this->updateSpotOrderStatuses($userId, $userExchange, $exchangeService);
-            
-        } catch (\Throwable $e) {
-            $this->error("    Spot order lifecycle management failed for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    private function syncPendingSpotOrders(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
-    {
-        $this->info("    Syncing pending spot orders for user {$userId} on {$userExchange->exchange_name}...");
-        
-        $pendingOrders = SpotOrder::where('user_exchange_id', $userExchange->id)
-            ->where('status', 'pending')
+        // Get all user exchanges (both demo and real)
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('spot_access', true)
             ->get();
 
-        if ($pendingOrders->isEmpty()) {
-            $this->info("    No pending spot orders found for user {$userId} on {$userExchange->exchange_name}");
-            return;
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
         }
+    }
 
-        $this->info("    Found {$pendingOrders->count()} pending spot orders for user {$userId} on {$userExchange->exchange_name}");
+    /**
+     * Sync lifecycle for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
+    {
+        try {
+            $this->info("پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}");
 
-        foreach ($pendingOrders as $dbOrder) {
+            // Create exchange service (real mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->api_key,
+                $userExchange->api_secret,
+                $userExchange->api_passphrase,
+                false // Real mode
+            );
+
+            // Test connection by trying to get account info
+            try {
+                $exchangeService->getAccountInfo();
+            } catch (Exception $e) {
+                $this->warn("صرافی {$userExchange->exchange} برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
+                return;
+            }
+
+            // Sync order statuses
+            $this->syncOrderStatuses($exchangeService, $userExchange);
+
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Sync order statuses with exchange
+     */
+    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
+    {
+        // Get all pending spot orders for this user exchange (real mode)
+        $orders = SpotOrder::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', false)
+            ->whereIn('status', ['pending', 'partially_filled'])
+            ->get();
+
+        foreach ($orders as $order) {
             try {
                 // Get order status from exchange
-                $exchangeOrderStatus = $exchangeService->getSpotOrderStatus($dbOrder->order_id, $dbOrder->symbol);
+                $exchangeOrder = $exchangeService->getSpotOrder($order->order_id, $order->symbol);
+
+                // Update order status based on exchange response
+                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
                 
-                if ($exchangeOrderStatus) {
-                    $status = strtolower($exchangeOrderStatus['orderStatus'] ?? 'unknown');
+                if ($order->status !== $newStatus) {
+                    $order->status = $newStatus;
                     
-                    switch ($status) {
-                        case 'filled':
-                        case 'partiallyfilled':
-                            $dbOrder->update([
-                                'status' => 'filled',
-                                'executed_qty' => $exchangeOrderStatus['cumExecQty'] ?? $dbOrder->executed_qty,
-                                'executed_price' => $exchangeOrderStatus['avgPrice'] ?? $dbOrder->executed_price,
-                                'order_updated_at' => now(),
-                                'raw_response' => $exchangeOrderStatus,
-                            ]);
-                            $this->info("      Updated spot order {$dbOrder->order_id} status to filled");
-                            break;
-                            
-                        case 'cancelled':
-                        case 'rejected':
-                            $dbOrder->update([
-                                'status' => $status,
-                                'reject_reason' => $exchangeOrderStatus['rejectReason'] ?? null,
-                                'order_updated_at' => now(),
-                                'raw_response' => $exchangeOrderStatus,
-                            ]);
-                            $this->info("      Updated spot order {$dbOrder->order_id} status to {$status}");
-                            break;
-                            
-                        case 'new':
-                        case 'partiallyfilled':
-                            // Order is still active, update any partial fill info
-                            $dbOrder->update([
-                                'executed_qty' => $exchangeOrderStatus['cumExecQty'] ?? $dbOrder->executed_qty,
-                                'executed_price' => $exchangeOrderStatus['avgPrice'] ?? $dbOrder->executed_price,
-                                'raw_response' => $exchangeOrderStatus,
-                            ]);
-                            break;
+                    // Update filled quantity if available
+                    if (isset($exchangeOrder['filled'])) {
+                        $order->filled_quantity = $exchangeOrder['filled'];
                     }
+                    
+                    // Update average price if available
+                    if (isset($exchangeOrder['average'])) {
+                        $order->average_price = $exchangeOrder['average'];
+                    }
+                    
+                    // Update fee if available
+                    if (isset($exchangeOrder['fee'])) {
+                        $order->fee = $exchangeOrder['fee']['cost'] ?? 0;
+                        $order->fee_currency = $exchangeOrder['fee']['currency'] ?? null;
+                    }
+                    
+                    $order->save();
+                    
+                    $this->info("وضعیت سفارش نقدی {$order->order_id} به {$newStatus} تغییر یافت");
                 }
-            } catch (\Exception $e) {
-                $this->warn("      Failed to sync spot order {$dbOrder->order_id}: " . $e->getMessage());
-                Log::warning("Failed to sync spot order for user {$userId}", [
-                    'order_id' => $dbOrder->order_id,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
+
+            } catch (Exception $e) {
+                // Order might be deleted/expired on exchange
+                if (strpos($e->getMessage(), 'not found') !== false || 
+                    strpos($e->getMessage(), 'does not exist') !== false) {
+                    $order->status = 'deleted';
+                    $order->save();
+                    $this->info("سفارش نقدی {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
+                }
             }
         }
     }
 
-    private function updateSpotOrderStatuses(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
+    /**
+     * Map exchange status to our internal status
+     */
+    private function mapExchangeStatus($exchangeStatus)
     {
-        $this->info("    Updating spot order statuses for user {$userId} on {$userExchange->exchange_name}...");
-        
-        // Check for orders that might have been filled or cancelled outside our tracking
-        $activeOrders = SpotOrder::where('user_exchange_id', $userExchange->id)
-            ->whereIn('status', ['pending', 'new'])
-            ->whereNotNull('order_id')
-            ->get();
+        $statusMap = [
+            'NEW' => 'pending',
+            'PENDING' => 'pending',
+            'PARTIALLY_FILLED' => 'partially_filled',
+            'FILLED' => 'filled',
+            'CANCELED' => 'cancelled',
+            'CANCELLED' => 'cancelled',
+            'REJECTED' => 'rejected',
+            'EXPIRED' => 'expired',
+            'CLOSED' => 'closed'
+        ];
 
-        if ($activeOrders->isEmpty()) {
-            $this->info("    No active spot orders to update for user {$userId} on {$userExchange->exchange_name}");
-            return;
-        }
-
-        foreach ($activeOrders as $dbOrder) {
-            try {
-                $exchangeOrderStatus = $exchangeService->getSpotOrderStatus($dbOrder->order_id, $dbOrder->symbol);
-                
-                if (!$exchangeOrderStatus) {
-                    // Order not found on exchange, might have been cancelled or filled
-                    $this->warn("      Spot order {$dbOrder->order_id} not found on exchange, marking as unknown");
-                    continue;
-                }
-                
-                $status = strtolower($exchangeOrderStatus['orderStatus'] ?? 'unknown');
-                
-                if ($status !== strtolower($dbOrder->status)) {
-                    $dbOrder->update([
-                        'status' => $status,
-                        'executed_qty' => $exchangeOrderStatus['cumExecQty'] ?? $dbOrder->executed_qty,
-                        'executed_price' => $exchangeOrderStatus['avgPrice'] ?? $dbOrder->executed_price,
-                        'order_updated_at' => now(),
-                        'raw_response' => $exchangeOrderStatus,
-                    ]);
-                    $this->info("      Updated spot order {$dbOrder->order_id} status from {$dbOrder->status} to {$status}");
-                }
-                
-            } catch (\Exception $e) {
-                $this->warn("      Failed to update spot order {$dbOrder->order_id}: " . $e->getMessage());
-            }
-        }
+        return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
     }
 }

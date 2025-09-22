@@ -2,409 +2,254 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Order;
-use App\Models\User;
-use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\UserExchange;
+use App\Models\Order;
+use App\Services\Exchanges\ExchangeFactory;
+use Exception;
 
 class FuturesSlTpSync extends Command
 {
-    protected $signature = 'futures:sync-sltp {--user= : Specific user ID to sync for}';
-    protected $description = 'Sync stop-loss and take-profit levels between database and active exchanges for real accounts only';
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'futures:sync-sltp {--user=}';
 
-    public function handle(): int
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'همگام‌سازی سطوح Stop Loss و Take Profit برای کاربران در حالت سخت‌گیرانه';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
     {
-        $this->info('Starting stop-loss and take-profit synchronization...');
+        $this->info('شروع همگام‌سازی Stop Loss و Take Profit...');
 
-        try {
-            if ($this->option('user')) {
-                $this->syncForUser($this->option('user'));
-            } else {
-                $this->syncForAllUsers();
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Stop loss sync failed: " . $e->getMessage());
-            Log::error('Futures stop loss sync failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished stop loss synchronization.');
-        return self::SUCCESS;
+        $this->info('همگام‌سازی Stop Loss و Take Profit با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function syncForAllUsers(): void
+    /**
+     * Sync SL/TP for all users in strict mode
+     */
+    private function syncForAllUsers()
     {
-        // Only process users with future_strict_mode enabled and active exchanges
-        $users = User::where('future_strict_mode', true)
-                    ->whereHas('activeExchanges')
-                    ->get();
+        // Find all users who are in strict mode
+        $users = User::where('future_strict_mode', true)->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with future strict mode enabled and active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر در حالت سخت‌گیرانه...");
 
-        $this->info("Found {$users->count()} users with future strict mode enabled and active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->syncForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to sync stop loss for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to sync stop loss for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function syncForUser(int $userId): void
+    /**
+     * Sync SL/TP for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Syncing stop loss for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Check if user has future strict mode enabled
-        if (!$user->future_strict_mode) {
-            $this->info("User {$userId} does not have future strict mode enabled. Skipping...");
-            return;
-        }
-
-        // Get all active exchanges for this user
-        $activeExchanges = $user->activeExchanges;
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->syncForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to sync stop loss for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Stop loss sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function syncForUserExchange(int $userId, $userExchange): void
-    {
-        $this->info("  Syncing stop loss for user {$userId} on {$userExchange->exchange_name}...");
-        
-        try {
-            // Force real mode (not demo) for stop loss sync
-            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
-
-        // Get user's selected market, default to ETHUSDT if not set
-        $user = User::find($userId);
-        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
-
-        // Get all filled orders for this user on this exchange
-        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('status', 'filled')
-            ->where('symbol', $symbol)
+        // Get all user exchanges for this user
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
             ->get();
 
-        if ($filledOrders->isEmpty()) {
-            $this->info("    No filled {$symbol} orders found for user {$userId} on {$userExchange->exchange_name}");
-            return;
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
         }
+    }
 
+    /**
+     * Sync SL/TP for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
+    {
         try {
-            $positionResult = $exchangeService->getPositions($symbol);
-            $positions = $positionResult['list'] ?? [];
+            $this->info("پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}");
 
-            if (empty($positions)) {
-                $this->info("    No open positions found for user {$userId} on {$userExchange->exchange_name} for {$symbol}");
+            // Create exchange service (real mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->api_key,
+                $userExchange->api_secret,
+                $userExchange->api_passphrase,
+                false // Real mode
+            );
+
+            // Get all filled orders for this user exchange (real mode)
+            $filledOrders = Order::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', false)
+                ->where('status', 'filled')
+                ->get();
+
+            if ($filledOrders->isEmpty()) {
+                $this->info("هیچ سفارش تکمیل شده‌ای برای کاربر {$user->email} در صرافی {$userExchange->exchange} یافت نشد");
                 return;
             }
 
-            foreach ($positions as $position) {
-                // Ignore positions that are not open
-                if ((float)($position['positionAmt'] ?? $position['size'] ?? 0) == 0) {
-                    continue;
+            // Get current positions from exchange
+            $positions = $exchangeService->getPositions();
+
+            foreach ($filledOrders as $order) {
+                // Find corresponding open position for this order
+                $position = $this->findPositionForOrder($positions, $order);
+                
+                if (!$position) {
+                    continue; // No open position for this order
                 }
 
-                // Find matching DB order
-                $matchingOrder = null;
-                foreach ($filledOrders as $order) {
-                    $positionSide = strtolower($position['side'] ?? ($position['positionSide'] ?? ''));
-                    $orderSide = strtolower($order->side);
+                // Check and sync Stop Loss
+                $this->syncStopLoss($exchangeService, $order, $position);
 
-                    if ($positionSide === $orderSide) {
-                        $matchingOrder = $order;
-                        break;
-                    }
-                }
-
-                if (!$matchingOrder) {
-                    Log::warning("Could not find matching DB order for position", [
-                        'user_id' => $userId,
-                        'exchange' => $userExchange->exchange_name,
-                        'symbol' => $symbol,
-                        'position' => $position
-                    ]);
-                    continue;
-                }
-
-                $exchangeSl = (float)($position['stopLoss'] ?? 0);
-                $databaseSl = (float)$matchingOrder->sl;
-                $exchangeTp = (float)($position['takeProfit'] ?? 0);
-                $databaseTp = (float)$matchingOrder->tp;
-
-                // Compare SL or TP with tolerance for floating point precision
-                if (abs($exchangeSl - $databaseSl) > 0.001 || abs($exchangeTp - $databaseTp) > 0.001) {
-                    $this->warn("    SL/TP mismatch for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$matchingOrder->side}). Exchange SL:{$exchangeSl}/TP:{$exchangeTp}, DB SL:{$databaseSl}/TP:{$databaseTp}. Updating...");
-
-                    $success = $this->updateStopLossUsingTradingStop($exchangeService, $position, $symbol, $databaseSl, $databaseTp, $userId, $userExchange->exchange_name, $matchingOrder->id);
-                    
-                    if ($success) {
-                        $this->info("    Successfully updated SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} to SL:{$databaseSl}/TP:{$databaseTp}");
-                        
-                        // Additionally ensure TP is set as reduce-only order if needed
-                        $this->ensureTpAsReduceOrder($exchangeService, $position, $symbol, $databaseTp, $matchingOrder, $userId, $userExchange->exchange_name);
-                    } else {
-                        $this->error("    Failed to update SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol}");
-                    }
-                } else {
-                    $this->info("    SL/TP for user {$userId} on {$userExchange->exchange_name}, {$symbol} (Side: {$matchingOrder->side}) is in sync");
-                    
-                    // Even if SL/TP are in sync, ensure TP is properly set as reduce-only order
-                    $this->ensureTpAsReduceOrder($exchangeService, $position, $symbol, $databaseTp, $matchingOrder, $userId, $userExchange->exchange_name);
-                }
+                // Check and sync Take Profit
+                $this->syncTakeProfit($exchangeService, $order, $position);
             }
 
-        } catch (\Exception $e) {
-            $this->error("    Failed to sync SL for user {$userId} on {$userExchange->exchange_name}, symbol {$symbol}: " . $e->getMessage());
-            Log::error("Stop loss sync error for user {$userId} on exchange {$userExchange->exchange_name}", [
-                'symbol' => $symbol,
-                'error' => $e->getMessage()
-            ]);
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}: " . $e->getMessage());
         }
     }
 
     /**
-     * Update stop loss using the correct Bybit API endpoint: POST /v5/position/trading-stop
-     * This directly modifies the stopLoss on an open position without creating/canceling orders
-     * 
-     * @param ExchangeApiServiceInterface $exchangeService
-     * @param array $position
-     * @param string $symbol
-     * @param float $targetSl
-     * @param int $userId
-     * @param string $exchangeName
-     * @param int $orderId
-     * @return bool Success status
+     * Find position that corresponds to the given order
      */
-    private function updateStopLossUsingTradingStop(
-        ExchangeApiServiceInterface $exchangeService,
-        array $position,
-        string $symbol,
-        float $targetSl,
-        float $targetTp,
-        int $userId,
-        string $exchangeName,
-        int $orderId
-    ): bool {
-        try {
-            $this->info("      Using POST /v5/position/trading-stop to update SL/TP...");
-
-            // Determine position index
-            $positionIdx = $this->determinePositionIdx($position);
-
-            // Prepare parameters for the trading-stop endpoint
-            $params = [
-                'category' => 'linear', // for futures trading
-                'symbol' => $symbol,
-                'positionIdx' => $positionIdx,
-                'stopLoss' => (string)$targetSl,
-                'tpslMode' => 'Full', // Full position stop loss/take profit
-            ];
-
-            // Set take profit from database value if it's greater than zero
-            if ($targetTp > 0) {
-                $params['takeProfit'] = (string)$targetTp;
-            }
-
-            $this->info("        Updating position SL/TP to {$targetSl}/{$targetTp} for position index {$positionIdx}");
-
-            // Log the API call parameters
-            Log::info("Updating SL/TP using trading-stop endpoint", [
-                'user_id' => $userId,
-                'exchange' => $exchangeName,
-                'symbol' => $symbol,
-                'positionIdx' => $positionIdx,
-                'new_stop_loss' => $targetSl,
-                'new_take_profit' => $targetTp,
-                'params' => $params
-            ]);
-
-            // Call the setStopLossAdvanced method which uses the trading-stop endpoint
-            $result = $exchangeService->setStopLossAdvanced($params);
-
-            $this->info("      Success: SL/TP updated using trading-stop endpoint");
-
-            Log::info("SL/TP successfully updated", [
-                'user_id' => $userId,
-                'exchange' => $exchangeName,
-                'symbol' => $symbol,
-                'new_stop_loss' => $targetSl,
-                'new_take_profit' => $targetTp,
-                'api_response' => $result
-            ]);
-
-            return true;
-
-        } catch (\Exception $e) {
-            $this->error("      Failed to update SL/TP using trading-stop endpoint: " . $e->getMessage());
-
-            Log::error("SL/TP update failed using trading-stop endpoint", [
-                'user_id' => $userId,
-                'exchange' => $exchangeName,
-                'symbol' => $symbol,
-                'target_sl' => $targetSl,
-                'target_tp' => $targetTp,
-                'position_idx' => $positionIdx ?? 'unknown',
-                'error' => $e->getMessage(),
-                'params' => $params ?? []
-            ]);
-
-            return false;
-        }
-    }
-
-    /**
-     * Ensure TP is set as a reduce-only order
-     * TP must always be of type reduce and function as closing the main order
-     * 
-     * @param ExchangeApiServiceInterface $exchangeService
-     * @param array $position
-     * @param string $symbol
-     * @param float $targetTp
-     * @param object $matchingOrder
-     * @param int $userId
-     * @param string $exchangeName
-     */
-    private function ensureTpAsReduceOrder(
-        ExchangeApiServiceInterface $exchangeService,
-        array $position,
-        string $symbol,
-        float $targetTp,
-        object $matchingOrder,
-        int $userId,
-        string $exchangeName
-    ): void {
-        try {
-            if ($targetTp <= 0) {
-                return; // No TP to set
-            }
-
-            // Get current open orders to check for existing TP orders
-            $openOrdersResult = $exchangeService->getOpenOrders($symbol);
-            $openOrders = $openOrdersResult['list'] ?? [];
-            
-            $positionSize = abs((float)($position['size'] ?? 0));
-            $positionSide = strtolower($position['side'] ?? '');
-            $tpSide = ($positionSide === 'buy') ? 'Sell' : 'Buy'; // Opposite side for TP
-            
-            // Check if there's already a valid TP order
-            $hasValidTpOrder = false;
-            foreach ($openOrders as $order) {
-                $orderPrice = (float)($order['price'] ?? $order['triggerPrice'] ?? 0);
-                $orderSide = strtolower($order['side'] ?? '');
-                $isReduceOnly = ($order['reduceOnly'] ?? false) === true;
-                
-                // Check if this is our TP order
-                if ($isReduceOnly && 
-                    $orderSide === strtolower($tpSide) && 
-                    abs($orderPrice - $targetTp) < 0.01) {
-                    $hasValidTpOrder = true;
-                    $this->info("      Valid TP reduce-only order already exists at {$targetTp}");
-                    break;
-                }
-            }
-            
-            if (!$hasValidTpOrder) {
-                // Create TP as reduce-only order
-                $positionIdx = $this->determinePositionIdx($position);
-                
-                $tpOrderParams = [
-                    'category' => 'linear',
-                    'symbol' => $symbol,
-                    'side' => $tpSide,
-                    'orderType' => 'Limit',
-                    'qty' => (string)$positionSize,
-                    'price' => (string)$targetTp,
-                    'reduceOnly' => true,
-                    'positionIdx' => $positionIdx,
-                    'timeInForce' => 'GTC'
-                ];
-                
-                $this->info("      Creating TP reduce-only order at {$targetTp} for {$positionSize} {$symbol}");
-                
-                $result = $exchangeService->createOrder($tpOrderParams);
-                
-                if (isset($result['orderId'])) {
-                    $this->info("      Successfully created TP reduce-only order: {$result['orderId']}");
-                } else {
-                    $this->warn("      TP order creation response: " . json_encode($result));
-                }
-            }
-            
-        } catch (\Exception $e) {
-            $this->warn("      Failed to ensure TP as reduce-only order: " . $e->getMessage());
-            Log::warning("TP reduce-only order creation failed", [
-                'user_id' => $userId,
-                'exchange' => $exchangeName,
-                'symbol' => $symbol,
-                'target_tp' => $targetTp,
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Determine the correct positionIdx from position data
-     * This is critical for the trading-stop endpoint to work correctly
-     * 
-     * @param array $position
-     * @return int
-     */
-    private function determinePositionIdx(array $position): int
+    private function findPositionForOrder($positions, Order $order)
     {
-        // First try to get positionIdx directly from the position data
-        if (isset($position['positionIdx']) && is_numeric($position['positionIdx'])) {
-            return (int)$position['positionIdx'];
-        }
-        
-        // Fallback: Try to determine from side in hedge mode
-        if (isset($position['side'])) {
-            $side = strtolower($position['side']);
-            // In hedge mode:
-            // positionIdx = 1 for Buy side (long positions)
-            // positionIdx = 2 for Sell side (short positions)
-            if ($side === 'buy') {
-                return 1; 
-            } elseif ($side === 'sell') {
-                return 2; 
+        foreach ($positions as $position) {
+            // Check if symbol matches
+            if ($position['symbol'] !== $order->symbol) {
+                continue;
+            }
+
+            // Check if position has size (is open)
+            if (($position['size'] ?? 0) == 0) {
+                continue;
+            }
+
+            // Check if side matches
+            $positionSide = strtolower($position['side'] ?? '');
+            $orderSide = strtolower($order->side);
+            
+            if ($positionSide === $orderSide) {
+                return $position;
             }
         }
-        
-        // Default to one-way mode
-        // positionIdx = 0 for one-way mode (both buy and sell in same position)
-        return 0;
+
+        return null;
+    }
+
+    /**
+     * Check and sync Stop Loss
+     */
+    private function syncStopLoss($exchangeService, Order $order, $position)
+    {
+        // Check if SL is defined in database
+        if (!$order->sl) {
+            return; // No SL defined in database
+        }
+
+        try {
+            // Get current stop loss orders from exchange
+            $stopLossOrders = $exchangeService->getStopLossOrders($order->symbol, $order->side);
+            
+            $currentSL = null;
+            if (!empty($stopLossOrders)) {
+                $currentSL = $stopLossOrders[0]['stopPrice'] ?? null;
+            }
+
+            // Check if SL exists and matches database
+            if (!$currentSL || abs($currentSL - $order->sl) > 0.0001) {
+                // SL doesn't exist or has changed, reset it
+                
+                // First, cancel any existing SL orders
+                if (!empty($stopLossOrders)) {
+                    foreach ($stopLossOrders as $slOrder) {
+                        $exchangeService->cancelOrder($slOrder['orderId'], $order->symbol);
+                    }
+                }
+
+                // Create new SL order
+                $exchangeService->createStopLossOrder(
+                    $order->symbol,
+                    $order->side,
+                    $position['size'],
+                    $order->sl
+                );
+
+                $this->info("Stop Loss برای سفارش {$order->order_id} در قیمت {$order->sl} تنظیم شد");
+            }
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی Stop Loss برای سفارش {$order->order_id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check and sync Take Profit
+     */
+    private function syncTakeProfit($exchangeService, Order $order, $position)
+    {
+        // Check if TP is defined in database
+        if (!$order->tp) {
+            return; // No TP defined in database
+        }
+
+        try {
+            // Get current take profit orders from exchange
+            $takeProfitOrders = $exchangeService->getTakeProfitOrders($order->symbol, $order->side);
+            
+            $currentTP = null;
+            if (!empty($takeProfitOrders)) {
+                $currentTP = $takeProfitOrders[0]['stopPrice'] ?? null;
+            }
+
+            // Check if TP exists and matches database
+            if ($currentTP && abs($currentTP - $order->tp) > 0.0001) {
+                // TP exists but is different, delete it
+                foreach ($takeProfitOrders as $tpOrder) {
+                    $exchangeService->cancelOrder($tpOrder['orderId'], $order->symbol);
+                }
+                $currentTP = null; // Mark as deleted
+            }
+
+            // If no TP exists or we just deleted it, create new one
+            if (!$currentTP) {
+                // Create new TP order as reduce order to close the main position
+                $exchangeService->createTakeProfitOrder(
+                    $order->symbol,
+                    $order->side,
+                    $position['size'],
+                    $order->tp,
+                    'reduce' // Reduce order type to close position
+                );
+
+                $this->info("Take Profit برای سفارش {$order->order_id} در قیمت {$order->tp} تنظیم شد");
+            }
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی Take Profit برای سفارش {$order->order_id}: " . $e->getMessage());
+        }
     }
 }

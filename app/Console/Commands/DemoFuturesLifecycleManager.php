@@ -2,245 +2,252 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Console\Command;
+use App\Models\User;
+use App\Models\UserExchange;
 use App\Models\Order;
 use App\Models\Trade;
-use App\Models\User;
 use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
-use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
+use Exception;
 
 class DemoFuturesLifecycleManager extends Command
 {
-    protected $signature = 'demo:futures:lifecycle {--user= : Specific user ID to sync demo orders for}';
-    protected $description = 'Sync local demo order statuses and PnL records with active exchanges for demo accounts only';
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'demo:futures:lifecycle {--user=}';
 
-    public function handle(): int
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'مدیریت چرخه حیات سفارشات آتی دمو برای تمام کاربران تایید شده';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
     {
-        $this->info('Starting demo futures lifecycle management...');
+        $this->info('شروع مدیریت چرخه حیات سفارشات آتی دمو...');
 
-        try {
-            if ($this->option('user')) {
-                $this->syncForUser($this->option('user'));
-            } else {
-                $this->syncForAllUsers();
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Demo lifecycle management failed: " . $e->getMessage());
-            Log::error('Demo futures lifecycle management failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished demo futures lifecycle management.');
-        return self::SUCCESS;
+        $this->info('مدیریت چرخه حیات سفارشات آتی دمو با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function syncForAllUsers(): void
+    /**
+     * Sync lifecycle for all verified users
+     */
+    private function syncForAllUsers()
     {
-        // Get users with futures strict mode enabled and who have demo-active exchanges
-        $users = User::where('future_strict_mode', true)
-                    ->whereHas('activeExchanges', function($query) {
-                        $query->where('is_demo_active', true);
-                    })
-                    ->get();
+        $users = User::whereNotNull('email_verified_at')->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with future strict mode enabled, demo active, and active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر تایید شده...");
 
-        $this->info("Found {$users->count()} users with demo accounts enabled and active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->syncForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to sync demo lifecycle for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to sync demo lifecycle for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function syncForUser(int $userId): void
+    /**
+     * Sync lifecycle for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Syncing demo lifecycle for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Only process users with future_strict_mode enabled
-        if (!$user->future_strict_mode) {
-            $this->info("Skipping user {$user->id}: futures strict mode not enabled");
-            return;
-        }
-
-        // Check if user has a selected market in strict mode
-        if (empty($user->selected_market)) {
-            $this->info("User {$userId} is in strict mode but has no selected market. Skipping...");
-            return;
-        }
-
-        // Get demo-active exchanges for this user
-        $activeExchanges = $user->activeExchanges()->where('is_demo_active', true)->get();
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->syncForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to sync demo lifecycle for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Demo lifecycle sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function syncForUserExchange(int $userId, $userExchange): void
-    {
-        $this->info("  Syncing demo lifecycle for user {$userId} on {$userExchange->exchange_name}...");
-        
-        try {
-            // Force demo mode for exchange service
-            $exchangeService = ExchangeFactory::createForUserExchange($userExchange, true);
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create demo exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
-
-        $user = User::find($userId);
-        $symbol = $user->selected_market;
-
-        try {
-            // 1. Sync pending demo orders
-            $this->syncPendingOrders($exchangeService, $userExchange, $symbol);
-            
-            // 2. Sync filled demo orders and create trades
-            $this->syncFilledOrders($exchangeService, $userExchange, $symbol);
-            
-        } catch (\Throwable $e) {
-            $this->error("  Failed to sync demo lifecycle for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            Log::error("Demo lifecycle sync failed for user exchange", [
-                'user_exchange_id' => $userExchange->id,
-                'user_id' => $userId,
-                'exchange' => $userExchange->exchange_name,
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    private function syncPendingOrders(ExchangeApiServiceInterface $exchangeService, $userExchange, string $symbol): void
-    {
-        // Get pending demo orders from database
-        $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('status', 'pending')
-            ->where('is_demo', true) // Only demo orders
+        // Get all user exchanges with demo API keys
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
+            ->whereNotNull('demo_api_key')
+            ->whereNotNull('demo_api_secret')
             ->get();
 
-        if ($pendingOrders->isEmpty()) {
-            return;
-        }
-
-        $this->info("    Found {$pendingOrders->count()} pending demo orders to sync.");
-
-        // Get open orders from exchange
-        $openOrdersResult = $exchangeService->getOpenOrders($symbol);
-        $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
-        $exchangeOpenOrderIds = array_map(fn($o) => $o['orderId'], $exchangeOpenOrders);
-
-        foreach ($pendingOrders as $order) {
-            // If order is not in exchange's open orders, it might be filled or canceled
-            if (!in_array($order->order_id, $exchangeOpenOrderIds)) {
-                try {
-                    // Check order history to see what happened
-                    $orderHistoryResult = $exchangeService->getHistoryOrder($order->order_id);
-                    $orderHistory = isset($orderHistoryResult['list']) ? $orderHistoryResult['list'] : [$orderHistoryResult];
-                    
-                    if (!empty($orderHistory)) {
-                        $exchangeOrder = $orderHistory[0];
-                        $orderStatus = $exchangeOrder['orderStatus'] ?? '';
-                        
-                        if ($orderStatus === 'Filled') {
-                            $this->info("    Demo order {$order->order_id} was filled. Updating status...");
-                            $order->status = 'filled';
-                            $order->filled_at = now();
-                            $order->avg_price = (float)($exchangeOrder['avgPrice'] ?? $order->entry_price);
-                            $order->save();
-                        } elseif (in_array($orderStatus, ['Cancelled', 'Rejected'])) {
-                            $this->info("    Demo order {$order->order_id} was {$orderStatus}. Updating status...");
-                            $order->status = strtolower($orderStatus);
-                            $order->closed_at = now();
-                            $order->save();
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    $this->warn("    Failed to check demo order history for {$order->order_id}: " . $e->getMessage());
-                }
-            }
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
         }
     }
 
-    private function syncFilledOrders(ExchangeApiServiceInterface $exchangeService, $userExchange, string $symbol): void
+    /**
+     * Sync lifecycle for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
     {
-        // Get recently filled demo orders that don't have trades yet
-        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('status', 'filled')
-            ->where('is_demo', true) // Only demo orders
-            ->whereDoesntHave('trade')
-            ->where('filled_at', '>=', Carbon::now()->subDays(7)) // Only recent orders
+        try {
+            $this->info("پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}");
+
+            // Create exchange service (demo mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->demo_api_key,
+                $userExchange->demo_api_secret,
+                $userExchange->demo_api_passphrase,
+                true // Demo mode
+            );
+
+            // Test connection by trying to get account info
+            try {
+                $exchangeService->getAccountInfo();
+            } catch (Exception $e) {
+                $this->warn("صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
+                return;
+            }
+
+            // Sync order statuses
+            $this->syncOrderStatuses($exchangeService, $userExchange);
+
+            // Sync PnL records for hedge mode
+            $this->syncPnlRecords($exchangeService, $userExchange);
+
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Sync order statuses with exchange
+     */
+    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
+    {
+        // Get all pending orders for this user exchange (demo mode)
+        $orders = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->whereIn('status', ['pending', 'partially_filled'])
             ->get();
 
-        if ($filledOrders->isEmpty()) {
-            return;
-        }
-
-        $this->info("    Found {$filledOrders->count()} filled demo orders without trades to process.");
-
-        foreach ($filledOrders as $order) {
+        foreach ($orders as $order) {
             try {
-                // Get order details from exchange to confirm fill
-                $orderHistoryResult = $exchangeService->getHistoryOrder($order->order_id);
-                $orderHistory = isset($orderHistoryResult['list']) ? $orderHistoryResult['list'] : [$orderHistoryResult];
+                // Get order status from exchange
+                $exchangeOrder = $exchangeService->getOrder($order->order_id, $order->symbol);
+
+                // Update order status based on exchange response
+                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
                 
-                if (!empty($orderHistory)) {
-                    $exchangeOrder = $orderHistory[0];
+                if ($order->status !== $newStatus) {
+                    $order->status = $newStatus;
                     
-                    if (($exchangeOrder['orderStatus'] ?? '') === 'Filled') {
-                        // Create trade record for demo order
-                        $avgPrice = (float)($exchangeOrder['avgPrice'] ?? $order->avg_price ?? $order->entry_price);
-                        $qty = (float)($exchangeOrder['qty'] ?? $order->amount);
-                        
-                        Trade::create([
-                            'user_exchange_id' => $userExchange->id,
-                            'is_demo' => true, // Mark as demo trade
-                            'symbol' => $symbol,
-                            'side' => $order->side,
-                            'order_type' => $order->order_type,
-                            'leverage' => $order->leverage,
-                            'qty' => $qty,
-                            'avg_entry_price' => $avgPrice,
-                            'avg_exit_price' => null, // Will be set when position is closed
-                            'pnl' => 0, // Will be calculated when position is closed
-                            'order_id' => $order->order_id,
-                            'closed_at' => null, // Will be set when position is closed
-                        ]);
-                        
-                        $this->info("    Created demo trade record for order {$order->order_id}");
+                    // Update filled quantity if available
+                    if (isset($exchangeOrder['filled'])) {
+                        $order->filled_quantity = $exchangeOrder['filled'];
                     }
+                    
+                    // Update average price if available
+                    if (isset($exchangeOrder['average'])) {
+                        $order->average_price = $exchangeOrder['average'];
+                    }
+                    
+                    $order->save();
+                    
+                    $this->info("وضعیت سفارش دمو {$order->order_id} به {$newStatus} تغییر یافت");
                 }
-            } catch (\Throwable $e) {
-                $this->warn("    Failed to create demo trade for order {$order->order_id}: " . $e->getMessage());
+
+            } catch (Exception $e) {
+                // Order might be deleted/expired on exchange
+                if (strpos($e->getMessage(), 'not found') !== false || 
+                    strpos($e->getMessage(), 'does not exist') !== false) {
+                    $order->status = 'deleted';
+                    $order->save();
+                    $this->info("سفارش دمو {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
+                }
             }
         }
+    }
+
+    /**
+     * Sync PnL records for hedge mode
+     */
+    private function syncPnlRecords($exchangeService, UserExchange $userExchange)
+    {
+        // Only sync if position mode is hedge
+        if ($userExchange->position_mode !== 'hedge') {
+            return;
+        }
+
+        try {
+            // Get positions from exchange
+            $positions = $exchangeService->getPositions();
+
+            foreach ($positions as $position) {
+                // Skip positions with zero size
+                if ($position['size'] == 0) {
+                    continue;
+                }
+
+                // Find or create trade record
+                $trade = Trade::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', true)
+                    ->where('symbol', $position['symbol'])
+                    ->where('side', $position['side'])
+                    ->first();
+
+                if (!$trade) {
+                    // Create new trade record
+                    $trade = new Trade([
+                        'user_exchange_id' => $userExchange->id,
+                        'is_demo' => true,
+                        'symbol' => $position['symbol'],
+                        'side' => $position['side'],
+                        'quantity' => $position['size'],
+                        'entry_price' => $position['entryPrice'] ?? 0,
+                        'pnl' => $position['unrealizedPnl'] ?? 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                    $trade->save();
+                } else {
+                    // Update existing trade
+                    $trade->quantity = $position['size'];
+                    $trade->entry_price = $position['entryPrice'] ?? $trade->entry_price;
+                    $trade->pnl = $position['unrealizedPnl'] ?? 0;
+                    $trade->updated_at = now();
+                    $trade->save();
+                }
+            }
+
+            // Mark closed positions
+            $symbols = collect($positions)->pluck('symbol')->unique();
+            Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
+                ->whereNotIn('symbol', $symbols)
+                ->update(['pnl' => 0, 'updated_at' => now()]);
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی سوابق PnL دمو: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Map exchange status to our internal status
+     */
+    private function mapExchangeStatus($exchangeStatus)
+    {
+        $statusMap = [
+            'NEW' => 'pending',
+            'PENDING' => 'pending',
+            'PARTIALLY_FILLED' => 'partially_filled',
+            'FILLED' => 'filled',
+            'CANCELED' => 'cancelled',
+            'CANCELLED' => 'cancelled',
+            'REJECTED' => 'rejected',
+            'EXPIRED' => 'expired',
+            'CLOSED' => 'closed'
+        ];
+
+        return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
     }
 }

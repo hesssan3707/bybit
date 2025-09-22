@@ -2,229 +2,256 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Order;
-use App\Models\User;
-use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\UserExchange;
+use App\Models\Order;
+use App\Services\Exchanges\ExchangeFactory;
+use Exception;
 
 class DemoFuturesSlTpSync extends Command
 {
-    protected $signature = 'demo:futures:sync-sltp {--user= : Specific user ID to sync demo stop-loss for}';
-    protected $description = 'Sync stop-loss and take-profit levels between database and active exchanges for demo accounts only';
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'demo:futures:sync-sltp {--user=}';
 
-    public function handle(): int
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'همگام‌سازی سطوح Stop Loss و Take Profit برای کاربران در حالت سخت‌گیرانه (دمو)';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
     {
-        $this->info('Starting demo stop-loss and take-profit synchronization...');
+        $this->info('شروع همگام‌سازی Stop Loss و Take Profit (دمو)...');
 
-        try {
-            if ($this->option('user')) {
-                $this->syncForUser($this->option('user'));
-            } else {
-                $this->syncForAllUsers();
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Demo stop loss sync failed: " . $e->getMessage());
-            Log::error('Demo futures stop loss sync failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished demo stop loss synchronization.');
-        return self::SUCCESS;
+        $this->info('همگام‌سازی Stop Loss و Take Profit (دمو) با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function syncForAllUsers(): void
+    /**
+     * Sync SL/TP for all users in strict mode
+     */
+    private function syncForAllUsers()
     {
-        // Only process users with future_strict_mode enabled and active exchanges
-        $users = User::where('future_strict_mode', true)
-                    ->whereHas('activeExchanges')
-                    ->get();
+        // Find all users who are in strict mode
+        $users = User::where('future_strict_mode', true)->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with future strict mode enabled, demo active, and active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر در حالت سخت‌گیرانه (دمو)...");
 
-        $this->info("Found {$users->count()} users with demo accounts enabled and active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->syncForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to sync demo stop loss for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to sync demo stop loss for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function syncForUser(int $userId): void
+    /**
+     * Sync SL/TP for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Syncing demo stop loss for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Only process users with future_strict_mode enabled
-        if (!$user->future_strict_mode) {
-            $this->info("Skipping user {$user->id}: futures strict mode not enabled");
-            return;
-        }
+        // Get all user exchanges with demo API keys
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
+            ->whereNotNull('demo_api_key')
+            ->whereNotNull('demo_api_secret')
+            ->get();
 
-        // Get all active exchanges for this user
-        $activeExchanges = $user->activeExchanges;
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->syncForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to sync demo stop loss for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Demo stop loss sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
         }
     }
 
-    private function syncForUserExchange(int $userId, $userExchange): void
+    /**
+     * Sync SL/TP for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
     {
-        $this->info("  Syncing demo stop loss for user {$userId} on {$userExchange->exchange_name}...");
-        
         try {
-            // Force demo mode for exchange service
-            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'demo');
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create demo exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
+            $this->info("پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}");
 
-        $user = User::find($userId);
-        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
+            // Create exchange service (demo mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->demo_api_key,
+                $userExchange->demo_api_secret,
+                $userExchange->demo_api_passphrase,
+                true // Demo mode
+            );
 
-        try {
-            // Get filled demo orders that have stop loss but no active stop loss order
-            $filledOrdersWithSl = Order::where('user_exchange_id', $userExchange->id)
+            // Get all filled orders for this user exchange (demo mode)
+            $filledOrders = Order::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
                 ->where('status', 'filled')
-                ->where('is_demo', true) // Only demo orders
-                ->whereNotNull('sl')
-                ->where('sl', '>', 0)
                 ->get();
 
-            if ($filledOrdersWithSl->isEmpty()) {
-                $this->info("    No filled demo orders with stop loss found for user {$userId}.");
+            if ($filledOrders->isEmpty()) {
+                $this->info("هیچ سفارش تکمیل شده‌ای برای کاربر {$user->email} در صرافی {$userExchange->exchange} (دمو) یافت نشد");
                 return;
             }
 
-            $this->info("    Found {$filledOrdersWithSl->count()} filled demo orders with stop loss to sync.");
-
             // Get current positions from exchange
-            $positionsResult = $exchangeService->getPositions($symbol);
-            $positions = $positionsResult['list'] ?? [];
+            $positions = $exchangeService->getPositions();
 
-            // Get current conditional orders (stop loss orders)
-            $conditionalOrdersResult = $exchangeService->getConditionalOrders($symbol);
-            $conditionalOrders = $conditionalOrdersResult['list'] ?? [];
-
-            foreach ($filledOrdersWithSl as $order) {
-                try {
-                    $this->syncStopLossForOrder($exchangeService, $order, $positions, $conditionalOrders, $symbol);
-                } catch (\Throwable $e) {
-                    $this->warn("    Failed to sync demo stop loss for order {$order->order_id}: " . $e->getMessage());
+            foreach ($filledOrders as $order) {
+                // Find corresponding open position for this order
+                $position = $this->findPositionForOrder($positions, $order);
+                
+                if (!$position) {
+                    continue; // No open position for this order
                 }
+
+                // Check and sync Stop Loss
+                $this->syncStopLoss($exchangeService, $order, $position);
+
+                // Check and sync Take Profit
+                $this->syncTakeProfit($exchangeService, $order, $position);
             }
 
-        } catch (\Throwable $e) {
-            $this->error("  Failed to sync demo stop loss for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            Log::error("Demo stop loss sync failed for user exchange", [
-                'user_exchange_id' => $userExchange->id,
-                'user_id' => $userId,
-                'exchange' => $userExchange->exchange_name,
-                'error' => $e->getMessage()
-            ]);
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
         }
     }
 
-    private function syncStopLossForOrder(ExchangeApiServiceInterface $exchangeService, $order, array $positions, array $conditionalOrders, string $symbol): void
+    /**
+     * Find position that corresponds to the given order
+     */
+    private function findPositionForOrder($positions, Order $order)
     {
-        // Find the position for this order's symbol
-        $position = null;
-        foreach ($positions as $pos) {
-            if ($pos['symbol'] === $symbol) {
-                $position = $pos;
-                break;
+        foreach ($positions as $position) {
+            // Check if symbol matches
+            if ($position['symbol'] !== $order->symbol) {
+                continue;
+            }
+
+            // Check if position has size (is open)
+            if (($position['size'] ?? 0) == 0) {
+                continue;
+            }
+
+            // Check if side matches
+            $positionSide = strtolower($position['side'] ?? '');
+            $orderSide = strtolower($order->side);
+            
+            if ($positionSide === $orderSide) {
+                return $position;
             }
         }
 
-        if (!$position) {
-            $this->info("    No position found for demo order {$order->order_id} on symbol {$symbol}.");
-            return;
+        return null;
+    }
+
+    /**
+     * Check and sync Stop Loss
+     */
+    private function syncStopLoss($exchangeService, Order $order, $position)
+    {
+        // Check if SL is defined in database
+        if (!$order->sl) {
+            return; // No SL defined in database
         }
 
-        $positionSize = (float)($position['size'] ?? 0);
-        if ($positionSize == 0) {
-            $this->info("    Position size is 0 for demo order {$order->order_id}. No stop loss needed.");
-            return;
-        }
-
-        $positionSide = $position['side'] ?? '';
-        $positionIdx = (int)($position['positionIdx'] ?? 0);
-
-        // Check if there's already a stop loss order for this position
-        $hasStopLoss = false;
-        foreach ($conditionalOrders as $condOrder) {
-            if ($condOrder['symbol'] === $symbol && 
-                isset($condOrder['triggerPrice']) && 
-                $condOrder['triggerPrice'] > 0) {
-                $hasStopLoss = true;
-                break;
-            }
-        }
-
-        if ($hasStopLoss) {
-            $this->info("    Demo stop loss already exists for order {$order->order_id}.");
-            return;
-        }
-
-        // Create stop loss order
-        $targetSl = (float)$order->sl;
-        
         try {
-            $orderParams = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'side' => $positionSide === 'Buy' ? 'Sell' : 'Buy', // Opposite side
-                'orderType' => 'Market',
-                'qty' => (string)abs($positionSize),
-                'triggerPrice' => (string)$targetSl,
-                'triggerBy' => 'LastPrice',
-                'triggerDirection' => $positionSide === 'Buy' ? 2 : 1, // 2: falls, 1: rises
-                'reduceOnly' => true,
-                'closeOnTrigger' => true,
-                'positionIdx' => $positionIdx,
-                'timeInForce' => 'GTC',
-                'orderLinkId' => 'demo_sl_' . time() . '_' . rand(1000, 9999),
-            ];
-
-            $response = $exchangeService->createOrder($orderParams);
+            // Get current stop loss orders from exchange
+            $stopLossOrders = $exchangeService->getStopLossOrders($order->symbol, $order->side);
             
-            if (isset($response['retCode']) && $response['retCode'] == 0) {
-                $this->info("    Created demo stop loss order for {$order->order_id} at price {$targetSl}");
-            } else {
-                $this->warn("    Failed to create demo stop loss for order {$order->order_id}: " . json_encode($response));
+            $currentSL = null;
+            if (!empty($stopLossOrders)) {
+                $currentSL = $stopLossOrders[0]['stopPrice'] ?? null;
             }
+
+            // Check if SL exists and matches database
+            if (!$currentSL || abs($currentSL - $order->sl) > 0.0001) {
+                // SL doesn't exist or has changed, reset it
+                
+                // First, cancel any existing SL orders
+                if (!empty($stopLossOrders)) {
+                    foreach ($stopLossOrders as $slOrder) {
+                        $exchangeService->cancelOrder($slOrder['orderId'], $order->symbol);
+                    }
+                }
+
+                // Create new SL order
+                $exchangeService->createStopLossOrder(
+                    $order->symbol,
+                    $order->side,
+                    $position['size'],
+                    $order->sl
+                );
+
+                $this->info("Stop Loss (دمو) برای سفارش {$order->order_id} در قیمت {$order->sl} تنظیم شد");
+            }
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی Stop Loss (دمو) برای سفارش {$order->order_id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check and sync Take Profit
+     */
+    private function syncTakeProfit($exchangeService, Order $order, $position)
+    {
+        // Check if TP is defined in database
+        if (!$order->tp) {
+            return; // No TP defined in database
+        }
+
+        try {
+            // Get current take profit orders from exchange
+            $takeProfitOrders = $exchangeService->getTakeProfitOrders($order->symbol, $order->side);
             
-        } catch (\Throwable $e) {
-            $this->warn("    Exception creating demo stop loss for order {$order->order_id}: " . $e->getMessage());
+            $currentTP = null;
+            if (!empty($takeProfitOrders)) {
+                $currentTP = $takeProfitOrders[0]['stopPrice'] ?? null;
+            }
+
+            // Check if TP exists and matches database
+            if ($currentTP && abs($currentTP - $order->tp) > 0.0001) {
+                // TP exists but is different, delete it
+                foreach ($takeProfitOrders as $tpOrder) {
+                    $exchangeService->cancelOrder($tpOrder['orderId'], $order->symbol);
+                }
+                $currentTP = null; // Mark as deleted
+            }
+
+            // If no TP exists or we just deleted it, create new one
+            if (!$currentTP) {
+                // Create new TP order as reduce order to close the main position
+                $exchangeService->createTakeProfitOrder(
+                    $order->symbol,
+                    $order->side,
+                    $position['size'],
+                    $order->tp,
+                    'reduce' // Reduce order type to close position
+                );
+
+                $this->info("Take Profit (دمو) برای سفارش {$order->order_id} در قیمت {$order->tp} تنظیم شد");
+            }
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی Take Profit (دمو) برای سفارش {$order->order_id}: " . $e->getMessage());
         }
     }
 }

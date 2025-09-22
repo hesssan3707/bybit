@@ -2,201 +2,191 @@
 
 namespace App\Console\Commands;
 
-use App\Models\SpotOrder;
-use App\Models\User;
-use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\UserExchange;
+use App\Models\SpotOrder;
+use App\Services\Exchanges\ExchangeFactory;
+use Exception;
 
 class DemoSpotOrderLifecycleManager extends Command
 {
-    protected $signature = 'demo:spot:lifecycle {--user= : Specific user ID to manage demo spot orders for}';
-    protected $description = 'Manage demo spot order lifecycle for all users (not affected by strict mode)';
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'demo:spot:lifecycle {--user=}';
 
-    public function handle(): int
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'مدیریت چرخه حیات سفارشات نقدی دمو برای تمام کاربران تایید شده';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
     {
-        $this->info('Starting demo spot order lifecycle management...');
+        $this->info('شروع مدیریت چرخه حیات سفارشات نقدی دمو...');
 
-        try {
-            if ($this->option('user')) {
-                $this->syncForUser($this->option('user'));
-            } else {
-                $this->syncForAllUsers();
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Demo spot lifecycle management failed: " . $e->getMessage());
-            Log::error('Demo spot lifecycle management failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished demo spot lifecycle management.');
-        return self::SUCCESS;
+        $this->info('مدیریت چرخه حیات سفارشات نقدی دمو با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function syncForAllUsers(): void
+    /**
+     * Sync lifecycle for all verified users
+     */
+    private function syncForAllUsers()
     {
-        // Process ALL users with active exchanges - demo commands use demo credentials
-        $users = User::whereHas('activeExchanges')->get();
+        $users = User::whereNotNull('email_verified_at')->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with demo active and active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر تایید شده...");
 
-        $this->info("Found {$users->count()} users with demo accounts enabled and active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->syncForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to sync demo spot lifecycle for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to sync demo spot lifecycle for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function syncForUser(int $userId): void
+    /**
+     * Sync lifecycle for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Syncing demo spot lifecycle for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Check if user exists
-        if (!$user) {
-            $this->info("Skipping user {$userId}: user not found");
-            return;
-        }
+        // Get all user exchanges with demo API keys
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('spot_access', true)
+            ->whereNotNull('demo_api_key')
+            ->whereNotNull('demo_api_secret')
+            ->get();
 
-        // Get all active exchanges for this user
-        $activeExchanges = $user->activeExchanges;
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->syncForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to sync demo spot lifecycle for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Demo spot lifecycle sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
         }
     }
 
-    private function syncForUserExchange(int $userId, $userExchange): void
+    /**
+     * Sync lifecycle for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
     {
-        $this->info("  Syncing demo spot lifecycle for user {$userId} on {$userExchange->exchange_name}...");
-        
         try {
-            // Force demo mode for exchange service
-            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'demo');
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create demo exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
+            $this->info("پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}");
 
-        try {
-            // Get pending demo spot orders from database
-            $pendingOrders = SpotOrder::where('user_exchange_id', $userExchange->id)
-                ->where('status', 'pending')
-                ->where('is_demo', true) // Only demo orders
-                ->get();
+            // Create exchange service (demo mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->demo_api_key,
+                $userExchange->demo_api_secret,
+                $userExchange->demo_api_passphrase,
+                true // Demo mode
+            );
 
-            if ($pendingOrders->isEmpty()) {
-                $this->info("    No pending demo spot orders found for user {$userId}.");
+            // Test connection by trying to get account info
+            try {
+                $exchangeService->getAccountInfo();
+            } catch (Exception $e) {
+                $this->warn("صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
                 return;
             }
 
-            $this->info("    Found {$pendingOrders->count()} pending demo spot orders to sync.");
+            // Sync order statuses
+            $this->syncOrderStatuses($exchangeService, $userExchange);
 
-            foreach ($pendingOrders as $order) {
-                try {
-                    $this->syncSpotOrder($exchangeService, $order);
-                } catch (\Throwable $e) {
-                    $this->warn("    Failed to sync demo spot order {$order->order_id}: " . $e->getMessage());
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Sync order statuses with exchange
+     */
+    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
+    {
+        // Get all pending spot orders for this user exchange (demo mode)
+        $orders = SpotOrder::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->whereIn('status', ['pending', 'partially_filled'])
+            ->get();
+
+        foreach ($orders as $order) {
+            try {
+                // Get order status from exchange
+                $exchangeOrder = $exchangeService->getSpotOrder($order->order_id, $order->symbol);
+
+                // Update order status based on exchange response
+                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
+                
+                if ($order->status !== $newStatus) {
+                    $order->status = $newStatus;
+                    
+                    // Update filled quantity if available
+                    if (isset($exchangeOrder['filled'])) {
+                        $order->filled_quantity = $exchangeOrder['filled'];
+                    }
+                    
+                    // Update average price if available
+                    if (isset($exchangeOrder['average'])) {
+                        $order->average_price = $exchangeOrder['average'];
+                    }
+                    
+                    // Update fee if available
+                    if (isset($exchangeOrder['fee'])) {
+                        $order->fee = $exchangeOrder['fee']['cost'] ?? 0;
+                        $order->fee_currency = $exchangeOrder['fee']['currency'] ?? null;
+                    }
+                    
+                    $order->save();
+                    
+                    $this->info("وضعیت سفارش نقدی دمو {$order->order_id} به {$newStatus} تغییر یافت");
+                }
+
+            } catch (Exception $e) {
+                // Order might be deleted/expired on exchange
+                if (strpos($e->getMessage(), 'not found') !== false || 
+                    strpos($e->getMessage(), 'does not exist') !== false) {
+                    $order->status = 'deleted';
+                    $order->save();
+                    $this->info("سفارش نقدی دمو {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
                 }
             }
-
-        } catch (\Throwable $e) {
-            $this->error("  Failed to sync demo spot lifecycle for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            Log::error("Demo spot lifecycle sync failed for user exchange", [
-                'user_exchange_id' => $userExchange->id,
-                'user_id' => $userId,
-                'exchange' => $userExchange->exchange_name,
-                'error' => $e->getMessage()
-            ]);
         }
     }
 
-    private function syncSpotOrder(ExchangeApiServiceInterface $exchangeService, SpotOrder $order): void
+    /**
+     * Map exchange status to our internal status
+     */
+    private function mapExchangeStatus($exchangeStatus)
     {
-        try {
-            // Check if order still exists on exchange
-            $orderResult = $exchangeService->getSpotOrderHistory($order->symbol, $order->order_id);
-            $orderHistory = $orderResult['list'] ?? [];
-            
-            if (empty($orderHistory)) {
-                $this->info("    Demo spot order {$order->order_id} not found in exchange history.");
-                return;
-            }
+        $statusMap = [
+            'NEW' => 'pending',
+            'PENDING' => 'pending',
+            'PARTIALLY_FILLED' => 'partially_filled',
+            'FILLED' => 'filled',
+            'CANCELED' => 'cancelled',
+            'CANCELLED' => 'cancelled',
+            'REJECTED' => 'rejected',
+            'EXPIRED' => 'expired',
+            'CLOSED' => 'closed'
+        ];
 
-            $exchangeOrder = $orderHistory[0];
-            $orderStatus = $exchangeOrder['orderStatus'] ?? '';
-            
-            switch ($orderStatus) {
-                case 'Filled':
-                    if ($order->status !== 'filled') {
-                        $this->info("    Demo spot order {$order->order_id} was filled. Updating status...");
-                        $order->status = 'filled';
-                        $order->filled_at = now();
-                        $order->avg_price = (float)($exchangeOrder['avgPrice'] ?? $order->price);
-                        $order->executed_qty = (float)($exchangeOrder['executedQty'] ?? $order->quantity);
-                        $order->save();
-                    }
-                    break;
-                    
-                case 'Cancelled':
-                case 'Rejected':
-                    if ($order->status !== 'cancelled') {
-                        $this->info("    Demo spot order {$order->order_id} was {$orderStatus}. Updating status...");
-                        $order->status = 'cancelled';
-                        $order->cancelled_at = now();
-                        $order->save();
-                    }
-                    break;
-                    
-                case 'PartiallyFilled':
-                    if ($order->status !== 'partially_filled') {
-                        $this->info("    Demo spot order {$order->order_id} is partially filled. Updating status...");
-                        $order->status = 'partially_filled';
-                        $order->executed_qty = (float)($exchangeOrder['executedQty'] ?? 0);
-                        $order->save();
-                    }
-                    break;
-                    
-                case 'New':
-                case 'PartiallyFilledCanceled':
-                    // Order is still active, no action needed
-                    break;
-                    
-                default:
-                    $this->warn("    Unknown demo spot order status '{$orderStatus}' for order {$order->order_id}");
-                    break;
-            }
-            
-        } catch (\Throwable $e) {
-            $this->warn("    Exception syncing demo spot order {$order->order_id}: " . $e->getMessage());
-        }
+        return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
     }
 }

@@ -2,417 +2,250 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Console\Command;
+use App\Models\User;
+use App\Models\UserExchange;
 use App\Models\Order;
 use App\Models\Trade;
-use App\Models\User;
 use App\Services\Exchanges\ExchangeFactory;
-use App\Services\Exchanges\ExchangeApiServiceInterface;
-use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
+use Exception;
 
 class FuturesLifecycleManager extends Command
 {
-    protected $signature = 'futures:lifecycle {--user= : Specific user ID to sync for}';
-    protected $description = 'Sync futures order lifecycle for real accounts only (users with strict mode enabled)';
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'futures:lifecycle {--user=}';
 
-    public function handle(): int
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'مدیریت چرخه حیات سفارشات آتی برای تمام کاربران تایید شده';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
     {
-        $this->info('Starting futures lifecycle management...');
+        $this->info('شروع مدیریت چرخه حیات سفارشات آتی...');
 
-        try {
-            if ($this->option('user')) {
-                $this->syncForUser($this->option('user'));
-            } else {
-                $this->syncForAllUsers();
+        $userOption = $this->option('user');
+
+        if ($userOption) {
+            $user = User::find($userOption);
+            if (!$user) {
+                $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+                return 1;
             }
-        } catch (\Throwable $e) {
-            $this->error("Lifecycle management failed: " . $e->getMessage());
-            Log::error('Futures lifecycle management failed', ['error' => $e->getMessage()]);
-            return self::FAILURE;
+            $this->syncForUser($user);
+        } else {
+            $this->syncForAllUsers();
         }
 
-        $this->info('Successfully finished futures lifecycle management.');
-        return self::SUCCESS;
+        $this->info('مدیریت چرخه حیات سفارشات آتی با موفقیت تکمیل شد.');
+        return 0;
     }
 
-    private function syncForAllUsers(): void
+    /**
+     * Sync lifecycle for all verified users
+     */
+    private function syncForAllUsers()
     {
-        // Only process users with future_strict_mode enabled and active exchanges
-        $users = User::where('future_strict_mode', true)
-                    ->whereHas('activeExchanges')
-                    ->get();
+        $users = User::whereNotNull('email_verified_at')->get();
         
-        if ($users->isEmpty()) {
-            $this->info('No users with future strict mode enabled and active exchanges found.');
-            return;
-        }
+        $this->info("پردازش {$users->count()} کاربر تایید شده...");
 
-        $this->info("Found {$users->count()} users with future strict mode enabled and active exchanges.");
-        
         foreach ($users as $user) {
-            try {
-                $this->syncForUser($user->id);
-            } catch (\Exception $e) {
-                $this->warn("Failed to sync lifecycle for user {$user->id}: " . $e->getMessage());
-                Log::warning("Failed to sync lifecycle for user {$user->id}", ['error' => $e->getMessage()]);
-            }
+            $this->syncForUser($user);
         }
     }
 
-    private function syncForUser(int $userId): void
+    /**
+     * Sync lifecycle for a specific user
+     */
+    private function syncForUser(User $user)
     {
-        $this->info("Syncing lifecycle for user {$userId}...");
-        
-        $user = User::find($userId);
-        if (!$user) {
-            $this->warn("User {$userId} not found.");
-            return;
-        }
+        $this->info("پردازش کاربر: {$user->email}");
 
-        // Check if user has future strict mode enabled
-        if (!$user->future_strict_mode) {
-            $this->info("User {$userId} does not have future strict mode enabled. Skipping...");
-            return;
-        }
-
-        // Check if user has a selected market in strict mode
-        if (empty($user->selected_market)) {
-            $this->info("User {$userId} is in strict mode but has no selected market. Skipping...");
-            return;
-        }
-
-        // Get all active exchanges for this user
-        $activeExchanges = $user->activeExchanges;
-        if ($activeExchanges->isEmpty()) {
-            $this->warn("No active exchanges for user {$userId}.");
-            return;
-        }
-
-        foreach ($activeExchanges as $userExchange) {
-            try {
-                $this->syncForUserExchange($userId, $userExchange);
-            } catch (\Exception $e) {
-                $this->error("Failed to sync lifecycle for user {$userId} on exchange {$userExchange->exchange_name}: " . $e->getMessage());
-                Log::error("Lifecycle sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function syncForUserExchange(int $userId, $userExchange): void
-    {
-        $this->info("  Syncing lifecycle for user {$userId} on {$userExchange->exchange_name}...");
-        
-        try {
-            // Force real mode (not demo) for exchange service
-            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, 'real');
-        } catch (\Exception $e) {
-            $this->warn("  Cannot create exchange service for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
-            return;
-        }
-
-        $this->syncOrderStatuses($userId, $userExchange, $exchangeService);
-        $this->syncPnlRecords($userId, $userExchange, $exchangeService);
-    }
-
-    private function syncOrderStatuses(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
-    {
-        // Get user's selected market, default to ETHUSDT if not set
-        $user = User::find($userId);
-        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
-        
-        $ordersToCheck = Order::where('user_exchange_id', $userExchange->id)
-            ->whereIn('status', ['pending', 'filled'])
-            ->where('symbol', $symbol)
+        // Get all user exchanges (both demo and real)
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
             ->get();
 
-        $this->info("    Found " . $ordersToCheck->count() . " orders to check for user {$userId} on {$userExchange->exchange_name}");
+        foreach ($userExchanges as $userExchange) {
+            $this->syncForUserExchange($user, $userExchange);
+        }
+    }
 
-        foreach ($ordersToCheck as $dbOrder) {
+    /**
+     * Sync lifecycle for a specific user exchange
+     */
+    private function syncForUserExchange(User $user, UserExchange $userExchange)
+    {
+        try {
+            $this->info("پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}");
+
+            // Create exchange service (real mode)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange,
+                $userExchange->api_key,
+                $userExchange->api_secret,
+                $userExchange->api_passphrase,
+                false // Real mode
+            );
+
+            // Test connection by trying to get account info
             try {
-                $symbol = $dbOrder->symbol;
+                $exchangeService->getAccountInfo();
+            } catch (Exception $e) {
+                $this->warn("صرافی {$userExchange->exchange} برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
+                return;
+            }
 
-                // Logic for 'pending' orders: Check if they have been filled or externally canceled
-                if ($dbOrder->status === 'pending') {
-                    // Check order history for final states (Filled, Cancelled)
-                    $orderResult = $exchangeService->getOrderHistory($symbol, 50);
-                    $orders = $orderResult['list'] ?? [];
-                    
-                    // Find our specific order
-                    $order = collect($orders)->firstWhere('orderId', $dbOrder->order_id);
+            // Sync order statuses
+            $this->syncOrderStatuses($exchangeService, $userExchange);
 
-                    if (!$order) {
-                        // Order is still active, skip
-                        continue;
-                    }
+            // Sync PnL records for hedge mode
+            $this->syncPnlRecords($exchangeService, $userExchange);
 
-                    $exchangeStatus = $order['orderStatus'];
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange} برای کاربر {$user->email}: " . $e->getMessage());
+        }
+    }
 
-                    if ($exchangeStatus === 'Filled') {
-                        // Create take profit order
-                        $closeSide = (strtolower($dbOrder->side) === 'buy') ? 'Sell' : 'Buy';
-                        $tpPrice = (float)$dbOrder->tp;
-                        
-                        try {
-                            $tpOrderParams = [
-                                'category' => 'linear',
-                                'symbol' => $symbol,
-                                'side' => $closeSide,
-                                'orderType' => 'Limit',
-                                'qty' => (string)$dbOrder->amount,
-                                'price' => (string)$tpPrice,
-                                'reduceOnly' => true,
-                                'timeInForce' => 'GTC',
-                            ];
+    /**
+     * Sync order statuses with exchange
+     */
+    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
+    {
+        // Get all pending orders for this user exchange (real mode)
+        $orders = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', false)
+            ->whereIn('status', ['pending', 'partially_filled'])
+            ->get();
 
-                            $exchangeService->createOrder($tpOrderParams);
-                            $dbOrder->status = 'filled';
-                            $dbOrder->save();
-                            $this->info("    Order {$dbOrder->order_id} is now 'filled' with TP order created");
-                        } catch (\Exception $e) {
-                            $this->warn("    Failed to create TP order for {$dbOrder->order_id}: " . $e->getMessage());
-                            // Still mark as filled even if TP creation fails
-                            $dbOrder->status = 'filled';
-                            $dbOrder->save();
-                        }
-                    } elseif (in_array($exchangeStatus, ['Cancelled', 'Deactivated', 'Rejected'])) {
-                        $dbOrder->status = 'canceled';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
-                        $this->info("    Marked order {$dbOrder->order_id} as canceled");
-                    }
-                }
+        foreach ($orders as $order) {
+            try {
+                // Get order status from exchange
+                $exchangeOrder = $exchangeService->getOrder($order->order_id, $order->symbol);
+
+                // Update order status based on exchange response
+                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
                 
-                // For already filled orders, check if they've been closed via TP/SL
-                if ($dbOrder->status === 'filled') {
-                    $this->checkForTpSlClosure($dbOrder, $userExchange, $exchangeService);
-                }
-            } catch (\Throwable $e) {
-                $this->error("    Lifecycle check failed for order {$dbOrder->id}: " . $e->getMessage());
-            }
-        }
-
-        // Mark 'filled' orders as 'closed' if position is no longer open
-        $this->checkClosedPositions($userId, $userExchange, $exchangeService);
-    }
-
-    private function checkClosedPositions(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
-    {
-        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('status', 'filled')
-            ->get();
-            
-        if ($filledOrders->isEmpty()) {
-            return;
-        }
-
-        // Get user's selected market, default to ETHUSDT if not set
-        $user = User::find($userId);
-        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
-
-        try {
-            $positionResult = $exchangeService->getPositions($symbol);
-            $positions = $positionResult['list'] ?? [];
-            $position = collect($positions)->firstWhere('symbol', $symbol);
-            
-            if (!$position || (float)($position['size'] ?? 0) == 0) {
-                // Position is closed, retrieve and store closed position data
-                foreach ($filledOrders as $order) {
-                    $this->storeClosedPositionData($order, $userExchange, $exchangeService);
-                    $order->status = 'closed';
-                    $order->closed_at = now();
+                if ($order->status !== $newStatus) {
+                    $order->status = $newStatus;
+                    
+                    // Update filled quantity if available
+                    if (isset($exchangeOrder['filled'])) {
+                        $order->filled_quantity = $exchangeOrder['filled'];
+                    }
+                    
+                    // Update average price if available
+                    if (isset($exchangeOrder['average'])) {
+                        $order->average_price = $exchangeOrder['average'];
+                    }
+                    
                     $order->save();
-                    $this->info("    Marked order {$order->order_id} as closed (no open position)");
+                    
+                    $this->info("وضعیت سفارش {$order->order_id} به {$newStatus} تغییر یافت");
+                }
+
+            } catch (Exception $e) {
+                // Order might be deleted/expired on exchange
+                if (strpos($e->getMessage(), 'not found') !== false || 
+                    strpos($e->getMessage(), 'does not exist') !== false) {
+                    $order->status = 'deleted';
+                    $order->save();
+                    $this->info("سفارش {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
                 }
             }
-        } catch (\Exception $e) {
-            $this->warn("    Failed to check positions for user {$userId} on {$userExchange->exchange_name}: " . $e->getMessage());
         }
     }
 
     /**
-     * Retrieve and store closed position data from exchange for a specific order
+     * Sync PnL records for hedge mode
      */
-    private function storeClosedPositionData(Order $order, $userExchange, ExchangeApiServiceInterface $exchangeService): void
+    private function syncPnlRecords($exchangeService, UserExchange $userExchange)
     {
-        try {
-            // Get recent closed PnL records to find the matching closed position
-            $pnlResult = $exchangeService->getClosedPnl($order->symbol, 10);
-            $pnlEvents = $pnlResult['list'] ?? [];
-            
-            // Find matching closed PnL event for this order (by order ID or time proximity)
-            foreach ($pnlEvents as $pnlEvent) {
-                // Check if we already have this trade recorded
-                $existingTrade = Trade::where('user_exchange_id', $userExchange->id)
-                    ->where('order_id', $pnlEvent['orderId'])
-                    ->first();
-                    
-                if (!$existingTrade && !empty($pnlEvent['orderId'])) {
-                    // Create new trade record for the closed position
-                    Trade::create([
-                        'user_exchange_id' => $userExchange->id,
-                        'is_demo' => $order->is_demo ?? $userExchange->is_demo_active,
-                        'symbol' => $pnlEvent['symbol'],
-                        'side' => $order->side,
-                        'order_type' => $pnlEvent['orderType'],
-                        'leverage' => $pnlEvent['leverage'],
-                        'qty' => $pnlEvent['qty'],
-                        'avg_entry_price' => $pnlEvent['avgEntryPrice'],
-                        'avg_exit_price' => $pnlEvent['avgExitPrice'],
-                        'pnl' => $pnlEvent['closedPnl'],
-                        'order_id' => $pnlEvent['orderId'],
-                        'closed_at' => Carbon::createFromTimestampMs($pnlEvent['updatedTime']),
-                    ]);
-                    
-                    $this->info("    Stored closed position data for order {$order->order_id}, P&L: {$pnlEvent['closedPnl']}");
-                    break; // Found and stored the relevant closed position
-                }
-            }
-        } catch (\Exception $e) {
-            $this->warn("    Failed to retrieve closed position data for order {$order->order_id}: " . $e->getMessage());
-            Log::warning("Failed to retrieve closed position data", [
-                'order_id' => $order->order_id,
-                'user_exchange_id' => $userExchange->id,
-                'error' => $e->getMessage()
-            ]);
+        // Only sync if position mode is hedge
+        if ($userExchange->position_mode !== 'hedge') {
+            return;
         }
-    }
 
-    /**
-     * Check if a filled order has been closed via TP/SL
-     */
-    private function checkForTpSlClosure(Order $order, $userExchange, ExchangeApiServiceInterface $exchangeService): void
-    {
         try {
-            // Get position info to check if it's still open
-            $positionResult = $exchangeService->getPositions($order->symbol);
-            $positions = $positionResult['list'] ?? [];
-            
-            $hasOpenPosition = false;
+            // Get positions from exchange
+            $positions = $exchangeService->getPositions();
+
             foreach ($positions as $position) {
-                if ((float)($position['size'] ?? 0) > 0) {
-                    $hasOpenPosition = true;
-                    break;
+                // Skip positions with zero size
+                if ($position['size'] == 0) {
+                    continue;
+                }
+
+                // Find or create trade record
+                $trade = Trade::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', false)
+                    ->where('symbol', $position['symbol'])
+                    ->where('side', $position['side'])
+                    ->first();
+
+                if (!$trade) {
+                    // Create new trade record
+                    $trade = new Trade([
+                        'user_exchange_id' => $userExchange->id,
+                        'is_demo' => false,
+                        'symbol' => $position['symbol'],
+                        'side' => $position['side'],
+                        'quantity' => $position['size'],
+                        'entry_price' => $position['entryPrice'] ?? 0,
+                        'pnl' => $position['unrealizedPnl'] ?? 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                    $trade->save();
+                } else {
+                    // Update existing trade
+                    $trade->quantity = $position['size'];
+                    $trade->entry_price = $position['entryPrice'] ?? $trade->entry_price;
+                    $trade->pnl = $position['unrealizedPnl'] ?? 0;
+                    $trade->updated_at = now();
+                    $trade->save();
                 }
             }
-            
-            // If no open position, the filled order has been closed
-            if (!$hasOpenPosition) {
-                // Store the closed position data before updating status
-                $this->storeClosedPositionData($order, $userExchange, $exchangeService);
-                
-                $order->status = 'closed';
-                $order->closed_at = now();
-                $order->save();
-                
-                $this->info("    Order {$order->order_id} closed via TP/SL, updated status to closed");
-            }
-        } catch (\Exception $e) {
-            $this->warn("    Failed to check TP/SL closure for order {$order->order_id}: " . $e->getMessage());
+
+            // Mark closed positions
+            $symbols = collect($positions)->pluck('symbol')->unique();
+            Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', false)
+                ->whereNotIn('symbol', $symbols)
+                ->update(['pnl' => 0, 'updated_at' => now()]);
+
+        } catch (Exception $e) {
+            $this->warn("خطا در همگام‌سازی سوابق PnL: " . $e->getMessage());
         }
     }
 
-    private function syncPnlRecords(int $userId, $userExchange, ExchangeApiServiceInterface $exchangeService): void
+    /**
+     * Map exchange status to our internal status
+     */
+    private function mapExchangeStatus($exchangeStatus)
     {
-        $this->info("    Syncing P&L records for user {$userId} on {$userExchange->exchange_name}...");
-        
-        // Get user's selected market, default to ETHUSDT if not set
-        $user = User::find($userId);
-        $symbol = ($user && $user->selected_market) ? $user->selected_market : 'ETHUSDT';
+        $statusMap = [
+            'NEW' => 'pending',
+            'PENDING' => 'pending',
+            'PARTIALLY_FILLED' => 'partially_filled',
+            'FILLED' => 'filled',
+            'CANCELED' => 'cancelled',
+            'CANCELLED' => 'cancelled',
+            'REJECTED' => 'rejected',
+            'EXPIRED' => 'expired',
+            'CLOSED' => 'closed'
+        ];
 
-        try {
-            // Find the timestamp of the last saved trade for this user on this exchange
-            $lastTrade = Trade::where('user_exchange_id', $userExchange->id)
-                ->latest('closed_at')
-                ->first();
-                
-            // Add a 1-second buffer to avoid fetching the same last record
-            $startTime = $lastTrade ? 
-                Carbon::parse($lastTrade->closed_at)->addSecond()->timestamp * 1000 : 
-                null;
-
-            // Get closed PnL from exchange
-            $pnlResult = $exchangeService->getClosedPnl($symbol, 50, $startTime);
-            $pnlEvents = $pnlResult['list'] ?? [];
-
-            if (empty($pnlEvents)) {
-                $this->info('    No new P&L events found for user ' . $userId . ' on ' . $userExchange->exchange_name);
-                return;
-            }
-
-            // Filter out existing records
-            $existingPnlOrderIds = Trade::where('user_exchange_id', $userExchange->id)
-                ->pluck('order_id')
-                ->all();
-                
-            $newPnlEvents = collect($pnlEvents)
-                ->whereNotIn('orderId', $existingPnlOrderIds);
-
-            if ($newPnlEvents->isEmpty()) {
-                $this->info('    No new P&L events to save for user ' . $userId . ' on ' . $userExchange->exchange_name);
-                return;
-            }
-
-            foreach ($newPnlEvents->reverse() as $pnlEvent) { // Process oldest first
-                $originalOrder = Order::where('order_id', $pnlEvent['orderId'])
-                                      ->where('user_exchange_id', $userExchange->id)
-                                      ->first();
-
-                Trade::create([
-                    'user_exchange_id' => $userExchange->id,
-                    'is_demo' => $originalOrder ? ($originalOrder->is_demo ?? $userExchange->is_demo_active) : $userExchange->is_demo_active,
-                    'symbol' => $pnlEvent['symbol'],
-                    'side' => $originalOrder ? $originalOrder->side : strtolower($pnlEvent['side']),
-                    'order_type' => $pnlEvent['orderType'],
-                    'leverage' => $pnlEvent['leverage'],
-                    'qty' => $pnlEvent['qty'],
-                    'avg_entry_price' => $pnlEvent['avgEntryPrice'],
-                    'avg_exit_price' => $pnlEvent['avgExitPrice'],
-                    'pnl' => $pnlEvent['closedPnl'],
-                    'order_id' => $pnlEvent['orderId'],
-                    'closed_at' => Carbon::createFromTimestampMs($pnlEvent['updatedTime']),
-                ]);
-                $this->info("    Saved new P&L record for user {$userId} on {$userExchange->exchange_name}, order ID: {$pnlEvent['orderId']}");
-            }
-
-        } catch (\Exception $e) {
-            $errorMessage = $e->getMessage();
-            
-            // Provide more specific error handling for common issues
-            if (str_contains($errorMessage, 'Unknown error') && str_contains($errorMessage, 'closed-pnl')) {
-                $this->warn("    P&L sync temporarily unavailable for user {$userId} on {$userExchange->exchange_name}: API endpoint returned unknown error (possibly rate limited or maintenance)");
-                Log::warning("Closed P&L API returned unknown error", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'symbol' => $symbol,
-                    'error' => $errorMessage
-                ]);
-            } elseif (str_contains($errorMessage, 'rate limit')) {
-                $this->warn("    P&L sync rate limited for user {$userId} on {$userExchange->exchange_name}");
-            } elseif (str_contains($errorMessage, 'permission') || str_contains($errorMessage, 'Forbidden')) {
-                $this->warn("    P&L sync permission denied for user {$userId} on {$userExchange->exchange_name}: Check API key permissions");
-                Log::warning("P&L sync permission issue", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'error' => $errorMessage
-                ]);
-            } else {
-                $this->warn("    Failed to sync P&L for user {$userId} on {$userExchange->exchange_name}: " . $errorMessage);
-                Log::error("P&L sync failed", [
-                    'user_exchange_id' => $userExchange->id,
-                    'user_id' => $userId,
-                    'exchange' => $userExchange->exchange_name,
-                    'symbol' => $symbol,
-                    'error' => $errorMessage
-                ]);
-            }
-        }
+        return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
     }
 }
