@@ -138,91 +138,139 @@ Route::middleware('auth')->group(function () {
 
 });
 Route::get('/schedule', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}.separator{color:#007cba;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#e7f3ff;border-radius:5px;}</style></head><body>';
+    
     Artisan::call('futures:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
+    
     Artisan::call('futures:enforce');
-    print_r(Artisan::output());
-    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
+    
     Artisan::call('futures:sync-sltp');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    
     sleep(10);
+    
     Artisan::call('futures:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
+    
     Artisan::call('futures:enforce');
-    print_r(Artisan::output());
-    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
+    
     Artisan::call('futures:sync-sltp');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    
     sleep(10);
+    
     Artisan::call('futures:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
+    
     Artisan::call('futures:enforce');
-    print_r(Artisan::output());
-    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
+    
     Artisan::call('futures:sync-sltp');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    
     sleep(10);
+    
     Artisan::call('futures:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ lifecycle done----------------------------------------- <br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
+    
     Artisan::call('futures:enforce');
-    print_r(Artisan::output());
-    echo '<br>-------------------------------------- enforce done -------------------------------------------------<br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
+    
     Artisan::call('futures:sync-sltp');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ sync sl tp done --------------------------------------------------<br> ';
-    return '************************************************************DONE*******************************************************';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    
+    echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">************************************************************DONE*******************************************************</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:4');
 
 Route::get('/demo-schedule', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}.separator{color:#ff6b35;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#fff3e0;border-radius:5px;}</style></head><body>';
+    
     Artisan::call('demo:futures:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------------------ demo lifecycle done----------------------------------------- <br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------------------ demo lifecycle done -----------------------------------------</div>';
+    
     Artisan::call('demo:futures:enforce');
-    print_r(Artisan::output());
-    echo '<br>-------------------------------------- demo enforce done -------------------------------------------------<br>';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">-------------------------------------- demo enforce done -------------------------------------------------</div>';
+    
     Artisan::call('demo:futures:sync-sltp');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ demo sync sl tp done --------------------------------------------------<br> ';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ demo sync sl tp done --------------------------------------------------</div>';
+    
     Artisan::call('demo:spot:lifecycle');
-    print_r(Artisan::output());
-    echo '<br>------------------------------------------ demo spot lifecycle done --------------------------------------------------<br> ';
-    return '************************************************************DEMO DONE*******************************************************';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ demo spot lifecycle done --------------------------------------------------</div>';
+    
+    echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">************************************************************DEMO DONE*******************************************************</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:4');
 
 Route::get('/get-prices', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #28a745;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
     Artisan::call('prices:save');
-    print_r(Artisan::output());
-    return 'DONE';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:4');
 
 Route::get('/validate-exchanges', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
     Artisan::call('exchanges:validate-active --force');
-    print_r(Artisan::output());
-    return 'DONE';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#007cba;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:2');
 
 Route::get('/demo-validate-exchanges', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
     Artisan::call('demo:exchanges:validate-active --force');
-    print_r(Artisan::output());
-    return 'DEMO VALIDATION DONE';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">DEMO VALIDATION DONE</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:2');
 
 Route::get('/spot-lifecycle', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #6f42c1;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
     Artisan::call('spot:lifecycle');
-    print_r(Artisan::output());
-    return 'DONE';
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#6f42c1;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:2');
 
 Route::get('/demo-spot-lifecycle', function() {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
     Artisan::call('demo:spot:lifecycle');
-    print_r(Artisan::output());
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">DEMO SPOT LIFECYCLE DONE</div>';
+    echo '</body></html>';
+    return '';
 })->middleware('throttle:2');
 
 // Non-protected utility routes if needed, but it's better to protect them.
