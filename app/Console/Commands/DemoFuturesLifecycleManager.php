@@ -96,7 +96,6 @@ class DemoFuturesLifecycleManager extends Command
                 $userExchange->exchange_name,
                 $userExchange->demo_api_key,
                 $userExchange->demo_api_secret,
-                $userExchange->demo_api_passphrase,
                 true // Demo mode
             );
 

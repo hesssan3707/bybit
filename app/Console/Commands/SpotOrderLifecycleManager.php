@@ -93,7 +93,6 @@ class SpotOrderLifecycleManager extends Command
                 $userExchange->exchange_name,
                 $userExchange->api_key,
                 $userExchange->api_secret,
-                $userExchange->api_passphrase,
                 false // Real mode
             );
 
