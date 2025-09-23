@@ -262,11 +262,14 @@ class BinanceApiService implements ExchangeApiServiceInterface
         return $this->getOpenOrders($symbol);
     }
 
-    public function getOrderHistory(string $symbol = null, int $limit = 50): array
+    public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array
     {
         $params = ['limit' => $limit];
         if ($symbol) {
             $params['symbol'] = $symbol;
+        }
+        if ($startTime) {
+            $params['startTime'] = $startTime;
         }
         $orders = $this->sendRequest('get', '/fapi/v1/allOrders', $params);
         return ['list' => $orders];

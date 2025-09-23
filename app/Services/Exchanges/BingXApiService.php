@@ -219,11 +219,14 @@ class BingXApiService implements ExchangeApiServiceInterface
         return ['list' => $orders['orders'] ?? []];
     }
 
-    public function getOrderHistory(string $symbol = null, int $limit = 50): array
+    public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array
     {
         $params = ['limit' => $limit];
         if ($symbol) {
             $params['symbol'] = $symbol;
+        }
+        if ($startTime) {
+            $params['startTime'] = $startTime;
         }
         $orders = $this->sendRequest('get', '/openApi/swap/v2/trade/allOrders', $params);
         return ['list' => $orders['orders'] ?? []];

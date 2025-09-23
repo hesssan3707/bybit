@@ -383,7 +383,7 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('GET', '/v5/order/realtime', $params);
     }
 
-    public function getOrderHistory(string $symbol = null, int $limit = 50): array
+    public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array
     {
         $params = [
             'category' => 'linear',
@@ -395,6 +395,9 @@ class BybitApiService implements ExchangeApiServiceInterface
             // Adding settleCoin for consistency with other methods
             // to ensure we get USDT-settled orders when no symbol is specified
             $params['settleCoin'] = 'USDT';
+        }
+        if ($startTime) {
+            $params['startTime'] = $startTime;
         }
         return $this->sendRequest('GET', '/v5/order/history', $params);
     }

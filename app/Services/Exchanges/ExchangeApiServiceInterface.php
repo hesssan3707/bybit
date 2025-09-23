@@ -83,7 +83,7 @@ interface ExchangeApiServiceInterface
     /**
      * Get order history
      */
-    public function getOrderHistory(string $symbol = null, int $limit = 50): array;
+    public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array;
 
     /**
      * Get spot order history

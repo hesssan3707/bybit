@@ -107,11 +107,8 @@ class DemoFuturesLifecycleManager extends Command
                 return;
             }
 
-            // Sync order statuses
-            $this->syncOrderStatuses($exchangeService, $userExchange);
-
-            // Sync PnL records for hedge mode
-            $this->syncPnlRecords($exchangeService, $userExchange);
+            // Sync lifecycle using new efficient approach
+            $this->syncLifecycleForExchange($exchangeService, $user, $userExchange);
 
         } catch (Exception $e) {
             $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
@@ -164,6 +161,235 @@ class DemoFuturesLifecycleManager extends Command
                     $this->info("سفارش دمو {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
                 }
             }
+        }
+    }
+
+    /**
+     * Sync lifecycle for a specific exchange using the new approach:
+     * Get orders from exchange and sync to database
+     */
+    private function syncLifecycleForExchange($exchangeService, User $user, UserExchange $userExchange)
+    {
+        // Get the oldest pending/filled order date for this user exchange (demo)
+        $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->whereIn('status', ['pending', 'filled', 'partially_filled'])
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        // Calculate start time: oldest order date minus 15 minutes, or 24 hours ago if no orders
+        $startTime = null;
+        if ($oldestOrder) {
+            $startTime = $oldestOrder->created_at->subMinutes(15)->timestamp * 1000; // Convert to milliseconds
+            try {
+            // Get orders from exchange with time filtering
+            $exchangeOrders = $exchangeService->getOrderHistory(null, 100, $startTime);
+            $orders = $exchangeOrders['list'] ?? [];
+
+            $this->info("دریافت " . count($orders) . " سفارش از صرافی {$userExchange->exchange_name} (دمو)");
+
+            foreach ($orders as $exchangeOrder) {
+                $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
+            }
+
+            // Sync PnL records for hedge mode
+            $this->syncPnlRecords($exchangeService, $userExchange);
+
+            } catch (Exception $e) {
+                $this->error("خطا در همگام‌سازی سفارشات از صرافی (دمو): " . $e->getMessage());
+            }
+        } else {
+            $this->info("سفارشی یافت نشد");
+        }
+    }
+
+    /**
+     * Sync individual exchange order to database
+     */
+    private function syncExchangeOrderToDatabase($exchangeOrder, UserExchange $userExchange)
+    {
+        // Extract order ID based on exchange format
+        $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
+        
+        if (!$orderId) {
+            return; // Skip if we can't get order ID
+        }
+
+        // Find order in our database (demo)
+        $order = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->where('order_id', $orderId)
+            ->first();
+
+        if ($order) {
+            // Order exists in database - update status
+            $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
+            
+            if ($order->status !== $newStatus) {
+                $order->status = $newStatus;
+                
+                // Update filled quantity if available
+                $filledQty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
+                if ($filledQty !== null) {
+                    $order->filled_quantity = $filledQty;
+                }
+                
+                // Update average price if available
+                $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
+                if ($avgPrice !== null) {
+                    $order->average_price = $avgPrice;
+                }
+
+                // If order is closed, set closed_at
+                if (in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
+                    $order->closed_at = now();
+                }
+                
+                $order->save();
+                $this->info("وضعیت سفارش دمو {$orderId} به {$newStatus} تغییر یافت");
+            }
+        } else {
+            // Order not found in database - this is a closed order, sync PnL
+            $this->syncClosedOrderPnl($exchangeOrder, $userExchange);
+        }
+    }
+
+    /**
+     * Handle closed orders not found in database - sync PnL (demo)
+     */
+    private function syncClosedOrderPnl($exchangeOrder, UserExchange $userExchange)
+    {
+        // Only process filled orders that represent closed positions
+        $status = $this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name);
+        if (strtoupper($status) !== 'FILLED') {
+            return;
+        }
+
+        try {
+            // Extract order details
+            $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
+            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name);
+            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
+            $qty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
+            $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
+
+            if (!$orderId || !$symbol || !$side || !$qty || !$avgPrice) {
+                return; // Skip if essential data is missing
+            }
+
+            // Create trade record for closed position (demo)
+            Trade::create([
+                'user_exchange_id' => $userExchange->id,
+                'is_demo' => true,
+                'symbol' => $symbol,
+                'side' => $side,
+                'order_type' => 'Market', // Default for closed positions
+                'leverage' => 1.0, // Default leverage
+                'qty' => $qty,
+                'avg_entry_price' => $avgPrice,
+                'avg_exit_price' => $avgPrice, // Same as entry for closed positions
+                'pnl' => 0, // Will be calculated separately
+                'order_id' => $orderId,
+                'closed_at' => now(),
+            ]);
+
+            $this->info("سفارش بسته شده دمو {$orderId} در جدول معاملات ثبت شد");
+
+        } catch (Exception $e) {
+            $this->warn("خطا در ثبت سفارش بسته شده دمو: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Extract order ID from exchange order based on exchange format
+     */
+    private function extractOrderId($exchangeOrder, string $exchangeName): ?string
+    {
+        switch ($exchangeName) {
+            case 'binance':
+                return $exchangeOrder['orderId'] ?? null;
+            case 'bybit':
+                return $exchangeOrder['orderId'] ?? null;
+            case 'bingx':
+                return $exchangeOrder['orderId'] ?? null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Extract order status from exchange order based on exchange format
+     */
+    private function extractOrderStatus($exchangeOrder, string $exchangeName): string
+    {
+        switch ($exchangeName) {
+            case 'binance':
+                return $exchangeOrder['status'] ?? 'UNKNOWN';
+            case 'bybit':
+                return $exchangeOrder['orderStatus'] ?? 'UNKNOWN';
+            case 'bingx':
+                return $exchangeOrder['status'] ?? 'UNKNOWN';
+            default:
+                return 'UNKNOWN';
+        }
+    }
+
+    /**
+     * Extract filled quantity from exchange order based on exchange format
+     */
+    private function extractFilledQuantity($exchangeOrder, string $exchangeName): ?float
+    {
+        switch ($exchangeName) {
+            case 'binance':
+                return isset($exchangeOrder['executedQty']) ? (float)$exchangeOrder['executedQty'] : null;
+            case 'bybit':
+                return isset($exchangeOrder['cumExecQty']) ? (float)$exchangeOrder['cumExecQty'] : null;
+            case 'bingx':
+                return isset($exchangeOrder['executedQty']) ? (float)$exchangeOrder['executedQty'] : null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Extract average price from exchange order based on exchange format
+     */
+    private function extractAveragePrice($exchangeOrder, string $exchangeName): ?float
+    {
+        switch ($exchangeName) {
+            case 'binance':
+                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+            case 'bybit':
+                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+            case 'bingx':
+                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Extract symbol from exchange order
+     */
+    private function extractSymbol($exchangeOrder, string $exchangeName): ?string
+    {
+        return $exchangeOrder['symbol'] ?? null;
+    }
+
+    /**
+     * Extract side from exchange order
+     */
+    private function extractSide($exchangeOrder, string $exchangeName): ?string
+    {
+        switch ($exchangeName) {
+            case 'binance':
+                return $exchangeOrder['side'] ?? null;
+            case 'bybit':
+                return $exchangeOrder['side'] ?? null;
+            case 'bingx':
+                return $exchangeOrder['side'] ?? null;
+            default:
+                return null;
         }
     }
 

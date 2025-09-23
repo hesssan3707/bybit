@@ -111,6 +111,11 @@ class FuturesSlTpSync extends Command
             // Get current positions from exchange
             $positions = $exchangeService->getPositions();
 
+            if($userExchange->exchange_name == 'bybit')
+			{
+				$positions = $positions['list'];
+			}
+
             foreach ($filledOrders as $order) {
                 // Find corresponding open position for this order
                 $position = $this->findPositionForOrder($positions, $order);
