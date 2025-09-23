@@ -130,7 +130,7 @@ class FuturesLifecycleManager extends Command
                 $exchangeOrder = $exchangeService->getOrder($order->order_id, $order->symbol);
 
                 // Update order status based on exchange response
-                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
+                $newStatus = $this->mapExchangeStatus($exchangeOrder['list'][0]['orderStatus']);
                 
                 if ($order->status !== $newStatus) {
                     $order->status = $newStatus;
