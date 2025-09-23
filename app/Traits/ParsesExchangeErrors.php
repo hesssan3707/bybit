@@ -280,7 +280,7 @@ trait ParsesExchangeErrors
         }
         if ((str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'mode')) || 
             (str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'side'))) {
-            return "خطا در تنظیمات حالت معاملاتی. لطفاً حالت معاملاتی صرافی خود را بررسی کنید.";
+            return "خطا در تنظیمات حالت معاملاتی. لطفاً حالت معاملاتی(hedge mode) صرافی خود را بررسی کنید.";
         }
         if (str_contains($lowerMessage, 'invalid symbol')) {
             return "جفت ارز انتخاب شده معتبر نیست. لطفاً جفت ارز صحیح را انتخاب کنید.";

@@ -500,6 +500,12 @@ class FuturesController extends Controller
             $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
 
+            // Get current exchange for hedge mode parameters
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            if (!$currentExchange) {
+                throw new \Exception('No active exchange found');
+            }
+
             // Create a market order to close the position instantly
             $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
 
@@ -526,7 +532,17 @@ class FuturesController extends Controller
                 'reduceOnly' => true,
             ];
 
+            // Add hedge mode parameters based on exchange (use original position side, not close side)
+            $originalPositionSide = ucfirst($order->side); // Convert 'buy' to 'Buy', 'sell' to 'Sell'
+            $this->addHedgeModeParameters($marketCloseParams, $currentExchange->exchange_name, $originalPositionSide);
+
             $exchangeService->createOrder($marketCloseParams);
+
+            // Update order status in database after successful exchange order
+            $order->update([
+                'status' => 'closed',
+                'closed_at' => now()
+            ]);
 
             return redirect()->route('futures.orders')->with('success', 'سفارش شما برای بسته شدن در قیمت لحظه‌ای بازار با موفقیت ثبت شد.');
 
@@ -610,22 +626,32 @@ class FuturesController extends Controller
 
     /**
      * Add hedge mode parameters to order based on exchange
+     * 
+     * @param array $orderParams Reference to order parameters array
+     * @param string $exchangeName Name of the exchange (bybit, binance, bingx)
+     * @param string $side Original position side ('Buy' or 'Sell') - NOT the closing order side
      */
     private function addHedgeModeParameters(array &$orderParams, string $exchangeName, string $side)
     {
         switch (strtolower($exchangeName)) {
             case 'bybit':
-                // Bybit requires positionIdx: 1 for Buy side, 2 for Sell side in hedge mode
+                // Bybit hedge mode: positionIdx indicates which position to affect
+                // positionIdx = 1 for LONG positions (original Buy orders)
+                // positionIdx = 2 for SHORT positions (original Sell orders)
                 $orderParams['positionIdx'] = ($side === 'Buy') ? 1 : 2;
                 break;
                 
             case 'binance':
-                // Binance requires positionSide: LONG for Buy, SHORT for Sell in hedge mode
+                // Binance hedge mode: positionSide indicates which position to affect
+                // positionSide = 'LONG' for LONG positions (original Buy orders)
+                // positionSide = 'SHORT' for SHORT positions (original Sell orders)
                 $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
                 break;
                 
             case 'bingx':
-                // BingX requires positionSide: LONG for Buy, SHORT for Sell in hedge mode
+                // BingX hedge mode: positionSide indicates which position to affect
+                // positionSide = 'LONG' for LONG positions (original Buy orders)
+                // positionSide = 'SHORT' for SHORT positions (original Sell orders)
                 $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
                 break;
         }

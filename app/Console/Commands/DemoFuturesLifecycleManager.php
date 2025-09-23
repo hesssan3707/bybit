@@ -180,6 +180,10 @@ class DemoFuturesLifecycleManager extends Command
         try {
             // Get positions from exchange
             $positions = $exchangeService->getPositions();
+            if($userExchange->exchange_name == 'bybit')
+			{
+				$positions = $positions['list'];
+			}
 
             foreach ($positions as $position) {
                 // Skip positions with zero size
@@ -201,17 +205,23 @@ class DemoFuturesLifecycleManager extends Command
                         'is_demo' => true,
                         'symbol' => $position['symbol'],
                         'side' => $position['side'],
-                        'quantity' => $position['size'],
-                        'entry_price' => $position['entryPrice'] ?? 0,
+                        'order_type' => 'Market', // Default order type for position tracking
+                        'leverage' => $position['leverage'] ?? 1.0,
+                        'qty' => $position['size'],
+                        'avg_entry_price' => $position['entryPrice'] ?? 0,
+                        'avg_exit_price' => 0, // Not applicable for open positions
                         'pnl' => $position['unrealizedPnl'] ?? 0,
+                        'order_id' => $position['orderId'] ?? 'demo_position_' . uniqid(), // Generate unique ID if not available
+                        'closed_at' => now(), // Use current time for tracking
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
                     $trade->save();
                 } else {
                     // Update existing trade
-                    $trade->quantity = $position['size'];
-                    $trade->entry_price = $position['entryPrice'] ?? $trade->entry_price;
+                    $trade->qty = $position['size'];
+                    $trade->avg_entry_price = $position['entryPrice'] ?? $trade->avg_entry_price;
+                    $trade->leverage = $position['leverage'] ?? $trade->leverage;
                     $trade->pnl = $position['unrealizedPnl'] ?? 0;
                     $trade->updated_at = now();
                     $trade->save();
