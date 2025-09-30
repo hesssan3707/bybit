@@ -64,6 +64,11 @@
             padding-right: 12px;
             padding-left: 12px;
         }
+        h1,h2
+        {
+            text-shadow: black 0 6px 4px;
+            color : white;
+        }
 
         /* Form elements */
         .form-group { text-align: right; }

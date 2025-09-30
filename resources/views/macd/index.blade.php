@@ -18,7 +18,6 @@
         .strategy-card h2 {
             margin-bottom: 30px;
             text-align: center;
-            color: var(--primary-color);
         }
         .table-responsive {
             overflow-x: auto;

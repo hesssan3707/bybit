@@ -64,6 +64,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            text-shadow:none;
         }
 
         .profile-email {
@@ -949,7 +950,7 @@
                     <p class="profile-email">{{ $user->email }}</p>
                 </div>
             </div>
-            
+
             <div class="profile-actions">
                 <a href="{{ route('password.change.form') }}" class="profile-action-btn">
                     <i class="fas fa-key"></i>
@@ -1044,8 +1045,8 @@
                     <div class="single-exchange-card">
                         <div class="exchange-main">
                             <div class="exchange-logo-container">
-                                <img src="{{ asset('public/logos/' . strtolower($currentExchange->exchange_display_name) . '-logo.png') }}" 
-                                     alt="{{ $currentExchange->exchange_display_name }}" 
+                                <img src="{{ asset('public/logos/' . strtolower($currentExchange->exchange_display_name) . '-logo.png') }}"
+                                     alt="{{ $currentExchange->exchange_display_name }}"
                                      class="exchange-logo">
                                 <div class="exchange-badge active">فعال</div>
                             </div>
@@ -1066,8 +1067,8 @@
                             <div class="exchange-card {{ $exchange->is_default ? 'active' : '' }}"
                                  onclick="switchExchange({{ $exchange->id }})">
                                 <div class="exchange-card-header">
-                                    <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}" 
-                                         alt="{{ $exchange->exchange_display_name }}" 
+                                    <img src="{{ asset('public/logos/' . strtolower($exchange->exchange_display_name) . '-logo.png') }}"
+                                         alt="{{ $exchange->exchange_display_name }}"
                                          class="exchange-logo">
                                     @if($exchange->is_default)
                                         <div class="exchange-badge active">فعال</div>
@@ -1146,13 +1147,13 @@
 
                         // Append CSRF token to form
                         form.appendChild(csrfInput);
-                        
+
                         // Append form to document body and submit
                         document.body.appendChild(form);
-                        
+
                         // Submit the form
                         form.submit();
-                        
+
                         // Clean up - remove form after submission
                         setTimeout(() => {
                             if (form.parentNode) {
@@ -1162,16 +1163,16 @@
 
                     } catch (error) {
                         console.error('Error switching exchange:', error);
-                        
+
                         // Handle different types of errors appropriately
                         let errorMessage = 'خطا در تغییر صرافی. لطفاً دوباره تلاش کنید.';
-                        
+
                         if (error.message.includes('CSRF')) {
                             errorMessage = 'خطای امنیتی. لطفاً صفحه را تازه‌سازی کنید و دوباره تلاش کنید.';
                         } else if (error.message.includes('exchange ID')) {
                             errorMessage = 'شناسه صرافی نامعتبر است.';
                         }
-                        
+
                         modernAlert(errorMessage, 'error');
                     }
                 }
