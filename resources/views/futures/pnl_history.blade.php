@@ -191,8 +191,6 @@
         </table>
     </div>
 
-    <div class="pagination">
-        {{ $trades->links() }}
-    </div>
+    {{ $trades->links() }}
 </div>
 @endsection

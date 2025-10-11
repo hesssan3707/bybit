@@ -176,6 +176,11 @@ class DemoFuturesLifecycleManager extends Command
      */
     private function syncLifecycleForExchange($exchangeService, User $user, UserExchange $userExchange)
     {
+        // در محیط محلی اتصال به صرافی انجام نمی‌شود (دمو)
+        if (app()->environment('local')) {
+            $this->info("[Demo] در محیط محلی، اتصال به صرافی {$userExchange->exchange_name} انجام نمی‌شود");
+            return;
+        }
         // Get the oldest pending/filled order date for this user exchange (demo)
         $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
@@ -198,8 +203,8 @@ class DemoFuturesLifecycleManager extends Command
                 $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
             }
 
-            // Sync PnL records for hedge mode
-            $this->syncPnlRecords($exchangeService, $userExchange);
+            // Sync PnL records for hedge mode - disabled per new logic
+            // $this->syncPnlRecords($exchangeService, $userExchange);
 
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی (دمو): " . $e->getMessage());
@@ -216,6 +221,12 @@ class DemoFuturesLifecycleManager extends Command
     {
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
         if (!$orderId) {
+            return;
+        }
+
+        // Skip system-created TP/SL or reduce-only closing orders
+        if ($this->isTpSlOrClosing($exchangeOrder, $userExchange->exchange_name)) {
+            $this->info("[Demo] سفارش {$orderId} از نوع TP/SL یا بستن موقعیت است و نادیده گرفته شد");
             return;
         }
 
@@ -249,7 +260,9 @@ class DemoFuturesLifecycleManager extends Command
                 }
             }
         } else {
-            $this->syncClosedOrderPnl($exchangeOrder, $userExchange);
+            // Skip unknown orders to ensure only system-created orders are processed
+            $this->info("[Demo] سفارش ناشناس {$orderId} نادیده گرفته شد");
+            return;
         }
     }
 
@@ -553,6 +566,28 @@ class DemoFuturesLifecycleManager extends Command
             default:
                 return null;
         }
+    }
+
+    /**
+     * Detect TP/SL or reduce-only closing orders across exchanges
+     */
+    private function isTpSlOrClosing(array $exchangeOrder, string $exchangeName): bool
+    {
+        $reduceOnly = ($exchangeOrder['reduceOnly'] ?? false) === true;
+        $closeOnTrigger = ($exchangeOrder['closeOnTrigger'] ?? false) === true;
+        $hasTrigger = isset($exchangeOrder['triggerPrice']) || isset($exchangeOrder['stopPrice']);
+        $hasSlOrTpField = !empty($exchangeOrder['stopLoss'] ?? null) || !empty($exchangeOrder['takeProfit'] ?? null);
+
+        $stopOrderType = strtolower((string)($exchangeOrder['stopOrderType'] ?? ''));
+        $isStopOrderType = in_array($stopOrderType, ['stop', 'stoploss', 'sl', 'takeprofit', 'tp', 'trailing_stop']);
+
+        $orderType = strtoupper((string)($exchangeOrder['orderType'] ?? ($exchangeOrder['type'] ?? '')));
+        $isStopType = in_array($orderType, ['STOP', 'STOP_MARKET', 'TAKE_PROFIT', 'TAKE_PROFIT_MARKET']);
+
+        if (($reduceOnly && ($hasTrigger || $isStopType || $isStopOrderType)) || $hasSlOrTpField || $closeOnTrigger) {
+            return true;
+        }
+        return false;
     }
 
     /**

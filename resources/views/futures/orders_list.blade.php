@@ -236,9 +236,7 @@
             </tbody>
         </table>
     </div>
-    <div class="pagination">
-        {{ $orders->links() }}
-    </div>
+    {{ $orders->links() }}
 </div>
 @endsection
 

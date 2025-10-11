@@ -119,6 +119,11 @@ class FuturesLifecycleManager extends Command
      */
     private function syncLifecycleForExchange($exchangeService, User $user, UserExchange $userExchange)
     {
+        // در محیط محلی اتصال به صرافی انجام نمی‌شود
+        if (app()->environment('local')) {
+            $this->info("در محیط محلی، اتصال به صرافی {$userExchange->exchange_name} انجام نمی‌شود");
+            return;
+        }
         // Get the oldest pending/filled order date for this user exchange
         $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
@@ -142,15 +147,16 @@ class FuturesLifecycleManager extends Command
             $this->info("دریافت {count($orders)} سفارش از صرافی {$userExchange->exchange_name}");
 
             foreach ($orders as $exchangeOrder) {
-                $this->syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, $userExchange);
+-                $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
++                $this->syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, $userExchange);
+             }
+
+            // Sync PnL records for hedge mode - disabled per new logic
+            // $this->syncPnlRecords($exchangeService, $userExchange);
+
+            } catch (Exception $e) {
+                $this->error("خطا در همگام‌سازی سفارشات از صرافی: " . $e->getMessage());
             }
-
-            // Sync PnL records for hedge mode
-            $this->syncPnlRecords($exchangeService, $userExchange);
-
-        } catch (Exception $e) {
-            $this->error("خطا در همگام‌سازی سفارشات از صرافی: " . $e->getMessage());
-        }
     }
 
     /**
@@ -158,54 +164,51 @@ class FuturesLifecycleManager extends Command
      */
     private function syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, UserExchange $userExchange)
     {
-        // Extract order ID based on exchange format
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
-        
         if (!$orderId) {
-            return; // Skip if we can't get order ID
+            return;
         }
 
-        // Find order in our database
+        // Skip system-created TP/SL or reduce-only closing orders across exchanges
+        if ($this->isTpSlOrClosing($exchangeOrder, $userExchange->exchange_name)) {
+            $this->info("سفارش {$orderId} از نوع TP/SL یا بستن موقعیت است و نادیده گرفته شد");
+            return;
+        }
+
         $order = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
             ->where('order_id', $orderId)
             ->first();
 
         if ($order) {
-            // Order exists in database - update status
             $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
-            
             if ($order->status !== $newStatus) {
                 $order->status = $newStatus;
-                
-                // Update filled quantity if available
+
                 $filledQty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
                 if ($filledQty !== null) {
                     $order->filled_quantity = $filledQty;
                 }
-                
-                // Update average price if available
                 $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
                 if ($avgPrice !== null) {
                     $order->average_price = $avgPrice;
                 }
 
-                // If order is closed or filled, set closed_at
                 if (in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
                     $order->closed_at = now();
                 }
-                
                 $order->save();
                 $this->info("وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
 
-                // If filled, check whether the position is actually closed and create Trade with PnL if possible
                 if ($newStatus === 'filled') {
-                    $this->handlePotentialClosure($exchangeService, $userExchange, $order, $exchangeOrder);
-                }
+-                    $this->handlePotentialClosure($userExchange, $order, $exchangeOrder);
++                    $this->handlePotentialClosure($exchangeService, $userExchange, $order, $exchangeOrder);
+                 }
             }
         } else {
-            // Order not found in database - this is a closed order, sync PnL
-            $this->syncClosedOrderPnl($exchangeOrder, $userExchange);
+            // Skip unknown orders to enforce only system-created orders
+            $this->info("سفارش ناشناس {$orderId} نادیده گرفته شد");
+            return;
         }
     }
 
@@ -561,6 +564,7 @@ class FuturesLifecycleManager extends Command
             $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name) ?: $order->symbol;
             $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
 
+            // بررسی بسته بودن موقعیت
             $positionsRaw = $exchangeService->getPositions($symbol);
             $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
 
@@ -575,41 +579,71 @@ class FuturesLifecycleManager extends Command
             }
             if (!$isClosed) return;
 
-            $existingTrade = Trade::where('user_exchange_id', $userExchange->id)
-                ->where('is_demo', false)
-                ->where('order_id', $order->order_id)
-                ->first();
-            if ($existingTrade) return;
-
+            // دریافت لیست PnL های بسته شده و ثبت چندگانه برای کلوزهای جزئی
             $startTime = $order->created_at ? $order->created_at->subMinutes(15)->timestamp * 1000 : null;
-            $closedRaw = $exchangeService->getClosedPnl($symbol, 50, $startTime);
+            $closedRaw = $exchangeService->getClosedPnl($symbol, 100, $startTime);
             $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
 
-            $matched = null;
-            foreach ($closedList as $c) {
-                if (($c['orderId'] ?? null) && (string)$c['orderId'] === (string)$order->order_id) { $matched = $c; break; }
-            }
-            if (!$matched && !empty($closedList)) {
-                usort($closedList, function($a,$b){return (($b['closedAt'] ?? 0) <=> ($a['closedAt'] ?? 0));});
-                $matched = $closedList[0];
+            if (empty($closedList)) {
+                // در صورت نبود داده، یک رکورد حداقلی ایجاد می‌کنیم
+                Trade::create([
+                    'user_exchange_id' => $userExchange->id,
+                    'is_demo' => false,
+                    'symbol' => $symbol,
+                    'side' => $side ?: ($order->side ?? 'Buy'),
+                    'order_type' => 'Market',
+                    'leverage' => 1.0,
+                    'qty' => $order->filled_quantity ?? 0,
+                    'avg_entry_price' => $order->average_price ?? 0,
+                    'avg_exit_price' => $order->average_price ?? 0,
+                    'pnl' => 0,
+                    'order_id' => $order->order_id,
+                    'closed_at' => now(),
+                ]);
+                $this->info("معامله بسته شده برای سفارش {$order->order_id} ثبت شد (بدون داده PnL)");
+                return;
             }
 
-            Trade::create([
-                'user_exchange_id' => $userExchange->id,
-                'is_demo' => false,
-                'symbol' => $symbol,
-                'side' => $side ?: ($order->side ?? 'Buy'),
-                'order_type' => 'Market',
-                'leverage' => 1.0,
-                'qty' => $order->filled_quantity ?? 0,
-                'avg_entry_price' => $matched['avgEntryPrice'] ?? ($order->average_price ?? 0),
-                'avg_exit_price' => $matched['avgExitPrice'] ?? ($order->average_price ?? 0),
-                'pnl' => $matched['realizedPnl'] ?? 0,
-                'order_id' => $order->order_id,
-                'closed_at' => isset($matched['closedAt']) ? \Carbon\Carbon::createFromTimestampMs($matched['closedAt']) : now(),
-            ]);
+            // فیلتر رکوردها: براساس orderId یا نماد (و در حالت هج، سمت)
+            $filtered = array_filter($closedList, function($c) use ($order, $symbol, $side, $userExchange) {
+                $matchId = isset($c['orderId']) && (string)$c['orderId'] === (string)$order->order_id;
+                $matchSymbol = ($c['symbol'] ?? null) === $symbol;
+                $matchSide = $userExchange->position_mode === 'hedge' ? (($c['side'] ?? null) === $side) : true;
+                return $matchId || ($matchSymbol && $matchSide);
+            });
 
-            $this->info("معامله بسته شده برای سفارش {$order->order_id} ثبت شد");
+            // اگر چیزی فیلتر نشد، کل لیست را در نظر بگیر
+            $events = !empty($filtered) ? array_values($filtered) : $closedList;
+
+            // ثبت چندگانه با جلوگیری از دوباره‌کاری با کلید (order_id + closed_at)
+            foreach ($events as $c) {
+                $closedAtMs = $c['closedAt'] ?? null;
+                $closedAt = $closedAtMs ? \Carbon\Carbon::createFromTimestampMs($closedAtMs) : now();
+
+                $exists = Trade::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', false)
+                    ->where('order_id', $order->order_id)
+                    ->where('closed_at', $closedAt)
+                    ->exists();
+                if ($exists) { continue; }
+
+                Trade::create([
+                    'user_exchange_id' => $userExchange->id,
+                    'is_demo' => false,
+                    'symbol' => $c['symbol'] ?? $symbol,
+                    'side' => $c['side'] ?? ($side ?: ($order->side ?? 'Buy')),
+                    'order_type' => 'Market',
+                    'leverage' => 1.0,
+                    'qty' => (float)($c['qty'] ?? ($order->filled_quantity ?? 0)),
+                    'avg_entry_price' => $c['avgEntryPrice'] ?? ($order->average_price ?? 0),
+                    'avg_exit_price' => $c['avgExitPrice'] ?? ($order->average_price ?? 0),
+                    'pnl' => (float)($c['realizedPnl'] ?? 0),
+                    'order_id' => $order->order_id,
+                    'closed_at' => $closedAt,
+                ]);
+            }
+
+            $this->info("ثبت معاملات بسته شده برای سفارش {$order->order_id} تکمیل شد");
         } catch (Exception $e) {
             $this->warn("خطا در بررسی بسته شدن موقعیت و ثبت معامله: " . $e->getMessage());
         }
@@ -650,5 +684,27 @@ class FuturesLifecycleManager extends Command
             ];
         }
         return $out;
+    }
+
+    /**
+     * Detect TP/SL or reduce-only closing orders across exchanges
+     */
+    private function isTpSlOrClosing(array $exchangeOrder, string $exchangeName): bool
+    {
+        $reduceOnly = ($exchangeOrder['reduceOnly'] ?? false) === true;
+        $closeOnTrigger = ($exchangeOrder['closeOnTrigger'] ?? false) === true;
+        $hasTrigger = isset($exchangeOrder['triggerPrice']) || isset($exchangeOrder['stopPrice']);
+        $hasSlOrTpField = !empty($exchangeOrder['stopLoss'] ?? null) || !empty($exchangeOrder['takeProfit'] ?? null);
+
+        $stopOrderType = strtolower((string)($exchangeOrder['stopOrderType'] ?? ''));
+        $isStopOrderType = in_array($stopOrderType, ['stop', 'stoploss', 'sl', 'takeprofit', 'tp', 'trailing_stop']);
+
+        $orderType = strtoupper((string)($exchangeOrder['orderType'] ?? ($exchangeOrder['type'] ?? '')));
+        $isStopType = in_array($orderType, ['STOP', 'STOP_MARKET', 'TAKE_PROFIT', 'TAKE_PROFIT_MARKET']);
+
+        if (($reduceOnly && ($hasTrigger || $isStopType || $isStopOrderType)) || $hasSlOrTpField || $closeOnTrigger) {
+            return true;
+        }
+        return false;
     }
 }
