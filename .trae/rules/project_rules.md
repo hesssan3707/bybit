@@ -4,4 +4,4 @@ every changes in ui/ux must be suitable for moile view too(responsive design);
 in api services we dont have strict mode,so dont need to check for strict mode,couse user cant call these apis in strict mode;
 before every changes in logic try to check if this change affect other exchanges if yes try to fix it for all of them;
 BEFORE EVERY CHANGES IN LOGIC,GIVE ME EXPLANATION OF CURRENT STATE AND ASK ME TO CONFIRM IT;
-never test connection to exchange ,couse we dont have access to exchange from localhost;
+in localhost tests ,skip connection to exchange,couse we dont have access to exchange from localhost;

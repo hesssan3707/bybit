@@ -385,21 +385,57 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array
     {
-        $params = [
-            'category' => 'linear',
-            'limit' => $limit,
-        ];
-        if ($symbol) {
-            $params['symbol'] = $symbol;
-        } else {
-            // Adding settleCoin for consistency with other methods
-            // to ensure we get USDT-settled orders when no symbol is specified
-            $params['settleCoin'] = 'USDT';
+        // Aggregate across 7-day chunks to respect Bybit's order history window
+        $nowMs = (int) (microtime(true) * 1000);
+        $chunkSizeMs = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+        $fromMs = $startTime ?? ($nowMs - $chunkSizeMs);
+
+        // Ensure fromMs is not in the future
+        if ($fromMs > $nowMs) {
+            return ['list' => []];
         }
-        if ($startTime) {
-            $params['startTime'] = $startTime;
+
+        $ordersById = [];
+
+        for ($chunkStart = $fromMs; $chunkStart < $nowMs; $chunkStart += $chunkSizeMs) {
+            $chunkEnd = min($chunkStart + $chunkSizeMs - 1, $nowMs);
+
+            $params = [
+                'category' => 'linear',
+                'limit' => $limit,
+            ];
+            if ($symbol) {
+                $params['symbol'] = $symbol;
+            } else {
+                // When no symbol provided, specify settleCoin to fetch USDT-settled orders
+                $params['settleCoin'] = 'USDT';
+            }
+            // Use chunked time window
+            $params['startTime'] = $chunkStart;
+            $params['endTime'] = $chunkEnd;
+
+            try {
+                $resp = $this->sendRequest('GET', '/v5/order/history', $params);
+                // Bybit v5 typically returns structure: ['result' => ['list' => [...]]]
+                $list = $resp['result']['list'] ?? ($resp['list'] ?? []);
+
+                foreach ($list as $item) {
+                    $oid = $item['orderId'] ?? ($item['id'] ?? null);
+                    if ($oid === null) {
+                        // Fallback key to avoid losing entries without orderId
+                        $ordersById[md5(json_encode($item))] = $item;
+                    } else {
+                        // Deduplicate by orderId
+                        $ordersById[$oid] = $item;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Best-effort aggregation: skip failed chunk and continue
+                continue;
+            }
         }
-        return $this->sendRequest('GET', '/v5/order/history', $params);
+
+        return ['list' => array_values($ordersById)];
     }
 
     public function getPositions(string $symbol = null): array

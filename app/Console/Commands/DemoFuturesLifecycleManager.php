@@ -17,7 +17,7 @@ class DemoFuturesLifecycleManager extends Command
      *
      * @var string
      */
-    protected $signature = 'demo:futures:lifecycle {--user=}';
+    protected $signature = 'demo:futures:lifecycle {--user=} {--dry-run}';
 
     /**
      * The console command description.
@@ -90,6 +90,12 @@ class DemoFuturesLifecycleManager extends Command
     {
         try {
             $this->info("پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}");
+
+            // If dry-run, skip any external API/network calls
+            if ($this->option('dry-run')) {
+                $this->info("[Dry-run] فراخوانی‌های شبکه‌ای برای صرافی {$userExchange->exchange_name} (دمو) نادیده گرفته شد.");
+                return;
+            }
 
             // Create exchange service (demo mode)
             $exchangeService = ExchangeFactory::create(
@@ -208,54 +214,210 @@ class DemoFuturesLifecycleManager extends Command
      */
     private function syncExchangeOrderToDatabase($exchangeOrder, UserExchange $userExchange)
     {
-        // Extract order ID based on exchange format
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
-        
         if (!$orderId) {
-            return; // Skip if we can't get order ID
+            return;
         }
 
-        // Find order in our database (demo)
         $order = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->where('order_id', $orderId)
             ->first();
 
         if ($order) {
-            // Order exists in database - update status
             $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
-            
             if ($order->status !== $newStatus) {
                 $order->status = $newStatus;
-                
-                // Update filled quantity if available
+
                 $filledQty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
                 if ($filledQty !== null) {
                     $order->filled_quantity = $filledQty;
                 }
-                
-                // Update average price if available
                 $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
                 if ($avgPrice !== null) {
                     $order->average_price = $avgPrice;
                 }
 
-                // If order is closed, set closed_at
                 if (in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
                     $order->closed_at = now();
                 }
-                
                 $order->save();
-                $this->info("وضعیت سفارش دمو {$orderId} به {$newStatus} تغییر یافت");
+                $this->info("[Demo] وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
+
+                if ($newStatus === 'filled') {
+                    $this->handlePotentialClosureDemo($userExchange, $order, $exchangeOrder);
+                }
             }
         } else {
-            // Order not found in database - this is a closed order, sync PnL
             $this->syncClosedOrderPnl($exchangeOrder, $userExchange);
         }
     }
 
+    private function syncPnlRecords($exchangeService, UserExchange $userExchange)
+    {
+        if ($userExchange->position_mode !== 'hedge') {
+            return;
+        }
+
+        try {
+            $positionsRaw = $exchangeService->getPositions();
+            $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
+
+            foreach ($positions as $rawPosition) {
+                if (!is_array($rawPosition)) {
+                    continue;
+                }
+                $position = $this->mapRawPositionToCommon($userExchange->exchange_name, $rawPosition);
+                if (!$position) {
+                    continue;
+                }
+                if (empty($position['size']) || (float)$position['size'] == 0.0) {
+                    continue;
+                }
+
+                $trade = Trade::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', true)
+                    ->where('symbol', $position['symbol'])
+                    ->where('side', $position['side'])
+                    ->first();
+
+                if (!$trade) {
+                    $trade = new Trade([
+                        'user_exchange_id' => $userExchange->id,
+                        'is_demo' => true,
+                        'symbol' => $position['symbol'],
+                        'side' => $position['side'],
+                        'order_type' => 'Market',
+                        'leverage' => $position['leverage'] ?? 1.0,
+                        'qty' => (float)$position['size'],
+                        'avg_entry_price' => $position['entryPrice'] ?? 0,
+                        'avg_exit_price' => 0,
+                        'pnl' => $position['unrealizedPnl'] ?? 0,
+                        'order_id' => $position['orderId'] ?? 'position_' . uniqid(),
+                        'closed_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                    $trade->save();
+                } else {
+                    $trade->qty = (float)$position['size'];
+                    $trade->avg_entry_price = $position['entryPrice'] ?? $trade->avg_entry_price;
+                    $trade->leverage = $position['leverage'] ?? $trade->leverage;
+                    $trade->pnl = $position['unrealizedPnl'] ?? 0;
+                    $trade->updated_at = now();
+                    $trade->save();
+                }
+            }
+
+            $symbols = collect($positions)
+                ->map(function($p){ return is_array($p) ? ($p['symbol'] ?? null) : null; })
+                ->filter()
+                ->unique();
+            Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
+                ->whereNotIn('symbol', $symbols)
+                ->update(['pnl' => 0, 'updated_at' => now()]);
+
+        } catch (Exception $e) {
+            $this->warn("[Demo] خطا در همگام‌سازی سوابق PnL: " . $e->getMessage());
+        }
+    }
+
+    private function normalizePositionsList(string $exchangeName, $positionsRaw): array
+    {
+        if (is_string($positionsRaw)) {
+            $decoded = json_decode($positionsRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $positionsRaw = $decoded;
+            }
+        }
+        if (is_array($positionsRaw) && array_key_exists('list', $positionsRaw)) {
+            $list = $positionsRaw['list'];
+        } else {
+            $list = $positionsRaw;
+        }
+        if (!is_array($list)) {
+            return [];
+        }
+        return $list;
+    }
+
+    private function mapRawPositionToCommon(string $exchangeName, array $raw): ?array
+    {
+        $symbol = $raw['symbol'] ?? null;
+        if (!$symbol) return null;
+
+        $side = $raw['side'] ?? null;
+        if (!$side && isset($raw['positionSide'])) {
+            $ps = strtoupper((string)$raw['positionSide']);
+            $side = ($ps === 'LONG') ? 'Buy' : (($ps === 'SHORT') ? 'Sell' : null);
+        }
+
+        $size = null;
+        if (isset($raw['size'])) {
+            $size = (float)$raw['size'];
+        } elseif (isset($raw['positionAmt'])) {
+            $size = abs((float)$raw['positionAmt']);
+        }
+
+        $entryPrice = $raw['entryPrice'] ?? ($raw['avgPrice'] ?? ($raw['avg_entry_price'] ?? null));
+        $unrealizedPnl = $raw['unrealizedPnl'] ?? ($raw['unRealizedProfit'] ?? null);
+        $leverage = $raw['leverage'] ?? null;
+
+        if ($side === null || $size === null) {
+            return null;
+        }
+
+        return [
+            'symbol' => $symbol,
+            'side' => $side,
+            'size' => $size,
+            'entryPrice' => $entryPrice,
+            'unrealizedPnl' => $unrealizedPnl,
+            'leverage' => $leverage,
+        ];
+    }
+
+    private function handlePotentialClosureDemo(UserExchange $userExchange, Order $order, $exchangeOrder): void
+    {
+        try {
+            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name) ?: $order->symbol;
+            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
+
+            $isClosed = true; // In demo, assume filled means closed unless a position exists with same symbol/side
+
+            if (!$isClosed) return;
+
+            $existingTrade = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
+                ->where('order_id', $order->order_id)
+                ->first();
+            if ($existingTrade) return;
+
+            Trade::create([
+                'user_exchange_id' => $userExchange->id,
+                'is_demo' => true,
+                'symbol' => $symbol,
+                'side' => $side ?: ($order->side ?? 'Buy'),
+                'order_type' => 'Market',
+                'leverage' => 1.0,
+                'qty' => $order->filled_quantity ?? 0,
+                'avg_entry_price' => $order->average_price ?? 0,
+                'avg_exit_price' => $order->average_price ?? 0,
+                'pnl' => 0,
+                'order_id' => $order->order_id,
+                'closed_at' => now(),
+            ]);
+
+            $this->info("[Demo] معامله بسته شده برای سفارش {$order->order_id} ثبت شد");
+        } catch (Exception $e) {
+            $this->warn("[Demo] خطا در بررسی بسته شدن موقعیت و ثبت معامله: " . $e->getMessage());
+        }
+    }
+
+
     /**
-     * Handle closed orders not found in database - sync PnL (demo)
+     * Handle closed orders not found in database - sync PnL (Demo)
      */
     private function syncClosedOrderPnl($exchangeOrder, UserExchange $userExchange)
     {
@@ -277,7 +439,7 @@ class DemoFuturesLifecycleManager extends Command
                 return; // Skip if essential data is missing
             }
 
-            // Create trade record for closed position (demo)
+            // Create trade record for closed position in demo mode
             Trade::create([
                 'user_exchange_id' => $userExchange->id,
                 'is_demo' => true,
@@ -293,10 +455,10 @@ class DemoFuturesLifecycleManager extends Command
                 'closed_at' => now(),
             ]);
 
-            $this->info("سفارش بسته شده دمو {$orderId} در جدول معاملات ثبت شد");
+            $this->info("[Demo] سفارش بسته شده {$orderId} در جدول معاملات ثبت شد");
 
         } catch (Exception $e) {
-            $this->warn("خطا در ثبت سفارش بسته شده دمو: " . $e->getMessage());
+            $this->warn("[Demo] خطا در ثبت سفارش بسته شده: " . $e->getMessage());
         }
     }
 
@@ -390,79 +552,6 @@ class DemoFuturesLifecycleManager extends Command
                 return $exchangeOrder['side'] ?? null;
             default:
                 return null;
-        }
-    }
-
-    /**
-     * Sync PnL records for hedge mode
-     */
-    private function syncPnlRecords($exchangeService, UserExchange $userExchange)
-    {
-        // Only sync if position mode is hedge
-        if ($userExchange->position_mode !== 'hedge') {
-            return;
-        }
-
-        try {
-            // Get positions from exchange
-            $positions = $exchangeService->getPositions();
-            if($userExchange->exchange_name == 'bybit')
-			{
-				$positions = $positions['list'];
-			}
-
-            foreach ($positions as $position) {
-                // Skip positions with zero size
-                if ($position['size'] == 0) {
-                    continue;
-                }
-
-                // Find or create trade record
-                $trade = Trade::where('user_exchange_id', $userExchange->id)
-                    ->where('is_demo', true)
-                    ->where('symbol', $position['symbol'])
-                    ->where('side', $position['side'])
-                    ->first();
-
-                if (!$trade) {
-                    // Create new trade record
-                    $trade = new Trade([
-                        'user_exchange_id' => $userExchange->id,
-                        'is_demo' => true,
-                        'symbol' => $position['symbol'],
-                        'side' => $position['side'],
-                        'order_type' => 'Market', // Default order type for position tracking
-                        'leverage' => $position['leverage'] ?? 1.0,
-                        'qty' => $position['size'],
-                        'avg_entry_price' => $position['entryPrice'] ?? 0,
-                        'avg_exit_price' => 0, // Not applicable for open positions
-                        'pnl' => $position['unrealizedPnl'] ?? 0,
-                        'order_id' => $position['orderId'] ?? 'demo_position_' . uniqid(), // Generate unique ID if not available
-                        'closed_at' => now(), // Use current time for tracking
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-                    $trade->save();
-                } else {
-                    // Update existing trade
-                    $trade->qty = $position['size'];
-                    $trade->avg_entry_price = $position['entryPrice'] ?? $trade->avg_entry_price;
-                    $trade->leverage = $position['leverage'] ?? $trade->leverage;
-                    $trade->pnl = $position['unrealizedPnl'] ?? 0;
-                    $trade->updated_at = now();
-                    $trade->save();
-                }
-            }
-
-            // Mark closed positions
-            $symbols = collect($positions)->pluck('symbol')->unique();
-            Trade::where('user_exchange_id', $userExchange->id)
-                ->where('is_demo', true)
-                ->whereNotIn('symbol', $symbols)
-                ->update(['pnl' => 0, 'updated_at' => now()]);
-
-        } catch (Exception $e) {
-            $this->warn("خطا در همگام‌سازی سوابق PnL دمو: " . $e->getMessage());
         }
     }
 

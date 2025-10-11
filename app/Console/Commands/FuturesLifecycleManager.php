@@ -142,7 +142,7 @@ class FuturesLifecycleManager extends Command
             $this->info("دریافت {count($orders)} سفارش از صرافی {$userExchange->exchange_name}");
 
             foreach ($orders as $exchangeOrder) {
-                $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
+                $this->syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, $userExchange);
             }
 
             // Sync PnL records for hedge mode
@@ -156,7 +156,7 @@ class FuturesLifecycleManager extends Command
     /**
      * Sync individual exchange order to database
      */
-    private function syncExchangeOrderToDatabase($exchangeOrder, UserExchange $userExchange)
+    private function syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, UserExchange $userExchange)
     {
         // Extract order ID based on exchange format
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
@@ -190,13 +190,18 @@ class FuturesLifecycleManager extends Command
                     $order->average_price = $avgPrice;
                 }
 
-                // If order is closed, set closed_at
+                // If order is closed or filled, set closed_at
                 if (in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
                     $order->closed_at = now();
                 }
                 
                 $order->save();
                 $this->info("وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
+
+                // If filled, check whether the position is actually closed and create Trade with PnL if possible
+                if ($newStatus === 'filled') {
+                    $this->handlePotentialClosure($exchangeService, $userExchange, $order, $exchangeOrder);
+                }
             }
         } else {
             // Order not found in database - this is a closed order, sync PnL
@@ -264,16 +269,20 @@ class FuturesLifecycleManager extends Command
         }
 
         try {
-            // Get positions from exchange
-            $positions = $exchangeService->getPositions();
-            if($userExchange->exchange_name == 'bybit')
-			{
-				$positions = $positions['list'];
-			}
+            // Get positions from exchange and normalize list
+            $positionsRaw = $exchangeService->getPositions();
+            $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
 
-            foreach ($positions as $position) {
+            foreach ($positions as $rawPosition) {
+                if (!is_array($rawPosition)) {
+                    continue;
+                }
+                $position = $this->mapRawPositionToCommon($userExchange->exchange_name, $rawPosition);
+                if (!$position) {
+                    continue;
+                }
                 // Skip positions with zero size
-                if ($position['size'] == 0) {
+                if (empty($position['size']) || (float)$position['size'] == 0.0) {
                     continue;
                 }
 
@@ -293,7 +302,7 @@ class FuturesLifecycleManager extends Command
                         'side' => $position['side'],
                         'order_type' => 'Market', // Default order type for position tracking
                         'leverage' => $position['leverage'] ?? 1.0,
-                        'qty' => $position['size'],
+                        'qty' => (float)$position['size'],
                         'avg_entry_price' => $position['entryPrice'] ?? 0,
                         'avg_exit_price' => 0, // Not applicable for open positions
                         'pnl' => $position['unrealizedPnl'] ?? 0,
@@ -305,7 +314,7 @@ class FuturesLifecycleManager extends Command
                     $trade->save();
                 } else {
                     // Update existing trade
-                    $trade->qty = $position['size'];
+                    $trade->qty = (float)$position['size'];
                     $trade->avg_entry_price = $position['entryPrice'] ?? $trade->avg_entry_price;
                     $trade->leverage = $position['leverage'] ?? $trade->leverage;
                     $trade->pnl = $position['unrealizedPnl'] ?? 0;
@@ -315,7 +324,10 @@ class FuturesLifecycleManager extends Command
             }
 
             // Mark closed positions
-            $symbols = collect($positions)->pluck('symbol')->unique();
+            $symbols = collect($positions)
+                ->map(function($p){ return is_array($p) ? ($p['symbol'] ?? null) : null; })
+                ->filter()
+                ->unique();
             Trade::where('user_exchange_id', $userExchange->id)
                 ->where('is_demo', false)
                 ->whereNotIn('symbol', $symbols)
@@ -483,5 +495,160 @@ class FuturesLifecycleManager extends Command
         ];
 
         return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
+    }
+
+    private function normalizePositionsList(string $exchangeName, $positionsRaw): array
+    {
+        // If string json, decode
+        if (is_string($positionsRaw)) {
+            $decoded = json_decode($positionsRaw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $positionsRaw = $decoded;
+            }
+        }
+        // If top-level has 'list', use it
+        if (is_array($positionsRaw) && array_key_exists('list', $positionsRaw)) {
+            $list = $positionsRaw['list'];
+        } else {
+            $list = $positionsRaw;
+        }
+        // Ensure array
+        if (!is_array($list)) {
+            return [];
+        }
+        return $list;
+    }
+
+    private function mapRawPositionToCommon(string $exchangeName, array $raw): ?array
+    {
+        $symbol = $raw['symbol'] ?? null;
+        if (!$symbol) return null;
+
+        $side = $raw['side'] ?? null;
+        if (!$side && isset($raw['positionSide'])) {
+            $ps = strtoupper((string)$raw['positionSide']);
+            $side = ($ps === 'LONG') ? 'Buy' : (($ps === 'SHORT') ? 'Sell' : null);
+        }
+
+        $size = null;
+        if (isset($raw['size'])) {
+            $size = (float)$raw['size'];
+        } elseif (isset($raw['positionAmt'])) {
+            $size = abs((float)$raw['positionAmt']);
+        }
+
+        $entryPrice = $raw['entryPrice'] ?? ($raw['avgPrice'] ?? ($raw['avg_entry_price'] ?? null));
+        $unrealizedPnl = $raw['unrealizedPnl'] ?? ($raw['unRealizedProfit'] ?? null);
+        $leverage = $raw['leverage'] ?? null;
+
+        if ($side === null || $size === null) {
+            return null;
+        }
+
+        return [
+            'symbol' => $symbol,
+            'side' => $side,
+            'size' => $size,
+            'entryPrice' => $entryPrice,
+            'unrealizedPnl' => $unrealizedPnl,
+            'leverage' => $leverage,
+        ];
+    }
+
+    private function handlePotentialClosure($exchangeService, UserExchange $userExchange, Order $order, $exchangeOrder): void
+    {
+        try {
+            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name) ?: $order->symbol;
+            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
+
+            $positionsRaw = $exchangeService->getPositions($symbol);
+            $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
+
+            $isClosed = true;
+            foreach ($positions as $raw) {
+                if (!is_array($raw)) continue;
+                $p = $this->mapRawPositionToCommon($userExchange->exchange_name, $raw);
+                if (!$p) continue;
+                if ($p['symbol'] !== $symbol) continue;
+                if ($userExchange->position_mode === 'hedge' && $side && $p['side'] !== $side) continue;
+                if ((float)$p['size'] > 0.0) { $isClosed = false; break; }
+            }
+            if (!$isClosed) return;
+
+            $existingTrade = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', false)
+                ->where('order_id', $order->order_id)
+                ->first();
+            if ($existingTrade) return;
+
+            $startTime = $order->created_at ? $order->created_at->subMinutes(15)->timestamp * 1000 : null;
+            $closedRaw = $exchangeService->getClosedPnl($symbol, 50, $startTime);
+            $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
+
+            $matched = null;
+            foreach ($closedList as $c) {
+                if (($c['orderId'] ?? null) && (string)$c['orderId'] === (string)$order->order_id) { $matched = $c; break; }
+            }
+            if (!$matched && !empty($closedList)) {
+                usort($closedList, function($a,$b){return (($b['closedAt'] ?? 0) <=> ($a['closedAt'] ?? 0));});
+                $matched = $closedList[0];
+            }
+
+            Trade::create([
+                'user_exchange_id' => $userExchange->id,
+                'is_demo' => false,
+                'symbol' => $symbol,
+                'side' => $side ?: ($order->side ?? 'Buy'),
+                'order_type' => 'Market',
+                'leverage' => 1.0,
+                'qty' => $order->filled_quantity ?? 0,
+                'avg_entry_price' => $matched['avgEntryPrice'] ?? ($order->average_price ?? 0),
+                'avg_exit_price' => $matched['avgExitPrice'] ?? ($order->average_price ?? 0),
+                'pnl' => $matched['realizedPnl'] ?? 0,
+                'order_id' => $order->order_id,
+                'closed_at' => isset($matched['closedAt']) ? \Carbon\Carbon::createFromTimestampMs($matched['closedAt']) : now(),
+            ]);
+
+            $this->info("معامله بسته شده برای سفارش {$order->order_id} ثبت شد");
+        } catch (Exception $e) {
+            $this->warn("خطا در بررسی بسته شدن موقعیت و ثبت معامله: " . $e->getMessage());
+        }
+    }
+
+    private function normalizeClosedPnl(string $exchangeName, $raw): array
+    {
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $raw = $decoded;
+            }
+        }
+        $list = (is_array($raw) && isset($raw['list'])) ? $raw['list'] : $raw;
+        if (!is_array($list)) return [];
+
+        $out = [];
+        foreach ($list as $item) {
+            if (!is_array($item)) continue;
+            $orderId = $item['orderId'] ?? ($item['order_id'] ?? null);
+            $symbol = $item['symbol'] ?? null;
+            $side = $item['side'] ?? null;
+            $qty = $item['qty'] ?? ($item['size'] ?? null);
+            $avgEntry = $item['avgEntryPrice'] ?? ($item['avg_entry_price'] ?? ($item['avgPrice'] ?? ($item['entryPrice'] ?? null)));
+            $avgExit = $item['avgExitPrice'] ?? ($item['avg_exit_price'] ?? ($item['closePrice'] ?? ($item['avgPrice'] ?? null)));
+            $pnl = $item['closedPnl'] ?? ($item['realisedPnl'] ?? ($item['realizedPnl'] ?? 0));
+            $closedAt = $item['updatedTime'] ?? ($item['createdTime'] ?? ($item['closedAt'] ?? null));
+
+            $out[] = [
+                'orderId' => $orderId,
+                'symbol' => $symbol,
+                'side' => $side,
+                'qty' => $qty,
+                'avgEntryPrice' => $avgEntry,
+                'avgExitPrice' => $avgExit,
+                'realizedPnl' => (float)$pnl,
+                'closedAt' => $closedAt ? (int)$closedAt : null,
+            ];
+        }
+        return $out;
     }
 }

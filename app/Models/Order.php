@@ -25,6 +25,8 @@ class Order extends Model
         'amount' => 'decimal:10',
         'entry_low' => 'decimal:10',
         'entry_high' => 'decimal:10',
+        'filled_quantity' => 'decimal:8',
+        'average_price' => 'decimal:4',
     ];
 
     /**

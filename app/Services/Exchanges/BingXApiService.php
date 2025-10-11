@@ -221,15 +221,52 @@ class BingXApiService implements ExchangeApiServiceInterface
 
     public function getOrderHistory(string $symbol = null, int $limit = 50, ?int $startTime = null): array
     {
-        $params = ['limit' => $limit];
-        if ($symbol) {
-            $params['symbol'] = $symbol;
+        // Aggregate across 7-day chunks to align with other exchanges and ensure consistent retrieval over longer ranges
+        $nowMs = (int) (microtime(true) * 1000);
+        $chunkSizeMs = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+        $fromMs = $startTime ?? ($nowMs - $chunkSizeMs);
+
+        // Ensure fromMs is not in the future
+        if ($fromMs > $nowMs) {
+            return ['list' => []];
         }
-        if ($startTime) {
-            $params['startTime'] = $startTime;
+
+        $ordersById = [];
+
+        for ($chunkStart = $fromMs; $chunkStart < $nowMs; $chunkStart += $chunkSizeMs) {
+            $chunkEnd = min($chunkStart + $chunkSizeMs - 1, $nowMs);
+
+            $params = [
+                'limit' => $limit,
+                'startTime' => $chunkStart,
+                'endTime' => $chunkEnd,
+            ];
+            if ($symbol) {
+                $params['symbol'] = $symbol;
+            }
+
+            try {
+                $resp = $this->sendRequest('get', '/openApi/swap/v2/trade/allOrders', $params);
+                // BingX typically returns structure with 'orders' key; fallback to 'list' if present
+                $list = $resp['orders'] ?? ($resp['list'] ?? []);
+
+                foreach ($list as $item) {
+                    $oid = $item['orderId'] ?? null;
+                    if ($oid === null) {
+                        // Fallback key to avoid losing entries without orderId
+                        $ordersById[md5(json_encode($item))] = $item;
+                    } else {
+                        // Deduplicate by orderId
+                        $ordersById[$oid] = $item;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Best-effort aggregation: skip failed chunk and continue
+                continue;
+            }
         }
-        $orders = $this->sendRequest('get', '/openApi/swap/v2/trade/allOrders', $params);
-        return ['list' => $orders['orders'] ?? []];
+
+        return ['list' => array_values($ordersById)];
     }
 
     public function closePosition(string $symbol, string $side, float $qty): array
