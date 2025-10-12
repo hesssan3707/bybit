@@ -496,6 +496,23 @@ class FuturesController extends Controller
             return redirect()->route('futures.orders')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
         }
 
+        // Local environment: skip exchange call and update Trade only
+        if (app()->environment('local')) {
+            $trade = \App\Models\Trade::whereNull('closed_at')
+                ->where('order_id', $order->order_id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($trade) {
+                $trade->closed_at = now();
+                // Do not modify avg_exit_price or pnl to avoid exchange dependency
+                $trade->save();
+                return redirect()->route('futures.pnl_history')->with('success', 'موقعیت به صورت آزمایشی در محیط محلی بسته شد.');
+            } else {
+                return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
+            }
+        }
+
         try {
             $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
@@ -547,7 +564,7 @@ class FuturesController extends Controller
             return redirect()->route('futures.orders')->with('success', 'سفارش شما برای بسته شدن در قیمت لحظه‌ای بازار با موفقیت ثبت شد.');
 
         } catch (\Exception $e) {
-            Log::error('Futures market close failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Futures market close failed: ' . $e->getMessage());
 
             $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
 
@@ -619,7 +636,9 @@ class FuturesController extends Controller
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
 
-        $trades = $tradesQuery->latest('closed_at')->paginate(20);
+        // Closed trades (paginate) and order by closed_at desc
+        $closedTradesQuery = clone $tradesQuery;
+        $closedTrades = $closedTradesQuery->whereNotNull('closed_at')->latest('closed_at')->paginate(20);
 
         // Open trades (closed_at is null)
         $openTradesQuery = Trade::forUser(auth()->id());
@@ -645,7 +664,7 @@ class FuturesController extends Controller
         }
 
         return view('futures.pnl_history', [
-            'trades' => $trades,
+            'closedTrades' => $closedTrades,
             'openTrades' => $openTrades,
             'orderModelByOrderId' => $orderModelByOrderId,
         ]);

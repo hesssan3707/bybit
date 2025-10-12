@@ -111,7 +111,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
+            background-color: #090909;
             transition: .4s;
             border-radius: 40px;
         }
@@ -125,9 +125,6 @@
             background-color: white;
             transition: .4s;
             border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #2196F3;
         }
         input:checked + .slider:before {
             transform: translateX(52px);
@@ -161,6 +158,13 @@
             margin-top: 20px;
             padding: 15px;
             color : white;
+        }
+        .trend-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 1em; }
+        .badge-up { background: rgb(253, 253, 253);color: #000; border: 1px solid rgba(40,167,69,0.35); }
+        .badge-down { background: rgba(0, 0, 0, 0.9);color: #fff; border: 1px solid rgba(220,53,69,0.35); }
+        .badge-neutral { background: rgba(108,117,125,0.15); color: #6c757d; border: 1px solid rgba(108,117,125,0.35); }
+        @media screen and (max-width: 768px) {
+          .trend-badge { font-size: 1.1em; padding: 6px 12px; }
         }
     </style>
 @endpush
@@ -240,18 +244,17 @@
                                         <span style="color: red;">داده کافی نیست</span>
                                     @endif
                                 </td>
-                                <td data-label="روند" style="font-size: 1.2em;" class="{{ $comparisonData[$timeframe]['trend'] === 'up' || $comparisonData[$timeframe]['trend'] === 'strong_up' ? 'trend-up' : ($comparisonData[$timeframe]['trend'] === 'down' || $comparisonData[$timeframe]['trend'] === 'strong_down' ? 'trend-down' : '') }}">
-                                    @if($comparisonData[$timeframe]['trend'] === 'strong_up')
-                                        ⇗
-                                    @elseif($comparisonData[$timeframe]['trend'] === 'up')
-                                        ↗
-                                    @elseif($comparisonData[$timeframe]['trend'] === 'strong_down')
-                                        ⇘
-                                    @elseif($comparisonData[$timeframe]['trend'] === 'down')
-                                        ↘
-                                    @else
-                                        ◯
-                                    @endif
+                                <td data-label="روند">
+                                    @php
+                                        $trend = $comparisonData[$timeframe]['trend'] ?? null;
+                                        $badgeClass = 'badge-neutral';
+                                        $arrow = '◯';
+                                        if ($trend === 'strong_up') { $badgeClass = 'badge-up'; $arrow = '⇗'; }
+                                        elseif ($trend === 'up') { $badgeClass = 'badge-up'; $arrow = '↗'; }
+                                        elseif ($trend === 'strong_down') { $badgeClass = 'badge-down'; $arrow = '⇘'; }
+                                        elseif ($trend === 'down') { $badgeClass = 'badge-down'; $arrow = '↘'; }
+                                    @endphp
+                                    <span class="trend-badge {{ $badgeClass }}">{{ $arrow }}</span>
                                 </td>
                             </tr>
                         @endforeach

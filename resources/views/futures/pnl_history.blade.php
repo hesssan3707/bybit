@@ -139,7 +139,13 @@
     .position-value { color: #fff; }
     .pnl-positive { color: #28a745; font-weight: 700; }
     .pnl-negative { color: #dc3545; font-weight: 700; }
-
+    /* Badge styles for readable PnL values */
+    .pnl-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 0.95em; }
+    .badge-positive { background: rgba(251, 251, 251, 0.85); color: #28a745; border: 1px solid rgba(40,167,69,0.35); }
+    .badge-negative { background: rgba(0, 0, 0, 0.7); color: #dc3545; border: 1px solid rgba(220,53,69,0.35); }
+    @media screen and (max-width: 768px) {
+      .pnl-badge { font-size: 1.05em; padding: 6px 12px; }
+    }
     @media screen and (max-width: 768px) {
         .mobile-redirect-section {
             display: block;
@@ -298,39 +304,45 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse ($trades as $trade)
+                @foreach ($openTrades as $trade)
                     <tr>
                         <td data-label="نماد">{{ $trade->symbol }}</td>
                         <td data-label="جهت">{{ $trade->side }}</td>
                         <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
                         <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 4), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت خروج">
-                            @if(is_null($trade->closed_at))
-                                --
-                            @else
-                                {{ rtrim(rtrim(number_format($trade->avg_exit_price, 4), '0'), '.') }}
-                            @endif
-                        </td>
+                        <td data-label="میانگین قیمت خروج">--</td>
                         <td data-label="سود و زیان">
-                            <span style="color: {{ $trade->pnl >= 0 ? 'green' : 'red' }};">
+                            <span style="direction: ltr;" class="pnl-badge {{ $trade->pnl >= 0 ? 'badge-positive' : 'badge-negative' }}">
                                 {{ rtrim(rtrim(number_format($trade->pnl, 4), '0'), '.') }}
                             </span>
                         </td>
                         <td data-label="زمان بسته شدن">
-                            @if(is_null($trade->closed_at))
-                                @php $oid = $orderModelByOrderId[$trade->order_id] ?? null; @endphp
-                                @if($oid)
-                                    <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');" title="بستن موقعیت باز">
-                                        @csrf
-                                        <button type="submit" class="close-btn">بستن</button>
-                                    </form>
-                                @else
-                                    <span class="text-muted" title="سفارش مرتبط برای بستن یافت نشد">سفارش مرتبط یافت نشد</span>
-                                @endif
+                            @php $oid = $orderModelByOrderId[$trade->order_id] ?? null; @endphp
+                            @if($oid)
+                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');" title="بستن موقعیت باز">
+                                    @csrf
+                                    <button type="submit" class="close-btn">بستن</button>
+                                </form>
                             @else
-                                {{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}
+                                <span class="text-muted" title="سفارش مرتبط برای بستن یافت نشد">سفارش مرتبط یافت نشد</span>
                             @endif
                         </td>
+                    </tr>
+                @endforeach
+
+                @forelse ($closedTrades as $trade)
+                    <tr>
+                        <td data-label="نماد">{{ $trade->symbol }}</td>
+                        <td data-label="جهت">{{ $trade->side }}</td>
+                        <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 4), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($trade->avg_exit_price, 4), '0'), '.') }}</td>
+                        <td data-label="سود و زیان">
+                            <span style="direction: ltr;" class="pnl-badge {{ $trade->pnl >= 0 ? 'badge-positive' : 'badge-negative' }}">
+                                {{ rtrim(rtrim(number_format($trade->pnl, 4), '0'), '.') }}
+                            </span>
+                        </td>
+                        <td data-label="زمان بسته شدن">{{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}</td>
                     </tr>
                 @empty
                     <tr>
@@ -341,6 +353,6 @@
         </table>
     </div>
 
-    {{ $trades->links() }}
+    {{ $closedTrades->links() }}
 </div>
 @endsection
