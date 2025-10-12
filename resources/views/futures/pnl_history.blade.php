@@ -206,8 +206,8 @@
         </div>
     @endif
 
-    <!-- Open Positions Section -->
-    @if(isset($openTrades) && $openTrades->count() > 0)
+    <!-- Open Positions Section (disabled: merged into unified table) -->
+    @if(false)
     <div class="table-responsive open-positions-table" title="در این بخش، موقعیت‌های باز شما نمایش داده می‌شود. برای بستن، روی دکمه بستن کلیک کنید.">
         <h3 style="margin-top:10px">موقعیت‌های باز</h3>
         <table>
@@ -304,13 +304,33 @@
                         <td data-label="جهت">{{ $trade->side }}</td>
                         <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
                         <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 4), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($trade->avg_exit_price, 4), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت خروج">
+                            @if(is_null($trade->closed_at))
+                                --
+                            @else
+                                {{ rtrim(rtrim(number_format($trade->avg_exit_price, 4), '0'), '.') }}
+                            @endif
+                        </td>
                         <td data-label="سود و زیان">
                             <span style="color: {{ $trade->pnl >= 0 ? 'green' : 'red' }};">
                                 {{ rtrim(rtrim(number_format($trade->pnl, 4), '0'), '.') }}
                             </span>
                         </td>
-                        <td data-label="زمان بسته شدن">{{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}</td>
+                        <td data-label="زمان بسته شدن">
+                            @if(is_null($trade->closed_at))
+                                @php $oid = $orderModelByOrderId[$trade->order_id] ?? null; @endphp
+                                @if($oid)
+                                    <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');" title="بستن موقعیت باز">
+                                        @csrf
+                                        <button type="submit" class="close-btn">بستن</button>
+                                    </form>
+                                @else
+                                    <span class="text-muted" title="سفارش مرتبط برای بستن یافت نشد">سفارش مرتبط یافت نشد</span>
+                                @endif
+                            @else
+                                {{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
