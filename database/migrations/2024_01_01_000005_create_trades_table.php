@@ -23,7 +23,7 @@ return new class extends Migration
             $table->decimal('avg_exit_price', 20, 8);
             $table->decimal('pnl', 20, 8); // Profit and Loss
             $table->string('order_id'); // Exchange order ID
-            $table->timestamp('closed_at');
+            $table->timestamp('closed_at')->nullable()->default(null);
             $table->timestamps();
             
             // Foreign key constraints

@@ -621,7 +621,34 @@ class FuturesController extends Controller
 
         $trades = $tradesQuery->latest('closed_at')->paginate(20);
 
-        return view('futures.pnl_history', compact('trades'));
+        // Open trades (closed_at is null)
+        $openTradesQuery = Trade::forUser(auth()->id());
+        if ($currentExchange) {
+            $openTradesQuery->accountType($currentExchange->is_demo_active);
+        }
+        $openTrades = $openTradesQuery->whereNull('closed_at')->get();
+
+        // Map open trade order_ids to Order model ids for close actions
+        $orderModelByOrderId = [];
+        if ($openTrades->count() > 0) {
+            $orderIds = $openTrades->pluck('order_id')->filter()->unique()->values()->all();
+            if (!empty($orderIds)) {
+                $ordersQuery = Order::forUser(auth()->id());
+                if ($currentExchange) {
+                    $ordersQuery->accountType($currentExchange->is_demo_active);
+                }
+                $orders = $ordersQuery->whereIn('order_id', $orderIds)->get();
+                foreach ($orders as $o) {
+                    $orderModelByOrderId[$o->order_id] = $o->id;
+                }
+            }
+        }
+
+        return view('futures.pnl_history', [
+            'trades' => $trades,
+            'openTrades' => $openTrades,
+            'orderModelByOrderId' => $orderModelByOrderId,
+        ]);
     }
 
     /**

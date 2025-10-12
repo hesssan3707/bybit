@@ -120,7 +120,7 @@ class SpotOrderLifecycleManager extends Command
         // Get all pending spot orders for this user exchange (real mode)
         $orders = SpotOrder::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
-            ->whereIn('status', ['pending', 'partially_filled'])
+            ->whereIn('status', ['pending'])
             ->get();
 
         foreach ($orders as $order) {
@@ -172,18 +172,22 @@ class SpotOrderLifecycleManager extends Command
      */
     private function mapExchangeStatus($exchangeStatus)
     {
-        $statusMap = [
-            'NEW' => 'pending',
-            'PENDING' => 'pending',
-            'PARTIALLY_FILLED' => 'partially_filled',
-            'FILLED' => 'filled',
-            'CANCELED' => 'cancelled',
-            'CANCELLED' => 'cancelled',
-            'REJECTED' => 'rejected',
-            'EXPIRED' => 'expired',
-            'CLOSED' => 'closed'
-        ];
-
-        return $statusMap[strtoupper($exchangeStatus)] ?? 'unknown';
+        $status = strtoupper((string)$exchangeStatus);
+        switch ($status) {
+            case 'NEW':
+            case 'ACTIVE':
+            case 'OPEN':
+            case 'PENDING':
+                return 'pending';
+            case 'FILLED':
+                return 'filled';
+            case 'CANCELED':
+            case 'CANCELLED':
+                return 'canceled';
+            case 'EXPIRED':
+                return 'expired';
+            default:
+                return 'pending';
+        }
     }
 }

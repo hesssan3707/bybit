@@ -216,7 +216,8 @@
                                     <button type="submit" class="delete-btn">لغو کردن</button>
                                 </form>
                             @elseif($order->status === 'filled')
-                                <button type="button" class="close-btn" data-order-id="{{ $order->id }}" data-order-side="{{ $order->side }}">بستن</button>
+                                {{-- دکمه بستن به بخش سود و زیان منتقل شد --}}
+                                -
                             @elseif($order->status === 'expired')
                                 <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش منقضی شده مطمئن هستید؟');">
                                     @csrf
