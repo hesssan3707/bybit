@@ -360,7 +360,6 @@ class FuturesLifecycleManager extends Command
                 foreach ($closedList as $c) {
                     $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
                     $fieldsMatch = (($c['symbol'] ?? null) === $symbol)
-                        && (($c['side'] ?? null) === $trade->side)
                         && isset($c['qty']) && (float)$c['qty'] == (float)$trade->qty
                         && isset($c['avgEntryPrice']) && (float)$c['avgEntryPrice'] == (float)$trade->avg_entry_price;
                     if ($idMatch || $fieldsMatch) {

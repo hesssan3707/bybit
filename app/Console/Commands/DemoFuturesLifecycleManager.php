@@ -332,7 +332,6 @@ class DemoFuturesLifecycleManager extends Command
                 $matchedPosition = null;
                 foreach ($normalized as $p) {
                     if (($p['symbol'] ?? null) === $trade->symbol
-                        && ($p['side'] ?? null) === $trade->side
                         && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
                         && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
                         $matchedPosition = $p;
