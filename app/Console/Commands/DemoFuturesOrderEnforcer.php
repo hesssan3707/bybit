@@ -206,63 +206,6 @@ class DemoFuturesOrderEnforcer extends Command
                 }
                 continue;
             }
-
-            // بررسی تاریخ انقضا
-            if ($dbOrder->expire_minutes !== null) {
-                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
-                if (time() >= $expireAt) {
-                    try {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'expired';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
-                        $this->info("    لغو سفارش منقضی شده (دمو): {$dbOrder->order_id}");
-                    } catch (Exception $e) {
-                        $this->warn("    خطا در لغو سفارش منقضی (دمو) {$dbOrder->order_id}: " . $e->getMessage());
-                    }
-                    continue;
-                }
-            }
-
-            // بررسی رسیدن به قیمت بسته شدن
-            if ($dbOrder->cancel_price) {
-                try {
-                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
-                    // نرمال‌سازی لیست کندل‌ها در صرافی‌های مختلف
-                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
-                    if (!is_array($list)) { $list = []; }
-                    // استخراج سقف و کف برای دو کندل آخر
-                    $candles = array_slice($list, -2);
-                    $extractHL = function($candle) {
-                        if (is_array($candle)) {
-                            if (array_keys($candle) === range(0, count($candle)-1)) {
-                                $high = isset($candle[2]) ? (float)$candle[2] : (isset($candle[1]) ? (float)$candle[1] : 0.0);
-                                $low = isset($candle[3]) ? (float)$candle[3] : (isset($candle[2]) ? (float)$candle[2] : 0.0);
-                                return [$high, $low];
-                            }
-                            $high = (float)($candle['high'] ?? $candle['highPrice'] ?? $candle['h'] ?? 0);
-                            $low  = (float)($candle['low']  ?? $candle['lowPrice']  ?? $candle['l'] ?? 0);
-                            return [$high, $low];
-                        }
-                        return [0.0, 0.0];
-                    };
-                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
-                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
-                    
-                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
-                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
-
-                    if ($shouldCancel) {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'canceled';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
-                        $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن (دمو): {$dbOrder->order_id}");
-                    }
-                } catch (Exception $e) {
-                    $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش (دمو) {$dbOrder->order_id}: " . $e->getMessage());
-                }
-            }
         }
     }
 
