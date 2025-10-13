@@ -227,7 +227,27 @@ class BinanceApiService implements ExchangeApiServiceInterface
     }
     public function getKlines(string $symbol , string $interval , $limit): array
     {
-        return $this->sendRequestWithoutCredentials('GET', '/api/v3/klines', ['interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
+        // Normalize interval for Binance: expects strings like '1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1M'
+        $normalized = $interval;
+        $lower = strtolower($interval);
+        if (preg_match('/^\d+$/', $lower)) {
+            // numeric minutes -> append 'm'
+            $normalized = $lower . 'm';
+        } elseif (preg_match('/^\d+m$/', $lower)) {
+            $normalized = $lower;
+        } elseif (preg_match('/^\d+h$/', $lower)) {
+            $normalized = $lower;
+        } elseif (in_array(strtoupper($interval), ['D','W','M'])) {
+            // Map Bybit-style 'D','W','M' to Binance equivalents
+            $map = ['D' => '1d', 'W' => '1w', 'M' => '1M'];
+            $normalized = $map[strtoupper($interval)];
+        } elseif ($lower === '1day') {
+            $normalized = '1d';
+        } elseif ($lower === '60min') {
+            $normalized = '1h';
+        }
+    
+        return $this->sendRequestWithoutCredentials('GET', '/api/v3/klines', ['interval' => $normalized, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     // Interface implementation methods that need to be adapted or implemented

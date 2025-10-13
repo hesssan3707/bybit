@@ -232,6 +232,7 @@ class DemoFuturesLifecycleManager extends Command
         $order = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->where('order_id', $orderId)
+            ->whereNotIn('status', ['expired'])
             ->first();
 
         if ($order) {

@@ -185,7 +185,27 @@ class BingXApiService implements ExchangeApiServiceInterface
     }
     public function getKlines(string $symbol , string $interval , $limit): array
     {
-        return $this->sendRequestWithoutCredentials('GET', '/openApi/spot/v1/market/kline', ['interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
+        // Normalize interval for BingX spot kline: expects '1min','5min','15min','30min','60min','1day' etc.
+        $normalized = $interval;
+        $lower = strtolower($interval);
+        if (preg_match('/^\d+m$/', $lower)) {
+            // '15m' -> '15min'
+            $normalized = intval($lower) . 'min';
+        } elseif (preg_match('/^\d+h$/', $lower)) {
+            // '1h' -> '60min'
+            $normalized = (intval($lower) * 60) . 'min';
+        } elseif (in_array(strtoupper($interval), ['D'])) {
+            $normalized = '1day';
+        } elseif ($lower === '60min') {
+            $normalized = '60min';
+        } elseif ($lower === '1day' || $lower === '1d') {
+            $normalized = '1day';
+        } elseif (preg_match('/^\d+$/', $lower)) {
+            // numeric minutes -> '<n>min'
+            $normalized = intval($lower) . 'min';
+        }
+    
+        return $this->sendRequestWithoutCredentials('GET', '/openApi/spot/v1/market/kline', ['interval' => $normalized, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     public function getAccountBalance(): array

@@ -222,7 +222,27 @@ class BybitApiService implements ExchangeApiServiceInterface
     }
     public function getKlines(string $symbol , string $interval , $limit): array
     {
-        return $this->sendRequestWithoutCredentials('GET', '/v5/market/kline', ['category' => 'linear' , 'interval' => $interval, 'symbol' => $symbol , 'limit' => $limit]);
+        // Normalize interval for Bybit v5: minutes numeric ('1','3','5','15','30','60','120','240','360','720'), or 'D','W','M'
+        $normalized = $interval;
+        $lower = strtolower($interval);
+        if (preg_match('/^\d+m$/', $lower)) {
+            // convert like '15m' -> '15'
+            $normalized = (string)intval($lower);
+        } elseif (preg_match('/^\d+h$/', $lower)) {
+            // convert like '1h' -> '60'
+            $normalized = (string)(intval($lower) * 60);
+        } elseif (in_array(strtoupper($interval), ['D','W','M'])) {
+            $normalized = strtoupper($interval);
+        } elseif ($lower === '1day') {
+            $normalized = 'D';
+        } elseif ($lower === '60min') {
+            $normalized = '60';
+        } elseif (preg_match('/^\d+$/', $lower)) {
+            // already numeric minutes
+            $normalized = $lower;
+        }
+    
+        return $this->sendRequestWithoutCredentials('GET', '/v5/market/kline', ['category' => 'linear', 'interval' => $normalized, 'symbol' => $symbol , 'limit' => $limit]);
     }
 
     /**

@@ -41,9 +41,17 @@ class DemoFuturesOrderEnforcer extends Command
                 $this->error("کاربر با شناسه {$userOption} یافت نشد.");
                 return 1;
             }
-            $this->enforceForUser($user);
+            // اجرای جریان بررسی فقط قیمت لغو و تاریخ انقضا برای کاربر مشخص
+            $this->enforceCancelExpireOnlyForUser($user);
+            // اگر کاربر در حالت سخت‌گیرانه است، اجرای کامل قوانین نیز انجام شود
+            if ($user->future_strict_mode) {
+                $this->enforceForUser($user);
+            }
         } else {
+            // اجرای جریان بررسی فقط قیمت لغو و تاریخ انقضا برای همه کاربران دارای سفارش در انتظار
             $this->enforceForAllUsers();
+            // سپس اجرای کامل قوانین برای کاربران در حالت سخت‌گیرانه
+            $this->enforceForStrictAccount();
         }
 
         $this->info('بررسی و اعمال قوانین سفارشات اضافی (دمو) با موفقیت تکمیل شد.');
@@ -55,13 +63,22 @@ class DemoFuturesOrderEnforcer extends Command
      */
     private function enforceForAllUsers()
     {
-        // Find all users who have strict mode enabled
-        $users = User::where('future_strict_mode', true)->get();
-        
-        $this->info("پردازش {$users->count()} کاربر در حالت سخت‌گیرانه (دمو)...");
+        // یافتن کاربران دارای حداقل یک سفارش در انتظار (دمو)
+        $pendingUserExchangeIds = Order::where('is_demo', true)
+            ->where('status', 'pending')
+            ->pluck('user_exchange_id')
+            ->filter()
+            ->unique();
+
+        $userIds = UserExchange::whereIn('id', $pendingUserExchangeIds)
+            ->pluck('user_id')
+            ->unique();
+
+        $users = User::whereIn('id', $userIds)->get();
+        $this->info("پردازش {$users->count()} کاربر دارای سفارش در انتظار (دمو) (فقط بررسی قیمت لغو و تاریخ انقضا)...");
 
         foreach ($users as $user) {
-            $this->enforceForUser($user);
+            $this->enforceCancelExpireOnlyForUser($user);
         }
     }
 
@@ -100,6 +117,11 @@ class DemoFuturesOrderEnforcer extends Command
      */
     private function enforceForUserExchange(User $user, UserExchange $userExchange)
     {
+        // در محیط لوکال از اتصال زنده به صرافی‌ها صرف‌نظر شود
+        if (app()->environment('local')) {
+            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود (دمو).");
+            return;
+        }
         try {
             $this->info("پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}");
 
@@ -114,8 +136,8 @@ class DemoFuturesOrderEnforcer extends Command
             // Get user's selected market
             $symbol = $user->selected_market;
 
-            // Get all open orders from exchange
-            $openOrdersResult = $exchangeService->getOpenOrders($symbol);
+            // Get all open orders from exchange (fetch for all symbols)
+            $openOrdersResult = $exchangeService->getOpenOrders(null);
             $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
             
             // Get all positions from exchange
@@ -148,13 +170,13 @@ class DemoFuturesOrderEnforcer extends Command
     {
         $this->info("  بررسی سفارشات در انتظار (دمو)...");
 
-        // Get all pending orders from database (demo mode)
+        // دریافت همه سفارشات در انتظار از دیتابیس (دمو)
         $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->where('status', 'pending')
             ->get();
 
-        // Create map of exchange orders for quick lookup
+        // ساخت نقشه سفارشات صرافی برای جستجوی سریع
         $exchangeOrdersMap = [];
         foreach ($exchangeOpenOrders as $order) {
             $exchangeOrdersMap[$order['orderId']] = $order;
@@ -163,12 +185,12 @@ class DemoFuturesOrderEnforcer extends Command
         foreach ($pendingOrders as $dbOrder) {
             $exchangeOrder = $exchangeOrdersMap[$dbOrder->order_id] ?? null;
 
-            // If order is not on exchange, skip (let lifecycle handle it)
+            // اگر سفارش روی صرافی وجود ندارد، صرف‌نظر (واگذاری به چرخه عمر)
             if (!$exchangeOrder) {
                 continue;
             }
 
-            // Check if order size or entry price doesn't match
+            // بررسی عدم تطابق مقدار/قیمت
             $exchangePrice = (float)($exchangeOrder['price'] ?? 0);
             $dbPrice = (float)$dbOrder->entry_price;
             $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
@@ -185,7 +207,7 @@ class DemoFuturesOrderEnforcer extends Command
                 continue;
             }
 
-            // Check if expiry date has passed
+            // بررسی تاریخ انقضا
             if ($dbOrder->expire_minutes !== null) {
                 $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
                 if (time() >= $expireAt) {
@@ -202,13 +224,33 @@ class DemoFuturesOrderEnforcer extends Command
                 }
             }
 
-            // Check if closing price has been reached
+            // بررسی رسیدن به قیمت بسته شدن
             if ($dbOrder->cancel_price) {
                 try {
-                    $klines = $exchangeService->getKlines($symbol, 1, 2);
+                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
+                    // نرمال‌سازی لیست کندل‌ها در صرافی‌های مختلف
+                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
+                    if (!is_array($list)) { $list = []; }
+                    // استخراج سقف و کف برای دو کندل آخر
+                    $candles = array_slice($list, -2);
+                    $extractHL = function($candle) {
+                        if (is_array($candle)) {
+                            if (array_keys($candle) === range(0, count($candle)-1)) {
+                                $high = isset($candle[2]) ? (float)$candle[2] : (isset($candle[1]) ? (float)$candle[1] : 0.0);
+                                $low = isset($candle[3]) ? (float)$candle[3] : (isset($candle[2]) ? (float)$candle[2] : 0.0);
+                                return [$high, $low];
+                            }
+                            $high = (float)($candle['high'] ?? $candle['highPrice'] ?? $candle['h'] ?? 0);
+                            $low  = (float)($candle['low']  ?? $candle['lowPrice']  ?? $candle['l'] ?? 0);
+                            return [$high, $low];
+                        }
+                        return [0.0, 0.0];
+                    };
+                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
+                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
                     
-                    $shouldCancel = ($dbOrder->side === 'buy' && max($klines['list'][0][2], $klines['list'][1][2]) >= $dbOrder->cancel_price) ||
-                                   ($dbOrder->side === 'sell' && min($klines['list'][0][3], $klines['list'][1][3]) <= $dbOrder->cancel_price);
+                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
+                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
 
                     if ($shouldCancel) {
                         $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
@@ -262,19 +304,9 @@ class DemoFuturesOrderEnforcer extends Command
 
             if (abs($exchangeSize - $dbSize) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
                 try {
-                    // Send market close order for this position
-                    $closeSide = ($dbOrder->side === 'buy') ? 'sell' : 'buy';
-                    
-                    $marketCloseParams = [
-                        'category' => 'linear',
-                        'symbol' => $dbOrder->symbol,
-                        'side' => $closeSide,
-                        'orderType' => 'Market',
-                        'qty' => (string)$exchangeSize,
-                        'reduceOnly' => true,
-                    ];
-                    
-                    $exchangeService->createOrder($marketCloseParams);
+                    // Unified market close using closePosition across exchanges
+                    $closeSideFull = ($dbOrder->side === 'buy') ? 'Sell' : 'Buy';
+                    $exchangeService->closePosition($dbOrder->symbol, $closeSideFull, (string)$exchangeSize);
                     
                     // Mark order as closed in database
                     $dbOrder->status = 'closed_by_enforcer';
@@ -312,21 +344,19 @@ class DemoFuturesOrderEnforcer extends Command
 
         foreach ($exchangeOpenOrders as $exchangeOrder) {
             $orderId = $exchangeOrder['orderId'];
+            $orderSymbol = $exchangeOrder['symbol'] ?? $symbol;
             
-            // Skip if this is our tracked order
             if (in_array($orderId, $ourOrderIds)) {
                 continue;
             }
 
-            // Check if this is a TP/SL order that should be preserved
             if ($this->isValidTpSlOrder($exchangeOrder, $ourRegisteredOrders)) {
                 $this->info("    حفظ سفارش TP/SL معتبر (دمو): {$orderId}");
                 continue;
             }
 
-            // This is a foreign order, delete it
             try {
-                $exchangeService->cancelOrderWithSymbol($orderId, $symbol);
+                $exchangeService->cancelOrderWithSymbol($orderId, $orderSymbol);
                 $this->info("    حذف سفارش خارجی (دمو): {$orderId}");
             } catch (Exception $e) {
                 $this->warn("    خطا در حذف سفارش خارجی (دمو) {$orderId}: " . $e->getMessage());
@@ -339,27 +369,24 @@ class DemoFuturesOrderEnforcer extends Command
      */
     private function isValidTpSlOrder(array $exchangeOrder, $ourRegisteredOrders): bool
     {
-        $isReduceOnly = ($exchangeOrder['reduceOnly'] ?? false) === true;
-        $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? 0);
+        $reduceRaw = $exchangeOrder['reduceOnly'] ?? false;
+        $isReduceOnly = ($reduceRaw === true || $reduceRaw === 'true' || $reduceRaw === 1 || $reduceRaw === '1');
+        $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? $exchangeOrder['stopPrice'] ?? $exchangeOrder['stopPx'] ?? 0);
         $orderSide = strtolower($exchangeOrder['side'] ?? '');
-        $orderQty = (float)($exchangeOrder['qty'] ?? 0);
+        $orderQty = (float)($exchangeOrder['qty'] ?? $exchangeOrder['quantity'] ?? $exchangeOrder['origQty'] ?? 0);
 
-        // Only check reduce-only orders (TP/SL orders)
         if (!$isReduceOnly) {
             return false;
         }
 
-        // Check against all our registered orders
         foreach ($ourRegisteredOrders as $registeredOrder) {
             $registeredSl = (float)$registeredOrder->sl;
             $registeredTp = (float)$registeredOrder->tp;
             $registeredSide = strtolower($registeredOrder->side);
             $registeredQty = (float)$registeredOrder->amount;
 
-            // Expected opposite side for TP/SL
             $expectedOppositeSide = ($registeredSide === 'buy') ? 'sell' : 'buy';
 
-            // Check if this matches our SL
             if ($registeredSl > 0 && 
                 abs($orderPrice - $registeredSl) < 0.01 && 
                 $orderSide === $expectedOppositeSide &&
@@ -367,7 +394,6 @@ class DemoFuturesOrderEnforcer extends Command
                 return true;
             }
 
-            // Check if this matches our TP
             if ($registeredTp > 0 && 
                 abs($orderPrice - $registeredTp) < 0.01 && 
                 $orderSide === $expectedOppositeSide &&
@@ -377,5 +403,141 @@ class DemoFuturesOrderEnforcer extends Command
         }
 
         return false;
+    }
+
+    private function enforceCancelExpireOnlyForUser(User $user)
+    {
+        $this->info("پردازش کاربر برای بررسی قیمت لغو/انقضا (دمو): {$user->email}");
+
+        // دریافت همه صرافی‌های دمو فعال کاربر
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
+            ->whereNotNull('demo_api_key')
+            ->whereNotNull('demo_api_secret')
+            ->get();
+
+        if ($userExchanges->isEmpty()) {
+            $this->info("هیچ صرافی دمو فعالی برای کاربر {$user->email} یافت نشد");
+            return;
+        }
+
+        foreach ($userExchanges as $userExchange) {
+            $this->enforceCancelExpireOnlyForUserExchange($user, $userExchange);
+        }
+    }
+
+    private function enforceCancelExpireOnlyForUserExchange(User $user, UserExchange $userExchange)
+    {
+        // در محیط لوکال از اتصال زنده به صرافی‌ها صرف‌نظر شود
+        if (app()->environment('local')) {
+            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود (دمو).");
+            return;
+        }
+
+        try {
+            $this->info("پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email} - فقط بررسی قیمت لغو/انقضا");
+
+            // ایجاد سرویس صرافی (دمو)
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange_name,
+                $userExchange->demo_api_key,
+                $userExchange->demo_api_secret,
+                true
+            );
+
+            $symbol = $user->selected_market;
+
+            // دریافت همه سفارشات باز (همه نمادها)
+            $openOrdersResult = $exchangeService->getOpenOrders(null);
+            $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
+
+            // اجرای بررسی فقط قیمت لغو و تاریخ انقضا
+            $this->checkPendingOrdersCancelExpireOnly($exchangeService, $userExchange, $symbol, $exchangeOpenOrders);
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email} در بررسی لغو/انقضا: " . $e->getMessage());
+        }
+    }
+
+    private function checkPendingOrdersCancelExpireOnly($exchangeService, UserExchange $userExchange, string $symbol, array $exchangeOpenOrders)
+    {
+        $this->info("  بررسی سفارشات در انتظار (دمو) - فقط قیمت لغو و تاریخ انقضا...");
+
+        $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->where('status', 'pending')
+            ->get();
+
+        $exchangeOrdersMap = [];
+        foreach ($exchangeOpenOrders as $order) {
+            $exchangeOrdersMap[$order['orderId']] = $order;
+        }
+
+        foreach ($pendingOrders as $dbOrder) {
+            $exchangeOrder = $exchangeOrdersMap[$dbOrder->order_id] ?? null;
+            if (!$exchangeOrder) { continue; }
+
+            // تاریخ انقضا
+            if ($dbOrder->expire_minutes !== null) {
+                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                if (time() >= $expireAt) {
+                    try {
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'expired';
+                        $dbOrder->closed_at = now();
+                        $dbOrder->save();
+                        $this->info("    لغو سفارش منقضی شده (دمو): {$dbOrder->order_id}");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در لغو سفارش منقضی (دمو) {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                    continue;
+                }
+            }
+
+            // قیمت لغو
+            if ($dbOrder->cancel_price) {
+                try {
+                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
+                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
+                    if (!is_array($list)) { $list = []; }
+                    $candles = array_slice($list, -2);
+                    $extractHL = function($candle) {
+                        if (is_array($candle)) {
+                            if (array_keys($candle) === range(0, count($candle)-1)) {
+                                $high = isset($candle[2]) ? (float)$candle[2] : (isset($candle[1]) ? (float)$candle[1] : 0.0);
+                                $low = isset($candle[3]) ? (float)$candle[3] : (isset($candle[2]) ? (float)$candle[2] : 0.0);
+                                return [$high, $low];
+                            }
+                            $high = (float)($candle['high'] ?? $candle['highPrice'] ?? $candle['h'] ?? 0);
+                            $low  = (float)($candle['low']  ?? $candle['lowPrice']  ?? $candle['l'] ?? 0);
+                            return [$high, $low];
+                        }
+                        return [0.0, 0.0];
+                    };
+                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
+                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
+                    
+                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
+                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
+
+                    if ($shouldCancel) {
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'canceled';
+                        $dbOrder->closed_at = now();
+                        $dbOrder->save();
+                        $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن (دمو): {$dbOrder->order_id}");
+                    }
+                } catch (Exception $e) {
+                    $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش (دمو) {$dbOrder->order_id}: " . $e->getMessage());
+                }
+            }
+        }
+    }
+    private function enforceForStrictAccount()
+    {
+        $this->info("اجرای کامل قوانین برای کاربران با حالت سخت‌گیرانه (دمو)...");
+        $strictUsers = User::where('future_strict_mode', true)->get();
+        foreach ($strictUsers as $user) {
+            $this->enforceForUser($user);
+        }
     }
 }

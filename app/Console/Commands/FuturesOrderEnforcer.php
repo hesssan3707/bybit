@@ -41,9 +41,17 @@ class FuturesOrderEnforcer extends Command
                 $this->error("کاربر با شناسه {$userOption} یافت نشد.");
                 return 1;
             }
-            $this->enforceForUser($user);
+            // Run cancel/expire-only flow for specified user
+            $this->enforceCancelExpireOnlyForUser($user);
+            // If user is strict, also run full strict enforcement
+            if ($user->future_strict_mode) {
+                $this->enforceForUser($user);
+            }
         } else {
+            // Run cancel/expire-only across all users with pending orders
             $this->enforceForAllUsers();
+            // Then run full enforcement for strict-mode users
+            $this->enforceForStrictAccount();
         }
 
         $this->info('بررسی و اعمال قوانین سفارشات اضافی با موفقیت تکمیل شد.');
@@ -55,13 +63,22 @@ class FuturesOrderEnforcer extends Command
      */
     private function enforceForAllUsers()
     {
-        // Find all users who have strict mode enabled
-        $users = User::where('future_strict_mode', true)->get();
-        
-        $this->info("پردازش {$users->count()} کاربر در حالت سخت‌گیرانه...");
+        // Find users who have at least one pending order
+        $pendingUserExchangeIds = Order::where('is_demo', false)
+            ->where('status', 'pending')
+            ->pluck('user_exchange_id')
+            ->filter()
+            ->unique();
+
+        $userIds = UserExchange::whereIn('id', $pendingUserExchangeIds)
+            ->pluck('user_id')
+            ->unique();
+
+        $users = User::whereIn('id', $userIds)->get();
+        $this->info("پردازش {$users->count()} کاربر دارای سفارش در انتظار (فقط بررسی قیمت لغو و تاریخ انقضا)...");
 
         foreach ($users as $user) {
-            $this->enforceForUser($user);
+            $this->enforceCancelExpireOnlyForUser($user);
         }
     }
 
@@ -100,6 +117,12 @@ class FuturesOrderEnforcer extends Command
      */
     private function enforceForUserExchange(User $user, UserExchange $userExchange)
     {
+        // Skip live connectivity in local environment
+        if (app()->environment('local')) {
+            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود.");
+            return;
+        }
+
         try {
             $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}");
 
@@ -114,8 +137,8 @@ class FuturesOrderEnforcer extends Command
             // Get user's selected market
             $symbol = $user->selected_market;
 
-            // Get all open orders from exchange
-            $openOrdersResult = $exchangeService->getOpenOrders($symbol);
+            // Get all open orders from exchange (all symbols)
+            $openOrdersResult = $exchangeService->getOpenOrders(null);
             $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
             
             // Get all positions from exchange
@@ -205,10 +228,31 @@ class FuturesOrderEnforcer extends Command
             // Check if closing price has been reached
             if ($dbOrder->cancel_price) {
                 try {
-                    $klines = $exchangeService->getKlines($symbol, 1, 2);
+                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
+                    // Normalize kline list across exchanges
+                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
+                    if (!is_array($list)) { $list = []; }
+                    // Extract highs/lows for last two candles
+                    $candles = array_slice($list, -2);
+                    $extractHL = function($candle) {
+                        // Support array-of-arrays [open, high, low, close, ...] or associative keys
+                        if (is_array($candle)) {
+                            if (array_keys($candle) === range(0, count($candle)-1)) {
+                                $high = isset($candle[2]) ? (float)$candle[2] : (isset($candle[1]) ? (float)$candle[1] : 0.0);
+                                $low = isset($candle[3]) ? (float)$candle[3] : (isset($candle[2]) ? (float)$candle[2] : 0.0);
+                                return [$high, $low];
+                            }
+                            $high = (float)($candle['high'] ?? $candle['highPrice'] ?? $candle['h'] ?? 0);
+                            $low  = (float)($candle['low']  ?? $candle['lowPrice']  ?? $candle['l'] ?? 0);
+                            return [$high, $low];
+                        }
+                        return [0.0, 0.0];
+                    };
+                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
+                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
                     
-                    $shouldCancel = ($dbOrder->side === 'buy' && max($klines['list'][0][2], $klines['list'][1][2]) >= $dbOrder->cancel_price) ||
-                                   ($dbOrder->side === 'sell' && min($klines['list'][0][3], $klines['list'][1][3]) <= $dbOrder->cancel_price);
+                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
+                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
 
                     if ($shouldCancel) {
                         $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
@@ -262,19 +306,9 @@ class FuturesOrderEnforcer extends Command
 
             if (abs($exchangeSize - $dbSize) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
                 try {
-                    // Send market close order for this position
-                    $closeSide = ($dbOrder->side === 'buy') ? 'sell' : 'buy';
-                    
-                    $marketCloseParams = [
-                        'category' => 'linear',
-                        'symbol' => $dbOrder->symbol,
-                        'side' => $closeSide,
-                        'orderType' => 'Market',
-                        'qty' => (string)$exchangeSize,
-                        'reduceOnly' => true,
-                    ];
-                    
-                    $exchangeService->createOrder($marketCloseParams);
+                    // Send market close order for this position via unified service method
+                    $closeSide = ($dbOrder->side === 'buy') ? 'Buy' : 'Sell';
+                    $exchangeService->closePosition($dbOrder->symbol, $closeSide, (float)$exchangeSize);
                     
                     // Mark order as closed in database
                     $dbOrder->status = 'closed_by_enforcer';
@@ -326,7 +360,8 @@ class FuturesOrderEnforcer extends Command
 
             // This is a foreign order, delete it
             try {
-                $exchangeService->cancelOrderWithSymbol($orderId, $symbol);
+                $symbolForCancel = $exchangeOrder['symbol'] ?? $symbol;
+                $exchangeService->cancelOrderWithSymbol($orderId, $symbolForCancel);
                 $this->info("    حذف سفارش خارجی: {$orderId}");
             } catch (Exception $e) {
                 $this->warn("    خطا در حذف سفارش خارجی {$orderId}: " . $e->getMessage());
@@ -339,10 +374,11 @@ class FuturesOrderEnforcer extends Command
      */
     private function isValidTpSlOrder(array $exchangeOrder, $ourRegisteredOrders): bool
     {
-        $isReduceOnly = ($exchangeOrder['reduceOnly'] ?? false) === true;
-        $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? 0);
+        $reduceOnlyRaw = $exchangeOrder['reduceOnly'] ?? ($exchangeOrder['isReduceOnly'] ?? null);
+        $isReduceOnly = $reduceOnlyRaw === true || $reduceOnlyRaw === 'true' || $reduceOnlyRaw === 1 || $reduceOnlyRaw === '1';
+        $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? $exchangeOrder['stopPrice'] ?? $exchangeOrder['stopPx'] ?? 0);
         $orderSide = strtolower($exchangeOrder['side'] ?? '');
-        $orderQty = (float)($exchangeOrder['qty'] ?? 0);
+        $orderQty = (float)($exchangeOrder['qty'] ?? $exchangeOrder['quantity'] ?? $exchangeOrder['origQty'] ?? 0);
 
         // Only check reduce-only orders (TP/SL orders)
         if (!$isReduceOnly) {
