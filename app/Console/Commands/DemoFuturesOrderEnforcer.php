@@ -248,8 +248,8 @@ class DemoFuturesOrderEnforcer extends Command
             if (abs($exchangeSize - $dbSize) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
                 try {
                     // Unified market close using closePosition across exchanges
-                    $closeSideFull = ($dbOrder->side === 'buy') ? 'Sell' : 'Buy';
-                    $exchangeService->closePosition($dbOrder->symbol, $closeSideFull, (string)$exchangeSize);
+                    $closeSide = ($dbOrder->side === 'buy') ? 'Buy' : 'Sell';
+                    $exchangeService->closePosition($dbOrder->symbol, $closeSide, (float)$exchangeSize);
                     
                     // Mark order as closed in database
                     $dbOrder->status = 'closed_by_enforcer';

@@ -473,14 +473,49 @@ class BybitApiService implements ExchangeApiServiceInterface
 
     public function closePosition(string $symbol, string $side, float $qty): array
     {
-        return $this->createOrder([
+        // Determine correct positionIdx for Bybit to avoid "position idx not match position mode" (10001)
+        // Try to find the matching active position for this symbol and side
+        $positionsList = [];
+        try {
+            $positionsResult = $this->getPositions($symbol);
+            $positionsList = $positionsResult['list'] ?? ($positionsResult['result']['list'] ?? []);
+        } catch (\Exception $e) {
+            // If positions lookup fails, proceed with safe fallbacks below
+        }
+
+        $positionIdx = 0;
+        $matched = null;
+        foreach ($positionsList as $pos) {
+            if ((($pos['symbol'] ?? '') === $symbol) &&
+                (strtolower($pos['side'] ?? '') === strtolower($side)) &&
+                ((float)($pos['size'] ?? 0) > 0)) {
+                $matched = $pos;
+                break;
+            }
+        }
+
+        if ($matched) {
+            // Use exchange-provided positionIdx when available or derive via helper
+            $positionIdx = $this->getPositionIdx($matched);
+        } else {
+            // Fallback:
+            // - Hedge mode: Buy -> 1 (long), Sell -> 2 (short)
+            // - One-way mode: 0
+            $positionIdx = ($side === 'Buy') ? 1 : (($side === 'Sell') ? 2 : 0);
+        }
+
+        // Build reduce-only market order payload with explicit positionIdx
+        $orderPayload = [
             'category' => 'linear',
             'symbol' => $symbol,
             'side' => $side === 'Buy' ? 'Sell' : 'Buy', // Opposite side to close
             'orderType' => 'Market',
             'qty' => (string)$qty,
             'reduceOnly' => true,
-        ]);
+            'positionIdx' => $positionIdx,
+        ];
+
+        return $this->createOrder($orderPayload);
     }
 
     public function setStopLoss(string $symbol, float $stopLoss, string $side): array
@@ -875,7 +910,9 @@ class BybitApiService implements ExchangeApiServiceInterface
             '10007' => 'آدرس IP مجاز نیست',
             '10009' => 'کلید API غیرفعال است',
             '10016' => 'سرویس در دسترس نیست',
-            '10018' => 'حساب کاربری محدود شده است'
+            '10018' => 'حساب کاربری محدود شده است',
+            // Explicit mapping for positionIdx mismatch
+            '10001' => 'شناسه موقعیت با حالت موقعیت مطابقت ندارد. لطفاً positionIdx صحیح را ارسال کنید یا حالت موقعیت (یک‌طرفه/دوطرفه) را بررسی کنید.',
         ];
 
         // Check for specific demo account issues
