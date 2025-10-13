@@ -111,8 +111,8 @@ class DemoFuturesOrderEnforcer extends Command
                 true // Demo mode
             );
 
-            // Get user's selected market, default to ETHUSDT if not set
-            $symbol = $user->selected_market ?: 'ETHUSDT';
+            // Get user's selected market
+            $symbol = $user->selected_market;
 
             // Get all open orders from exchange
             $openOrdersResult = $exchangeService->getOpenOrders($symbol);

@@ -329,7 +329,9 @@
                         </td>
                     </tr>
                 @endforeach
-
+                @if(isset($openTrades[0]))
+                    <tr><td colspan="7" class="section-separator"></td></tr>
+                @endif
                 @forelse ($closedTrades as $trade)
                     <tr>
                         <td data-label="نماد">{{ $trade->symbol }}</td>

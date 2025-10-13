@@ -41,31 +41,44 @@ class ProfileController extends Controller
                     $name = $defaultExchange->exchange_name;
 
                     if ($name === 'bybit') {
-                        // Prefer wallet balance (excludes unrealized PnL)
+                        // BYBIT (UNIFIED, USDT):
+                        // موجودی کل (Total Equity) = equity (includes unrealized PnL)
+                        // کیف پول (Wallet) = wallet balance = equity - unrealizedPnl
                         $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
                         $usdt = $balanceInfo['list'][0] ?? null;
                         if ($usdt) {
-                            $equityExUPL = (float)($usdt['totalWalletBalance'] ?? ($usdt['availableBalance'] ?? ($usdt['walletBalance'] ?? 0)));
-                            $totalEquity = number_format($equityExUPL, 2);
-                            $totalBalance = number_format($equityExUPL, 2);
+                            $equity = (float)($usdt['totalEquity'] ?? ($usdt['equity'] ?? ((($usdt['totalWalletBalance'] ?? ($usdt['walletBalance'] ?? 0))) + ($usdt['unrealizedPnl'] ?? 0))));
+                            $unrealized = (float)($usdt['unrealizedPnl'] ?? 0);
+                            $wallet = (float)($usdt['totalWalletBalance'] ?? ($usdt['walletBalance'] ?? ($equity - $unrealized)));
+                            $totalEquity = number_format($equity, 2);
+                            $totalBalance = number_format($wallet, 2);
                         }
                     } elseif ($name === 'binance') {
-                        // Binance futures: use USDT asset's balance/availableBalance (excludes unrealized PnL)
+                        // BINANCE (FUTURES, USDT from /fapi/v2/balance):
+                        // موجودی کل (Total Equity) = wallet + crossUnPnl (if available)
+                        // کیف پول (Wallet) = wallet balance (balance/crossWalletBalance)
                         $balanceInfo = $exchangeService->getWalletBalance('FUTURES', 'USDT');
                         $usdtRow = $balanceInfo['list'][0] ?? null;
                         if ($usdtRow) {
-                            $equityExUPL = (float)($usdtRow['balance'] ?? ($usdtRow['availableBalance'] ?? ($usdtRow['crossWalletBalance'] ?? ($usdtRow['maxWithdrawAmount'] ?? 0))));
-                            $totalEquity = number_format($equityExUPL, 2);
-                            $totalBalance = number_format($equityExUPL, 2);
+                            $walletBase = (float)($usdtRow['crossWalletBalance'] ?? ($usdtRow['balance'] ?? 0));
+                            $unpnl = (float)($usdtRow['crossUnPnl'] ?? 0);
+                            $equity = $walletBase + $unpnl;
+                            $wallet = (float)($usdtRow['crossWalletBalance'] ?? ($usdtRow['balance'] ?? ($usdtRow['availableBalance'] ?? ($usdtRow['maxWithdrawAmount'] ?? 0))));
+                            $totalEquity = number_format($equity, 2);
+                            $totalBalance = number_format($wallet, 2);
                         }
                     } elseif ($name === 'bingx') {
-                        // BingX futures: single object; prefer totalWalletBalance/availableBalance/walletBalance
+                        // BINGX (FUTURES, single object):
+                        // موجودی کل (Total Equity) = equity (includes unrealized PnL)
+                        // کیف پول (Wallet) = totalWalletBalance/walletBalance/availableBalance or equity - unrealizedPnl
                         $balanceInfo = $exchangeService->getWalletBalance('FUTURES');
                         $obj = $balanceInfo['list'][0] ?? null;
                         if ($obj) {
-                            $equityExUPL = (float)($obj['totalWalletBalance'] ?? ($obj['availableBalance'] ?? ($obj['walletBalance'] ?? ($obj['equity'] ?? 0))));
-                            $totalEquity = number_format($equityExUPL, 2);
-                            $totalBalance = number_format($equityExUPL, 2);
+                            $equity = (float)($obj['equity'] ?? ((($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? 0))) + ($obj['unrealizedPnl'] ?? 0)));
+                            $unrealized = (float)($obj['unrealizedPnl'] ?? 0);
+                            $wallet = (float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? ($obj['availableBalance'] ?? ($equity - $unrealized))));
+                            $totalEquity = number_format($equity, 2);
+                            $totalBalance = number_format($wallet, 2);
                         }
                     } else {
                         // Fallback to generic if available

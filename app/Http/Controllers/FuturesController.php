@@ -480,7 +480,7 @@ class FuturesController extends Controller
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
         if (!$exchangeStatus['hasActiveExchange']) {
-            return redirect()->route('futures.orders')
+            return redirect()->route('futures.pnl_history')
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
 
@@ -488,87 +488,138 @@ class FuturesController extends Controller
         $user = auth()->user();
         $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
         if (!in_array($order->user_exchange_id, $userExchangeIds)) {
-            return redirect()->route('futures.orders')
+            return redirect()->route('futures.pnl_history')
                 ->withErrors(['msg' => 'شما مجاز به بستن این سفارش نیستید.']);
         }
 
-        if ($order->status !== 'filled') {
-            return redirect()->route('futures.orders')->withErrors(['msg' => 'فقط سفارش‌های پر شده قابل بستن هستند.']);
-        }
+        // پیدا کردن معامله مرتبط باز
+        $trade = \App\Models\Trade::whereNull('closed_at')
+            ->where('order_id', $order->order_id)
+            ->where('user_exchange_id', $order->user_exchange_id)
+            ->first();
 
-        // Local environment: skip exchange call and update Trade only
+        // محیط محلی: عدم اتصال به صرافی و بروزرسانی حداقلی معامله
         if (app()->environment('local')) {
-            $trade = \App\Models\Trade::whereNull('closed_at')
-                ->where('order_id', $order->order_id)
-                ->where('user_id', $user->id)
-                ->first();
-
             if ($trade) {
+                $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
+                $trade->pnl = 0;
                 $trade->closed_at = now();
-                // Do not modify avg_exit_price or pnl to avoid exchange dependency
                 $trade->save();
                 return redirect()->route('futures.pnl_history')->with('success', 'موقعیت به صورت آزمایشی در محیط محلی بسته شد.');
-            } else {
-                return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
             }
+            return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
         }
 
         try {
             $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
 
-            // Get current exchange for hedge mode parameters
+            // تشخیص صرافی فعال کاربر
             $currentExchange = $user->currentExchange ?? $user->defaultExchange;
             if (!$currentExchange) {
                 throw new \Exception('No active exchange found');
             }
 
-            // Create a market order to close the position instantly
-            $closeSide = ($order->side === 'buy') ? 'Sell' : 'Buy';
+            // تعیین مقدار و سمت موقعیت برای بستن
+            $openSide = $trade ? ($trade->side ?? null) : (ucfirst($order->side) ?: null);
+            $qty = $trade ? (float)$trade->qty : (float)($order->filled_quantity ?? $order->amount ?? 0);
 
-            // Get proper quantity precision for this symbol
-            $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
-            $qtyStep = (float) $instrumentInfo['list'][0]['lotSizeFilter']['qtyStep'];
-
-            $closeQty = $order->amount;
-            if ($qtyStep >= 1) {
-                // For whole number steps, ensure quantity is a multiple of the step
-                $closeQty = round($closeQty / $qtyStep) * $qtyStep;
-            } else {
-                // For decimal steps, round to the appropriate precision
-                $amountPrec = (strpos((string)$qtyStep, '.') !== false) ? strlen(substr((string)$qtyStep, strpos((string)$qtyStep, '.') + 1)) : 0;
-                $closeQty = round($closeQty, $amountPrec);
+            if (!$openSide || $qty <= 0) {
+                return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'اطلاعات موقعیت برای بستن ناقص است.']);
             }
 
-            $marketCloseParams = [
-                'category' => 'linear',
-                'symbol' => $symbol,
-                'side' => $closeSide,
-                'orderType' => 'Market',
-                'qty' => (string)$closeQty,
-                'reduceOnly' => true,
-            ];
+            // ارسال دستور بستن موقعیت از طریق رابط واحد صرافی‌ها
+            $exchangeService->closePosition($symbol, $openSide, $qty);
 
-            // Add hedge mode parameters based on exchange (use original position side, not close side)
-            $originalPositionSide = ucfirst($order->side); // Convert 'buy' to 'Buy', 'sell' to 'Sell'
-            $this->addHedgeModeParameters($marketCloseParams, $currentExchange->exchange_name, $originalPositionSide);
+            // دریافت لیست PnL بسته شده و بروزرسانی معامله مشابه منطق lifecycle
+            $startTime = $order->created_at ? $order->created_at->subMinutes(15)->timestamp * 1000 : null;
+            $rawClosed = $exchangeService->getClosedPnl($symbol, 100, $startTime);
 
-            $exchangeService->createOrder($marketCloseParams);
+            // نرمال‌سازی رویدادهای کلوز بین صرافی‌ها
+            $list = (is_array($rawClosed) && isset($rawClosed['list'])) ? $rawClosed['list'] : $rawClosed;
+            $events = [];
+            if (is_array($list)) {
+                foreach ($list as $item) {
+                    if (!is_array($item)) { continue; }
+                    $orderId = $item['orderId'] ?? ($item['order_id'] ?? null);
+                    $sym = $item['symbol'] ?? null;
+                    $sideRaw = $item['side'] ?? null;
+                    $qtyVal = $item['qty'] ?? ($item['size'] ?? null);
+                    $avgEntry = $item['avgEntryPrice'] ?? ($item['avg_entry_price'] ?? ($item['avgPrice'] ?? ($item['entryPrice'] ?? null)));
+                    $avgExit = $item['avgExitPrice'] ?? ($item['avg_exit_price'] ?? ($item['closePrice'] ?? ($item['avgPrice'] ?? null)));
+                    $pnl = $item['closedPnl'] ?? ($item['realisedPnl'] ?? ($item['realizedPnl'] ?? 0));
+                    $closedAt = $item['updatedTime'] ?? ($item['createdTime'] ?? ($item['closedAt'] ?? null));
 
-            // Update order status in database after successful exchange order
-            $order->update([
-                'status' => 'closed',
-                'closed_at' => now()
-            ]);
+                    // Normalize side
+                    $side = null;
+                    if ($sideRaw !== null) {
+                        $s = strtolower((string)$sideRaw);
+                        if ($s === 'buy' || $s === 'long') { $side = 'Buy'; }
+                        elseif ($s === 'sell' || $s === 'short') { $side = 'Sell'; }
+                        else { $side = $sideRaw; }
+                    }
 
-            return redirect()->route('futures.orders')->with('success', 'سفارش شما برای بسته شدن در قیمت لحظه‌ای بازار با موفقیت ثبت شد.');
+                    if (!$sym) { continue; }
+
+                    $events[] = [
+                        'orderId' => $orderId,
+                        'symbol' => $sym,
+                        'side' => $side,
+                        'qty' => $qtyVal !== null ? (float)$qtyVal : null,
+                        'avgEntryPrice' => $avgEntry !== null ? (float)$avgEntry : null,
+                        'avgExitPrice' => $avgExit !== null ? (float)$avgExit : null,
+                        'realizedPnl' => (float)$pnl,
+                        'closedAt' => $closedAt ? (int)$closedAt : null,
+                    ];
+                }
+            }
+
+            // تطبیق رویداد براساس شناسه سفارش یا نماد/سمت و اندازه‌ها
+            $positionMode = $currentExchange->position_mode;
+            $matched = null;
+            foreach ($events as $e) {
+                $idMatch = isset($e['orderId']) && (string)$e['orderId'] === (string)$order->order_id;
+                $fieldsMatch = (($e['symbol'] ?? null) === $symbol)
+                    && ($positionMode === 'hedge' ? (($e['side'] ?? null) === $openSide) : true)
+                    && (isset($e['qty']) ? abs((float)$e['qty'] - (float)$qty) < 1e-8 : true)
+                    && ($trade && isset($e['avgEntryPrice']) ? abs((float)$e['avgEntryPrice'] - (float)$trade->avg_entry_price) < 1e-8 : true);
+                if ($idMatch || $fieldsMatch) {
+                    $matched = $e;
+                    break;
+                }
+            }
+
+            if ($trade) {
+                if ($matched) {
+                    if (array_key_exists('avgExitPrice', $matched) && $matched['avgExitPrice'] !== null) {
+                        $trade->avg_exit_price = $matched['avgExitPrice'];
+                    } else {
+                        $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
+                    }
+                    if (array_key_exists('realizedPnl', $matched) && $matched['realizedPnl'] !== null) {
+                        $trade->pnl = $matched['realizedPnl'];
+                    }
+                    $trade->closed_at = isset($matched['closedAt']) && $matched['closedAt']
+                        ? \Carbon\Carbon::createFromTimestampMs($matched['closedAt'])
+                        : now();
+                    $trade->save();
+                } else {
+                    // حداقل بروزرسانی در صورت نبود رویداد
+                    $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
+                    $trade->pnl = 0;
+                    $trade->closed_at = now();
+                    $trade->save();
+                }
+            }
+
+            return redirect()->route('futures.pnl_history')->with('success', 'درخواست بستن موقعیت ارسال شد و سوابق PnL به‌روزرسانی شد.');
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Futures market close failed: ' . $e->getMessage());
 
             $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
 
-            return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
+            return redirect()->route('futures.pnl_history')->withErrors(['msg' => $userFriendlyMessage]);
         }
     }
 

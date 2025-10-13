@@ -332,6 +332,7 @@ class DemoFuturesLifecycleManager extends Command
                 $matchedPosition = null;
                 foreach ($normalized as $p) {
                     if (($p['symbol'] ?? null) === $trade->symbol
+                        && ($p['side'] ?? null) === $trade->side
                         && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
                         && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
                         $matchedPosition = $p;
@@ -360,7 +361,6 @@ class DemoFuturesLifecycleManager extends Command
                 foreach ($closedList as $c) {
                     $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
                     $fieldsMatch = (($c['symbol'] ?? null) === $symbol)
-                        && (($c['side'] ?? null) === $trade->side)
                         && isset($c['qty']) && (float)$c['qty'] == (float)$trade->qty
                         && isset($c['avgEntryPrice']) && (float)$c['avgEntryPrice'] == (float)$trade->avg_entry_price;
                     if ($idMatch || $fieldsMatch) {
