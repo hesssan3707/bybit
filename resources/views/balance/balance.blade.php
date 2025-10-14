@@ -188,7 +188,6 @@
             @if(isset($spotBalances) && count($spotBalances) > 0)
                 <div class="balance-card">
                     <div class="balance-header spot">
-                        <h2>کیف پول اسپات</h2>
                         <div class="total-equity">
                             ${{ number_format($spotTotalEquity ?? 0, 2) }}
                         </div>
@@ -212,7 +211,6 @@
             @else
                 <div class="balance-card">
                     <div class="balance-header spot">
-                        <h2>کیف پول اسپات</h2>
                         <div class="total-equity">$0.00</div>
                     </div>
                     <div class="empty-balance">
@@ -231,7 +229,6 @@
             @if(isset($perpetualBalances) && count($perpetualBalances) > 0)
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">
                             ${{ number_format($perpetualTotalEquity ?? 0, 2) }}
                         </div>
@@ -255,7 +252,6 @@
             @else
                 <div class="balance-card">
                     <div class="balance-header perpetual">
-                        <h2>کیف پول آتی</h2>
                         <div class="total-equity">$0.00</div>
                     </div>
                     <div class="empty-balance">
