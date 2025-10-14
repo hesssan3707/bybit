@@ -541,4 +541,51 @@ class ExchangeController extends Controller
             ]);
         }
     }
+
+    /**
+     * Enable hedge position mode for the given exchange
+     */
+    public function enableHedgeMode(UserExchange $exchange)
+    {
+        try {
+            if ($exchange->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'دسترسی غیرمجاز'
+                ], 403);
+            }
+
+            if (!$exchange->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'صرافی فعال نیست'
+                ]);
+            }
+
+            // Use proper factory that reads credentials and demo/real mode from the model
+            $exchangeService = ExchangeFactory::createForUserExchange($exchange);
+            $exchangeService->switchPositionMode(true);
+
+            \Log::info('Hedge mode enabled on-demand', [
+                'user_id' => auth()->id(),
+                'exchange_id' => $exchange->id,
+                'exchange_name' => $exchange->exchange_name
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'حالت معاملاتی به Hedge تغییر شد'
+            ]);
+        } catch (\Exception $e) {
+            \Log::warning('Failed to enable hedge mode on-demand', [
+                'user_id' => auth()->id(),
+                'exchange_id' => $exchange->id ?? null,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'خطا در تغییر حالت معاملاتی: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

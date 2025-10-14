@@ -9,6 +9,7 @@ use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 use Exception;
 
 class FuturesOrderEnforcer extends Command
@@ -198,15 +199,33 @@ class FuturesOrderEnforcer extends Command
             $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
             $dbQty = (float)$dbOrder->amount;
 
-            if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
+            // درصد اختلاف‌ها را محاسبه کنید
+            $priceBase = max(abs($dbPrice), 1e-9);
+            $qtyBase   = max(abs($dbQty), 1e-9);
+            $priceDiffPct = ($priceBase > 0) ? (abs($exchangePrice - $dbPrice) / $priceBase) : 0.0;
+            $qtyDiffPct   = ($qtyBase > 0) ? (abs($exchangeQty - $dbQty) / $qtyBase) : 0.0;
+
+            // آستانه تحمل 0.2% (0.002 نسبت)
+            $tolerance = 0.002;
+
+            if ($priceDiffPct > $tolerance || $qtyDiffPct > $tolerance) {
+                // اختلاف زیاد: رفتار قبلی (لغو و حذف)
                 try {
                     $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
                     $dbOrder->delete();
-                    $this->info("    حذف سفارش تغییر یافته: {$dbOrder->order_id} (عدم تطابق قیمت/مقدار)");
+                    $this->info("    حذف سفارش تغییر یافته: {$dbOrder->order_id} (عدم تطابق قابل توجه قیمت/مقدار)");
                 } catch (Exception $e) {
                     $this->warn("    خطا در حذف سفارش {$dbOrder->order_id}: " . $e->getMessage());
                 }
                 continue;
+            }
+
+            // اختلاف جزئی: رکورد محلی را با صرافی همسان‌سازی کنید
+            if ($priceDiffPct > 0 || $qtyDiffPct > 0) {
+                $dbOrder->entry_price = $exchangePrice;
+                $dbOrder->amount = $exchangeQty;
+                $dbOrder->save();
+                $this->info("    به‌روزرسانی سفارش با اختلاف جزئی: {$dbOrder->order_id} (همسان‌سازی قیمت/مقدار با صرافی)");
             }
         }
     }
@@ -242,26 +261,55 @@ class FuturesOrderEnforcer extends Command
                 continue;
             }
 
+            // ابتدا بررسی سود/زیان: اگر بزرگ‌تر از ±10% باشد، موقعیت بسته شود
+            $pnlRatio = $this->getPositionPnlRatio($matchingPosition);
+            if ($pnlRatio !== null && abs($pnlRatio) >= 0.10) {
+                try {
+                    $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                    $exchangeSizeForClose = (float)($matchingPosition['size'] ?? 0);
+                    $exchangeService->closePosition($dbTrade->symbol, $closeSide, $exchangeSizeForClose);
+                    $dbTrade->closed_at = now();
+                    $dbTrade->save();
+                    $this->info("    بستن موقعیت به دلیل سود/زیان بزرگ: {$dbTrade->symbol} (PnL=" . round($pnlRatio*100,2) . "%)");
+                    continue;
+                } catch (Exception $e) {
+                    $this->warn("    خطا در بستن موقعیت به دلیل PnL {$dbTrade->symbol}: " . $e->getMessage());
+                }
+            }
+
             // Check if size or entry price doesn't match
             $exchangeSize = (float)($matchingPosition['size'] ?? 0);
             $dbSize = (float)$dbTrade->qty;
             $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
             $dbPrice = (float)$dbTrade->avg_entry_price;
 
-            if (abs($exchangeSize - $dbSize) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
+            // درصد اختلاف‌ها را محاسبه کنید
+            $sizeBase  = max(abs($dbSize), 1e-9);
+            $priceBase = max(abs($dbPrice), 1e-9);
+            $sizeDiffPct  = ($sizeBase > 0) ? (abs($exchangeSize - $dbSize) / $sizeBase) : 0.0;
+            $priceDiffPct = ($priceBase > 0) ? (abs($exchangePrice - $dbPrice) / $priceBase) : 0.0;
+
+            $tolerance = 0.002; // 0.2%
+
+            if ($sizeDiffPct > $tolerance || $priceDiffPct > $tolerance) {
+                // اختلاف قابل توجه: بستن موقعیت مطابق منطق قبلی
                 try {
-                    // Unified market close using closePosition across exchanges
                     $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
                     $exchangeService->closePosition($dbTrade->symbol, $closeSide, (float)$exchangeSize);
 
-                    // Mark trade as closed in database (closed_by_enforcer)
                     $dbTrade->closed_at = now();
                     $dbTrade->save();
 
-                    $this->info("    بستن موقعیت تغییر یافته: {$dbTrade->symbol} (عدم تطابق اندازه/قیمت)");
+                    $this->info("    بستن موقعیت تغییر یافته: {$dbTrade->symbol} (عدم تطابق قابل توجه اندازه/قیمت)");
                 } catch (Exception $e) {
                     $this->warn("    خطا در بستن موقعیت {$dbTrade->symbol}: " . $e->getMessage());
                 }
+            } else if ($sizeDiffPct > 0 || $priceDiffPct > 0) {
+                // اختلاف جزئی: همسان‌سازی رکورد محلی با مقادیر صرافی
+                $dbTrade->qty = $exchangeSize;
+                $dbTrade->avg_entry_price = $exchangePrice;
+                $dbTrade->save();
+                $this->info("    به‌روزرسانی موقعیت با اختلاف جزئی: {$dbTrade->symbol} (همسان‌سازی اندازه/قیمت با صرافی)");
             }
         }
     }
@@ -299,6 +347,26 @@ class FuturesOrderEnforcer extends Command
             if ($orderSymbol !== $symbol) { continue; }
 
             if (in_array($orderId, $ourOrderIds)) {
+                continue;
+            }
+
+            // اگر اختلاف زمانی بین سفارش صرافی و رکوردهای ما کمتر از ۱ دقیقه باشد، آن را خارجی در نظر نگیرید
+            $exchangeTs = $this->getExchangeOrderTimestamp($exchangeOrder);
+            $isNearTime = false;
+            if ($exchangeTs !== null) {
+                $exchangeTime = Carbon::createFromTimestamp($exchangeTs);
+                $from = $exchangeTime->copy()->subMinute();
+                $to   = $exchangeTime->copy()->addMinute();
+                $isNearTime = Order::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', false)
+                    ->whereIn('status', ['pending', 'filled'])
+                    ->where('symbol', $orderSymbol)
+                    ->whereBetween('created_at', [$from, $to])
+                    ->exists();
+            }
+
+            if ($isNearTime) {
+                $this->info("    حفظ سفارش نزدیک به زمان ثبت ما: {$orderId}");
                 continue;
             }
 
@@ -378,5 +446,66 @@ class FuturesOrderEnforcer extends Command
         }
 
         return false;
+    }
+
+    /**
+     * استخراج زمان ثبت سفارش صرافی به‌صورت timestamp ثانیه‌ای
+     */
+    private function getExchangeOrderTimestamp(array $order): ?int
+    {
+        // فیلدهای رایج در صرافی‌ها
+        $candidates = [
+            $order['createdTime'] ?? null,
+            $order['createTime'] ?? null,
+            $order['time'] ?? null,
+            $order['updateTime'] ?? null,
+            $order['transactTime'] ?? null,
+            $order['timestamp'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if ($value === null) { continue; }
+            $ts = (int)$value;
+            if ($ts <= 0) { continue; }
+            // ms یا s تشخیص داده شود
+            if ($ts > 2000000000) { // بزرگ‌تر از ~2033 به ثانیه => احتمالاً میلی‌ثانیه
+                return (int) floor($ts / 1000);
+            }
+            return $ts; // ثانیه
+        }
+
+        return null;
+    }
+
+    /**
+     * محاسبه نسبت سود/زیان موقعیت (ROI) به صورت نسبت (0.10 = 10%)
+     */
+    private function getPositionPnlRatio(array $position): ?float
+    {
+        // اولویت: فیلدهای صریح ROI
+        $uplRatio = $position['uplRatio'] ?? $position['upl'] ?? null; // Bybit
+        if ($uplRatio !== null) {
+            $val = (float)$uplRatio;
+            return $val; // Bybit returns ratio (e.g., 0.12)
+        }
+        $roe = $position['roe'] ?? null; // BingX may provide percent
+        if ($roe !== null) {
+            $val = (float)$roe;
+            if (abs($val) > 2) { // if looks like percent, convert to ratio
+                $val = $val / 100.0;
+            }
+            return $val;
+        }
+
+        // محاسبه بر اساس قیمت‌ها
+        $avg = (float)($position['avgPrice'] ?? $position['entryPrice'] ?? $position['avgCostPrice'] ?? 0);
+        $mark = (float)($position['markPrice'] ?? $position['marketPrice'] ?? 0);
+        $side = strtolower($position['side'] ?? $position['positionSide'] ?? '');
+        if ($avg > 0 && $mark > 0 && ($side === 'buy' || $side === 'sell' || $side === 'long' || $side === 'short')) {
+            $isLong = ($side === 'buy' || $side === 'long');
+            $ratio = $isLong ? (($mark - $avg) / $avg) : (($avg - $mark) / $avg);
+            return $ratio;
+        }
+        return null;
     }
 }

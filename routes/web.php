@@ -88,14 +88,15 @@ Route::middleware('auth')->group(function () {
     });
 
     // Exchange Management Routes (requires authentication)
-    Route::prefix('exchanges')->group(function () {
+Route::prefix('exchanges')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
         Route::get('/create', [ExchangeController::class, 'create'])->name('exchanges.create');
         Route::post('/', [ExchangeController::class, 'store'])->name('exchanges.store');
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
-        Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
+    Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
+    Route::post('/{exchange}/enable-hedge', [ExchangeController::class, 'enableHedgeMode'])->name('exchanges.enable-hedge');
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
         Route::post('/{exchange}/test-real-connection', [ExchangeController::class, 'testRealConnection'])->name('exchanges.test-real-connection');
         Route::post('/{exchange}/test-demo-connection', [ExchangeController::class, 'testDemoConnection'])->name('exchanges.test-demo-connection');

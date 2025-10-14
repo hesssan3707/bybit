@@ -109,9 +109,41 @@
 
     @if($errors->any())
         <div class="alert alert-danger">
+            @php $hedgeHintDetected = false; @endphp
             @foreach ($errors->all() as $error)
                 <p>{{ $error }}</p>
+                @php
+                    // Broaden detection for position mode related errors (Persian & English variants)
+                    $msgLower = strtolower($error);
+                    $hedgeKeywords = [
+                        'حالت معاملاتی',
+                        'حالت موقعیت',
+                        'دوطرفه',
+                        'یک‌طرفه',
+                        'یک طرفه', // alternate typing
+                        'hedge',
+                        'one-way',
+                        'position mode',
+                        'position side does not match',
+                        'positionidx',
+                        'idx not match'
+                    ];
+                    foreach ($hedgeKeywords as $kw) {
+                        if (strpos($msgLower, strtolower($kw)) !== false || strpos($error, $kw) !== false) {
+                            $hedgeHintDetected = true;
+                            break;
+                        }
+                    }
+                @endphp
             @endforeach
+            @php $exchangeAccess = request()->attributes->get('exchange_access'); @endphp
+            @if(!empty($exchangeAccess['current_exchange']) && $hedgeHintDetected)
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-primary" id="enable-hedge-btn" data-exchange-id="{{ $exchangeAccess['current_exchange']->id }}">
+                        تغییر حالت به Hedge
+                    </button>
+                </div>
+            @endif
         </div>
     @endif
 
@@ -219,6 +251,8 @@
     </form>
 </div>
 @endsection
+
+@include('partials.alert-modal')
 
 @push('scripts')
 <script>
@@ -357,6 +391,35 @@
             if (defaultSymbol && entry1Input.value === '') {
                 fetchMarketPrice(defaultSymbol);
             }
+        }
+
+        // Hedge mode enable handler if error hint detected
+        var hedgeBtn = document.getElementById('enable-hedge-btn');
+        if (hedgeBtn) {
+            hedgeBtn.addEventListener('click', function () {
+                var exchangeId = this.getAttribute('data-exchange-id');
+                modernConfirm(
+                    'تغییر حالت معاملاتی',
+                    'حساب شما در حالت One-way است. با تایید، به Hedge تغییر داده می‌شود.',
+                    function () {
+                        var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                        fetch('/exchanges/' + exchangeId + '/enable-hedge', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+                        }).then(function (res) { return res.json(); })
+                        .then(function (data) {
+                            if (data && data.success) {
+                                modernAlert('حالت معاملاتی به Hedge تغییر شد. لطفاً مجدد سفارش خود را ثبت کنید.', 'success');
+                            } else {
+                                modernAlert((data && data.message) ? data.message : 'خطا در تغییر حالت معاملاتی', 'error');
+                            }
+                        }).catch(function () {
+                            modernAlert('خطا در ارتباط با سرور', 'error');
+                        });
+                    },
+                    function () {}
+                );
+            });
         }
     });
 </script>
