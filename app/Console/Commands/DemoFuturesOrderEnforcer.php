@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\UserExchange;
+use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -214,51 +215,51 @@ class DemoFuturesOrderEnforcer extends Command
      */
     private function checkFilledOrders($exchangeService, UserExchange $userExchange, string $symbol, array $exchangePositions)
     {
-        $this->info("  بررسی سفارشات تکمیل شده (موقعیت‌های فعال) (دمو)...");
+        $this->info("  بررسی معاملات باز (موقعیت‌های فعال) (دمو)...");
 
-        // Get all filled orders from database (demo mode)
-        $filledOrders = Order::where('user_exchange_id', $userExchange->id)
+        // Get all not-closed trades from database (demo mode) for this user exchange and symbol
+        $openTrades = Trade::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
-            ->where('status', 'filled')
+            ->whereNull('closed_at')
+            ->where('symbol', $symbol)
             ->get();
 
-        foreach ($filledOrders as $dbOrder) {
-            // Find corresponding position on exchange
+        foreach ($openTrades as $dbTrade) {
+            // Find corresponding position on exchange by symbol and side
             $matchingPosition = null;
             foreach ($exchangePositions as $position) {
-                if ($position['symbol'] === $dbOrder->symbol && 
-                    strtolower($position['side']) === strtolower($dbOrder->side) &&
-                    ($position['size'] ?? 0) > 0) {
+                if (($position['symbol'] ?? null) === $dbTrade->symbol &&
+                    strtolower($position['side'] ?? '') === strtolower($dbTrade->side) &&
+                    (float)($position['size'] ?? 0) > 0) {
                     $matchingPosition = $position;
                     break;
                 }
             }
 
             if (!$matchingPosition) {
-                // Position not found on exchange, skip
+                // No active position found for this trade; skip closing and continue
                 continue;
             }
 
             // Check if size or entry price doesn't match
             $exchangeSize = (float)($matchingPosition['size'] ?? 0);
-            $dbSize = (float)$dbOrder->amount;
+            $dbSize = (float)$dbTrade->qty;
             $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
-            $dbPrice = (float)$dbOrder->entry_price;
+            $dbPrice = (float)$dbTrade->avg_entry_price;
 
             if (abs($exchangeSize - $dbSize) > 0.000001 || abs($exchangePrice - $dbPrice) > 0.0001) {
                 try {
                     // Unified market close using closePosition across exchanges
-                    $closeSide = ($dbOrder->side === 'buy') ? 'Buy' : 'Sell';
-                    $exchangeService->closePosition($dbOrder->symbol, $closeSide, (float)$exchangeSize);
+                    $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                    $exchangeService->closePosition($dbTrade->symbol, $closeSide, (float)$exchangeSize);
                     
-                    // Mark order as closed in database
-                    $dbOrder->status = 'closed_by_enforcer';
-                    $dbOrder->closed_at = now();
-                    $dbOrder->save();
+                    // Mark trade as closed in database (closed_by_enforcer)
+                    $dbTrade->closed_at = now();
+                    $dbTrade->save();
                     
-                    $this->info("    بستن موقعیت تغییر یافته (دمو): {$dbOrder->symbol} (عدم تطابق اندازه/قیمت)");
+                    $this->info("    بستن موقعیت تغییر یافته (دمو): {$dbTrade->symbol} (عدم تطابق اندازه/قیمت)");
                 } catch (Exception $e) {
-                    $this->warn("    خطا در بستن موقعیت (دمو) {$dbOrder->symbol}: " . $e->getMessage());
+                    $this->warn("    خطا در بستن موقعیت (دمو) {$dbTrade->symbol}: " . $e->getMessage());
                 }
             }
         }
@@ -279,21 +280,27 @@ class DemoFuturesOrderEnforcer extends Command
             ->filter()
             ->toArray();
 
-        // Get our registered orders with TP/SL values for validation (demo mode)
-        $ourRegisteredOrders = Order::where('user_exchange_id', $userExchange->id)
+        // Get all not-closed trades (demo) for validation of TP/SL
+        $openTrades = Trade::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
-            ->whereIn('status', ['pending', 'filled'])
+            ->whereNull('closed_at')
+            ->with('order')
+            ->where('symbol', $symbol)
             ->get();
 
         foreach ($exchangeOpenOrders as $exchangeOrder) {
             $orderId = $exchangeOrder['orderId'];
             $orderSymbol = $exchangeOrder['symbol'] ?? $symbol;
+
+            // Only consider orders for the selected symbol
+            if ($orderSymbol !== $symbol) { continue; }
             
             if (in_array($orderId, $ourOrderIds)) {
                 continue;
             }
 
-            if ($this->isValidTpSlOrder($exchangeOrder, $ourRegisteredOrders)) {
+            // Preserve valid TP/SL orders strictly matching our trades
+            if ($this->isValidTpSlOrder($exchangeOrder, $openTrades)) {
                 $this->info("    حفظ سفارش TP/SL معتبر (دمو): {$orderId}");
                 continue;
             }
@@ -310,37 +317,44 @@ class DemoFuturesOrderEnforcer extends Command
     /**
      * Check if an exchange order is a valid TP/SL order that should be preserved
      */
-    private function isValidTpSlOrder(array $exchangeOrder, $ourRegisteredOrders): bool
+    private function isValidTpSlOrder(array $exchangeOrder, $openTrades): bool
     {
+        // Normalize fields across exchanges (Bybit/Binance/BingX)
         $reduceRaw = $exchangeOrder['reduceOnly'] ?? false;
         $isReduceOnly = ($reduceRaw === true || $reduceRaw === 'true' || $reduceRaw === 1 || $reduceRaw === '1');
         $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? $exchangeOrder['stopPrice'] ?? $exchangeOrder['stopPx'] ?? 0);
-        $orderSide = strtolower($exchangeOrder['side'] ?? '');
-        $orderQty = (float)($exchangeOrder['qty'] ?? $exchangeOrder['quantity'] ?? $exchangeOrder['origQty'] ?? 0);
+        $orderSide  = strtolower($exchangeOrder['side'] ?? '');
+        $orderQty   = (float)($exchangeOrder['qty'] ?? $exchangeOrder['quantity'] ?? $exchangeOrder['origQty'] ?? 0);
+        $orderSymbol = $exchangeOrder['symbol'] ?? null;
 
-        if (!$isReduceOnly) {
-            return false;
-        }
+        if (!$isReduceOnly) { return false; }
+        if ($orderQty <= 0) { return false; }
+        if ($orderPrice <= 0) { return false; }
 
-        foreach ($ourRegisteredOrders as $registeredOrder) {
-            $registeredSl = (float)$registeredOrder->sl;
-            $registeredTp = (float)$registeredOrder->tp;
-            $registeredSide = strtolower($registeredOrder->side);
-            $registeredQty = (float)$registeredOrder->amount;
+        $qtyEps = 1e-6;        // strict qty match with float epsilon
+        $priceTol = 0.01;      // acceptable price tolerance
 
+        foreach ($openTrades as $trade) {
+            $order = $trade->order; // related order holds tp/sl
+            if (!$order) { continue; }
+
+            $registeredSl = (float)($order->sl ?? 0);
+            $registeredTp = (float)($order->tp ?? 0);
+            $registeredSide = strtolower($trade->side);
+            $registeredQty = (float)$trade->qty;
+            $registeredSymbol = $trade->symbol;
             $expectedOppositeSide = ($registeredSide === 'buy') ? 'sell' : 'buy';
 
-            if ($registeredSl > 0 && 
-                abs($orderPrice - $registeredSl) < 0.01 && 
-                $orderSide === $expectedOppositeSide &&
-                abs($orderQty - $registeredQty) < 0.000001) {
-                return true;
-            }
+            if ($orderSymbol !== null && $registeredSymbol !== $orderSymbol) { continue; }
+            if ($orderSide !== $expectedOppositeSide) { continue; }
 
-            if ($registeredTp > 0 && 
-                abs($orderPrice - $registeredTp) < 0.01 && 
-                $orderSide === $expectedOppositeSide &&
-                abs($orderQty - $registeredQty) < 0.000001) {
+            // No partial TP/SL: qty must match exactly (within epsilon)
+            if (abs($orderQty - $registeredQty) > $qtyEps) { continue; }
+
+            $matchesSl = ($registeredSl > 0) && (abs($orderPrice - $registeredSl) <= $priceTol);
+            $matchesTp = ($registeredTp > 0) && (abs($orderPrice - $registeredTp) <= $priceTol);
+
+            if ($matchesSl || $matchesTp) {
                 return true;
             }
         }
