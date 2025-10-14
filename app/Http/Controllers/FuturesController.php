@@ -262,6 +262,7 @@ class FuturesController extends Controller
 
             $avgEntry = ($entry1 + $entry2) / 2.0;
             $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
+            $sideLower = strtolower($side);
 
             // Feature 2: Validate entry price against market price
             $tickerInfo = $exchangeService->getTickerInfo($symbol);
@@ -273,6 +274,31 @@ class FuturesController extends Controller
                 }
                 if ($side === 'Sell' && $avgEntry < $marketPrice) {
                     return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                }
+            }
+
+            // Prevent placing multiple orders with the same direction if there's
+            // an existing pending order or an open trade on the same side (for current exchange & symbol)
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            if ($currentExchange) {
+                $hasPendingSameSide = Order::where('user_exchange_id', $currentExchange->id)
+                    ->where('is_demo', $currentExchange->is_demo_active)
+                    ->where('status', 'pending')
+                    ->where('symbol', $symbol)
+                    ->where('side', $sideLower)
+                    ->exists();
+
+                $hasOpenSameSideTrade = Trade::where('user_exchange_id', $currentExchange->id)
+                    ->where('is_demo', $currentExchange->is_demo_active)
+                    ->whereNull('closed_at')
+                    ->where('symbol', $symbol)
+                    ->where('side', $sideLower)
+                    ->exists();
+
+                if ($hasPendingSameSide || $hasOpenSameSideTrade) {
+                    return back()->withErrors([
+                        'msg' => 'ثبت سفارش جدید در همین جهت امکان‌پذیر نیست؛ شما یک سفارش در انتظار یا معامله باز در همین جهت دارید. لطفاً ابتدا آن را لغو یا ببندید.'
+                    ])->withInput();
                 }
             }
 
