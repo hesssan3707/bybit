@@ -322,7 +322,22 @@ class DemoFuturesOrderEnforcer extends Command
         // Normalize fields across exchanges (Bybit/Binance/BingX)
         $reduceRaw = $exchangeOrder['reduceOnly'] ?? false;
         $isReduceOnly = ($reduceRaw === true || $reduceRaw === 'true' || $reduceRaw === 1 || $reduceRaw === '1');
-        $orderPrice = (float)($exchangeOrder['price'] ?? $exchangeOrder['triggerPrice'] ?? $exchangeOrder['stopPrice'] ?? $exchangeOrder['stopPx'] ?? 0);
+        // Prefer the first non-zero among price, triggerPrice, stopPrice, stopPx
+        $orderPrice = 0.0;
+        $candidate = (float)($exchangeOrder['price'] ?? 0);
+        if ($candidate > 0) { $orderPrice = $candidate; }
+        else {
+            $candidate = (float)($exchangeOrder['triggerPrice'] ?? 0);
+            if ($candidate > 0) { $orderPrice = $candidate; }
+            else {
+                $candidate = (float)($exchangeOrder['stopPrice'] ?? 0);
+                if ($candidate > 0) { $orderPrice = $candidate; }
+                else {
+                    $candidate = (float)($exchangeOrder['stopPx'] ?? 0);
+                    if ($candidate > 0) { $orderPrice = $candidate; }
+                }
+            }
+        }
         $orderSide  = strtolower($exchangeOrder['side'] ?? '');
         $orderQty   = (float)($exchangeOrder['qty'] ?? $exchangeOrder['quantity'] ?? $exchangeOrder['origQty'] ?? 0);
         $orderSymbol = $exchangeOrder['symbol'] ?? null;
