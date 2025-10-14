@@ -210,7 +210,7 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
-                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از لغو این سفارش مطمئن هستید؟');">
+                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="delete-btn">لغو کردن</button>
@@ -219,7 +219,7 @@
                                 {{-- دکمه بستن به بخش سود و زیان منتقل شد --}}
                                 -
                             @elseif($order->status === 'expired')
-                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از حذف این سفارش منقضی شده مطمئن هستید؟');">
+                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="delete-btn">حذف</button>
@@ -272,6 +272,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     form.submit();
                 }
             );
+        });
+    });
+
+    // Intercept forms with modern confirm
+    const confirmForms = document.querySelectorAll('.modern-confirm-form');
+    confirmForms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const title = form.getAttribute('data-title') || 'تایید اقدام';
+            const message = form.getAttribute('data-message') || 'آیا از انجام این عملیات مطمئن هستید؟';
+            modernConfirm(title, message, function() { form.submit(); });
         });
     });
 });

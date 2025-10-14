@@ -224,7 +224,10 @@
         </div>
         <div class="stat-card">
             <h4>لغو شده</h4>
-            <div class="value">{{ $orders->where('status', 'Cancelled')->count() + $orders->where('status', 'PartiallyFilledCanceled')->count() }}</div>
+            <div class="value">{{
+                ($orders->where('status', 'cancelled')->count() +
+                 $orders->where('status', 'Rejected')->count() )
+            }}</div>
         </div>
     </div>
 
@@ -253,7 +256,7 @@
                             </span>
                         </td>
                         <td data-label="نوع سفارش">{{ $order->order_type === 'Market' ? 'بازار' : 'محدود' }}</td>
-                        <td data-label="مقدار">{{ number_format($order->qty, 8) }} {{ $order->base_coin }}</td>
+                        <td data-label="مقدار"><span style="direction:ltr;">{{ number_format($order->qty, 8) }} {{ $order->base_coin }}</span></td>
                         <td data-label="قیمت">
                             @if($order->price)
                                 ${{ number_format($order->price, 4) }}
@@ -273,20 +276,20 @@
                             </span>
                         </td>
                         <td data-label="زمان ایجاد">
-                            {{ $order->created_at->format('Y/m/d H:i') }}
+                            <span style="direction:ltr;">{{ $order->created_at->format('Y/m/d H:i') }}</span>
                             <br><small>{{ $order->created_at->diffForHumans() }}</small>
                         </td>
                         <td data-label="عملیات">
                             <div class="action-buttons">
                                 @if(in_array($order->status, ['New', 'PartiallyFilled']) && $order->order_id)
-                                    <form method="POST" action="{{ route('spot.order.cancel.web') }}" style="display: inline;" onsubmit="return confirm('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟')">
+                                    <form method="POST" action="{{ route('spot.order.cancel.web') }}" style="display: inline;" class="cancel-spot-order-form">
                                         @csrf
                                         <input type="hidden" name="orderId" value="{{ $order->order_id }}">
                                         <input type="hidden" name="symbol" value="{{ $order->symbol }}">
                                         <button type="submit" class="cancel-btn">لغو</button>
                                     </form>
                                 @else
-                                    <span style="color: #6c757d; font-size: 12px;">
+                                    <span style="color:rgb(255, 255, 255); font-size: 12px;">
                                         @if($order->status === 'Filled')
                                             تکمیل شده
                                         @elseif($order->status === 'Cancelled')
@@ -313,3 +316,23 @@
     {{ $orders->links() }}
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('.cancel-spot-order-form');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            modernConfirm(
+                'لغو سفارش اسپات',
+                'آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟',
+                function() { form.submit(); }
+            );
+        });
+    });
+});
+</script>
+@endpush
+
+@include('partials.alert-modal')

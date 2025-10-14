@@ -236,7 +236,7 @@
                         <td data-label="عملیات">
                             @php $oid = $orderModelByOrderId[$t->order_id] ?? null; @endphp
                             @if($oid)
-                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');" title="بستن موقعیت باز">
+                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" class="close-position-form" title="بستن موقعیت باز">
                                     @csrf
                                     <button type="submit" class="close-btn">بستن</button>
                                 </form>
@@ -265,7 +265,7 @@
             <div>
                 @php $oid = $orderModelByOrderId[$t->order_id] ?? null; @endphp
                 @if($oid)
-                    <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');">
+                    <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" class="close-position-form">
                         @csrf
                         <button type="submit" class="close-btn" style="width:100%">بستن</button>
                     </form>
@@ -319,7 +319,7 @@
                         <td data-label="زمان بسته شدن">
                             @php $oid = $orderModelByOrderId[$trade->order_id] ?? null; @endphp
                             @if($oid)
-                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" onsubmit="return confirm('آیا از بستن این موقعیت مطمئن هستید؟');" title="بستن موقعیت باز">
+                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" class="close-position-form" title="بستن موقعیت باز">
                                     @csrf
                                     <button type="submit" class="close-btn">بستن</button>
                                 </form>
@@ -358,3 +358,23 @@
     {{ $closedTrades->links() }}
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('.close-position-form');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            modernConfirm(
+                'بستن موقعیت',
+                'آیا از بستن این موقعیت مطمئن هستید؟',
+                function() { form.submit(); }
+            );
+        });
+    });
+});
+</script>
+@endpush
+
+@include('partials.alert-modal')

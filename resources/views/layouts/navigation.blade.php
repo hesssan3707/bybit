@@ -16,9 +16,15 @@
         -webkit-backdrop-filter: blur(5px);
     }
     .main-header .logo {
-        font-weight: bold;
-        font-size: 1.5em;
-        text-shadow: white 0 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 60px;
+    }
+    .main-header .logo img {
+        height: 36px; /* fits nicely in 60px header */
+        width: auto;
+        display: block;
     }
     .main-header .nav-links {
         display: flex;
@@ -132,7 +138,11 @@
 
 <!-- Web Header -->
 <header class="main-header">
-    <div class="logo">Trader Bridge</div>
+    <div class="logo">
+        <a href="{{ route('home') }}" aria-label="Bridge Home">
+            <img src="{{ asset('public/logos/bridge-logo.png') }}" alt="Bridge" decoding="async">
+        </a>
+    </div>
     <nav class="nav-links">
         <!-- Balance Menu -->
         <a href="{{ route('balance') }}" style="margin: 0 15px;">موجودی‌ها</a>

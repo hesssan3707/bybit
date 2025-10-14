@@ -225,8 +225,7 @@ class DemoFuturesLifecycleManager extends Command
 
         // Skip system-created TP/SL or reduce-only closing orders
         if ($this->isTpSlOrClosing($exchangeOrder, $userExchange->exchange_name)) {
-            $this->info("[Demo] سفارش {$orderId} از نوع TP/SL یا بستن موقعیت است و نادیده گرفته شد");
-            return;
+            return; // silently skip system-created TP/SL or closing orders (demo)
         }
 
         $order = Order::where('user_exchange_id', $userExchange->id)
@@ -295,8 +294,7 @@ class DemoFuturesLifecycleManager extends Command
                 }
             }
         } else {
-            // Skip unknown orders to ensure only system-created orders are processed
-            $this->info("[Demo] سفارش ناشناس {$orderId} نادیده گرفته شد");
+            // Skip unknown orders to ensure only system-created orders are processed, without logging (demo)
             return;
         }
     }
