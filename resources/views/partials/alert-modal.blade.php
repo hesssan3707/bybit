@@ -7,7 +7,7 @@
                     <i class="fas fa-info-circle"></i>
                 </div>
                 <h3 id="alertModalTitle">اطلاع‌رسانی</h3>
-                <button class="alert-modal-close" onclick="closeAlertModal()">
+                <button class="alert-modal-close" onclick="closeAlertModal(false)">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -15,10 +15,10 @@
                 <p id="alertModalMessage">پیام شما اینجا نمایش داده می‌شود</p>
             </div>
             <div class="alert-modal-footer">
-                <button id="alertModalConfirm" class="btn btn-primary" onclick="closeAlertModal()">
+                <button id="alertModalConfirm" class="btn btn-primary" onclick="closeAlertModal(true)">
                     تأیید
                 </button>
-                <button id="alertModalCancel" class="btn btn-secondary" onclick="closeAlertModal()" style="display: none;">
+                <button id="alertModalCancel" class="btn btn-secondary" onclick="closeAlertModal(false)" style="display: none;">
                     انصراف
                 </button>
             </div>
