@@ -113,6 +113,15 @@ class SpotOrderLifecycleManager extends Command
     }
 
     /**
+     * Sync spot orders workflow for this exchange (real)
+     */
+    private function syncSpotOrdersForExchange($exchangeService, User $user, UserExchange $userExchange)
+    {
+        // Currently we focus on syncing order statuses
+        $this->syncOrderStatuses($exchangeService, $userExchange);
+    }
+
+    /**
      * Sync order statuses with exchange
      */
     private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
@@ -120,34 +129,37 @@ class SpotOrderLifecycleManager extends Command
         // Get all pending spot orders for this user exchange (real mode)
         $orders = SpotOrder::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
-            ->whereIn('status', ['pending'])
+            ->whereIn('status', ['New', 'PartiallyFilled'])
             ->get();
 
         foreach ($orders as $order) {
             try {
-                // Get order status from exchange
-                $exchangeOrder = $exchangeService->getSpotOrder($order->order_id, $order->symbol);
+                // Get order status from exchange with cross-exchange handling
+                $exchangeOrder = $this->getExchangeSpotOrder($exchangeService, $userExchange, $order->order_id, $order->symbol);
 
-                // Update order status based on exchange response
-                $newStatus = $this->mapExchangeStatus($exchangeOrder['status']);
+                // Normalize different exchange response shapes
+                $normalized = $this->normalizeSpotExchangeOrder($exchangeOrder, $userExchange->exchange_name);
+
+                // Update order status based on exchange response (mapped to model statuses)
+                $newStatus = $this->mapExchangeStatus($normalized['status'] ?? null);
                 
                 if ($order->status !== $newStatus) {
                     $order->status = $newStatus;
                     
-                    // Update filled quantity if available
-                    if (isset($exchangeOrder['filled'])) {
-                        $order->filled_quantity = $exchangeOrder['filled'];
+                    // Update executed quantity if available
+                    if (isset($normalized['filled'])) {
+                        $order->executed_qty = $normalized['filled'];
                     }
-                    
-                    // Update average price if available
-                    if (isset($exchangeOrder['average'])) {
-                        $order->average_price = $exchangeOrder['average'];
+
+                    // Update executed (average) price if available
+                    if (isset($normalized['average'])) {
+                        $order->executed_price = $normalized['average'];
                     }
-                    
-                    // Update fee if available
-                    if (isset($exchangeOrder['fee'])) {
-                        $order->fee = $exchangeOrder['fee']['cost'] ?? 0;
-                        $order->fee_currency = $exchangeOrder['fee']['currency'] ?? null;
+
+                    // Update commission if available
+                    if (isset($normalized['fee'])) {
+                        $order->commission = $normalized['fee']['cost'] ?? 0;
+                        $order->commission_asset = $normalized['fee']['currency'] ?? null;
                     }
                     
                     $order->save();
@@ -159,9 +171,10 @@ class SpotOrderLifecycleManager extends Command
                 // Order might be deleted/expired on exchange
                 if (strpos($e->getMessage(), 'not found') !== false || 
                     strpos($e->getMessage(), 'does not exist') !== false) {
-                    $order->status = 'deleted';
+                    // Align with enum values: mark as cancelled when missing on exchange
+                    $order->status = 'cancelled';
                     $order->save();
-                    $this->info("سفارش نقدی {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
+                    $this->info("سفارش نقدی {$order->order_id} به عنوان کنسل‌شده علامت‌گذاری شد");
                 }
             }
         }
@@ -178,16 +191,107 @@ class SpotOrderLifecycleManager extends Command
             case 'ACTIVE':
             case 'OPEN':
             case 'PENDING':
-                return 'pending';
+                return 'New';
             case 'FILLED':
-                return 'filled';
+                return 'Filled';
             case 'CANCELED':
             case 'CANCELLED':
-                return 'canceled';
+                // Enum uses lowercase 'cancelled'
+                return 'cancelled';
             case 'EXPIRED':
-                return 'expired';
+                // No 'Expired' in enum; treat as cancelled
+                return 'cancelled';
             default:
-                return 'pending';
+                return 'New';
         }
+    }
+
+    /**
+     * Cross-exchange getter for a spot order
+     */
+    private function getExchangeSpotOrder($exchangeService, UserExchange $userExchange, string $orderId, string $symbol): array
+    {
+        $exchange = strtolower($userExchange->exchange_name);
+        try {
+            switch ($exchange) {
+                case 'bybit':
+                    // Bybit supports fetching by orderId only
+                    return $exchangeService->getSpotOrder($orderId);
+                case 'bingx':
+                    // BingX requires symbol for spot order lookup
+                    if (method_exists($exchangeService, 'getSpotOrderWithSymbol')) {
+                        return $exchangeService->getSpotOrderWithSymbol($orderId, $symbol);
+                    }
+                    return $exchangeService->getSpotOrder($orderId);
+                case 'binance':
+                    // Use dedicated Binance spot service due to interface differences
+                    $spotService = new \App\Services\Exchanges\BinanceSpotApiService($userExchange->is_demo_active);
+                    $spotService->setCredentials($userExchange->api_key ?? '', $userExchange->api_secret ?? '');
+                    return $spotService->getSpotOrderWithSymbol($orderId, $symbol);
+                default:
+                    return $exchangeService->getSpotOrder($orderId);
+            }
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
+    /**
+     * Normalize spot order response across exchanges to a common shape
+     * Returns ['status' => string, 'filled' => float|null, 'average' => float|null, 'fee' => ['cost' => float, 'currency' => string]|null]
+     */
+    private function normalizeSpotExchangeOrder($exchangeOrder, string $exchangeName): array
+    {
+        $name = strtolower($exchangeName);
+        $normalized = [
+            'status' => null,
+            'filled' => null,
+            'average' => null,
+            'fee' => null,
+        ];
+
+        // Unwrap common Bybit v5 response format
+        $item = $exchangeOrder;
+        if (isset($exchangeOrder['result']['list']) && is_array($exchangeOrder['result']['list'])) {
+            $item = $exchangeOrder['result']['list'][0] ?? [];
+        } elseif (isset($exchangeOrder['list']) && is_array($exchangeOrder['list'])) {
+            $item = $exchangeOrder['list'][0] ?? [];
+        }
+
+        switch ($name) {
+            case 'bybit':
+                $normalized['status'] = $item['orderStatus'] ?? ($item['status'] ?? null);
+                $normalized['filled'] = isset($item['cumExecQty']) ? (float)$item['cumExecQty'] : (isset($item['executedQty']) ? (float)$item['executedQty'] : null);
+                $normalized['average'] = isset($item['avgPrice']) ? (float)$item['avgPrice'] : null;
+                if (isset($item['cumExecFee']) || isset($item['feeAmount'])) {
+                    $normalized['fee'] = [
+                        'cost' => isset($item['cumExecFee']) ? (float)$item['cumExecFee'] : (float)($item['feeAmount'] ?? 0),
+                        'currency' => $item['feeCurrency'] ?? ($item['feeToken'] ?? null),
+                    ];
+                }
+                break;
+
+            case 'binance':
+                $normalized['status'] = $item['status'] ?? null;
+                $normalized['filled'] = isset($item['executedQty']) ? (float)$item['executedQty'] : null;
+                if (!empty($item['executedQty']) && !empty($item['cummulativeQuoteQty']) && (float)$item['executedQty'] > 0) {
+                    $normalized['average'] = (float)$item['cummulativeQuoteQty'] / (float)$item['executedQty'];
+                }
+                break;
+
+            case 'bingx':
+                $normalized['status'] = $item['status'] ?? null;
+                $normalized['filled'] = isset($item['executedQty']) ? (float)$item['executedQty'] : (isset($item['cumExecQty']) ? (float)$item['cumExecQty'] : null);
+                $normalized['average'] = isset($item['avgPrice']) ? (float)$item['avgPrice'] : null;
+                break;
+
+            default:
+                $normalized['status'] = $item['status'] ?? null;
+                $normalized['filled'] = $item['filled'] ?? null;
+                $normalized['average'] = $item['average'] ?? null;
+                $normalized['fee'] = $item['fee'] ?? null;
+        }
+
+        return $normalized;
     }
 }
