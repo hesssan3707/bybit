@@ -137,6 +137,7 @@
     .pnl-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 0.95em; }
     .badge-positive { background: rgba(251, 251, 251, 0.85); color: #28a745; border: 1px solid rgba(40,167,69,0.35); }
     .badge-negative { background: rgba(0, 0, 0, 0.7); color: #dc3545; border: 1px solid rgba(220,53,69,0.35); }
+    .sync-warning { display: inline-block; margin-right: 6px; color: #ffcc00; font-weight: 900; cursor: help; }
     @media screen and (max-width: 768px) {
       .pnl-badge { font-size: 1.05em; padding: 6px 12px; }
     }
@@ -266,6 +267,9 @@
                         <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 2), '0'), '.') }}</td>
                         <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($trade->avg_exit_price, 2), '0'), '.') }}</td>
                         <td data-label="سود و زیان">
+                            @if(($trade->synchronized ?? 0) === 2)
+                                <span class="sync-warning" title="این عدد ممکن است اشتباه باشد">!</span>
+                            @endif
                             <span style="direction: ltr;" class="pnl-badge {{ $trade->pnl >= 0 ? 'badge-positive' : 'badge-negative' }}">
                                 {{ rtrim(rtrim(number_format($trade->pnl, 2), '0'), '.') }}
                             </span>

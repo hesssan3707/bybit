@@ -122,55 +122,6 @@ class DemoFuturesLifecycleManager extends Command
     }
 
     /**
-     * Sync order statuses with exchange
-     */
-    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
-    {
-        // Get all pending orders for this user exchange (demo mode)
-        $orders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('is_demo', true)
-            ->whereIn('status', ['pending', 'filled'])
-            ->get();
-
-        foreach ($orders as $order) {
-            try {
-                // Get order status from exchange
-                $exchangeOrder = $exchangeService->getOrder($order->order_id, $order->symbol);
-
-                // Update order status based on exchange response
-                $newStatus = $this->mapExchangeStatus($exchangeOrder['list'][0]['orderStatus']);
-                
-                if ($order->status !== $newStatus) {
-                    $order->status = $newStatus;
-                    
-                    // Update filled quantity if available
-                    if (isset($exchangeOrder['filled'])) {
-                        $order->filled_quantity = $exchangeOrder['filled'];
-                    }
-                    
-                    // Update average price if available
-                    if (isset($exchangeOrder['average'])) {
-                        $order->average_price = $exchangeOrder['average'];
-                    }
-                    
-                    $order->save();
-                    
-                    $this->info("وضعیت سفارش دمو {$order->order_id} به {$newStatus} تغییر یافت");
-                }
-
-            } catch (Exception $e) {
-                // Order might be deleted/expired on exchange
-                if (strpos($e->getMessage(), 'not found') !== false || 
-                    strpos($e->getMessage(), 'does not exist') !== false) {
-                    $order->status = 'deleted';
-                    $order->save();
-                    $this->info("سفارش دمو {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
-                }
-            }
-        }
-    }
-
-    /**
      * Sync lifecycle for a specific exchange using the new approach:
      * Get orders from exchange and sync to database
      */
@@ -211,6 +162,9 @@ class DemoFuturesLifecycleManager extends Command
             }
             // پس از همگام‌سازی سفارش‌ها، موقعیت‌های باز را نیز همگام‌سازی می‌کنیم (دمو)
             $this->syncPnlRecords($exchangeService, $userExchange);
+
+            // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
+            $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
 
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی (دمو): " . $e->getMessage());
@@ -374,7 +328,7 @@ class DemoFuturesLifecycleManager extends Command
                     }
                 }
 
-                if ($matchedClosed) {
+               if ($matchedClosed) {
                     if (array_key_exists('avgExitPrice', $matchedClosed) && $matchedClosed['avgExitPrice'] !== null) {
                         $trade->avg_exit_price = $matchedClosed['avgExitPrice'];
                     }
@@ -382,9 +336,10 @@ class DemoFuturesLifecycleManager extends Command
                         $trade->pnl = $matchedClosed['realizedPnl'];
                     }
                     $trade->closed_at = now();
+                    $trade->synchronized = 1; // verified sync with exchange
                     $trade->updated_at = now();
                     $trade->save();
-                }
+               }
             }
         } catch (Exception $e) {
             $this->warn("[Demo] خطا در همگام‌سازی سوابق PnL: " . $e->getMessage());
@@ -499,132 +454,6 @@ class DemoFuturesLifecycleManager extends Command
             'unrealizedPnl' => $unrealizedPnl,
             'leverage' => $leverage,
         ];
-    }
-
-    private function handlePotentialClosure($exchangeService, UserExchange $userExchange, Order $order, $exchangeOrder): void
-    {
-        try {
-            if (($order->status ?? null) !== 'closed') {
-                return;
-            }
-            if (app()->environment('local')) {
-                $this->info("[Demo] در محیط محلی، دریافت PnL بسته شده برای سفارش {$order->order_id} نادیده گرفته شد");
-                return;
-            }
-
-            $alreadyProcessed = Trade::where('user_exchange_id', $userExchange->id)
-                ->where('is_demo', true)
-                ->where('order_id', $order->order_id)
-                ->exists();
-            if ($alreadyProcessed) {
-                $this->info("[Demo] ثبت PnL برای سفارش {$order->order_id} قبلاً انجام شده است؛ نادیده گرفته شد");
-                return;
-            }
-
-            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name) ?: $order->symbol;
-            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name) ?: ($order->side ?? null);
-
-            if (!$order->closed_at) {
-                $this->warn("[Demo] زمان بسته شدن سفارش {$order->order_id} نامشخص است؛ همگام‌سازی PnL ممکن است ناقص باشد");
-            }
-            $startTime = ($order->closed_at ? $order->closed_at->subMinutes(5) : now()->subMinutes(5))->timestamp * 1000;
-
-            $closedRaw = $exchangeService->getClosedPnl($symbol, 100, $startTime);
-            $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
-
-            if (empty($closedList)) {
-                $this->info("[Demo] هیچ رویداد PnL بسته‌ای برای سفارش {$order->order_id} یافت نشد");
-                return;
-            }
-
-            $events = array_values(array_filter($closedList, function($c) use ($order, $symbol, $side, $userExchange) {
-                $matchId = isset($c['orderId']) && (string)$c['orderId'] === (string)$order->order_id;
-                $matchSymbol = ($c['symbol'] ?? null) === $symbol;
-                $matchSide = $userExchange->position_mode === 'hedge' ? (($c['side'] ?? null) === $side) : true;
-                return $matchId || ($matchSymbol && $matchSide);
-            }));
-            if (empty($events)) {
-                $events = $closedList;
-            }
-
-            foreach ($events as $c) {
-                $closedAtMs = $c['closedAt'] ?? null;
-                $closedAt = $closedAtMs ? \Carbon\Carbon::createFromTimestampMs($closedAtMs) : ($order->closed_at ?: now());
-
-                $exists = Trade::where('user_exchange_id', $userExchange->id)
-                    ->where('is_demo', true)
-                    ->where('order_id', $order->order_id)
-                    ->where('closed_at', $closedAt)
-                    ->exists();
-                if ($exists) { continue; }
-
-                Trade::create([
-                    'user_exchange_id' => $userExchange->id,
-                    'is_demo' => true,
-                    'symbol' => $c['symbol'] ?? $symbol,
-                    'side' => $c['side'] ?? ($side ?: 'Buy'),
-                    'order_type' => 'Limit',
-                    'leverage' => 1.0,
-                    'qty' => (float)($c['qty'] ?? ($order->filled_quantity ?? 0)),
-                    'avg_entry_price' => $c['avgEntryPrice'] ?? ($order->average_price ?? 0),
-                    'avg_exit_price' => $c['avgExitPrice'] ?? ($order->average_price ?? 0),
-                    'pnl' => (float)($c['realizedPnl'] ?? 0),
-                    'order_id' => $order->order_id,
-                    'closed_at' => $closedAt,
-                ]);
-            }
-
-            $this->info("[Demo] ثبت PnL بسته برای سفارش {$order->order_id} تکمیل شد");
-        } catch (Exception $e) {
-            $this->warn("[Demo] خطا در همگام‌سازی PnL بسته برای سفارش {$order->order_id}: " . $e->getMessage());
-        }
-    }
-
-
-    /**
-     * Handle closed orders not found in database - sync PnL (Demo)
-     */
-    private function syncClosedOrderPnl($exchangeOrder, UserExchange $userExchange)
-    {
-        // Only process filled orders that represent closed positions
-        $status = $this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name);
-        if (strtoupper($status) !== 'FILLED') {
-            return;
-        }
-
-        try {
-            // Extract order details
-            $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
-            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name);
-            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
-            $qty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
-            $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
-
-            if (!$orderId || !$symbol || !$side || !$qty || !$avgPrice) {
-                return; // Skip if essential data is missing
-            }
-
-            // Create trade record for closed position in demo mode
-            Trade::create([
-                'user_exchange_id' => $userExchange->id,
-                'is_demo' => true,
-                'symbol' => $symbol,
-                'side' => $side,
-                'order_type' => 'Market', // Default for closed positions
-                'leverage' => 1.0, // Default leverage
-                'qty' => $qty,
-                'avg_entry_price' => $avgPrice,
-                'avg_exit_price' => $avgPrice, // Same as entry for closed positions
-                'pnl' => 0, // Will be calculated separately
-                'order_id' => $orderId,
-                'closed_at' => now(),
-            ]);
-
-            $this->info("[Demo] سفارش بسته شده {$orderId} در جدول معاملات ثبت شد");
-
-        } catch (Exception $e) {
-            $this->warn("[Demo] خطا در ثبت سفارش بسته شده: " . $e->getMessage());
-        }
     }
 
     /**
@@ -840,5 +669,120 @@ class DemoFuturesLifecycleManager extends Command
             ];
         }
         return $out;
+    }
+    /**
+     * Verify closed trades against exchange PnL history and mark synchronization status.
+     * synchronized: 1 = verified, 2 = not found (unverified)
+     */
+    private function verifyClosedTradesSynchronization($exchangeService, UserExchange $userExchange): void
+    {
+        if (app()->environment('local')) {
+            $this->info("[Demo] در محیط محلی، تأیید همگام‌سازی معاملات بسته نادیده گرفته شد");
+            return;
+        }
+
+        try {
+            $trades = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
+                ->whereNotNull('closed_at')
+                ->where('synchronized', 0)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            if ($trades->isEmpty()) { return; }
+
+            $oldestCreatedAt = $trades->first()->created_at;
+            $startTime = $oldestCreatedAt ? $oldestCreatedAt->timestamp * 1000 : null;
+
+            // Group trades by symbol to minimize requests (one request per symbol)
+            $bySymbol = $trades->groupBy('symbol');
+
+            foreach ($bySymbol as $symbol => $symbolTrades) {
+                $closedRaw = $exchangeService->getClosedPnl($symbol, 200, $startTime);
+                $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
+
+                // Build quick lookup sets per symbol
+                $records = array_values(array_filter($closedList, function($c) use ($symbol) {
+                    return isset($c['symbol']) && $c['symbol'] === $symbol;
+                }));
+
+                foreach ($symbolTrades as $trade) {
+                    $matched = null;
+                    $epsilonQty = 1e-8;
+                    $epsilonPrice = 1e-6;
+
+                    // 1) Direct match by orderId or exact fields
+                    foreach ($records as $c) {
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $fieldsMatch = isset($c['qty'], $c['avgEntryPrice'])
+                            && abs((float)$c['qty'] - (float)$trade->qty) <= $epsilonQty
+                            && abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        if ($idMatch || $fieldsMatch) { $matched = [$c]; break; }
+                    }
+
+                    // 2) If not matched, try multi-record match (split closures)
+                    if (!$matched) {
+                        $cands = array_values(array_filter($records, function($c) use ($trade, $epsilonPrice) {
+                            if (!isset($c['avgEntryPrice'], $c['qty'])) { return false; }
+                            return abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        }));
+
+                        // Sum all candidates first
+                        $sumQty = 0.0; $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                        foreach ($cands as $c) {
+                            $q = (float)($c['qty'] ?? 0.0); $sumQty += $q;
+                            if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
+                            if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                        }
+                        if (abs($sumQty - (float)$trade->qty) <= $epsilonQty && $sumQty > 0) {
+                            $matched = $cands;
+                            $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
+                            $trade->pnl = $sumPnl;
+                        } else {
+                            // Try pair combinations
+                            $n = count($cands); $foundPair = null;
+                            for ($i = 0; $i < $n; $i++) {
+                                for ($j = $i + 1; $j < $n; $j++) {
+                                    $q = (float)($cands[$i]['qty'] ?? 0.0) + (float)($cands[$j]['qty'] ?? 0.0);
+                                    if (abs($q - (float)$trade->qty) <= $epsilonQty) { $foundPair = [$cands[$i], $cands[$j]]; break; }
+                                }
+                                if ($foundPair) { break; }
+                            }
+                            if ($foundPair) {
+                                $matched = $foundPair;
+                                $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                                foreach ($foundPair as $c) {
+                                    $q = (float)($c['qty'] ?? 0.0);
+                                    if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
+                                    if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                                }
+                                $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
+                                $trade->pnl = $sumPnl;
+                            }
+                        }
+                    }
+
+                    // Finalize
+                    if ($matched) {
+                        // If single record, prefer its explicit values
+                        if (count($matched) === 1) {
+                            $m = $matched[0];
+                            if (array_key_exists('avgExitPrice', $m) && $m['avgExitPrice'] !== null) {
+                                $trade->avg_exit_price = (float)$m['avgExitPrice'];
+                            }
+                            if (array_key_exists('realizedPnl', $m) && $m['realizedPnl'] !== null) {
+                                $trade->pnl = (float)$m['realizedPnl'];
+                            }
+                        }
+                        $trade->synchronized = 1;
+                    } else {
+                        $trade->synchronized = 2; // mark as unverified sync
+                    }
+                    $trade->save();
+                }
+            }
+        } catch (\Exception $e) {
+            $this->warn("[Demo] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());
+        }
     }
 }

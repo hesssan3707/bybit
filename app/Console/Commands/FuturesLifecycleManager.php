@@ -154,10 +154,11 @@ class FuturesLifecycleManager extends Command
                     $this->syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, $userExchange);
                 }
 
-                // پس از همگام‌سازی سفارش‌ها، موقعیت‌های باز را نیز همگام‌سازی می‌کنیم
-                $this->syncOpenPositions($exchangeService, $userExchange);
-                // Sync PnL records for hedge mode - disabled per new logic
-                // $this->syncPnlRecords($exchangeService, $userExchange);
+                // پس از همگام‌سازی سفارش‌ها، سوابق PnL را نیز همگام‌سازی می‌کنیم
+                $this->syncPnlRecords($exchangeService, $userExchange);
+
+                // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
+                $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
 
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی: " . $e->getMessage());
@@ -231,7 +232,7 @@ class FuturesLifecycleManager extends Command
                                 'is_demo' => false,
                                 'symbol' => $symbol,
                                 'side' => $side,
-                                'order_type' => 'Limit',
+                                'order_type' => 'Market',
                                 'leverage' => 1.0,
                                 'qty' => (float)$qty,
                                 'avg_entry_price' => (float)$avgPrice,
@@ -252,58 +253,8 @@ class FuturesLifecycleManager extends Command
         }
     }
 
-    /**
-     * Sync order statuses with exchange
-     */
-    private function syncOrderStatuses($exchangeService, UserExchange $userExchange)
-    {
-        // Get all pending orders for this user exchange (real mode)
-        $orders = Order::where('user_exchange_id', $userExchange->id)
-            ->where('is_demo', false)
-            ->whereIn('status', ['pending', 'filled'])
-            ->get();
 
-        foreach ($orders as $order) {
-            try {
-                // Get order status from exchange
-                $exchangeOrder = $exchangeService->getOrder($order->order_id, $order->symbol);
 
-                // Update order status based on exchange response
-                $newStatus = $this->mapExchangeStatus($exchangeOrder['list'][0]['orderStatus']);
-                
-                if ($order->status !== $newStatus) {
-                    $order->status = $newStatus;
-                    
-                    // Update filled quantity if available
-                    if (isset($exchangeOrder['filled'])) {
-                        $order->filled_quantity = $exchangeOrder['filled'];
-                    }
-                    
-                    // Update average price if available
-                    if (isset($exchangeOrder['average'])) {
-                        $order->average_price = $exchangeOrder['average'];
-                    }
-                    
-                    $order->save();
-                    
-                    $this->info("وضعیت سفارش {$order->order_id} به {$newStatus} تغییر یافت");
-                }
-
-            } catch (Exception $e) {
-                // Order might be deleted/expired on exchange
-                if (strpos($e->getMessage(), 'not found') !== false || 
-                    strpos($e->getMessage(), 'does not exist') !== false) {
-                    $order->status = 'deleted';
-                    $order->save();
-                    $this->info("سفارش {$order->order_id} به عنوان حذف شده علامت‌گذاری شد");
-                }
-            }
-        }
-    }
-
-    /**
-     * Sync PnL records for hedge mode
-     */
     private function syncPnlRecords($exchangeService, UserExchange $userExchange)
     {
         // Skip exchange connectivity on localhost
@@ -313,7 +264,6 @@ class FuturesLifecycleManager extends Command
         }
 
         try {
-            // دریافت موقعیت‌ها و نرمال‌سازی برای صرافی‌های مختلف
             $positionsRaw = $exchangeService->getPositions();
             $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
 
@@ -381,6 +331,7 @@ class FuturesLifecycleManager extends Command
                         $trade->pnl = $matchedClosed['realizedPnl'];
                     }
                     $trade->closed_at = now();
+                    $trade->synchronized = 1; // verified sync with exchange
                     $trade->updated_at = now();
                     $trade->save();
                 }
@@ -458,51 +409,6 @@ class FuturesLifecycleManager extends Command
         }
     }
 
-    /**
-     * Handle closed orders not found in database - sync PnL
-     */
-    private function syncClosedOrderPnl($exchangeOrder, UserExchange $userExchange)
-    {
-        // Only process filled orders that represent closed positions
-        $status = $this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name);
-        if (strtoupper($status) !== 'FILLED') {
-            return;
-        }
-
-        try {
-            // Extract order details
-            $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
-            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name);
-            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
-            $qty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
-            $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
-
-            if (!$orderId || !$symbol || !$side || !$qty || !$avgPrice) {
-                return; // Skip if essential data is missing
-            }
-
-            // Create trade record for closed position
-            Trade::create([
-                'user_exchange_id' => $userExchange->id,
-                'is_demo' => false,
-                'symbol' => $symbol,
-                'side' => $side,
-                'order_type' => 'Market', // Default for closed positions
-                'leverage' => 1.0, // Default leverage
-                'qty' => $qty,
-                'avg_entry_price' => $avgPrice,
-                'avg_exit_price' => $avgPrice, // Same as entry for closed positions
-                'pnl' => 0, // Will be calculated separately
-                'order_id' => $orderId,
-                'closed_at' => now(),
-            ]);
-
-            $this->info("سفارش بسته شده {$orderId} در جدول معاملات ثبت شد");
-
-        } catch (Exception $e) {
-            $this->warn("خطا در ثبت سفارش بسته شده: " . $e->getMessage());
-        }
-    }
 
     /**
      * Extract symbol from exchange order
@@ -665,96 +571,6 @@ class FuturesLifecycleManager extends Command
         ];
     }
 
-    private function handlePotentialClosure($exchangeService, UserExchange $userExchange, Order $order, $exchangeOrder): void
-    {
-        try {
-            $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name) ?: $order->symbol;
-            $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
-
-            // بررسی بسته بودن موقعیت
-            $positionsRaw = $exchangeService->getPositions($symbol);
-            $positions = $this->normalizePositionsList($userExchange->exchange_name, $positionsRaw);
-
-            $isClosed = true;
-            foreach ($positions as $raw) {
-                if (!is_array($raw)) continue;
-                $p = $this->mapRawPositionToCommon($userExchange->exchange_name, $raw);
-                if (!$p) continue;
-                if ($p['symbol'] !== $symbol) continue;
-                if ($userExchange->position_mode === 'hedge' && $side && $p['side'] !== $side) continue;
-                if ((float)$p['size'] > 0.0) { $isClosed = false; break; }
-            }
-            if (!$isClosed) return;
-
-            // دریافت لیست PnL های بسته شده و ثبت چندگانه برای کلوزهای جزئی
-            $startTime = $order->created_at ? $order->created_at->subMinutes(15)->timestamp * 1000 : null;
-            $closedRaw = $exchangeService->getClosedPnl($symbol, 100, $startTime);
-            $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
-
-            if (empty($closedList)) {
-                // در صورت نبود داده، یک رکورد حداقلی ایجاد می‌کنیم
-                Trade::create([
-                    'user_exchange_id' => $userExchange->id,
-                    'is_demo' => false,
-                    'symbol' => $symbol,
-                    'side' => $side ?: ($order->side ?? 'Buy'),
-                    'order_type' => 'Market',
-                    'leverage' => 1.0,
-                    'qty' => $order->filled_quantity ?? 0,
-                    'avg_entry_price' => $order->average_price ?? 0,
-                    'avg_exit_price' => $order->average_price ?? 0,
-                    'pnl' => 0,
-                    'order_id' => $order->order_id,
-                    'closed_at' => now(),
-                ]);
-                $this->info("معامله بسته شده برای سفارش {$order->order_id} ثبت شد (بدون داده PnL)");
-                return;
-            }
-
-            // فیلتر رکوردها: براساس orderId یا نماد (و در حالت هج، سمت)
-            $filtered = array_filter($closedList, function($c) use ($order, $symbol, $side, $userExchange) {
-                $matchId = isset($c['orderId']) && (string)$c['orderId'] === (string)$order->order_id;
-                $matchSymbol = ($c['symbol'] ?? null) === $symbol;
-                $matchSide = $userExchange->position_mode === 'hedge' ? (($c['side'] ?? null) === $side) : true;
-                return $matchId || ($matchSymbol && $matchSide);
-            });
-
-            // اگر چیزی فیلتر نشد، کل لیست را در نظر بگیر
-            $events = !empty($filtered) ? array_values($filtered) : $closedList;
-
-            // ثبت چندگانه با جلوگیری از دوباره‌کاری با کلید (order_id + closed_at)
-            foreach ($events as $c) {
-                $closedAtMs = $c['closedAt'] ?? null;
-                $closedAt = $closedAtMs ? \Carbon\Carbon::createFromTimestampMs($closedAtMs) : now();
-
-                $exists = Trade::where('user_exchange_id', $userExchange->id)
-                    ->where('is_demo', false)
-                    ->where('order_id', $order->order_id)
-                    ->where('closed_at', $closedAt)
-                    ->exists();
-                if ($exists) { continue; }
-
-                Trade::create([
-                    'user_exchange_id' => $userExchange->id,
-                    'is_demo' => false,
-                    'symbol' => $c['symbol'] ?? $symbol,
-                    'side' => $c['side'] ?? ($side ?: ($order->side ?? 'Buy')),
-                    'order_type' => 'Market',
-                    'leverage' => 1.0,
-                    'qty' => (float)($c['qty'] ?? ($order->filled_quantity ?? 0)),
-                    'avg_entry_price' => $c['avgEntryPrice'] ?? ($order->average_price ?? 0),
-                    'avg_exit_price' => $c['avgExitPrice'] ?? ($order->average_price ?? 0),
-                    'pnl' => (float)($c['realizedPnl'] ?? 0),
-                    'order_id' => $order->order_id,
-                    'closed_at' => $closedAt,
-                ]);
-            }
-
-            $this->info("ثبت معاملات بسته شده برای سفارش {$order->order_id} تکمیل شد");
-        } catch (Exception $e) {
-            $this->warn("خطا در بررسی بسته شدن موقعیت و ثبت معامله: " . $e->getMessage());
-        }
-    }
 
     private function normalizeClosedPnl(string $exchangeName, $raw): array
     {
@@ -841,9 +657,12 @@ class FuturesLifecycleManager extends Command
         $orderType = strtoupper((string)($exchangeOrder['orderType'] ?? ($exchangeOrder['type'] ?? '')));
         $isStopType = in_array($orderType, ['STOP', 'STOP_MARKET', 'TAKE_PROFIT', 'TAKE_PROFIT_MARKET']);
 
-        // Only treat explicit reduce-only or close-on-trigger as closing
-        // Do NOT treat mere presence of stopLoss/takeProfit on normal orders as closing.
-        if ($reduceOnly || $closeOnTrigger || $hasTrigger || $isStopType || $isStopOrderType) {
+        // Only treat explicit reduce-only or close-on-trigger as closing.
+        if ($reduceOnly || $closeOnTrigger) {
+            return true;
+        }
+        // Require a trigger together with stop/TP semantics; do not treat mere presence alone.
+        if ($hasTrigger && ($isStopType || $isStopOrderType)) {
             return true;
         }
         return false;
@@ -896,6 +715,121 @@ class FuturesLifecycleManager extends Command
             }
         } catch (\Exception $e) {
             $this->warn("[Real] خطا در همگام‌سازی موقعیت‌های باز: " . $e->getMessage());
+        }
+    }
+    /**
+     * Verify closed trades against exchange PnL history and mark synchronization status.
+     * synchronized: 1 = verified, 2 = not found (unverified)
+     */
+    private function verifyClosedTradesSynchronization($exchangeService, UserExchange $userExchange): void
+    {
+        if (app()->environment('local')) {
+            $this->info("[Real] در محیط محلی، تأیید همگام‌سازی معاملات بسته نادیده گرفته شد");
+            return;
+        }
+
+        try {
+            $trades = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', false)
+                ->whereNotNull('closed_at')
+                ->where('synchronized', 0)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            if ($trades->isEmpty()) { return; }
+
+            $oldestCreatedAt = $trades->first()->created_at;
+            $startTime = $oldestCreatedAt ? $oldestCreatedAt->timestamp * 1000 : null;
+
+            // Group trades by symbol to minimize requests (one request per symbol)
+            $bySymbol = $trades->groupBy('symbol');
+
+            foreach ($bySymbol as $symbol => $symbolTrades) {
+                $closedRaw = $exchangeService->getClosedPnl($symbol, 200, $startTime);
+                $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
+
+                // Build quick lookup sets per symbol
+                $records = array_values(array_filter($closedList, function($c) use ($symbol) {
+                    return isset($c['symbol']) && $c['symbol'] === $symbol;
+                }));
+
+                foreach ($symbolTrades as $trade) {
+                    $matched = null;
+                    $epsilonQty = 1e-8;
+                    $epsilonPrice = 1e-6;
+
+                    // 1) Direct match by orderId or exact fields
+                    foreach ($records as $c) {
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $fieldsMatch = isset($c['qty'], $c['avgEntryPrice'])
+                            && abs((float)$c['qty'] - (float)$trade->qty) <= $epsilonQty
+                            && abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        if ($idMatch || $fieldsMatch) { $matched = [$c]; break; }
+                    }
+
+                    // 2) If not matched, try multi-record match (split closures)
+                    if (!$matched) {
+                        $cands = array_values(array_filter($records, function($c) use ($trade, $epsilonPrice) {
+                            if (!isset($c['avgEntryPrice'], $c['qty'])) { return false; }
+                            return abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        }));
+
+                        // Sum all candidates first
+                        $sumQty = 0.0; $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                        foreach ($cands as $c) {
+                            $q = (float)($c['qty'] ?? 0.0); $sumQty += $q;
+                            if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
+                            if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                        }
+                        if (abs($sumQty - (float)$trade->qty) <= $epsilonQty && $sumQty > 0) {
+                            $matched = $cands;
+                            $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
+                            $trade->pnl = $sumPnl;
+                        } else {
+                            // Try pair combinations
+                            $n = count($cands); $foundPair = null;
+                            for ($i = 0; $i < $n; $i++) {
+                                for ($j = $i + 1; $j < $n; $j++) {
+                                    $q = (float)($cands[$i]['qty'] ?? 0.0) + (float)($cands[$j]['qty'] ?? 0.0);
+                                    if (abs($q - (float)$trade->qty) <= $epsilonQty) { $foundPair = [$cands[$i], $cands[$j]]; break; }
+                                }
+                                if ($foundPair) { break; }
+                            }
+                            if ($foundPair) {
+                                $matched = $foundPair;
+                                $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                                foreach ($foundPair as $c) {
+                                    $q = (float)($c['qty'] ?? 0.0);
+                                    if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
+                                    if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                                }
+                                $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
+                                $trade->pnl = $sumPnl;
+                            }
+                        }
+                    }
+
+                    // Finalize
+                    if ($matched) {
+                        // If single record, prefer its explicit values
+                        if (count($matched) === 1) {
+                            $m = $matched[0];
+                            if (array_key_exists('avgExitPrice', $m) && $m['avgExitPrice'] !== null) {
+                                $trade->avg_exit_price = (float)$m['avgExitPrice'];
+                            }
+                            if (array_key_exists('realizedPnl', $m) && $m['realizedPnl'] !== null) {
+                                $trade->pnl = (float)$m['realizedPnl'];
+                            }
+                        }
+                        $trade->synchronized = 1;
+                    } else {
+                        $trade->synchronized = 2; // mark as unverified sync
+                    }
+                    $trade->save();
+                }
+            }
+        } catch (\Exception $e) {
+            $this->warn("[Real] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());
         }
     }
 }

@@ -24,6 +24,7 @@ class Trade extends Model
         'pnl',
         'order_id',
         'closed_at',
+        'synchronized',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Trade extends Model
         'avg_exit_price' => 'decimal:10',
         'pnl' => 'decimal:10',
         'closed_at' => 'datetime',
+        'synchronized' => 'integer',
     ];
 
     /**
