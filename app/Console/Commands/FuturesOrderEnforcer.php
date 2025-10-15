@@ -143,8 +143,8 @@ class FuturesOrderEnforcer extends Command
             $openOrdersResult = $exchangeService->getOpenOrders(null);
             $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
             
-            // Get all positions from exchange
-            $positionsResult = $exchangeService->getPositions($symbol);
+            // Get all positions from exchange (fetch all symbols to allow cross-symbol checks)
+            $positionsResult = $exchangeService->getPositions(null);
             $exchangePositions = $positionsResult['list'] ?? [];
 
             // 1. Check all pending orders
@@ -155,6 +155,9 @@ class FuturesOrderEnforcer extends Command
 
             // 3. Check for foreign orders on exchange
             $this->checkForeignOrders($exchangeService, $userExchange, $symbol, $exchangeOpenOrders);
+
+            // 4. Optionally purge positions in other symbols if env key allows
+            $this->purgeOtherSymbolsPositions($exchangeService, $userExchange, $symbol, $exchangePositions);
 
         } catch (Exception $e) {
             $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}: " . $e->getMessage());
@@ -324,12 +327,27 @@ class FuturesOrderEnforcer extends Command
             ->where('symbol', $symbol)
             ->get();
 
+        // Read env flag: if true, purge foreign orders in other symbols too
+        $purgeOtherSymbolsRaw = env('FUTURES_STRICT_PURGE_OTHER_SYMBOLS', false);
+        $purgeOtherSymbols = ($purgeOtherSymbolsRaw === true || $purgeOtherSymbolsRaw === 'true' || $purgeOtherSymbolsRaw === 1 || $purgeOtherSymbolsRaw === '1');
+
         foreach ($exchangeOpenOrders as $exchangeOrder) {
             $orderId = $exchangeOrder['orderId'];
             $orderSymbol = $exchangeOrder['symbol'] ?? $symbol;
 
-            // فقط سفارشات مربوط به نماد انتخاب‌شده بررسی شوند
-            if ($orderSymbol !== $symbol) { continue; }
+            // اگر نماد سفارش متفاوت از نماد انتخاب‌شده است و پرچم محیطی فعال باشد، سفارش خارجی حذف شود
+            if ($orderSymbol !== $symbol) {
+                if ($purgeOtherSymbols && !in_array($orderId, $ourOrderIds)) {
+                    try {
+                        $exchangeService->cancelOrderWithSymbol($orderId, $orderSymbol);
+                        $this->info("    حذف سفارش خارجی نماد دیگر: {$orderId} ({$orderSymbol})");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در حذف سفارش خارجی {$orderId} ({$orderSymbol}): " . $e->getMessage());
+                    }
+                }
+                // در غیر این صورت، این سفارشات لمس نشوند
+                continue;
+            }
 
             if (in_array($orderId, $ourOrderIds)) {
                 continue;
@@ -346,6 +364,49 @@ class FuturesOrderEnforcer extends Command
                 $this->info("    حذف سفارش خارجی: {$orderId}");
             } catch (Exception $e) {
                 $this->warn("    خطا در حذف سفارش خارجی {$orderId}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Purge positions in symbols other than the user's selected market when env key is true
+     */
+    private function purgeOtherSymbolsPositions($exchangeService, UserExchange $userExchange, string $selectedSymbol, array $exchangePositions)
+    {
+        // Read env flag: if false, do nothing
+        $purgeOtherSymbolsRaw = env('FUTURES_STRICT_PURGE_OTHER_SYMBOLS', false);
+        $purgeOtherSymbols = ($purgeOtherSymbolsRaw === true || $purgeOtherSymbolsRaw === 'true' || $purgeOtherSymbolsRaw === 1 || $purgeOtherSymbolsRaw === '1');
+        if (!$purgeOtherSymbols) { return; }
+
+        $this->info("  پاکسازی موقعیت‌های نمادهای دیگر در حالت سخت‌گیرانه...");
+
+        // Close any active positions for symbols other than selectedSymbol
+        foreach ($exchangePositions as $position) {
+            $posSymbol = $position['symbol'] ?? null;
+            $posSize = (float)($position['size'] ?? 0);
+            $rawSide = strtolower($position['side'] ?? $position['positionSide'] ?? '');
+            $closeSide = ($rawSide === 'buy' || $rawSide === 'long') ? 'Buy' : 'Sell';
+
+            if (!$posSymbol || $posSymbol === $selectedSymbol) { continue; }
+            if ($posSize <= 0) { continue; }
+
+            try {
+                $exchangeService->closePosition($posSymbol, $closeSide, $posSize);
+
+                // Mark any related trades in our DB as closed
+                $relatedTrades = Trade::where('user_exchange_id', $userExchange->id)
+                    ->where('is_demo', false)
+                    ->whereNull('closed_at')
+                    ->where('symbol', $posSymbol)
+                    ->get();
+                foreach ($relatedTrades as $t) {
+                    $t->closed_at = now();
+                    $t->save();
+                }
+
+                $this->info("    بستن موقعیت نماد دیگر: {$posSymbol} (اندازه={$posSize})");
+            } catch (Exception $e) {
+                $this->warn("    خطا در بستن موقعیت نماد دیگر {$posSymbol}: " . $e->getMessage());
             }
         }
     }
