@@ -332,26 +332,6 @@ class DemoFuturesOrderEnforcer extends Command
                 continue;
             }
 
-            // اگر اختلاف زمانی بین سفارش صرافی و رکوردهای ما کمتر از ۱ دقیقه باشد، آن را خارجی در نظر نگیریم
-            $exchangeTs = $this->getExchangeOrderTimestamp($exchangeOrder);
-            $isNearTime = false;
-            if ($exchangeTs !== null) {
-                $exchangeTime = Carbon::createFromTimestamp($exchangeTs);
-                $from = $exchangeTime->copy()->subMinute();
-                $to   = $exchangeTime->copy()->addMinute();
-                $isNearTime = Order::where('user_exchange_id', $userExchange->id)
-                    ->where('is_demo', true)
-                    ->whereIn('status', ['pending', 'filled'])
-                    ->where('symbol', $orderSymbol)
-                    ->whereBetween('created_at', [$from, $to])
-                    ->exists();
-            }
-
-            if ($isNearTime) {
-                $this->info("    حفظ سفارش نزدیک به زمان ثبت ما (دمو): {$orderId}");
-                continue;
-            }
-
             // Preserve valid TP/SL orders strictly matching our trades
             if ($this->isValidTpSlOrder($exchangeOrder, $openTrades)) {
                 $this->info("    حفظ سفارش TP/SL معتبر (دمو): {$orderId}");
@@ -428,32 +408,6 @@ class DemoFuturesOrderEnforcer extends Command
         }
 
         return false;
-    }
-
-    /**
-     * استخراج زمان ثبت سفارش صرافی به صورت timestamp ثانیه‌ای
-     */
-    private function getExchangeOrderTimestamp(array $order): ?int
-    {
-        $candidates = [
-            $order['createdTime'] ?? null,
-            $order['createTime'] ?? null,
-            $order['time'] ?? null,
-            $order['updateTime'] ?? null,
-            $order['transactTime'] ?? null,
-            $order['timestamp'] ?? null,
-        ];
-
-        foreach ($candidates as $value) {
-            if ($value === null) { continue; }
-            $ts = (int)$value;
-            if ($ts <= 0) { continue; }
-            if ($ts > 2000000000) { // likely milliseconds
-                return (int) floor($ts / 1000);
-            }
-            return $ts;
-        }
-        return null;
     }
 
     /**
