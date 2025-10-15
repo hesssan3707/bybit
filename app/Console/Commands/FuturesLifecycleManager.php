@@ -157,13 +157,12 @@ class FuturesLifecycleManager extends Command
                 // پس از همگام‌سازی سفارش‌ها، سوابق PnL را نیز همگام‌سازی می‌کنیم
                 $this->syncPnlRecords($exchangeService, $userExchange);
 
-                // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
-                $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
-
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی: " . $e->getMessage());
             }
         }
+        // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
+        $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
     }
 
     /**

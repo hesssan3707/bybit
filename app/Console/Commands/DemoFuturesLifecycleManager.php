@@ -163,15 +163,14 @@ class DemoFuturesLifecycleManager extends Command
             // پس از همگام‌سازی سفارش‌ها، موقعیت‌های باز را نیز همگام‌سازی می‌کنیم (دمو)
             $this->syncPnlRecords($exchangeService, $userExchange);
 
-            // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
-            $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
-
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی (دمو): " . $e->getMessage());
             }
         } else {
             $this->info("سفارشی یافت نشد");
         }
+        // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
+        $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
     }
 
     /**
