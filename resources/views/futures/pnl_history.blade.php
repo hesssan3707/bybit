@@ -103,13 +103,7 @@
 
     /* Open positions card layout (mobile-first) */
     .open-positions-table { display: block; }
-    .open-positions-cards { display: none; }
 
-    .open-positions-cards {
-        grid-template-columns: 1fr;
-        gap: 12px;
-        margin-top: 10px;
-    }
     .position-card {
         background: rgba(255,255,255,0.06);
         backdrop-filter: blur(4px);
@@ -193,8 +187,6 @@
         }
 
         /* Open positions: show cards, hide table */
-        .open-positions-table { display: none; }
-        .open-positions-cards { display: grid; }
         .position-card { font-size: 0.95rem; }
     }
 </style>
@@ -210,72 +202,6 @@
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
-    @endif
-
-    <!-- Open Positions Section (disabled: merged into unified table) -->
-    @if(false)
-    <div class="table-responsive open-positions-table" title="در این بخش، موقعیت‌های باز شما نمایش داده می‌شود. برای بستن، روی دکمه بستن کلیک کنید.">
-        <h3 style="margin-top:10px">موقعیت‌های باز</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>نماد</th>
-                    <th>جهت</th>
-                    <th>مقدار</th>
-                    <th>میانگین قیمت ورود</th>
-                    <th>عملیات</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($openTrades as $t)
-                    <tr>
-                        <td data-label="نماد">{{ $t->symbol }}</td>
-                        <td data-label="جهت">{{ $t->side }}</td>
-                        <td data-label="مقدار">{{ rtrim(rtrim(number_format($t->qty, 8), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($t->avg_entry_price, 4), '0'), '.') }}</td>
-                        <td data-label="عملیات">
-                            @php $oid = $orderModelByOrderId[$t->order_id] ?? null; @endphp
-                            @if($oid)
-                                <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" style="display:inline;" class="close-position-form" title="بستن موقعیت باز">
-                                    @csrf
-                                    <button type="submit" class="close-btn">بستن</button>
-                                </form>
-                            @else
-                                <span class="text-muted" title="سفارش مرتبط برای بستن یافت نشد">سفارش مرتبط یافت نشد</span>
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Mobile Cards for Open Positions -->
-    <div class="open-positions-cards" title="نمای کارت‌ها برای موبایل: اطلاعات موقعیت‌های باز شما">
-        @foreach($openTrades as $t)
-        <div class="position-card">
-            <div class="position-header">
-                <span>{{ $t->symbol }}</span>
-                <span>{{ $t->side }}</span>
-            </div>
-            <div class="position-meta">
-                <div class="position-field"><span class="position-label">مقدار</span><span class="position-value">{{ rtrim(rtrim(number_format($t->qty, 8), '0'), '.') }}</span></div>
-                <div class="position-field"><span class="position-label">میانگین ورود</span><span class="position-value">{{ rtrim(rtrim(number_format($t->avg_entry_price, 4), '0'), '.') }}</span></div>
-            </div>
-            <div>
-                @php $oid = $orderModelByOrderId[$t->order_id] ?? null; @endphp
-                @if($oid)
-                    <form action="{{ url('/futures/orders/' . $oid . '/close') }}" method="POST" class="close-position-form">
-                        @csrf
-                        <button type="submit" class="close-btn" style="width:100%">بستن</button>
-                    </form>
-                @else
-                    <span class="text-muted">سفارش مرتبط یافت نشد</span>
-                @endif
-            </div>
-        </div>
-        @endforeach
-    </div>
     @endif
 
     <!-- Mobile redirect buttons (only visible on mobile) -->
@@ -308,12 +234,12 @@
                     <tr>
                         <td data-label="نماد">{{ $trade->symbol }}</td>
                         <td data-label="جهت">{{ $trade->side }}</td>
-                        <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 4), '0'), '.') }}</td>
+                        <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 4), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 2), '0'), '.') }}</td>
                         <td data-label="میانگین قیمت خروج">--</td>
                         <td data-label="سود و زیان">
                             <span style="direction: ltr;" class="pnl-badge {{ $trade->pnl >= 0 ? 'badge-positive' : 'badge-negative' }}">
-                                {{ rtrim(rtrim(number_format($trade->pnl, 4), '0'), '.') }}
+                                {{ rtrim(rtrim(number_format($trade->pnl, 2), '0'), '.') }}
                             </span>
                         </td>
                         <td data-label="زمان بسته شدن">
@@ -337,11 +263,11 @@
                         <td data-label="نماد">{{ $trade->symbol }}</td>
                         <td data-label="جهت">{{ $trade->side }}</td>
                         <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 4), '0'), '.') }}</td>
-                        <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($trade->avg_exit_price, 4), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت ورود">{{ rtrim(rtrim(number_format($trade->avg_entry_price, 2), '0'), '.') }}</td>
+                        <td data-label="میانگین قیمت خروج">{{ rtrim(rtrim(number_format($trade->avg_exit_price, 2), '0'), '.') }}</td>
                         <td data-label="سود و زیان">
                             <span style="direction: ltr;" class="pnl-badge {{ $trade->pnl >= 0 ? 'badge-positive' : 'badge-negative' }}">
-                                {{ rtrim(rtrim(number_format($trade->pnl, 4), '0'), '.') }}
+                                {{ rtrim(rtrim(number_format($trade->pnl, 2), '0'), '.') }}
                             </span>
                         </td>
                         <td data-label="زمان بسته شدن">{{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}</td>

@@ -198,32 +198,21 @@ class DemoFuturesOrderEnforcer extends Command
             $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
             $dbQty = (float)$dbOrder->amount;
 
-            // درصد اختلاف‌ها را محاسبه کنید
-            $priceBase = max(abs($dbPrice), 1e-9);
-            $qtyBase   = max(abs($dbQty), 1e-9);
-            $priceDiffPct = ($priceBase > 0) ? (abs($exchangePrice - $dbPrice) / $priceBase) : 0.0;
-            $qtyDiffPct   = ($qtyBase > 0) ? (abs($exchangeQty - $dbQty) / $qtyBase) : 0.0;
+            // بررسی عدم تطابق مقدار/قیمت
+            $exchangePrice = (float)($exchangeOrder['price'] ?? 0);
+            $dbPrice = (float)$dbOrder->entry_price;
+            $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
+            $dbQty = (float)$dbOrder->amount;
 
-            $tolerance = 0.002; // 0.2%
-
-            if ($priceDiffPct > $tolerance || $qtyDiffPct > $tolerance) {
-                // اختلاف قابل توجه: لغو و حذف
+            if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
                 try {
                     $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
                     $dbOrder->delete();
-                    $this->info("    حذف سفارش تغییر یافته (دمو): {$dbOrder->order_id} (عدم تطابق قابل توجه قیمت/مقدار)");
+                    $this->info("    حذف سفارش تغییر یافته (دمو): {$dbOrder->order_id} (عدم تطابق قیمت/مقدار)");
                 } catch (Exception $e) {
                     $this->warn("    خطا در حذف سفارش (دمو) {$dbOrder->order_id}: " . $e->getMessage());
                 }
                 continue;
-            }
-
-            // اختلاف جزئی: همسان‌سازی رکورد محلی با صرافی
-            if ($priceDiffPct > 0 || $qtyDiffPct > 0) {
-                $dbOrder->entry_price = $exchangePrice;
-                $dbOrder->amount = $exchangeQty;
-                $dbOrder->save();
-                $this->info("    به‌روزرسانی سفارش با اختلاف جزئی (دمو): {$dbOrder->order_id} (همسان‌سازی قیمت/مقدار)");
             }
         }
     }
@@ -275,16 +264,18 @@ class DemoFuturesOrderEnforcer extends Command
                 }
             }
 
-            // Check if size or entry price doesn't match
-            $exchangeSize = (float)($matchingPosition['size'] ?? 0);
-            $dbSize = (float)$dbTrade->qty;
+            // Check if size or entry price doesn't match (نسبت به سفارش اصلی)
+            $exchangeSize  = (float)($matchingPosition['size'] ?? 0);
             $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
-            $dbPrice = (float)$dbTrade->avg_entry_price;
-            // درصد اختلاف‌ها را محاسبه کنید و آستانه 0.2% اعمال شود
-            $sizeBase  = max(abs($dbSize), 1e-9);
-            $priceBase = max(abs($dbPrice), 1e-9);
-            $sizeDiffPct  = ($sizeBase > 0) ? (abs($exchangeSize - $dbSize) / $sizeBase) : 0.0;
-            $priceDiffPct = ($priceBase > 0) ? (abs($exchangePrice - $dbPrice) / $priceBase) : 0.0;
+            // از سفارش مرتبط به عنوان مبنا استفاده شود؛ در نبود سفارش، از رکورد معامله استفاده شود
+            $relatedOrder = $dbTrade->order;
+            $orderBaselineSize  = (float)($relatedOrder->amount ?? $dbTrade->qty ?? 0);
+            $orderBaselinePrice = (float)($relatedOrder->entry_price ?? $dbTrade->avg_entry_price ?? 0);
+            // درصد اختلاف‌ها نسبت به سفارش اصلی و آستانه 0.2% اعمال شود
+            $sizeBase  = max(abs($orderBaselineSize), 1e-9);
+            $priceBase = max(abs($orderBaselinePrice), 1e-9);
+            $sizeDiffPct  = ($sizeBase > 0) ? (abs($exchangeSize - $orderBaselineSize) / $sizeBase) : 0.0;
+            $priceDiffPct = ($priceBase > 0) ? (abs($exchangePrice - $orderBaselinePrice) / $priceBase) : 0.0;
             $tolerance = 0.002; // 0.2%
 
             if ($sizeDiffPct > $tolerance || $priceDiffPct > $tolerance) {
@@ -293,16 +284,16 @@ class DemoFuturesOrderEnforcer extends Command
                     $exchangeService->closePosition($dbTrade->symbol, $closeSide, (float)$exchangeSize);
                     $dbTrade->closed_at = now();
                     $dbTrade->save();
-                    $this->info("    بستن موقعیت تغییر یافته (دمو): {$dbTrade->symbol} (عدم تطابق قابل توجه اندازه/قیمت)");
+                    $this->info("    بستن موقعیت تغییر یافته (دمو): {$dbTrade->symbol} (عدم تطابق >0.2% نسبت به سفارش ثبت‌شده)");
                 } catch (Exception $e) {
                     $this->warn("    خطا در بستن موقعیت (دمو) {$dbTrade->symbol}: " . $e->getMessage());
                 }
             } else if ($sizeDiffPct > 0 || $priceDiffPct > 0) {
-                // اختلاف جزئی: همسان‌سازی رکورد محلی
+                // اختلاف جزئی نسبت به سفارش اصلی: همسان‌سازی رکورد معامله
                 $dbTrade->qty = $exchangeSize;
                 $dbTrade->avg_entry_price = $exchangePrice;
                 $dbTrade->save();
-                $this->info("    به‌روزرسانی موقعیت با اختلاف جزئی (دمو): {$dbTrade->symbol} (همسان‌سازی اندازه/قیمت)");
+                $this->info("    به‌روزرسانی موقعیت با اختلاف جزئی (دمو): {$dbTrade->symbol} (همسان‌سازی با صرافی؛ مبنا سفارش اصلی)");
             }
         }
     }

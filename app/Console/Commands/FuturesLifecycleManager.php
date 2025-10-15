@@ -125,9 +125,16 @@ class FuturesLifecycleManager extends Command
             return;
         }
         // Get the oldest pending/filled order date for this user exchange
+        // Only consider orders that have an open trade (closed_at is null) or have no trade record
         $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
             ->whereIn('status', ['pending', 'filled'])
+            ->where(function($q) {
+                $q->whereHas('trade', function($t) {
+                    $t->whereNull('closed_at');
+                })
+                ->orWhereDoesntHave('trade');
+            })
             ->orderBy('created_at', 'asc')
             ->first();
 
@@ -224,7 +231,7 @@ class FuturesLifecycleManager extends Command
                                 'is_demo' => false,
                                 'symbol' => $symbol,
                                 'side' => $side,
-                                'order_type' => 'Market',
+                                'order_type' => 'Limit',
                                 'leverage' => 1.0,
                                 'qty' => (float)$qty,
                                 'avg_entry_price' => (float)$avgPrice,
@@ -330,7 +337,6 @@ class FuturesLifecycleManager extends Command
                 $matchedPosition = null;
                 foreach ($normalized as $p) {
                     if (($p['symbol'] ?? null) === $trade->symbol
-                        && ($p['side'] ?? null) === $trade->side
                         && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
                         && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
                         $matchedPosition = $p;
