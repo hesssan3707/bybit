@@ -176,14 +176,14 @@
         @endif
 
         <div class="form-group">
-            <label for="entry1">Entry 1 (پایین‌ترین نقطه ورود):</label>
+            <label for="entry1">پایین‌ترین نقطه ورود*:</label>
             <input id="entry1" type="number" name="entry1" step="any" required value="{{ old('entry1') }}">
             @error('entry1') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
         <div class="form-group">
             <label for="entry2">
-                Entry 2 (بالاترین نقطه ورود):
+                بالاترین نقطه ورود*:
                 <span id="chain-icon" style="cursor: pointer; font-size: 20px;" title="Toggle Chained Prices">⛓️</span>
             </label>
             <input id="entry2" type="number" name="entry2" step="any" required value="{{ old('entry2') }}">
@@ -191,19 +191,19 @@
         </div>
 
         <div class="form-group">
-            <label for="tp">Take Profit (TP):</label>
-            <input id="tp" type="number" name="tp" step="any" required value="{{ old('tp') }}">
-            @error('tp') <span class="invalid-feedback">{{ $message }}</span> @enderror
-        </div>
-
-        <div class="form-group">
-            <label for="sl">Stop Loss (SL):</label>
+            <label for="sl">حد ضرر (SL)*:</label>
             <input id="sl" type="number" name="sl" step="any" required value="{{ old('sl') }}">
             @error('sl') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
         <div class="form-group">
-            <label for="steps">تعداد پله‌ها:</label>
+            <label for="tp">حد سود (TP)*:</label>
+            <input id="tp" type="number" name="tp" step="any" required value="{{ old('tp') }}">
+            @error('tp') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        </div>
+
+        <div class="form-group">
+            <label for="steps">تعداد پله‌ها*:</label>
             <input id="steps" type="number" name="steps" min="1" max="8" value="{{ old('steps', $defaultFutureOrderSteps ?? 1) }}" required>
             @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
@@ -211,7 +211,7 @@
         <div class="form-row" style="display: flex; gap: 15px;">
             <div class="form-group" style="flex: 1;">
                 <label for="expire">
-                    مدت انقضای سفارش (اختیاری)
+                    مدت انقضای سفارش
                 </label>
                 <input id="expire" type="number" name="expire" min="1" max="999" value="{{ old('expire', $defaultExpiration ?? '') }}" placeholder="دقیقه" >
                 @error('expire') <span class="invalid-feedback">{{ $message }}</span> @enderror
@@ -219,7 +219,7 @@
 
             <div class="form-group" style="flex: 1;">
                 <label for="cancel_price">
-                    قیمت لغو سفارش (اختیاری)
+                    قیمت لغو سفارش
                 </label>
                 <input id="cancel_price" type="number" name="cancel_price" step="any" value="{{ old('cancel_price') }}">
                 @error('cancel_price') <span class="invalid-feedback">{{ $message }}</span> @enderror

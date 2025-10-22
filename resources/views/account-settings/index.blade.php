@@ -10,7 +10,7 @@
             margin: auto;
         }
         .settings-card {
-            padding: 30px;
+            padding: 20px;
             border-radius: 15px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
             margin-bottom: 20px;
@@ -18,7 +18,7 @@
         .settings-card h2 {
             margin-bottom: 30px;
             text-align: center;
-            color: var(--primary-color);
+            color: white;
         }
         .setting-item {
             padding: 20px;
@@ -184,8 +184,28 @@
                 width: 100%;
                 margin: 0;
             }
+            .button-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .btn {
+                width: 100%;
+                margin: 0;
+                box-sizing: border-box;
+            }
+            .input-group {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
             .form-control {
+                width: 100%;
+                box-sizing: border-box;
                 font-size: 16px; /* Prevents zoom on iOS */
+            }
+            .input-suffix {
+                text-align: center;
+                margin-top: 5px;
             }
         }
         .modal-buttons {
@@ -206,29 +226,6 @@
             max-width: 300px;
             margin: 0 auto;
             display: block;
-        }
-        .container {
-            width: 100%;
-            max-width: 800px;
-            margin: auto;
-        }
-        .settings-card {
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            background: var(--card-bg);
-        }
-        .settings-card h2 {
-            margin-bottom: 30px;
-            text-align: center;
-            color: white;
-        }
-        .setting-item {
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            background: var(--secondary-bg);
         }
         .setting-header {
             display: flex;
@@ -370,32 +367,6 @@
         .input-suffix {
             color: #ffffff;
             font-size: 14px;
-        }
-
-        /* Additional Mobile Responsive */
-        @media (max-width: 768px) {
-            .button-group {
-                flex-direction: column;
-                gap: 10px;
-            }
-            .btn {
-                width: 100%;
-                margin: 0;
-                box-sizing: border-box;
-            }
-            .input-group {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 8px;
-            }
-            .form-control {
-                width: 100%;
-                box-sizing: border-box;
-            }
-            .input-suffix {
-                text-align: center;
-                margin-top: 5px;
-            }
         }
 
         /* Modal Styles */
@@ -677,12 +648,15 @@
             <div class="setting-item">
 
                 <div class="setting-description">
-                    این حالت زمانی که فعال شود، موارد زیر را تحت تأثیر قرار می‌دهد:
+                    این حالت زمانی که فعال شود، موارد زیر را تحت تأثیر قرار می‌دهد(این محدودیت ها در جهت نظم دادن به معامله و جلو گیری از معامله های شتاب زده است):
                     <ul style="margin-top: 10px; padding-right: 20px;">
                         <li>امکان حذف یا تغییر Stop Loss و Take Profit وجود نخواهد داشت</li>
                         <li>تنها از طریق این سیستم می‌توانید سفارش جدید ثبت کنید</li>
+                        <li>در صورت بستن سفارش فعال از طریق صرافی(اگر در نقطه حدضرر یا حد سود نباشد) ،امکان ثبت سفارش تا 3 روز اینده نخواهید داشت</li>
+                        <li>درصورت بستن سفارش فعال ،امکان بستن سفارش تا یک هفته اینده را نخواهید داشت</li>
                         <li>حداکثر ریسک هر پوزیشن 10 درصد خواهد بود</li>
                         <li>پس از ضرر، باید 1 ساعت صبر کنید تا بتوانید سفارش جدید ثبت کنید</li>
+                        <li>اگر دوبار پشت سرهم ضرر کنید ، تا 24 ساعت اینده نمی توانید سفارش جدید ثبت کنید</li>
                         <li><strong>باید یک بازار انتخاب کنید و تنها در همان بازار قابلیت معامله خواهید داشت</strong></li>
                         <li>این حالت پس از فعال‌سازی قابل غیرفعال‌سازی نیست</li>
                     </ul>

@@ -139,9 +139,7 @@
 <!-- Web Header -->
 <header class="main-header">
     <div class="logo">
-        <a href="{{ route('home') }}" aria-label="Bridge Home">
-            <img src="{{ asset('public/logos/bridge-logo.png') }}" alt="Bridge" decoding="async">
-        </a>
+        <img src="{{ asset('public/logos/bridge-logo.png') }}" alt="Bridge" decoding="async">
     </div>
     <nav class="nav-links">
         <!-- Balance Menu -->

@@ -225,17 +225,31 @@ class FuturesController extends Controller
                 // Check for recent loss (only in strict mode)
                 $lastLossQuery = Trade::forUser(auth()->id());
 
+                $closedFromExchangeTrade = Trade::forUser(auth()->id());
+
                 // Filter by current account type (demo/real)
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
                 if ($currentExchange) {
                     $lastLossQuery->accountType($currentExchange->is_demo_active);
+                    $closedFromExchangeTrade->accountType($currentExchange->is_demo_active);
                 }
 
                 $lastTrades = $lastLossQuery->where('pnl', '<', 0)
                     ->latest('closed_at')
                     ->limit(2)
                     ->get();
+                $closedFromExchangeTrade = $closedFromExchangeTrade->whereNotNull('closed_at')
+                    ->where('closed_at' ,'>' , now()->subDays(3))
+                    ->whereHas('order', function ($query) {
+                        $query->whereRaw('ABS(orders.tp - trades.avg_exit_price) / trades.avg_exit_price > 0.002')
+                            ->whereRaw('ABS(orders.sl - trades.avg_exit_price) / trades.avg_exit_price > 0.002');})
+                    ->first();
 
+                if($closedFromExchangeTrade)
+                {
+                    $remainingTime = 72 - now()->diffInHours($closedFromExchangeTrade->closed_at);
+                    return back()->withErrors(['msg' => "به دلیل بستن سفارش فعال از طریق صرافی، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
+                }
                 if ($lastTrades[1] && now()->diffInHours($lastTrades[1]->closed_at) < 24 && now()->diffInHours($lastTrades[0]->closed_at) < 24) {
                     $remainingTime = 24 - now()->diffInHours($lastTrades[1]->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در دو معامله اخیر، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
