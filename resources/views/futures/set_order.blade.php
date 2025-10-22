@@ -204,7 +204,7 @@
 
         <div class="form-group">
             <label for="steps">تعداد پله‌ها:</label>
-            <input id="steps" type="number" name="steps" min="1" value="{{ old('steps', 4) }}" required>
+            <input id="steps" type="number" name="steps" min="1" max="8" value="{{ old('steps', $defaultFutureOrderSteps ?? 1) }}" required>
             @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 

@@ -18,9 +18,10 @@ class AccountSettingsController extends Controller
 
         // Get current settings
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
+        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id);
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id);
 
-        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime'));
+        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps'));
     }
 
     /**
@@ -33,6 +34,7 @@ class AccountSettingsController extends Controller
         // Validate input - allow empty strings to remove default values
         $validatedData = $request->validate([
             'default_risk' => 'nullable|numeric|min:1|max:80',
+            'default_future_order_steps' => 'nullable|integer|min:1|max:8',
             'default_expiration_time' => 'nullable|integer|min:1|max:1000',
         ]);
 
@@ -49,6 +51,18 @@ class AccountSettingsController extends Controller
                 }
             }
 
+            // Update default future order steps
+            // If field is present in request, process it (even if empty)
+            if ($request->has('default_future_order_steps')) {
+                $futureOrderSteps = $request->default_future_order_steps;
+                // Empty string or null means remove default value
+                if ($futureOrderSteps === '' || $futureOrderSteps === null) {
+                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, 1);
+                } else {
+                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, $validatedData['default_future_order_steps']);
+                }
+            }
+
             // Update default expiration time
             // If field is present in request, process it (even if empty)
             if ($request->has('default_expiration_time')) {
@@ -61,8 +75,7 @@ class AccountSettingsController extends Controller
                 }
             }
 
-            return redirect()->route('account-settings.index')
-                            ->with('success', 'تنظیمات حساب کاربری با موفقیت به‌روزرسانی شد.');
+            return redirect()->route('account-settings.index')->with('success', 'تنظیمات حساب کاربری با موفقیت به‌روزرسانی شد.');
 
         } catch (\InvalidArgumentException $e) {
             return redirect()->route('account-settings.index')

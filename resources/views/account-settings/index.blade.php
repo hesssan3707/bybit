@@ -634,6 +634,22 @@
                         <small style="color: #aaa;">حداکثر 999 دقیقه - خالی بگذارید اگر نمی‌خواهید زمان انقضا تنظیم شود</small>
                     </div>
 
+                    <div class="form-group">
+                        <label for="default_expiration_time">تعداد پله پیش‌فرض (ثبت معامله اتی)</label>
+                        <div class="input-group">
+                            <input type="text"
+                                   id="default_future_order_steps"
+                                   name="default_future_order_steps"
+                                   class="form-control"
+                                   value="{{ $defaultFutureOrderSteps }}"
+                                   min="1"
+                                   max="8"
+                                   placeholder="خالی بگذارید برای عدم تنظیم">
+                            <span class="input-suffix">عدد</span>
+                        </div>
+                        <small style="color: #aaa;">حداکثر 8 پله - خالی بگذارید اگر نمی‌خواهید تنظیم شود</small>
+                    </div>
+
                     <div class="button-group">
                         <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
                     </div>
@@ -716,9 +732,9 @@
                 <div class="alert alert-warning">
                     <strong>هشدار:</strong> این عمل غیرقابل بازگشت است!
                 </div>
-                
+
                 <p>لطفاً بازار مورد نظر خود را انتخاب کنید. پس از فعال‌سازی، تنها می‌توانید در این بازار معامله کنید:</p>
-                
+
                 <div class="form-group">
                     <label for="selectedMarket">انتخاب بازار:</label>
                     <select id="selectedMarket" class="form-control" required>
@@ -822,16 +838,16 @@
                 .then(response => {
                     console.log('Response status:', response.status);
                     console.log('Response headers:', response.headers);
-                    
+
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    
+
                     return response.json();
                 })
                 .then(data => {
                     console.log('Response data:', data);
-                    
+
                     if (data.success) {
                         // Show success message and reload page
                         showAlert(data.message, 'success');
@@ -849,15 +865,15 @@
                 .catch(error => {
                     console.error('Fetch error details:', error);
                     console.error('Error stack:', error.stack);
-                    
+
                     let errorMessage = 'خطا در برقراری ارتباط با سرور';
-                    
+
                     if (error.message.includes('HTTP error')) {
                         errorMessage = 'خطا در پردازش درخواست. لطفاً دوباره تلاش کنید.';
                     } else if (error.message.includes('Failed to fetch')) {
                         errorMessage = 'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
                     }
-                    
+
                     showAlert(errorMessage, 'danger');
                     button.textContent = originalText;
                     button.disabled = false;

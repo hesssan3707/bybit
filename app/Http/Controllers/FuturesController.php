@@ -160,6 +160,7 @@ class FuturesController extends Controller
 
         // Get user's default settings
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
+        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id);
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id);
 
         // Apply strict mode limitations for risk only
@@ -177,6 +178,7 @@ class FuturesController extends Controller
             'user' => $user,
             'availableMarkets' => $availableMarkets,
             'selectedMarket' => $selectedMarket,
+            'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
             'defaultExpiration' => $defaultExpirationMinutes,
             'defaultRisk' => $defaultRisk,
             'currentSymbol' => $symbol // Pass the current symbol for proper price display
@@ -197,7 +199,7 @@ class FuturesController extends Controller
             'entry2' => 'required|numeric',
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
-            'steps'  => 'required|integer|min:1',
+            'steps'  => 'required|integer|min:1|max:8',
             'expire' => 'nullable|integer|min:1|max:999',
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
@@ -210,18 +212,16 @@ class FuturesController extends Controller
             // Get the current user
             $user = auth()->user();
 
-            // Validate market selection for strict mode users
+            // Apply strict mode conditions only if user has strict mode enabled
             if ($user->future_strict_mode) {
+
                 if (!$user->selected_market) {
                     return back()->withErrors(['msg' => 'برای حالت سخت‌گیرانه، باید بازار انتخابی تنظیم شده باشد.'])->withInput();
                 }
                 if ($validated['symbol'] !== $user->selected_market) {
                     return back()->withErrors(['symbol' => "در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید."])->withInput();
                 }
-            }
 
-            // Apply strict mode conditions only if user has strict mode enabled
-            if ($user->future_strict_mode) {
                 // Check for recent loss (only in strict mode)
                 $lastLossQuery = Trade::forUser(auth()->id());
 
@@ -231,12 +231,18 @@ class FuturesController extends Controller
                     $lastLossQuery->accountType($currentExchange->is_demo_active);
                 }
 
-                $lastLoss = $lastLossQuery->where('pnl', '<', 0)
+                $lastTrades = $lastLossQuery->where('pnl', '<', 0)
                     ->latest('closed_at')
-                    ->first();
+                    ->limit(2)
+                    ->get();
 
-                if ($lastLoss && now()->diffInMinutes($lastLoss->closed_at) < 60) {
-                    $remainingTime = 60 - now()->diffInMinutes($lastLoss->closed_at);
+                if ($lastTrades[1] && now()->diffInHours($lastTrades[1]->closed_at) < 24 && now()->diffInHours($lastTrades[0]->closed_at) < 24) {
+                    $remainingTime = 24 - now()->diffInHours($lastTrades[1]->closed_at);
+                    return back()->withErrors(['msg' => "به دلیل ضرر در دو معامله اخیر، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
+                }
+
+                if ($lastTrades[0] && now()->diffInMinutes($lastTrades[0]->closed_at) < 60) {
+                    $remainingTime = 60 - now()->diffInMinutes($lastTrades[0]->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
 
@@ -314,6 +320,11 @@ class FuturesController extends Controller
             $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
 
             $slDistance = abs($avgEntry - (float) $validated['sl']);
+            $tpDistance = abs($avgEntry - (float) $validated['tp']);
+
+            if ($user->future_strict_mode && $tpDistance < (1/3)*$slDistance) {
+                return back()->withErrors(['tp' => 'حد سود حداقل باید یک سوم حد ضرر باشد'])->withInput();
+            }
 
             if ($slDistance <= 0) {
                 return back()->withErrors(['sl' => 'حد ضرر باید متفاوت از قیمت ورود باشد.'])->withInput();
@@ -554,6 +565,13 @@ class FuturesController extends Controller
                 return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'اطلاعات موقعیت برای بستن ناقص است.']);
             }
 
+            $lastClosedTrade = Trade::where('closed_by_user' , 1)->latest('closed_at')->first();
+            if($user->future_strict_mode && $lastClosedTrade && now()->diffInHours($lastClosedTrade->closed_at) < 24*7)
+            {
+                $remainingTime = 7 - now()->diffInDays($lastClosedTrade->closed_at);
+                return redirect()->route('futures.pnl_history')->withErrors(['msg' => "به دلیل بستن دستی معامله اخیر، تا {$remainingTime} روز دیگر نمی‌توانید معامله ای را دستی ببندید. (حالت سخت‌گیرانه فعال)"]);
+            }
+
             // ارسال دستور بستن موقعیت از طریق رابط واحد صرافی‌ها
             $exchangeService->closePosition($symbol, $openSide, $qty);
 
@@ -628,12 +646,14 @@ class FuturesController extends Controller
                     $trade->closed_at = isset($matched['closedAt']) && $matched['closedAt']
                         ? \Carbon\Carbon::createFromTimestampMs($matched['closedAt'])
                         : now();
+                    $trade->closed_by_user = 1;
                     $trade->save();
                 } else {
                     // حداقل بروزرسانی در صورت نبود رویداد
                     $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
                     $trade->pnl = 0;
                     $trade->closed_at = now();
+                    $trade->closed_by_user = 1;
                     $trade->save();
                 }
             }
@@ -749,7 +769,7 @@ class FuturesController extends Controller
 
     /**
      * Add hedge mode parameters to order based on exchange
-     * 
+     *
      * @param array $orderParams Reference to order parameters array
      * @param string $exchangeName Name of the exchange (bybit, binance, bingx)
      * @param string $side Original position side ('Buy' or 'Sell') - NOT the closing order side
@@ -763,14 +783,14 @@ class FuturesController extends Controller
                 // positionIdx = 2 for SHORT positions (original Sell orders)
                 $orderParams['positionIdx'] = ($side === 'Buy') ? 1 : 2;
                 break;
-                
+
             case 'binance':
                 // Binance hedge mode: positionSide indicates which position to affect
                 // positionSide = 'LONG' for LONG positions (original Buy orders)
                 // positionSide = 'SHORT' for SHORT positions (original Sell orders)
                 $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
                 break;
-                
+
             case 'bingx':
                 // BingX hedge mode: positionSide indicates which position to affect
                 // positionSide = 'LONG' for LONG positions (original Buy orders)

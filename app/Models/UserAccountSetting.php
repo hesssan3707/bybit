@@ -103,12 +103,20 @@ class UserAccountSetting extends Model
     }
 
     /**
+     * Get default future order steps setting for user
+     */
+    public static function getDefaultFutureOrderSteps($userId)
+    {
+        return static::getUserSetting($userId, 'default_future_order_steps', null);
+    }
+    /**
      * Get default expiration time setting for user
      */
     public static function getDefaultExpirationTime($userId)
     {
         return static::getUserSetting($userId, 'default_expiration_time', null);
     }
+
 
     /**
      * Set default risk with strict mode validation
@@ -118,7 +126,7 @@ class UserAccountSetting extends Model
         // If risk is null, we're removing the default value, no validation needed
         if ($risk !== null) {
             $user = User::find($userId);
-            
+
             // Validate risk percentage in strict mode
             if ($user && $user->future_strict_mode && $risk > 10) {
                 throw new \InvalidArgumentException('در حالت سخت‌گیرانه نمی‌توانید ریسک بیش از ۱۰ درصد تنظیم کنید.');
@@ -126,6 +134,14 @@ class UserAccountSetting extends Model
         }
 
         return static::setUserSetting($userId, 'default_risk', $risk, 'decimal');
+    }
+
+    /**
+     * Set default expiration time
+     */
+    public static function setDefaultFutureOrderSteps($userId, $steps)
+    {
+        return static::setUserSetting($userId, 'default_future_order_steps', $steps, 'integer');
     }
 
     /**
