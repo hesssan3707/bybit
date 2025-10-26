@@ -108,12 +108,8 @@
             <p class="pnl-negative">{{ number_format($averageRisk, 2) }}%</p>
         </div>
         <div class="stat-card">
-            <h4>Average Profit</h4>
-            <p class="pnl-positive">${{ number_format($averageProfit, 2) }}</p>
-        </div>
-        <div class="stat-card">
-            <h4>Average Loss</h4>
-            <p class="pnl-negative">${{ number_format($averageLoss, 2) }}</p>
+            <h4>متوسط ریسک به ریوارد</h4>
+            <p>{{ number_format($averageRRR, 2) }}</p>
         </div>
         <div class="stat-card">
             <h4>Profitable Trades</h4>

@@ -827,21 +827,32 @@ class FuturesController extends Controller
         $profitableTrades = $trades->where('pnl', '>', 0);
         $losingTrades = $trades->where('pnl', '<', 0);
 
-        $averageProfit = $profitableTrades->count() > 0 ? $profitableTrades->avg('pnl') : 0;
-        $averageLoss = $losingTrades->count() > 0 ? $losingTrades->avg('pnl') : 0;
         $profitableTradesCount = $profitableTrades->count();
         $losingTradesCount = $losingTrades->count();
 
-        // Calculate average risk percentage from related orders
+        // Calculate average risk percentage and Risk/Reward Ratio from related orders
         $totalRiskPercentage = 0;
+        $totalRRR = 0;
         $riskCalculatedTrades = 0;
+        $rrrCalculatedTrades = 0;
+
         foreach ($trades as $trade) {
             if ($trade->order && $trade->order->entry_price > 0) {
+                // Average Risk %
                 $totalRiskPercentage += abs($trade->order->entry_price - $trade->order->sl) / $trade->order->entry_price * 100;
                 $riskCalculatedTrades++;
+
+                // Risk/Reward Ratio
+                $slDistance = abs($trade->order->entry_price - $trade->order->sl);
+                if ($slDistance > 0) {
+                    $tpDistance = abs($trade->order->tp - $trade->order->entry_price);
+                    $totalRRR += $tpDistance / $slDistance;
+                    $rrrCalculatedTrades++;
+                }
             }
         }
         $averageRisk = $riskCalculatedTrades > 0 ? $totalRiskPercentage / $riskCalculatedTrades : 0;
+        $averageRRR = $rrrCalculatedTrades > 0 ? $totalRRR / $rrrCalculatedTrades : 0;
 
 
         // Prepare data for charts
@@ -880,8 +891,7 @@ class FuturesController extends Controller
             'biggestProfit',
             'biggestLoss',
             'averageRisk',
-            'averageProfit',
-            'averageLoss',
+            'averageRRR',
             'profitableTradesCount',
             'losingTradesCount',
             'chartData',
