@@ -814,7 +814,7 @@ class FuturesController extends Controller
             $tradesQuery->where('side', $side);
         }
 
-        $trades = $tradesQuery->latest('closed_at')->get();
+        $trades = $tradesQuery->with('order')->latest('closed_at')->get();
 
         // Calculate statistics
         $totalPnl = $trades->sum('pnl');
@@ -824,8 +824,25 @@ class FuturesController extends Controller
         $biggestProfit = $trades->max('pnl') ?? 0;
         $biggestLoss = $trades->min('pnl') ?? 0;
 
+        $profitableTrades = $trades->where('pnl', '>', 0);
         $losingTrades = $trades->where('pnl', '<', 0);
-        $averageRisk = $losingTrades->count() > 0 ? $losingTrades->avg('pnl') : 0;
+
+        $averageProfit = $profitableTrades->count() > 0 ? $profitableTrades->avg('pnl') : 0;
+        $averageLoss = $losingTrades->count() > 0 ? $losingTrades->avg('pnl') : 0;
+        $profitableTradesCount = $profitableTrades->count();
+        $losingTradesCount = $losingTrades->count();
+
+        // Calculate average risk percentage from related orders
+        $totalRiskPercentage = 0;
+        $riskCalculatedTrades = 0;
+        foreach ($trades as $trade) {
+            if ($trade->order && $trade->order->entry_price > 0) {
+                $totalRiskPercentage += abs($trade->order->entry_price - $trade->order->sl) / $trade->order->entry_price * 100;
+                $riskCalculatedTrades++;
+            }
+        }
+        $averageRisk = $riskCalculatedTrades > 0 ? $totalRiskPercentage / $riskCalculatedTrades : 0;
+
 
         // Prepare data for charts
         $chartData = $trades->sortBy('closed_at')->map(function ($trade) {
@@ -863,6 +880,10 @@ class FuturesController extends Controller
             'biggestProfit',
             'biggestLoss',
             'averageRisk',
+            'averageProfit',
+            'averageLoss',
+            'profitableTradesCount',
+            'losingTradesCount',
             'chartData',
             'cumulativePnl',
             'availableMonths',

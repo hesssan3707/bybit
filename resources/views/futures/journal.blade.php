@@ -46,6 +46,15 @@
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 30px;
+        overflow-x: hidden;
+    }
+    @media (max-width: 768px) {
+        .filters {
+            flex-direction: column;
+        }
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 @endpush
@@ -95,8 +104,24 @@
             <p class="pnl-negative">${{ number_format($biggestLoss, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Average Risk</h4>
-            <p class="pnl-negative">${{ number_format($averageRisk, 2) }}</p>
+            <h4>Average Risk %</h4>
+            <p class="pnl-negative">{{ number_format($averageRisk, 2) }}%</p>
+        </div>
+        <div class="stat-card">
+            <h4>Average Profit</h4>
+            <p class="pnl-positive">${{ number_format($averageProfit, 2) }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>Average Loss</h4>
+            <p class="pnl-negative">${{ number_format($averageLoss, 2) }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>Profitable Trades</h4>
+            <p class="pnl-positive">{{ $profitableTradesCount }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>Losing Trades</h4>
+            <p class="pnl-negative">{{ $losingTradesCount }}</p>
         </div>
     </div>
 
@@ -107,37 +132,8 @@
         <div id="cumulativePnlChart"></div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Side</th>
-                    <th>Quantity</th>
-                    <th>Entry Price</th>
-                    <th>Exit Price</th>
-                    <th>PnL</th>
-                    <th>Closed At</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($trades as $trade)
-                    <tr>
-                        <td>{{ $trade->symbol }}</td>
-                        <td>{{ ucfirst($trade->side) }}</td>
-                        <td>{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
-                        <td>{{ rtrim(rtrim(number_format($trade->avg_entry_price, 2), '0'), '.') }}</td>
-                        <td>{{ rtrim(rtrim(number_format($trade->avg_exit_price, 2), '0'), '.') }}</td>
-                        <td class="{{ $trade->pnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}">${{ number_format($trade->pnl, 2) }}</td>
-                        <td>{{ $trade->closed_at->format('Y-m-d H:i') }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="text-center">No trades found for the selected period.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+    <div class="text-center text-muted mt-4">
+        <p>This page only calculates trades submitted from this site and trades that can't be synchronized are not calculated.</p>
     </div>
 </div>
 @endsection
@@ -151,12 +147,25 @@
             chart: {
                 type: 'bar',
                 height: 350,
-                toolbar: { show: false }
+                toolbar: {
+                    show: true,
+                    tools: {
+                        pan: true,
+                        zoom: true
+                    }
+                }
             },
             series: [{
                 name: 'PnL',
                 data: {!! json_encode($chartData) !!}
             }],
+            title: {
+                text: 'PnL Per Trade',
+                align: 'left',
+                style: {
+                    color: '#fff'
+                }
+            },
             xaxis: {
                 type: 'datetime',
                 labels: { style: { colors: '#adb5bd' } }
@@ -199,12 +208,30 @@
             chart: {
                 type: 'area',
                 height: 350,
-                toolbar: { show: false }
+                toolbar: {
+                    show: true,
+                    tools: {
+                        pan: true,
+                        zoom: true
+                    }
+                },
+                zoom: {
+                    type: 'x',
+                    enabled: true,
+                    autoScaleYaxis: true
+                },
             },
             series: [{
                 name: 'Cumulative PnL',
                 data: {!! json_encode($cumulativePnl) !!}
             }],
+            title: {
+                text: 'Cumulative PnL Over Time',
+                align: 'left',
+                style: {
+                    color: '#fff'
+                }
+            },
             xaxis: {
                 type: 'datetime',
                 labels: { style: { colors: '#adb5bd' } }
