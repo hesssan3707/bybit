@@ -108,7 +108,7 @@
         justify-content: space-around;
         align-items: center;
     }
-    .mobile-footer-nav a {
+    .mobile-footer-nav a, .mobile-footer-nav .dropup-toggle {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -116,6 +116,9 @@
         color: #555;
         font-size: 11px;
         flex-grow: 1;
+        background: none;
+        border: none;
+        cursor: pointer;
     }
     .mobile-footer-nav a.selected {
         color: var(--primary-color); /* Highlight color for selected mobile icon */
@@ -124,6 +127,27 @@
         font-size: 22px;
         margin-bottom: 2px;
     }
+
+    .dropup-menu {
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        right: 0;
+        background-color: #fff;
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        z-index: 999;
+        display: none;
+        flex-direction: column;
+    }
+    .dropup-menu a {
+        padding: 15px;
+        text-align: center;
+        border-bottom: 1px solid #eee;
+    }
+    .dropup-menu a:last-child {
+        border-bottom: none;
+    }
+
 
     /* Responsive Toggle */
     @media screen and (max-width: 768px) {
@@ -198,11 +222,13 @@
 </header>
 
 <!-- Mobile Sticky Footer -->
+<div id="dropup-menu" class="dropup-menu">
+    <a href="{{ route('futures.orders') }}">سفارش‌ها</a>
+    <a href="{{ route('futures.journal') }}">ژورنال</a>
+    <a href="{{ route('strategies.macd') }}">استراتژی‌ها</a>
+    <a href="{{ route('api.documentation') }}">مستندات</a>
+</div>
 <nav class="mobile-footer-nav">
-    <a href="{{ route('futures.orders') }}">
-        <span class="icon">📊</span>
-        <span>سفارش‌ها</span>
-    </a>
     <a href="{{ route('futures.order.create') }}">
         <span class="icon">➕</span>
         <span>جدید</span>
@@ -219,6 +245,10 @@
         <span class="icon">👤</span>
         <span>پروفایل</span>
     </a>
+    <button class="dropup-toggle" onclick="toggleDropUpMenu()">
+        <span class="icon">☰</span>
+        <span>بیشتر</span>
+    </button>
 </nav>
 
 <script>
@@ -325,5 +355,10 @@
         event.stopPropagation();
         const menu = document.getElementById('strategiesMenu');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleDropUpMenu() {
+        const menu = document.getElementById('dropup-menu');
+        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
     }
 </script>
