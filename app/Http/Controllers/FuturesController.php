@@ -856,10 +856,11 @@ class FuturesController extends Controller
 
 
         // Prepare data for charts
-        $chartData = $trades->sortBy('closed_at')->map(function ($trade) {
+        $pnlChartData = $trades->sortBy('closed_at')->map(function ($trade, $index) {
             return [
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
+                'x' => 'Trade ' . ($index + 1), // Use trade index as category
                 'y' => (float)$trade->pnl,
+                'date' => $trade->closed_at->format('Y-m-d H:i') // For tooltip
             ];
         })->values();
 
@@ -894,7 +895,7 @@ class FuturesController extends Controller
             'averageRRR',
             'profitableTradesCount',
             'losingTradesCount',
-            'chartData',
+            'pnlChartData',
             'cumulativePnl',
             'availableMonths',
             'month',
