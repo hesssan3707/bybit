@@ -151,6 +151,7 @@
             <div id="futuresMenu" class="dropdown-list">
                 <a href="{{ route('futures.orders') }}">تاریخچه سفارش‌ها</a>
                 <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
+                <a href="{{ route('futures.journal') }}">ژورنال</a>
                 <a href="{{ route('futures.order.create') }}">سفارش آتی جدید</a>
             </div>
         </div>

@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
         Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('pnl_history');
+        Route::get('/journal', [FuturesController::class, 'journal'])->name('journal');
     });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
