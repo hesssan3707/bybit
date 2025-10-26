@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Trading Journal')
+@section('title', 'ژورنال معاملاتی')
 
 @push('styles')
 <style>
@@ -52,50 +52,50 @@
 
 @section('content')
 <div class="glass-card container">
-    <h2>Trading Journal</h2>
+    <h2>ژورنال معاملاتی</h2>
 
     <form method="GET" action="{{ route('futures.journal') }}" class="filters">
         <select name="month" class="form-control">
-            <option value="last6months" {{ $month == 'last6months' ? 'selected' : '' }}>Last 6 Months</option>
+            <option value="last6months" {{ $month == 'last6months' ? 'selected' : '' }}>6 ماه گذشته</option>
             @foreach($availableMonths as $m)
                 <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>{{ \Carbon\Carbon::parse($m . '-01')->format('F Y') }}</option>
             @endforeach
         </select>
         <select name="side" class="form-control">
-            <option value="all" {{ $side == 'all' ? 'selected' : '' }}>All</option>
-            <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>Buy</option>
-            <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>Sell</option>
+            <option value="all" {{ $side == 'all' ? 'selected' : '' }}>همه</option>
+            <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>معامله های خرید</option>
+            <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>معامله های فروش</option>
         </select>
-        <button type="submit" class="btn btn-primary">Filter</button>
+        <button type="submit" class="btn btn-primary">فیلتر</button>
     </form>
 
     <div class="stats-grid">
         <div class="stat-card">
-            <h4>Total PnL</h4>
+            <h4>کل سود/ضرر</h4>
             <p class="{{ $totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}">${{ number_format($totalPnl, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Profits</h4>
+            <h4>کل سود</h4>
             <p class="pnl-positive">${{ number_format($totalProfits, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Losses</h4>
+            <h4>کل ضرر</h4>
             <p class="pnl-negative">${{ number_format($totalLosses, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Trades</h4>
+            <h4>تعداد معامله</h4>
             <p>{{ $totalTrades }}</p>
         </div>
         <div class="stat-card">
-            <h4>Biggest Profit</h4>
+            <h4>بزرگترین سود</h4>
             <p class="pnl-positive">${{ number_format($biggestProfit, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Biggest Loss</h4>
+            <h4>بزرگترین ضرر</h4>
             <p class="pnl-negative">${{ number_format($biggestLoss, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Average Risk</h4>
+            <h4>متوسط ریسک</h4>
             <p class="pnl-negative">${{ number_format($averageRisk, 2) }}</p>
         </div>
     </div>
