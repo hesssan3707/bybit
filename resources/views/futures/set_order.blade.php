@@ -53,7 +53,7 @@
         border-color: var(--primary-color);
         outline: none;
     }
-    button {
+    .submit-form-button {
         width: 100%;
         padding: 14px;
         background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
@@ -66,7 +66,7 @@
         cursor: pointer;
         transition: opacity 0.3s;
     }
-    button:hover {
+    .submit-form-button:hover {
         opacity: 0.9;
     }
     .alert {
@@ -241,7 +241,7 @@
             $hasAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
         @endphp
 
-        <button type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
+        <button class="submit-form-button" type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
             @if($hasAccess)
                 ارسال سفارش
             @else

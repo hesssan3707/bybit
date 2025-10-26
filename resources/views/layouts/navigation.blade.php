@@ -136,7 +136,6 @@
         background-color: #fff;
         box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
         z-index: 999;
-        display: none;
         flex-direction: column;
     }
     .dropup-menu a {
@@ -306,6 +305,12 @@
         for (let i = 0; i < dropdowns.length; i++) {
             dropdowns[i].style.display = 'none';
         }
+        const mobile_dropups = document.getElementsByClassName('dropup-menu');
+
+        for (let i = 0; i < mobile_dropups.length; i++) {
+            mobile_dropups[i].style.display = 'none';
+        }
+
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {

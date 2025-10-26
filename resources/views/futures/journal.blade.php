@@ -32,6 +32,10 @@
         border-color: var(--primary-color);
         box-shadow: none;
     }
+    .form-control option
+    {
+        color:black;
+    }
     .filters .btn-primary {
         background-color: var(--primary-color);
         border-color: var(--primary-color);
