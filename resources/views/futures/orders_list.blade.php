@@ -184,6 +184,9 @@
             <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
                 📈 سود و زیان
             </a>
+            <a href="{{ route('futures.journal') }}" class="redirect-btn">
+                📓 ژورنال
+            </a>
         </div>
     </div>
 
