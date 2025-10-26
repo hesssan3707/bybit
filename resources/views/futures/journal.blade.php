@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Trading Journal')
+@section('title', 'ژورنال معاملاتی')
 
 @push('styles')
 <style>
@@ -18,6 +18,31 @@
         gap: 15px;
         margin-bottom: 25px;
         justify-content: center;
+        align-items: center;
+    }
+    .filters .form-control, .filters .btn {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+    }
+    .filters .form-control:focus {
+        background-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-color: var(--primary-color);
+        box-shadow: none;
+    }
+    .form-control option
+    {
+        color:black;
+    }
+    .filters .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        transition: background-color 0.3s;
+    }
+    .filters .btn-primary:hover {
+        background-color: var(--primary-hover);
     }
     .stats-grid {
         display: grid;
@@ -48,6 +73,21 @@
         margin-bottom: 30px;
         overflow-x: hidden;
     }
+    .mobile-redirect-section { display: none; }
+    .redirect-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+    .redirect-btn {
+        flex: 1; padding: 15px; background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white; text-decoration: none; border-radius: 10px; text-align: center; font-weight: bold;
+        transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+    }
+    .redirect-btn:hover {
+        transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,123,255,0.4);
+        color: white; text-decoration: none;
+    }
+    .redirect-btn.secondary {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+    }
     @media (max-width: 768px) {
         .filters {
             flex-direction: column;
@@ -55,69 +95,87 @@
         .stats-grid {
             grid-template-columns: 1fr;
         }
+        .mobile-redirect-section { display: block; }
+        .redirect-buttons { flex-direction: column; gap: 15px; }
+        .redirect-btn { padding: 18px; font-size: 16px; }
     }
 </style>
 @endpush
 
 @section('content')
 <div class="glass-card container">
-    <h2>Trading Journal</h2>
+    <h2>ژورنال معاملاتی</h2>
+
+    <!-- Mobile redirect buttons (only visible on mobile) -->
+    <div class="mobile-redirect-section">
+        <div class="redirect-buttons">
+            <a href="{{ route('futures.orders') }}" class="redirect-btn">
+                📊 سفارش‌های آتی
+            </a>
+            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
+                📈 سود و زیان
+            </a>
+            <a href="{{ route('futures.journal') }}" class="redirect-btn">
+                📓 ژورنال
+            </a>
+        </div>
+    </div>
 
     <form method="GET" action="{{ route('futures.journal') }}" class="filters">
         <select name="month" class="form-control">
-            <option value="last6months" {{ $month == 'last6months' ? 'selected' : '' }}>Last 6 Months</option>
+            <option value="last6months" {{ $month == 'last6months' ? 'selected' : '' }}>6 ماه گذشته</option>
             @foreach($availableMonths as $m)
                 <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>{{ \Carbon\Carbon::parse($m . '-01')->format('F Y') }}</option>
             @endforeach
         </select>
         <select name="side" class="form-control">
-            <option value="all" {{ $side == 'all' ? 'selected' : '' }}>All</option>
-            <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>Buy</option>
-            <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>Sell</option>
+            <option value="all" {{ $side == 'all' ? 'selected' : '' }}>همه</option>
+            <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>معامله های خرید</option>
+            <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>معامله های فروش</option>
         </select>
-        <button type="submit" class="btn btn-primary">Filter</button>
+        <button type="submit" class="btn btn-primary">فیلتر</button>
     </form>
 
     <div class="stats-grid">
         <div class="stat-card">
-            <h4>Total PnL</h4>
-            <p class="{{ $totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}">${{ number_format($totalPnl, 2) }}</p>
+            <h4>کل سود/ضرر</h4>
+            <p class="{{ $totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">${{ number_format($totalPnl, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Profits</h4>
-            <p class="pnl-positive">${{ number_format($totalProfits, 2) }}</p>
+            <h4>کل سود</h4>
+            <p class="pnl-positive" style="direction:ltr">${{ number_format($totalProfits, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Losses</h4>
-            <p class="pnl-negative">${{ number_format($totalLosses, 2) }}</p>
+            <h4>کل ضرر</h4>
+            <p class="pnl-negative" style="direction:ltr">${{ number_format($totalLosses, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Total Trades</h4>
+            <h4>تعداد معامله</h4>
             <p>{{ $totalTrades }}</p>
         </div>
         <div class="stat-card">
-            <h4>Biggest Profit</h4>
-            <p class="pnl-positive">${{ number_format($biggestProfit, 2) }}</p>
+            <h4>بزرگترین سود</h4>
+            <p class="pnl-positive" style="direction:ltr">${{ number_format($biggestProfit, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Biggest Loss</h4>
-            <p class="pnl-negative">${{ number_format($biggestLoss, 2) }}</p>
+            <h4>بزرگترین ضرر</h4>
+            <p class="pnl-negative" style="direction:ltr">${{ number_format($biggestLoss, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Average Risk %</h4>
-            <p class="pnl-negative">{{ number_format($averageRisk, 2) }}%</p>
+            <h4>متوسط ریسک %</h4>
+            <p class="pnl-negative" style="direction:ltr">{{ number_format($averageRisk, 2) }}%</p>
         </div>
         <div class="stat-card">
             <h4>متوسط ریسک به ریوارد</h4>
             <p>1 : {{ number_format($averageRRR, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>Profitable Trades</h4>
-            <p class="pnl-positive">{{ $profitableTradesCount }}</p>
+            <h4>تعداد معامله سود</h4>
+            <p class="pnl-positive" style="direction:ltr">{{ $profitableTradesCount }}</p>
         </div>
         <div class="stat-card">
-            <h4>Losing Trades</h4>
-            <p class="pnl-negative">{{ $losingTradesCount }}</p>
+            <h4>تعداد معامله های ضرر</h4>
+            <p class="pnl-negative" style="direction:ltr">{{ $losingTradesCount }}</p>
         </div>
     </div>
 
@@ -129,7 +187,7 @@
     </div>
 
     <div class="text-center text-muted mt-4">
-        <p>This page only calculates trades submitted from this site and trades that can't be synchronized are not calculated.</p>
+        <p>این صفحه فقط معامله هایی که از طریق این سایت ثبت شده اند و اطلاعات معامله با صرافی سینک شده است را محاسبه میکند</p>
     </div>
 </div>
 @endsection
@@ -156,7 +214,7 @@
                 data: {!! json_encode($pnlChartData) !!}
             }],
             title: {
-                text: 'PnL Per Trade',
+                text: 'سود/زیان بر حسب معامعه',
                 align: 'left',
                 style: {
                     color: '#fff'
@@ -228,7 +286,7 @@
                 data: {!! json_encode($cumulativePnl) !!}
             }],
             title: {
-                text: 'Cumulative PnL Over Time',
+                text: 'سود/زیان تجمعی معاملات',
                 align: 'left',
                 style: {
                     color: '#fff'
