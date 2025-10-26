@@ -782,6 +782,95 @@ class FuturesController extends Controller
     }
 
     /**
+     * Display trading journal for the authenticated user
+     */
+    public function journal(Request $request)
+    {
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+
+        // Base query for synchronized trades
+        $tradesQuery = Trade::forUser($user->id)
+            ->where('synchronized', 1)
+            ->whereNotNull('closed_at');
+
+        if ($currentExchange) {
+            $tradesQuery->accountType($currentExchange->is_demo_active);
+        }
+
+        // Filtering logic
+        $month = $request->input('month', 'last6months');
+        $side = $request->input('side', 'all');
+
+        if ($month === 'last6months') {
+            $tradesQuery->where('closed_at', '>=', now()->subMonths(6));
+        } else {
+            // Assumes month is in 'YYYY-MM' format
+            $tradesQuery->whereYear('closed_at', '=', substr($month, 0, 4))
+                        ->whereMonth('closed_at', '=', substr($month, 5, 2));
+        }
+
+        if ($side !== 'all') {
+            $tradesQuery->where('side', $side);
+        }
+
+        $trades = $tradesQuery->latest('closed_at')->get();
+
+        // Calculate statistics
+        $totalPnl = $trades->sum('pnl');
+        $totalProfits = $trades->where('pnl', '>', 0)->sum('pnl');
+        $totalLosses = $trades->where('pnl', '<', 0)->sum('pnl');
+        $totalTrades = $trades->count();
+        $biggestProfit = $trades->max('pnl') ?? 0;
+        $biggestLoss = $trades->min('pnl') ?? 0;
+
+        $losingTrades = $trades->where('pnl', '<', 0);
+        $averageRisk = $losingTrades->count() > 0 ? $losingTrades->avg('pnl') : 0;
+
+        // Prepare data for charts
+        $chartData = $trades->sortBy('closed_at')->map(function ($trade) {
+            return [
+                'x' => $trade->closed_at->format('Y-m-d H:i'),
+                'y' => (float)$trade->pnl,
+            ];
+        })->values();
+
+        $cumulativePnl = $trades->sortBy('closed_at')->reduce(function ($carry, $trade) {
+            $lastPnl = $carry->last()['y'] ?? 0;
+            $carry->push([
+                'x' => $trade->closed_at->format('Y-m-d H:i'),
+                'y' => $lastPnl + (float)$trade->pnl,
+            ]);
+            return $carry;
+        }, collect())->values();
+
+
+        // Get available months for the filter dropdown
+        $availableMonths = Trade::forUser($user->id)
+            ->where('synchronized', 1)
+            ->whereNotNull('closed_at')
+            ->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') as month")
+            ->distinct()
+            ->orderBy('month', 'desc')
+            ->pluck('month');
+
+        return view('futures.journal', compact(
+            'trades',
+            'totalPnl',
+            'totalProfits',
+            'totalLosses',
+            'totalTrades',
+            'biggestProfit',
+            'biggestLoss',
+            'averageRisk',
+            'chartData',
+            'cumulativePnl',
+            'availableMonths',
+            'month',
+            'side'
+        ));
+    }
+    /**
      * Add hedge mode parameters to order based on exchange
      *
      * @param array $orderParams Reference to order parameters array
