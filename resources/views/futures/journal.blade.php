@@ -109,7 +109,7 @@
         </div>
         <div class="stat-card">
             <h4>متوسط ریسک به ریوارد</h4>
-            <p>{{ number_format($averageRRR, 2) }}</p>
+            <p>1 : {{ number_format($averageRRR, 2) }}</p>
         </div>
         <div class="stat-card">
             <h4>Profitable Trades</h4>
@@ -153,7 +153,7 @@
             },
             series: [{
                 name: 'PnL',
-                data: {!! json_encode($chartData) !!}
+                data: {!! json_encode($pnlChartData) !!}
             }],
             title: {
                 text: 'PnL Per Trade',
@@ -163,8 +163,10 @@
                 }
             },
             xaxis: {
-                type: 'datetime',
-                labels: { style: { colors: '#adb5bd' } }
+                type: 'category',
+                labels: {
+                    show: false // Hide x-axis labels to avoid clutter
+                }
             },
             yaxis: {
                 labels: {
@@ -187,7 +189,11 @@
             },
             tooltip: {
                 theme: 'dark',
-                x: { format: 'dd MMM yyyy HH:mm' },
+                x: {
+                    formatter: function(val, { series, seriesIndex, dataPointIndex, w }) {
+                        return w.globals.initialSeries[seriesIndex].data[dataPointIndex].date;
+                    }
+                },
                 y: {
                     formatter: function (val) {
                         return "$" + val.toFixed(2)
