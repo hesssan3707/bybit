@@ -143,6 +143,13 @@
         padding: 15px;
         text-align: center;
         border-bottom: 1px solid #eee;
+        text-decoration: none;
+        color: #333;
+        font-weight: 500;
+        transition: background-color 0.3s;
+    }
+    .dropup-menu a:hover {
+        background-color: #f5f5f5;
     }
     .dropup-menu a:last-child {
         border-bottom: none;

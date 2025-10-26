@@ -18,6 +18,27 @@
         gap: 15px;
         margin-bottom: 25px;
         justify-content: center;
+        align-items: center;
+    }
+    .filters .form-control, .filters .btn {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+    }
+    .filters .form-control:focus {
+        background-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-color: var(--primary-color);
+        box-shadow: none;
+    }
+    .filters .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        transition: background-color 0.3s;
+    }
+    .filters .btn-primary:hover {
+        background-color: var(--primary-hover);
     }
     .stats-grid {
         display: grid;
@@ -48,6 +69,21 @@
         margin-bottom: 30px;
         overflow-x: hidden;
     }
+    .mobile-redirect-section { display: none; }
+    .redirect-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+    .redirect-btn {
+        flex: 1; padding: 15px; background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white; text-decoration: none; border-radius: 10px; text-align: center; font-weight: bold;
+        transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+    }
+    .redirect-btn:hover {
+        transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,123,255,0.4);
+        color: white; text-decoration: none;
+    }
+    .redirect-btn.secondary {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+    }
     @media (max-width: 768px) {
         .filters {
             flex-direction: column;
@@ -55,6 +91,9 @@
         .stats-grid {
             grid-template-columns: 1fr;
         }
+        .mobile-redirect-section { display: block; }
+        .redirect-buttons { flex-direction: column; gap: 15px; }
+        .redirect-btn { padding: 18px; font-size: 16px; }
     }
 </style>
 @endpush
@@ -62,6 +101,21 @@
 @section('content')
 <div class="glass-card container">
     <h2>Trading Journal</h2>
+
+    <!-- Mobile redirect buttons (only visible on mobile) -->
+    <div class="mobile-redirect-section">
+        <div class="redirect-buttons">
+            <a href="{{ route('futures.orders') }}" class="redirect-btn">
+                📊 سفارش‌های آتی
+            </a>
+            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
+                📈 سود و زیان
+            </a>
+            <a href="{{ route('futures.journal') }}" class="redirect-btn">
+                📓 ژورنال
+            </a>
+        </div>
+    </div>
 
     <form method="GET" action="{{ route('futures.journal') }}" class="filters">
         <select name="month" class="form-control">
