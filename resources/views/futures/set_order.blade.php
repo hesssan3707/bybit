@@ -18,7 +18,11 @@
     .form-container {
         flex: 1;
         min-width: 300px;
-        max-width: 500px;
+        max-width: 800px; /* Adjusted for wider form */
+        margin: auto; /* Center the form container */
+    }
+    .tradingview-container {
+        margin-bottom: 20px; /* Space between chart and form fields */
     }
     .container {
         width: 100%;
@@ -106,9 +110,18 @@
     }
     .invalid-feedback { color: #842029; font-size: 14px; margin-top: 5px; display: block; }
 
+    .form-row {
+        display: flex;
+        gap: 15px;
+    }
+
     @media (max-width: 768px) {
         .page-container {
             flex-direction: column;
+        }
+        .form-row {
+            flex-direction: column;
+            gap: 0; /* Reset gap for stacked layout */
         }
     }
 </style>
@@ -116,6 +129,14 @@
 
 @section('content')
 <div class="page-container">
+    <div class="form-container">
+        <div class="glass-card container">
+    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
+        <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
+    @else
+        <h2>ثبت سفارش جدید</h2>
+    @endif
+
     <div class="tradingview-container">
         <!-- TradingView Widget BEGIN -->
         <div class="tradingview-widget-container">
@@ -124,7 +145,12 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const symbolSelect = document.getElementById('symbol');
-                const exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
+                let exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
+
+                // Map specific exchange names to their TradingView equivalents
+                if (exchangeName === 'BYBIT_V5') {
+                    exchangeName = 'BYBIT';
+                }
 
                 function updateTradingViewWidget(symbol) {
                     if (!symbol) return;
@@ -140,7 +166,11 @@
                         "locale": "en",
                         "toolbar_bg": "#f1f3f6",
                         "enable_publishing": false,
-                        "allow_symbol_change": true,
+                        "allow_symbol_change": false,
+                        "hide_side_toolbar": true,
+                        "studies_overrides": {
+                            "volume.show": false
+                        },
                         "container_id": "tradingview_12345"
                     });
                 }
@@ -162,13 +192,6 @@
         </div>
         <!-- TradingView Widget END -->
     </div>
-    <div class="form-container">
-        <div class="glass-card container">
-    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
-        <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
-    @else
-        <h2>ثبت سفارش جدید</h2>
-    @endif
 
     @include('partials.exchange-access-check')
 
@@ -244,22 +267,24 @@
             </div>
         @endif
 
-        <div class="form-group">
-            <label for="entry1">پایین‌ترین نقطه ورود*:</label>
-            <input id="entry1" type="number" name="entry1" step="any" required value="{{ old('entry1') }}">
-            @error('entry1') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+                <label for="entry1">پایین‌ترین نقطه ورود*:</label>
+                <input id="entry1" type="number" name="entry1" step="any" required value="{{ old('entry1') }}">
+                @error('entry1') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="entry2">
+                    بالاترین نقطه ورود*:
+                    <span id="chain-icon" style="cursor: pointer; font-size: 20px;" title="Toggle Chained Prices">⛓️</span>
+                </label>
+                <input id="entry2" type="number" name="entry2" step="any" required value="{{ old('entry2') }}">
+                @error('entry2') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="entry2">
-                بالاترین نقطه ورود*:
-                <span id="chain-icon" style="cursor: pointer; font-size: 20px;" title="Toggle Chained Prices">⛓️</span>
-            </label>
-            <input id="entry2" type="number" name="entry2" step="any" required value="{{ old('entry2') }}">
-            @error('entry2') <span class="invalid-feedback">{{ $message }}</span> @enderror
-        </div>
-
-        <div class="form-row" style="display: flex; gap: 15px;">
+        <div class="form-row">
             <div class="form-group" style="flex: 1;">
                 <label for="sl">حد ضرر (SL)*:</label>
                 <input id="sl" type="number" name="sl" step="any" required value="{{ old('sl') }}">
@@ -273,13 +298,23 @@
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="steps">تعداد پله‌ها*:</label>
-            <input id="steps" type="number" name="steps" min="1" max="8" value="{{ old('steps', $defaultFutureOrderSteps ?? 1) }}" required>
-            @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
+        <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+                <label for="steps">تعداد پله‌ها*:</label>
+                <input id="steps" type="number" name="steps" min="1" max="8" value="{{ old('steps', $defaultFutureOrderSteps ?? 1) }}" required>
+                @error('steps') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label for="risk_percentage">
+                    درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪)@endif:
+                </label>
+                <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', $defaultRisk ?? 10) }}" required>
+                @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
         </div>
 
-        <div class="form-row" style="display: flex; gap: 15px;">
+        <div class="form-row">
             <div class="form-group" style="flex: 1;">
                 <label for="expire">
                     مدت انقضای سفارش
@@ -295,14 +330,6 @@
                 <input id="cancel_price" type="number" name="cancel_price" step="any" value="{{ old('cancel_price') }}">
                 @error('cancel_price') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
-        </div>
-
-        <div class="form-group">
-            <label for="risk_percentage">
-                درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪ - حالت سخت‌گیرانه)@else(حداکثر ۱۰٪)@endif:
-            </label>
-            <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', $defaultRisk ?? 10) }}" required>
-            @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
         {{-- Submit button with dynamic state based on access --}}
