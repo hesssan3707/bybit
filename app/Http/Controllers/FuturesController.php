@@ -250,12 +250,12 @@ class FuturesController extends Controller
                     $remainingTime = 72 - now()->diffInHours($closedFromExchangeTrade->closed_at);
                     return back()->withErrors(['msg' => "به دلیل بستن سفارش فعال از طریق صرافی، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
-                if (isset($lastTrades[1]) && now()->diffInHours($lastTrades[1]->closed_at) < 24 && now()->diffInHours($lastTrades[0]->closed_at) < 24) {
+                if ($lastTrades[1] && now()->diffInHours($lastTrades[1]->closed_at) < 24 && now()->diffInHours($lastTrades[0]->closed_at) < 24) {
                     $remainingTime = 24 - now()->diffInHours($lastTrades[1]->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در دو معامله اخیر، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }
 
-                if (isset($lastTrades[0]) && now()->diffInMinutes($lastTrades[0]->closed_at) < 60) {
+                if ($lastTrades[0] && now()->diffInMinutes($lastTrades[0]->closed_at) < 60) {
                     $remainingTime = 60 - now()->diffInMinutes($lastTrades[0]->closed_at);
                     return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
                 }

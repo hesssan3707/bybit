@@ -134,6 +134,10 @@
         @media screen and (max-width: 768px) {
             body { padding: 20px 10px 80px 10px; }
         }
+        main.is-loading {
+            opacity: 0;
+            visibility: hidden;
+        }
     </style>
     @stack('styles')
 </head>
@@ -149,7 +153,7 @@
 
     @include('layouts.navigation')
 
-    <main class="fade-in">
+    <main class="is-loading">
         @yield('content')
     </main>
 
@@ -192,6 +196,31 @@
                     a.classList.add('alert-link');
                 }
             });
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const body = document.body;
+            const mainContent = document.querySelector('main');
+
+            const bodyStyle = window.getComputedStyle(body);
+            const bgImage = bodyStyle.backgroundImage;
+            const imageUrlMatch = bgImage.match(/url\\("?(.+?)"?\\)/);
+
+            const showContent = () => {
+                mainContent.classList.remove('is-loading');
+                mainContent.classList.add('fade-in');
+            };
+
+            if (imageUrlMatch && imageUrlMatch[1]) {
+                const img = new Image();
+                img.src = imageUrlMatch[1];
+                img.onload = showContent;
+                img.onerror = showContent; // Also show content if image fails to load
+            } else {
+                // If no background image, show content immediately
+                showContent();
+            }
         });
     </script>
 </body>
