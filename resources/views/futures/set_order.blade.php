@@ -120,8 +120,10 @@
             flex-direction: column;
         }
         .form-row {
-            flex-direction: column;
-            gap: 0; /* Reset gap for stacked layout */
+            gap: 10px;
+        }
+        .container {
+            padding: 10px;
         }
     }
 </style>
@@ -168,9 +170,14 @@
                         "enable_publishing": false,
                         "allow_symbol_change": false,
                         "hide_side_toolbar": true,
-                        "studies_overrides": {
-                            "volume.show": false
-                        },
+                        "studies": [
+                            {
+                                "id": "Volume@tv-basicstudies",
+                                "version": "1",
+                                "show": false,
+                                "in_fullscreen": false
+                            }
+                        ],
                         "container_id": "tradingview_12345"
                     });
                 }
