@@ -38,9 +38,9 @@
     }
     label {
         display: block;
+        margin-bottom: 8px;
         font-weight: 400;
         color: #ffffff;
-        height: 30px;
     }
     input {
         width: 100%;
@@ -149,16 +149,22 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const symbolSelect = document.getElementById('symbol');
-                let exchangeName = "{{ $user['currentExchange']['exchange_name'] }}".toUpperCase();
+                let exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
+
+                // Map specific exchange names to their TradingView equivalents
+                if (exchangeName === 'BYBIT_V5') {
+                    exchangeName = 'BYBIT';
+                }
 
                 function updateTradingViewWidget(symbol) {
                     if (!symbol) return;
-                    const tradingViewSymbol = `${exchangeName}:${symbol}`;
+                    // Append ".P" for perpetual futures contracts
+                    const tradingViewSymbol = `${exchangeName}:${symbol}.P`;
                     new TradingView.widget({
                         "width": "100%",
-                        "height": 300,
+                        "height": 400,
                         "symbol": tradingViewSymbol,
-                        "interval": "5",
+                        "interval": "D",
                         "timezone": "Etc/UTC",
                         "theme": "dark",
                         "style": "1",
@@ -167,6 +173,9 @@
                         "enable_publishing": false,
                         "allow_symbol_change": false,
                         "hide_side_toolbar": true,
+                        "studies_overrides": {
+                            "volume.volume.visible": false,
+                        },
                         "container_id": "tradingview_12345"
                     });
                 }
