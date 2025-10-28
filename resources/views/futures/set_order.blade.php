@@ -105,6 +105,12 @@
         color: #856404;
     }
     .invalid-feedback { color: #842029; font-size: 14px; margin-top: 5px; display: block; }
+
+    @media (max-width: 768px) {
+        .page-container {
+            flex-direction: column;
+        }
+    }
 </style>
 @endpush
 
@@ -114,12 +120,11 @@
         <!-- TradingView Widget BEGIN -->
         <div class="tradingview-widget-container">
           <div id="tradingview_12345"></div>
-          <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
           <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const symbolSelect = document.getElementById('symbol');
-                const exchangeName = "{{ $exchangeAccess['current_exchange']->exchange_name ?? 'BINANCE' }}".toUpperCase();
+                const exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
 
                 function updateTradingViewWidget(symbol) {
                     if (!symbol) return;
@@ -159,7 +164,7 @@
     </div>
     <div class="form-container">
         <div class="glass-card container">
-            @if(isset($user) && $user->future_strict_mode && $selectedMarket)
+    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
         <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
     @else
         <h2>ثبت سفارش جدید</h2>
@@ -254,16 +259,18 @@
             @error('entry2') <span class="invalid-feedback">{{ $message }}</span> @enderror
         </div>
 
-        <div class="form-group">
-            <label for="sl">حد ضرر (SL)*:</label>
-            <input id="sl" type="number" name="sl" step="any" required value="{{ old('sl') }}">
-            @error('sl') <span class="invalid-feedback">{{ $message }}</span> @enderror
-        </div>
+        <div class="form-row" style="display: flex; gap: 15px;">
+            <div class="form-group" style="flex: 1;">
+                <label for="sl">حد ضرر (SL)*:</label>
+                <input id="sl" type="number" name="sl" step="any" required value="{{ old('sl') }}">
+                @error('sl') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
 
-        <div class="form-group">
-            <label for="tp">حد سود (TP)*:</label>
-            <input id="tp" type="number" name="tp" step="any" required value="{{ old('tp') }}">
-            @error('tp') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            <div class="form-group" style="flex: 1;">
+                <label for="tp">حد سود (TP)*:</label>
+                <input id="tp" type="number" name="tp" step="any" required value="{{ old('tp') }}">
+                @error('tp') <span class="invalid-feedback">{{ $message }}</span> @enderror
+            </div>
         </div>
 
         <div class="form-group">
