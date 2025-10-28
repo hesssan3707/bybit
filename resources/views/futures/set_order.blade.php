@@ -4,9 +4,24 @@
 
 @push('styles')
 <style>
-    .container {
-        max-width: 500px;
+    .page-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        max-width: 1200px;
         margin: auto;
+    }
+    .tradingview-container {
+        flex: 1;
+        min-width: 300px;
+    }
+    .form-container {
+        flex: 1;
+        min-width: 300px;
+        max-width: 500px;
+    }
+    .container {
+        width: 100%;
         padding:20px;
     }
     h2 {
@@ -94,8 +109,57 @@
 @endpush
 
 @section('content')
-<div class="glass-card container">
-    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
+<div class="page-container">
+    <div class="tradingview-container">
+        <!-- TradingView Widget BEGIN -->
+        <div class="tradingview-widget-container">
+          <div id="tradingview_12345"></div>
+          <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const symbolSelect = document.getElementById('symbol');
+                const exchangeName = "{{ $exchangeAccess['current_exchange']->exchange_name ?? 'BINANCE' }}".toUpperCase();
+
+                function updateTradingViewWidget(symbol) {
+                    if (!symbol) return;
+                    const tradingViewSymbol = `${exchangeName}:${symbol}`;
+                    new TradingView.widget({
+                        "width": "100%",
+                        "height": 400,
+                        "symbol": tradingViewSymbol,
+                        "interval": "D",
+                        "timezone": "Etc/UTC",
+                        "theme": "dark",
+                        "style": "1",
+                        "locale": "en",
+                        "toolbar_bg": "#f1f3f6",
+                        "enable_publishing": false,
+                        "allow_symbol_change": true,
+                        "container_id": "tradingview_12345"
+                    });
+                }
+
+                if (symbolSelect) {
+                    symbolSelect.addEventListener('change', function () {
+                        updateTradingViewWidget(this.value);
+                    });
+                    // Initial load
+                    updateTradingViewWidget(symbolSelect.value);
+                } else {
+                    const selectedMarket = "{{ $selectedMarket ?? '' }}";
+                    if (selectedMarket) {
+                        updateTradingViewWidget(selectedMarket);
+                    }
+                }
+            });
+        </script>
+        </div>
+        <!-- TradingView Widget END -->
+    </div>
+    <div class="form-container">
+        <div class="glass-card container">
+            @if(isset($user) && $user->future_strict_mode && $selectedMarket)
         <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
     @else
         <h2>ثبت سفارش جدید</h2>
@@ -249,6 +313,8 @@
             @endif
         </button>
     </form>
+</div>
+</div>
 </div>
 @endsection
 
