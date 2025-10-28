@@ -151,7 +151,7 @@ class FuturesLifecycleManager extends Command
                 $this->info("دریافت " . count($orders) . " سفارش از صرافی {$userExchange->exchange_name}");
 
                 foreach ($orders as $exchangeOrder) {
-                    $this->syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, $userExchange);
+                    $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
                 }
 
                 // پس از همگام‌سازی سفارش‌ها، سوابق PnL را نیز همگام‌سازی می‌کنیم
@@ -160,6 +160,8 @@ class FuturesLifecycleManager extends Command
             } catch (Exception $e) {
                 $this->error("خطا در همگام‌سازی سفارشات از صرافی: " . $e->getMessage());
             }
+        } else {
+            $this->info("سفارشی یافت نشد");
         }
         // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
         $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
@@ -168,7 +170,7 @@ class FuturesLifecycleManager extends Command
     /**
      * Sync individual exchange order to database
      */
-    private function syncExchangeOrderToDatabase($exchangeService, $exchangeOrder, UserExchange $userExchange)
+    private function syncExchangeOrderToDatabase($exchangeOrder, UserExchange $userExchange)
     {
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
         if (!$orderId) {

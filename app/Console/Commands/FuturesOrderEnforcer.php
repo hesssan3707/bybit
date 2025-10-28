@@ -505,4 +505,141 @@ class FuturesOrderEnforcer extends Command
         }
         return null;
     }
+
+    private function enforceCancelExpireOnlyForUser(User $user)
+    {
+        $this->info("پردازش کاربر برای بررسی قیمت لغو/انقضا: {$user->email}");
+
+        // دریافت همه صرافی‌های فعال کاربر
+        $userExchanges = UserExchange::where('user_id', $user->id)
+            ->where('futures_access', true)
+            ->whereNotNull('api_key')
+            ->whereNotNull('api_secret')
+            ->get();
+
+        if ($userExchanges->isEmpty()) {
+            $this->info("هیچ صرافی فعالی برای کاربر {$user->email} یافت نشد");
+            return;
+        }
+
+        foreach ($userExchanges as $userExchange) {
+            $this->enforceCancelExpireOnlyForUserExchange($user, $userExchange);
+        }
+    }
+
+    private function enforceForStrictAccount()
+    {
+        $this->info("اجرای کامل قوانین برای کاربران با حالت سخت‌گیرانه...");
+        $strictUsers = User::where('future_strict_mode', true)->get();
+        foreach ($strictUsers as $user) {
+            $this->enforceForUser($user);
+        }
+    }
+
+    private function enforceCancelExpireOnlyForUserExchange(User $user, UserExchange $userExchange)
+    {
+        // در محیط لوکال از اتصال زنده به صرافی‌ها صرف‌نظر شود
+        if (app()->environment('local')) {
+            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود.");
+            return;
+        }
+
+        try {
+            $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email} - فقط بررسی قیمت لغو/انقضا");
+
+            // ایجاد سرویس صرافی
+            $exchangeService = ExchangeFactory::create(
+                $userExchange->exchange_name,
+                $userExchange->api_key,
+                $userExchange->api_secret,
+                false
+            );
+
+            $symbol = $user->selected_market;
+
+            // دریافت همه سفارشات باز (همه نمادها)
+            $openOrdersResult = $exchangeService->getOpenOrders(null);
+            $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
+
+            // اجرای بررسی فقط قیمت لغو و تاریخ انقضا
+            $this->checkPendingOrdersCancelExpireOnly($exchangeService, $userExchange, $symbol, $exchangeOpenOrders);
+        } catch (Exception $e) {
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email} در بررسی لغو/انقضا: " . $e->getMessage());
+        }
+    }
+
+    private function checkPendingOrdersCancelExpireOnly($exchangeService, UserExchange $userExchange, string $symbol, array $exchangeOpenOrders)
+    {
+        $this->info("  بررسی سفارشات در انتظار - فقط قیمت لغو و تاریخ انقضا...");
+
+        $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', false)
+            ->where('status', 'pending')
+            ->get();
+
+        $exchangeOrdersMap = [];
+        foreach ($exchangeOpenOrders as $order) {
+            $exchangeOrdersMap[$order['orderId']] = $order;
+        }
+
+        foreach ($pendingOrders as $dbOrder) {
+            $exchangeOrder = $exchangeOrdersMap[$dbOrder->order_id] ?? null;
+            if (!$exchangeOrder) { continue; }
+
+            // تاریخ انقضا
+            if ($dbOrder->expire_minutes !== null) {
+                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                if (time() >= $expireAt) {
+                    try {
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'expired';
+                        $dbOrder->closed_at = now();
+                        $dbOrder->save();
+                        $this->info("    لغو سفارش منقضی شده: {$dbOrder->order_id}");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در لغو سفارش منقضی {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                    continue;
+                }
+            }
+
+            // قیمت لغو
+            if ($dbOrder->cancel_price) {
+                try {
+                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
+                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
+                    if (!is_array($list)) { $list = []; }
+                    $candles = array_slice($list, -2);
+                    $extractHL = function($candle) {
+                        if (is_array($candle)) {
+                            if (array_keys($candle) === range(0, count($candle)-1)) {
+                                $high = isset($candle[2]) ? (float)$candle[2] : (isset($candle[1]) ? (float)$candle[1] : 0.0);
+                                $low = isset($candle[3]) ? (float)$candle[3] : (isset($candle[2]) ? (float)$candle[2] : 0.0);
+                                return [$high, $low];
+                            }
+                            $high = (float)($candle['high'] ?? $candle['highPrice'] ?? $candle['h'] ?? 0);
+                            $low  = (float)($candle['low']  ?? $candle['lowPrice']  ?? $candle['l'] ?? 0);
+                            return [$high, $low];
+                        }
+                        return [0.0, 0.0];
+                    };
+                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
+                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
+
+                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
+                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
+
+                    if ($shouldCancel) {
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                        $dbOrder->status = 'canceled';
+                        $dbOrder->closed_at = now();
+                        $dbOrder->save();
+                        $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن: {$dbOrder->order_id}");
+                    }
+                } catch (Exception $e) {
+                    $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش {$dbOrder->order_id}: " . $e->getMessage());
+                }
+            }
+        }
+    }
 }
