@@ -147,12 +147,7 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const symbolSelect = document.getElementById('symbol');
-                let exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
-
-                // Map specific exchange names to their TradingView equivalents
-                if (exchangeName === 'BYBIT_V5') {
-                    exchangeName = 'BYBIT';
-                }
+                let exchangeName = "{{ $user['currentExchange']['exchange_name'] }}".toUpperCase();
 
                 function updateTradingViewWidget(symbol) {
                     if (!symbol) return;
