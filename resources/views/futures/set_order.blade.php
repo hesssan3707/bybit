@@ -27,6 +27,7 @@
     .container {
         width: 100%;
         padding:20px;
+        box-sizing: border-box;
     }
     h2 {
         text-align: center;
@@ -37,9 +38,9 @@
     }
     label {
         display: block;
+        margin-bottom: 8px;
         font-weight: 400;
         color: #ffffff;
-        height:30px;
     }
     input {
         width: 100%;
@@ -118,6 +119,7 @@
     @media (max-width: 768px) {
         .page-container {
             flex-direction: column;
+            align-items: center;
         }
         .form-row {
             gap: 10px;
@@ -159,9 +161,9 @@
                     const tradingViewSymbol = `${exchangeName}:${symbol}`;
                     new TradingView.widget({
                         "width": "100%",
-                        "height": 300,
+                        "height": 400,
                         "symbol": tradingViewSymbol,
-                        "interval": "5",
+                        "interval": "D",
                         "timezone": "Etc/UTC",
                         "theme": "dark",
                         "style": "1",
@@ -170,6 +172,14 @@
                         "enable_publishing": false,
                         "allow_symbol_change": false,
                         "hide_side_toolbar": true,
+                        "studies": [
+                            {
+                                "id": "Volume@tv-basicstudies",
+                                "version": "1",
+                                "show": false,
+                                "in_fullscreen": false
+                            }
+                        ],
                         "container_id": "tradingview_12345"
                     });
                 }
