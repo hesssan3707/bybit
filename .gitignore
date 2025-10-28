@@ -18,3 +18,5 @@ npm_output.log
 /.fleet
 /.idea
 /.vscode
+laravel.log
+vite.log
