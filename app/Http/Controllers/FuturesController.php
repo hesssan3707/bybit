@@ -901,7 +901,7 @@ class FuturesController extends Controller
         }, collect())->values();
 
         $cumulativePnlPercent = $trades->sortBy('closed_at')->reduce(function ($carry, $trade) use ($initialCapital) {
-            $lastCumulativePnl = $carry->isEmpty() ? 0 : end($carry)['y'];
+            $lastCumulativePnl = empty($carry) ? 0 : end($carry)['y'];
             $currentPnl = (float) $trade->pnl;
             $newCumulativePnl = $lastCumulativePnl + $currentPnl;
 
