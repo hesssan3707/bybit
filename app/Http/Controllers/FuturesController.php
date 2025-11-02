@@ -900,17 +900,12 @@ class FuturesController extends Controller
             return $carry;
         }, collect())->values();
 
-        $cumulativePnlPercent = $trades->sortBy('closed_at')->reduce(function ($carry, $trade) use ($initialCapital) {
-            $lastCumulativePnl = empty($carry) ? 0 : end($carry)['y'];
-            $currentPnl = (float) $trade->pnl;
-            $newCumulativePnl = $lastCumulativePnl + $currentPnl;
-
-            $carry[] = [
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => ($newCumulativePnl / $initialCapital) * 100,
+        $cumulativePnlPercent = $cumulativePnl->map(function ($dataPoint) use ($initialCapital) {
+            return [
+                'x' => $dataPoint['x'],
+                'y' => ($dataPoint['y'] / $initialCapital) * 100,
             ];
-            return $carry;
-        }, []);
+        })->values();
 
 
         // Get available months for the filter dropdown
