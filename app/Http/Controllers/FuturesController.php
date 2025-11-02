@@ -105,9 +105,9 @@ class FuturesController extends Controller
         }
 
         $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
-                $query->whereIn('status', ['pending', 'filled'])
-                      ->orWhere('updated_at', '>=', $threeDaysAgo);
-            })
+            $query->whereIn('status', ['pending', 'filled'])
+                ->orWhere('updated_at', '>=', $threeDaysAgo);
+        })
             ->latest('updated_at')
             ->paginate(20);
 
@@ -809,7 +809,7 @@ class FuturesController extends Controller
         } else {
             // Assumes month is in 'YYYY-MM' format
             $tradesQuery->whereYear('closed_at', '=', substr($month, 0, 4))
-                        ->whereMonth('closed_at', '=', substr($month, 5, 2));
+                ->whereMonth('closed_at', '=', substr($month, 5, 2));
         }
 
         if ($side !== 'all') {
@@ -928,14 +928,13 @@ class FuturesController extends Controller
         $baseQuery = DB::table('trades')
             ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
             ->where('trades.synchronized', 1)
-            ->whereNotNull('trades.closed_at')
-            ->where('user_exchanges.is_demo', $isDemo);
+            ->whereNotNull('trades.closed_at');
 
         if ($month === 'last6months') {
             $baseQuery->where('trades.closed_at', '>=', now()->subMonths(6));
         } else {
             $baseQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                      ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
         }
 
         $rankings = $baseQuery
@@ -955,14 +954,13 @@ class FuturesController extends Controller
             ->whereNotNull('trades.closed_at')
             ->whereNotNull('orders.balance_at_creation')
             ->where('orders.balance_at_creation', '>', 0)
-            ->where('user_exchanges.is_demo', $isDemo)
             ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
 
         if ($month === 'last6months') {
             $allTradesQuery->where('trades.closed_at', '>=', now()->subMonths(6));
         } else {
             $allTradesQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                           ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
         }
 
         $allTrades = $allTradesQuery->get();
