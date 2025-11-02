@@ -137,6 +137,7 @@
     </form>
 
     <div class="stats-grid">
+        <!-- Row 1: PNL -->
         <div class="stat-card">
             <h4>کل سود/ضرر</h4>
             <p class="{{ $totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">${{ number_format($totalPnl, 2) }}</p>
@@ -150,16 +151,44 @@
             <p class="pnl-negative" style="direction:ltr">${{ number_format($totalLosses, 2) }}</p>
         </div>
         <div class="stat-card">
-            <h4>تعداد معامله</h4>
-            <p>{{ $totalTrades }}</p>
-        </div>
-        <div class="stat-card">
             <h4>بزرگترین سود</h4>
             <p class="pnl-positive" style="direction:ltr">${{ number_format($biggestProfit, 2) }}</p>
         </div>
         <div class="stat-card">
             <h4>بزرگترین ضرر</h4>
             <p class="pnl-negative" style="direction:ltr">${{ number_format($biggestLoss, 2) }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>کل سود/ضرر ٪</h4>
+            <p class="{{ $totalPnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">{{ number_format($totalPnlPercent, 2) }}%</p>
+        </div>
+        <div class="stat-card">
+            <h4>کل سود ٪</h4>
+            <p class="pnl-positive" style="direction:ltr">{{ number_format($totalProfitPercent, 2) }}%</p>
+        </div>
+        <div class="stat-card">
+            <h4>کل ضرر ٪</h4>
+            <p class="pnl-negative" style="direction:ltr">{{ number_format($totalLossPercent, 2) }}%</p>
+        </div>
+        <div class="stat-card">
+            <h4>رتبه شما (دلاری)</h4>
+            <p>{{ $pnlRank ?? 'N/A' }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>رتبه شما (درصد)</h4>
+            <p>{{ $pnlPercentRank ?? 'N/A' }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>تعداد معامله</h4>
+            <p>{{ $totalTrades }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>تعداد معامله سود</h4>
+            <p class="pnl-positive">{{ $profitableTradesCount }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>تعداد معامله ضرر</h4>
+            <p class="pnl-negative">{{ $losingTradesCount }}</p>
         </div>
         <div class="stat-card">
             <h4>متوسط ریسک %</h4>
@@ -169,14 +198,6 @@
             <h4>متوسط ریسک به ریوارد</h4>
             <p>1 : {{ number_format($averageRRR, 2) }}</p>
         </div>
-        <div class="stat-card">
-            <h4>تعداد معامله سود</h4>
-            <p class="pnl-positive" style="direction:ltr">{{ $profitableTradesCount }}</p>
-        </div>
-        <div class="stat-card">
-            <h4>تعداد معامله های ضرر</h4>
-            <p class="pnl-negative" style="direction:ltr">{{ $losingTradesCount }}</p>
-        </div>
     </div>
 
     <div class="chart-container">
@@ -184,6 +205,9 @@
     </div>
     <div class="chart-container">
         <div id="cumulativePnlChart"></div>
+    </div>
+     <div class="chart-container">
+        <div id="cumulativePnlPercentChart"></div>
     </div>
 
     <div class="text-center text-muted mt-4">
@@ -332,6 +356,59 @@
 
         var cumulativePnlChart = new ApexCharts(document.querySelector("#cumulativePnlChart"), cumulativePnlOptions);
         cumulativePnlChart.render();
+
+        // Cumulative PnL Percent Chart
+        var cumulativePnlPercentOptions = {
+            chart: {
+                type: 'area',
+                height: 350,
+                toolbar: { show: true },
+                zoom: { enabled: true }
+            },
+            series: [{
+                name: 'Cumulative PnL %',
+                data: {!! json_encode($cumulativePnlPercent) !!}
+            }],
+            title: {
+                text: 'درصد سود/زیان تجمعی',
+                align: 'left',
+                style: { color: '#fff' }
+            },
+            xaxis: {
+                type: 'datetime',
+                labels: { style: { colors: '#adb5bd' } }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: '#adb5bd' },
+                    formatter: (value) => { return value.toFixed(2) + '%'; }
+                }
+            },
+            stroke: { curve: 'smooth', width: 2 },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1,
+                    opacityFrom: 0.7,
+                    opacityTo: 0.3,
+                    stops: [0, 90, 100]
+                }
+            },
+            dataLabels: { enabled: false },
+            grid: { borderColor: 'rgba(255, 255, 255, 0.1)' },
+            tooltip: {
+                theme: 'dark',
+                x: { format: 'dd MMM yyyy HH:mm' },
+                y: {
+                    formatter: function (val) {
+                        return val.toFixed(2) + "%"
+                    }
+                }
+            }
+        };
+
+        var cumulativePnlPercentChart = new ApexCharts(document.querySelector("#cumulativePnlPercentChart"), cumulativePnlPercentOptions);
+        cumulativePnlPercentChart.render();
     });
 </script>
 @endpush

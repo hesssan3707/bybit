@@ -11,6 +11,7 @@ use App\Traits\HandlesExchangeAccess;
 use App\Traits\ParsesExchangeErrors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class FuturesController extends Controller
@@ -104,9 +105,9 @@ class FuturesController extends Controller
         }
 
         $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
-                $query->whereIn('status', ['pending', 'filled'])
-                      ->orWhere('updated_at', '>=', $threeDaysAgo);
-            })
+            $query->whereIn('status', ['pending', 'filled'])
+                ->orWhere('updated_at', '>=', $threeDaysAgo);
+        })
             ->latest('updated_at')
             ->paginate(20);
 
@@ -445,6 +446,7 @@ class FuturesController extends Controller
                     'status'           => 'pending',
                     'side'             => strtolower($side),
                     'amount'           => $finalQty, // Use the rounded quantity that was sent to Bybit
+                    'balance_at_creation' => $capitalUSD,
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
@@ -807,7 +809,7 @@ class FuturesController extends Controller
         } else {
             // Assumes month is in 'YYYY-MM' format
             $tradesQuery->whereYear('closed_at', '=', substr($month, 0, 4))
-                        ->whereMonth('closed_at', '=', substr($month, 5, 2));
+                ->whereMonth('closed_at', '=', substr($month, 5, 2));
         }
 
         if ($side !== 'all') {
@@ -854,6 +856,31 @@ class FuturesController extends Controller
         $averageRisk = $riskCalculatedTrades > 0 ? $totalRiskPercentage / $riskCalculatedTrades : 0;
         $averageRRR = $rrrCalculatedTrades > 0 ? $totalRRR / $rrrCalculatedTrades : 0;
 
+        // Get the first trade in the period to find the initial capital
+        $firstTrade = $trades->sortBy('closed_at')->first();
+        $initialCapital = $firstTrade && $firstTrade->order ? (float) $firstTrade->order->balance_at_creation : 1000;
+
+        // Fallback for older trades without balance_at_creation
+        if ($initialCapital == 1000) {
+            try {
+                $exchangeService = $this->getExchangeService();
+                $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+                $usdtBalanceData = $balanceInfo['list'][0] ?? null;
+                if ($usdtBalanceData && !empty($usdtBalanceData['totalEquity'])) {
+                    $initialCapital = (float) $usdtBalanceData['totalEquity'] - $totalPnl;
+                }
+            } catch (\Exception $e) {
+                Log::error('Could not fetch wallet balance for journal page: ' . $e->getMessage());
+            }
+        }
+
+        // Avoid division by zero
+        $initialCapital = $initialCapital > 0 ? $initialCapital : 1;
+
+        $totalPnlPercent = ($totalPnl / $initialCapital) * 100;
+        $totalProfitPercent = ($totalProfits / $initialCapital) * 100;
+        $totalLossPercent = ($totalLosses / $initialCapital) * 100;
+
 
         // Prepare data for charts
         $pnlChartData = $trades->sortBy('closed_at')->map(function ($trade, $index) {
@@ -873,6 +900,13 @@ class FuturesController extends Controller
             return $carry;
         }, collect())->values();
 
+        $cumulativePnlPercent = $cumulativePnl->map(function ($dataPoint) use ($initialCapital) {
+            return [
+                'x' => $dataPoint['x'],
+                'y' => ($dataPoint['y'] / $initialCapital) * 100,
+            ];
+        })->values();
+
 
         // Get available months for the filter dropdown
         $availableMonths = Trade::forUser($user->id)
@@ -882,6 +916,65 @@ class FuturesController extends Controller
             ->distinct()
             ->orderBy('month', 'desc')
             ->pluck('month');
+
+        // User Rankings
+        $isDemo = $currentExchange ? $currentExchange->is_demo_active : 0;
+
+        $baseQuery = DB::table('trades')
+            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+            ->where('trades.synchronized', 1)
+            ->whereNotNull('trades.closed_at');
+
+        if ($month === 'last6months') {
+            $baseQuery->where('trades.closed_at', '>=', now()->subMonths(6));
+        } else {
+            $baseQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
+                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+        }
+
+        $rankings = $baseQuery
+            ->select('user_exchanges.user_id', DB::raw('SUM(trades.pnl) as total_pnl'))
+            ->groupBy('user_exchanges.user_id')
+            ->orderBy('total_pnl', 'desc')
+            ->get();
+
+        $pnlRank = $rankings->search(fn($r) => $r->user_id == $user->id);
+        $pnlRank = $pnlRank !== false ? $pnlRank + 1 : null;
+
+        // PNL Percentage Ranking
+        $allTradesQuery = DB::table('trades')
+            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+            ->join('orders', 'trades.order_id', '=', 'orders.order_id')
+            ->where('trades.synchronized', 1)
+            ->whereNotNull('trades.closed_at')
+            ->whereNotNull('orders.balance_at_creation')
+            ->where('orders.balance_at_creation', '>', 0)
+            ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
+
+        if ($month === 'last6months') {
+            $allTradesQuery->where('trades.closed_at', '>=', now()->subMonths(6));
+        } else {
+            $allTradesQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
+                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+        }
+
+        $allTrades = $allTradesQuery->get();
+
+        $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
+            $totalPnl = $userTrades->sum('pnl');
+            $firstTrade = $userTrades->sortBy('closed_at')->first();
+            $initialCapital = (float) $firstTrade->balance_at_creation;
+
+            return [
+                'user_id' => $firstTrade->user_id,
+                'pnl_percent' => ($initialCapital > 0) ? ($totalPnl / $initialCapital) * 100 : 0,
+            ];
+        });
+
+        $percentRankings = $userStats->sortByDesc('pnl_percent')->values();
+        $pnlPercentRank = $percentRankings->search(fn($r) => $r['user_id'] == $user->id);
+        $pnlPercentRank = $pnlPercentRank !== false ? $pnlPercentRank + 1 : null;
+
 
         return view('futures.journal', compact(
             'trades',
@@ -899,7 +992,13 @@ class FuturesController extends Controller
             'cumulativePnl',
             'availableMonths',
             'month',
-            'side'
+            'side',
+            'totalPnlPercent',
+            'totalProfitPercent',
+            'totalLossPercent',
+            'pnlRank',
+            'pnlPercentRank',
+            'cumulativePnlPercent'
         ));
     }
     /**
