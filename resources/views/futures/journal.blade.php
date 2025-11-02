@@ -151,6 +151,14 @@
             <p class="pnl-negative" style="direction:ltr">${{ number_format($totalLosses, 2) }}</p>
         </div>
         <div class="stat-card">
+            <h4>بزرگترین سود</h4>
+            <p class="pnl-positive" style="direction:ltr">${{ number_format($biggestProfit, 2) }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>بزرگترین ضرر</h4>
+            <p class="pnl-negative" style="direction:ltr">${{ number_format($biggestLoss, 2) }}</p>
+        </div>
+        <div class="stat-card">
             <h4>کل سود/ضرر ٪</h4>
             <p class="{{ $totalPnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">{{ number_format($totalPnlPercent, 2) }}%</p>
         </div>
@@ -162,8 +170,14 @@
             <h4>کل ضرر ٪</h4>
             <p class="pnl-negative" style="direction:ltr">{{ number_format($totalLossPercent, 2) }}%</p>
         </div>
-
-        <!-- Row 2: Trade Counts & Ranks -->
+        <div class="stat-card">
+            <h4>رتبه شما (دلاری)</h4>
+            <p>{{ $pnlRank ?? 'N/A' }}</p>
+        </div>
+        <div class="stat-card">
+            <h4>رتبه شما (درصد)</h4>
+            <p>{{ $pnlPercentRank ?? 'N/A' }}</p>
+        </div>
         <div class="stat-card">
             <h4>تعداد معامله</h4>
             <p>{{ $totalTrades }}</p>
@@ -177,30 +191,12 @@
             <p class="pnl-negative">{{ $losingTradesCount }}</p>
         </div>
         <div class="stat-card">
-            <h4>رتبه شما (دلاری)</h4>
-            <p>{{ $pnlRank ?? 'N/A' }}</p>
-        </div>
-        <div class="stat-card">
-            <h4>رتبه شما (درصد)</h4>
-            <p>{{ $pnlPercentRank ?? 'N/A' }}</p>
-        </div>
-
-        <!-- Row 3: Averages & Extremes -->
-        <div class="stat-card">
             <h4>متوسط ریسک %</h4>
             <p class="pnl-negative" style="direction:ltr">{{ number_format($averageRisk, 2) }}%</p>
         </div>
         <div class="stat-card">
             <h4>متوسط ریسک به ریوارد</h4>
             <p>1 : {{ number_format($averageRRR, 2) }}</p>
-        </div>
-        <div class="stat-card">
-            <h4>بزرگترین سود</h4>
-            <p class="pnl-positive" style="direction:ltr">${{ number_format($biggestProfit, 2) }}</p>
-        </div>
-        <div class="stat-card">
-            <h4>بزرگترین ضرر</h4>
-            <p class="pnl-negative" style="direction:ltr">${{ number_format($biggestLoss, 2) }}</p>
         </div>
     </div>
 
