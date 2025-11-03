@@ -621,6 +621,21 @@
                         <small style="color: #aaa;">حداکثر 8 پله - خالی بگذارید اگر نمی‌خواهید تنظیم شود</small>
                     </div>
 
+                    <div class="form-group">
+                        <label for="tv_default_interval">بازه زمانی پیش‌فرض نمودار (TradingView)</label>
+                        <div class="input-group">
+                            <select id="tv_default_interval" class="form-control">
+                                <option value="1">۱ دقیقه</option>
+                                <option value="5">۵ دقیقه</option>
+                                <option value="15">۱۵ دقیقه</option>
+                                <option value="60">۱ ساعت</option>
+                                <option value="240">۴ ساعت</option>
+                                <option value="D">۱ روز</option>
+                            </select>
+                        </div>
+                        <small style="color: #aaa;">این تنظیم فقط نمایش نمودار را تغییر می‌دهد و در منطق سفارش اثری ندارد</small>
+                    </div>
+
                     <div class="button-group">
                         <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
                     </div>
@@ -668,6 +683,9 @@
                         تاریخ فعال‌سازی: {{ $user->future_strict_mode_activated_at->format('Y/m/d H:i') }}<br>
                         @if($user->selected_market)
                             <strong>بازار انتخابی: {{ $user->selected_market }}</strong>
+                        @endif
+                        @if(isset($minRrRatio))
+                            <br><strong>حداقل نسبت سود به ضرر: {{ $minRrRatio }}</strong>
                         @endif
                     </div>
                 @else
@@ -726,6 +744,16 @@
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="minRrRatio">حداقل نسبت سود به ضرر (RR) در حالت سخت‌گیرانه:</label>
+                    <select id="minRrRatio" class="form-control">
+                        <option value="3:1" selected>3:1 (سود سه برابر ضرر)</option>
+                        <option value="2:1">2:1 (سود دو برابر ضرر)</option>
+                        <option value="1:1">1:1 (سود برابر ضرر)</option>
+                        <option value="1:2">1:2 (سود نصف ضرر)</option>
+                    </select>
+                </div>
+
                 <div class="confirmation-text">
                     <p><strong>با فعال‌سازی این حالت:</strong></p>
                     <ul>
@@ -765,6 +793,21 @@
                     this.setCustomValidity('');
                 }
             });
+
+            // Initialize TradingView default interval select from localStorage
+            const tvIntervalSelect = document.getElementById('tv_default_interval');
+            if (tvIntervalSelect) {
+                const allowed = ['1','5','15','60','240','D'];
+                const stored = localStorage.getItem('tv_default_interval');
+                const initial = allowed.includes(stored) ? stored : '5';
+                tvIntervalSelect.value = initial;
+                tvIntervalSelect.addEventListener('change', function() {
+                    const val = this.value;
+                    if (allowed.includes(val)) {
+                        localStorage.setItem('tv_default_interval', val);
+                    }
+                });
+            }
         });
 
         function showConfirmationModal() {
@@ -778,6 +821,8 @@
         function activateFutureStrictMode() {
             // Validate market selection
             const selectedMarket = document.getElementById('selectedMarket').value;
+            const minRrRatioEl = document.getElementById('minRrRatio');
+            const minRrRatio = minRrRatioEl ? minRrRatioEl.value || '3:1' : '3:1';
             if (!selectedMarket) {
                 showAlert('لطفاً ابتدا بازار مورد نظر را انتخاب کنید', 'danger');
                 return;
@@ -793,7 +838,8 @@
 
             // Prepare request data
             const requestData = {
-                selected_market: selectedMarket
+                selected_market: selectedMarket,
+                min_rr_ratio: minRrRatio
             };
 
             console.log('Sending request data:', requestData);

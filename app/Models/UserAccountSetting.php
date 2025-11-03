@@ -151,4 +151,25 @@ class UserAccountSetting extends Model
     {
         return static::setUserSetting($userId, 'default_expiration_time', $minutes, 'integer');
     }
+
+    /**
+     * Get minimum RR ratio for strict mode (e.g., "3:1")
+     */
+    public static function getMinRrRatio($userId)
+    {
+        return static::getUserSetting($userId, 'min_rr_ratio', '3:1');
+    }
+
+    /**
+     * Set minimum RR ratio for strict mode (allowed: 3:1, 2:1, 1:1, 1:2)
+     */
+    public static function setMinRrRatio($userId, $ratio)
+    {
+        $allowed = ['3:1', '2:1', '1:1', '1:2'];
+        if (!in_array($ratio, $allowed, true)) {
+            throw new \InvalidArgumentException('نسبت RR نامعتبر است. از گزینه‌های 3:1، 2:1، 1:1 یا 1:2 استفاده کنید.');
+        }
+
+        return static::setUserSetting($userId, 'min_rr_ratio', $ratio, 'string');
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserExchange;
 use App\Models\Order;
 use App\Models\Trade;
+use App\Models\UserBan;
 use App\Services\Exchanges\ExchangeFactory;
 use Exception;
 
@@ -827,6 +828,80 @@ class FuturesLifecycleManager extends Command
                         $trade->synchronized = 2; // mark as unverified sync
                     }
                     $trade->save();
+
+                    // Create bans based on closure outcomes
+                    try {
+                        $userId = $userExchange->user_id;
+                        $isDemo = (bool)$trade->is_demo;
+
+                        // Heuristic: manual close detected if exit far from both TP and SL (>0.2%)
+                        $order = $trade->order;
+                        if ($order && $trade->avg_exit_price) {
+                            $exit = (float)$trade->avg_exit_price;
+                            $tpDelta = isset($order->tp) ? abs(((float)$order->tp - $exit) / $exit) : null;
+                            $slDelta = isset($order->sl) ? abs(((float)$order->sl - $exit) / $exit) : null;
+                            if ($tpDelta !== null && $slDelta !== null && $tpDelta > 0.002 && $slDelta > 0.002) {
+                                $existsManual = UserBan::where('trade_id', $trade->id)->where('ban_type', 'manual_close')->exists();
+                                if (!$existsManual && ($trade->closed_at !== null)) {
+                                    UserBan::create([
+                                        'user_id' => $userId,
+                                        'is_demo' => $isDemo,
+                                        'trade_id' => $trade->id,
+                                        'ban_type' => 'manual_close',
+                                        'starts_at' => now(),
+                                        'ends_at' => now()->addDays(3),
+                                    ]);
+                                }
+                            }
+                        }
+
+                        // Loss-based bans
+                        if ($trade->pnl !== null && (float)$trade->pnl < 0) {
+                            // Single loss: 1 hour ban
+                            $existsSingle = UserBan::where('trade_id', $trade->id)->where('ban_type', 'single_loss')->exists();
+                            if (!$existsSingle) {
+                                UserBan::create([
+                                    'user_id' => $userId,
+                                    'is_demo' => $isDemo,
+                                    'trade_id' => $trade->id,
+                                    'ban_type' => 'single_loss',
+                                    'starts_at' => now(),
+                                    'ends_at' => now()->addHour(),
+                                ]);
+                            }
+
+                            // Two consecutive losses: 24 hours ban
+                            $lastTwo = Trade::where('user_exchange_id', $userExchange->id)
+                                ->where('is_demo', $isDemo)
+                                ->whereNotNull('closed_at')
+                                ->orderBy('closed_at', 'desc')
+                                ->limit(2)
+                                ->get();
+                            if ($lastTwo->count() === 2
+                                && (float)$lastTwo[0]->pnl < 0
+                                && (float)$lastTwo[1]->pnl < 0
+                                && now()->diffInHours($lastTwo[0]->closed_at) < 24
+                                && now()->diffInHours($lastTwo[1]->closed_at) < 24) {
+                                $hasActiveDouble = UserBan::active()
+                                    ->forUser($userId)
+                                    ->accountType($isDemo)
+                                    ->where('ban_type', 'double_loss')
+                                    ->exists();
+                                if (!$hasActiveDouble) {
+                                    UserBan::create([
+                                        'user_id' => $userId,
+                                        'is_demo' => $isDemo,
+                                        'trade_id' => $trade->id,
+                                        'ban_type' => 'double_loss',
+                                        'starts_at' => now(),
+                                        'ends_at' => now()->addDay(),
+                                    ]);
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // Do not fail lifecycle flow due to ban creation issues
+                    }
                 }
             }
         } catch (\Exception $e) {

@@ -38,9 +38,9 @@
     }
     label {
         display: block;
-        margin-bottom: 8px;
         font-weight: 400;
         color: #ffffff;
+        height: 32px;
     }
     input {
         width: 100%;
@@ -155,11 +155,16 @@
                     if (!symbol) return;
                     // Append ".P" for perpetual futures contracts
                     const tradingViewSymbol = `${exchangeName}:${symbol}.P`;
+                    const defaultInterval = (function(){
+                        const v = localStorage.getItem('tv_default_interval');
+                        const allowed = ['1','5','15','60','240','D'];
+                        return allowed.includes(v) ? v : '5';
+                    })();
                     new TradingView.widget({
                         "width": "100%",
                         "height": 400,
                         "symbol": tradingViewSymbol,
-                        "interval": "5",
+                        "interval": defaultInterval,
                         "timezone": "Etc/UTC",
                         "theme": "dark",
                         "style": "1",
@@ -194,6 +199,23 @@
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+
+    @if(isset($activeBan) && $activeBan)
+        @php
+            $sec = isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0;
+            $days = intdiv($sec, 86400);
+            $hrs = intdiv($sec % 86400, 3600);
+            $mins = intdiv($sec % 3600, 60);
+            $initialCountdownText = $days > 0
+                ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
+                : sprintf('%02d : %02d', $hrs, $mins);
+        @endphp
+        <div class="alert alert-warning" id="ban-alert">
+            مدیریت ریسک فعال است. لطفاً تا
+            <span id="ban-countdown">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
+            دیگر برای ثبت سفارش صبر کنید.
+        </div>
     @endif
 
     @if($errors->any())
@@ -336,9 +358,16 @@
             $hasAccess = $exchangeAccess && $exchangeAccess['current_exchange'] && !$accessRestricted;
         @endphp
 
-        <button class="submit-form-button" type="submit" {{ !$hasAccess ? 'disabled' : '' }}>
+        @php
+            $banActive = isset($activeBan) && $activeBan && isset($banRemainingSeconds) && $banRemainingSeconds > 0;
+        @endphp
+        <button class="submit-form-button" type="submit" {{ (!$hasAccess || $banActive) ? 'disabled' : '' }}>
             @if($hasAccess)
-                ارسال سفارش
+                @if($banActive)
+                    مدیریت ریسک فعال است
+                @else
+                    ارسال سفارش
+                @endif
             @else
                 برای ارسال سفارش ابتدا صرافی فعال کنید
             @endif
@@ -358,6 +387,8 @@
         const entry2Input = document.getElementById('entry2');
         const chainIcon = document.getElementById('chain-icon');
         const symbolSelect = document.getElementById('symbol');
+        const stepsInput = document.getElementById('steps');
+        const stepsNote = document.getElementById('steps-note');
         let isChained = true; // Chained by default
 
         function updateChainIcon() {
@@ -400,6 +431,11 @@
                         if (isChained) {
                             entry2Input.value = data.price;
                         }
+                        // Sync hidden entry2 when steps == 1
+                        if (stepsInput && parseInt(stepsInput.value || '1', 10) <= 1) {
+                            var h = document.getElementById('entry2_hidden');
+                            if (h) h.value = data.price;
+                        }
                         // Flash success feedback
                         entry1Input.style.backgroundColor = '#d4edda';
                         if (isChained) {
@@ -441,6 +477,11 @@
             if (isChained) {
                 entry2Input.value = this.value;
             }
+            if (stepsInput && parseInt(stepsInput.value || '1', 10) <= 1) {
+                entry2Input.value = this.value;
+                var h = document.getElementById('entry2_hidden');
+                if (h) h.value = this.value;
+            }
         });
 
         entry2Input.addEventListener('input', function() {
@@ -451,6 +492,9 @@
         });
 
         chainIcon.addEventListener('click', function() {
+            if (stepsInput && parseInt(stepsInput.value || '1', 10) <= 1) {
+                return; // prevent toggling when only one step
+            }
             isChained = !isChained;
             if (isChained) {
                 entry2Input.value = entry1Input.value;
@@ -466,6 +510,44 @@
                     fetchMarketPrice(selectedSymbol);
                 }
             });
+        }
+
+        // Steps-based control: disable entry2 and use hidden input when steps == 1
+        function ensureHiddenEntry2() {
+            var h = document.getElementById('entry2_hidden');
+            if (!h) {
+                h = document.createElement('input');
+                h.type = 'hidden';
+                h.name = 'entry2';
+                h.id = 'entry2_hidden';
+                h.value = entry1Input.value;
+                var form = document.getElementById('order-form');
+                if (form) form.appendChild(h);
+            }
+            return h;
+        }
+
+        function updateStepsControls() {
+            if (!stepsInput) return;
+            var stepsVal = parseInt(stepsInput.value || '1', 10);
+            var isSingle = stepsVal <= 1;
+            entry2Input.disabled = isSingle;
+            if (isSingle) {
+                // Force chained behavior visually and sync hidden value
+                isChained = true;
+                entry2Input.value = entry1Input.value;
+                var h = ensureHiddenEntry2();
+                h.value = entry1Input.value;
+                updateChainIcon();
+            } else {
+                // Remove hidden input if exists
+                var h2 = document.getElementById('entry2_hidden');
+                if (h2) h2.remove();
+            }
+        }
+        if (stepsInput) {
+            updateStepsControls();
+            stepsInput.addEventListener('input', updateStepsControls);
         }
 
         // --- Initial market price logic ---
@@ -489,6 +571,39 @@
                 fetchMarketPrice(defaultSymbol);
             }
         }
+
+        // --- Ban countdown ---
+        (function() {
+            var countdownEl = document.getElementById('ban-countdown');
+            var submitBtn = document.querySelector('.submit-form-button');
+            var banSeconds = {{ isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0 }};
+            function pad(n) { return (n < 10 ? '0' : '') + n; }
+            function formatRemaining(sec) {
+                if (sec <= 0) return '00 : 00';
+                var days = Math.floor(sec / 86400);
+                var hrs = Math.floor((sec % 86400) / 3600);
+                var mins = Math.floor((sec % 3600) / 60);
+                if (days > 0) return days + ' : ' + pad(hrs) + ' : ' + pad(mins);
+                return pad(hrs) + ' : ' + pad(mins);
+            }
+            function tick() {
+                if (!countdownEl) return;
+                if (banSeconds <= 0) {
+                    countdownEl.textContent = '00 : 00';
+                    if (submitBtn) submitBtn.disabled = false;
+                    var banAlert = document.getElementById('ban-alert');
+                    if (banAlert) banAlert.style.display = 'none';
+                    return;
+                }
+                countdownEl.textContent = formatRemaining(banSeconds);
+                banSeconds -= 1;
+                setTimeout(tick, 1000);
+            }
+            if (banSeconds > 0) {
+                if (submitBtn) submitBtn.disabled = true;
+                tick();
+            }
+        })();
 
         // Hedge mode enable handler if error hint detected
         var hedgeBtn = document.getElementById('enable-hedge-btn');

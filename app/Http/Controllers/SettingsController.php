@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserAccountSetting;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +32,8 @@ class SettingsController extends Controller
 
         try {
             $request->validate([
-                'selected_market' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT'
+                'selected_market' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
+                'min_rr_ratio' => 'nullable|string|in:3:1,2:1,1:1,1:2'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation failed for strict mode activation', [
@@ -146,8 +148,12 @@ class SettingsController extends Controller
                 'selected_market' => $request->selected_market
             ]);
 
+            // Persist minimum RR ratio selection (default to 3:1 if not provided)
+            $selectedRr = $request->input('min_rr_ratio', '3:1');
+            UserAccountSetting::setMinRrRatio($user->id, $selectedRr);
+
             // Build success message
-            $message = "حالت سخت‌گیرانه آتی با موفقیت فعال شد. شما تنها می‌توانید در بازار {$request->selected_market} معامله کنید. این حالت غیرقابل بازگشت است.";
+            $message = "حالت سخت‌گیرانه آتی با موفقیت فعال شد. شما تنها می‌توانید در بازار {$request->selected_market} معامله کنید. حداقل نسبت سود به ضرر روی {$selectedRr} تنظیم شد. این حالت غیرقابل بازگشت است.";
             
             // Add warning for skipped exchanges during validation
             if (!empty($skippedExchanges)) {

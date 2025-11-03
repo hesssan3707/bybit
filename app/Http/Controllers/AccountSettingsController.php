@@ -20,8 +20,9 @@ class AccountSettingsController extends Controller
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id);
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id);
+        $minRrRatio = UserAccountSetting::getMinRrRatio($user->id);
 
-        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps'));
+        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps', 'minRrRatio'));
     }
 
     /**

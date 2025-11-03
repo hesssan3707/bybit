@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Trade;
+use App\Models\UserBan;
 use App\Models\UserAccountSetting;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
@@ -219,6 +220,26 @@ class FuturesController extends Controller
             }
         }
 
+        // Compute active ban for UI (strict mode only)
+        $activeBan = null;
+        $banRemainingSeconds = null;
+        try {
+            if ($user && ($user->future_strict_mode ?? false)) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                $activeBan = UserBan::active()
+                    ->forUser($user->id)
+                    ->accountType($isDemo)
+                    ->orderBy('ends_at', 'desc')
+                    ->first();
+                if ($activeBan) {
+                    $banRemainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                }
+            }
+        } catch (\Throwable $e) {
+            // silent failure
+        }
+
         return view('futures.set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
@@ -229,7 +250,9 @@ class FuturesController extends Controller
             'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
             'defaultExpiration' => $defaultExpirationMinutes,
             'defaultRisk' => $defaultRisk,
-            'currentSymbol' => $symbol // Pass the current symbol for proper price display
+            'currentSymbol' => $symbol, // Pass the current symbol for proper price display
+            'activeBan' => $activeBan,
+            'banRemainingSeconds' => $banRemainingSeconds,
         ]);
     }
 
@@ -239,6 +262,28 @@ class FuturesController extends Controller
         $exchangeStatus = $this->checkActiveExchange();
         if (!$exchangeStatus['hasActiveExchange']) {
             return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
+        }
+
+        // Enforce active bans before creating orders (strict mode only)
+        try {
+            $user = auth()->user();
+            if ($user && ($user->future_strict_mode ?? false)) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                $activeBan = UserBan::active()
+                    ->forUser($user->id)
+                    ->accountType($isDemo)
+                    ->orderBy('ends_at', 'desc')
+                    ->first();
+                if ($activeBan) {
+                    $remaining = $activeBan->ends_at->diffForHumans(null, true);
+                    return back()
+                        ->withErrors(['msg' => 'مدیریت ریسک فعال است. لطفاً ' . $remaining . ' صبر کنید تا امکان ثبت سفارش مجدد فراهم شود.'])
+                        ->withInput();
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
         }
 
         $validated = $request->validate([
@@ -269,46 +314,6 @@ class FuturesController extends Controller
                 if ($validated['symbol'] !== $user->selected_market) {
                     return back()->withErrors(['symbol' => "در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید."])->withInput();
                 }
-
-                // Check for recent loss (only in strict mode)
-                $lastLossQuery = Trade::forUser(auth()->id());
-
-                $closedFromExchangeTrade = Trade::forUser(auth()->id());
-
-                // Filter by current account type (demo/real)
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-                if ($currentExchange) {
-                    $lastLossQuery->accountType($currentExchange->is_demo_active);
-                    $closedFromExchangeTrade->accountType($currentExchange->is_demo_active);
-                }
-
-                $lastTrades = $lastLossQuery->where('pnl', '<', 0)
-                    ->latest('closed_at')
-                    ->limit(2)
-                    ->get();
-                $closedFromExchangeTrade = $closedFromExchangeTrade->whereNotNull('closed_at')
-                    ->where('closed_at' ,'>' , now()->subDays(3))
-                    ->whereHas('order', function ($query) {
-                        $query->whereRaw('ABS(orders.tp - trades.avg_exit_price) / trades.avg_exit_price > 0.002')
-                            ->whereRaw('ABS(orders.sl - trades.avg_exit_price) / trades.avg_exit_price > 0.002');})
-                    ->first();
-
-                if($closedFromExchangeTrade)
-                {
-                    $remainingTime = 72 - now()->diffInHours($closedFromExchangeTrade->closed_at);
-                    return back()->withErrors(['msg' => "به دلیل بستن سفارش فعال از طریق صرافی، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
-                }
-                if ($lastTrades[1] && now()->diffInHours($lastTrades[1]->closed_at) < 24 && now()->diffInHours($lastTrades[0]->closed_at) < 24) {
-                    $remainingTime = 24 - now()->diffInHours($lastTrades[1]->closed_at);
-                    return back()->withErrors(['msg' => "به دلیل ضرر در دو معامله اخیر، تا {$remainingTime} ساعت دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
-                }
-
-                if ($lastTrades[0] && now()->diffInMinutes($lastTrades[0]->closed_at) < 60) {
-                    $remainingTime = 60 - now()->diffInMinutes($lastTrades[0]->closed_at);
-                    return back()->withErrors(['msg' => "به دلیل ضرر در معامله اخیر، تا {$remainingTime} دقیقه دیگر نمی‌توانید معامله جدیدی ثبت کنید. (حالت سخت‌گیرانه فعال)"])->withInput();
-                }
-
-
             }
             // Apply strict mode risk percentage cap (only in strict mode)
             if ($user->future_strict_mode) {
@@ -378,12 +383,22 @@ class FuturesController extends Controller
             $slDistance = abs($avgEntry - (float) $validated['sl']);
             $tpDistance = abs($avgEntry - (float) $validated['tp']);
 
-            if ($user->future_strict_mode && $tpDistance < (1/3)*$slDistance) {
-                return back()->withErrors(['tp' => 'حد سود حداقل باید یک سوم حد ضرر باشد'])->withInput();
-            }
-
             if ($slDistance <= 0) {
                 return back()->withErrors(['sl' => 'حد ضرر باید متفاوت از قیمت ورود باشد.'])->withInput();
+            }
+            // Enforce configured minimum RR ratio when strict mode is active
+            if ($user->future_strict_mode) {
+                $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id);
+                if (!is_string($minRrStr) || !preg_match('/^\d+:\d+$/', $minRrStr)) {
+                    $minRrStr = '3:1';
+                }
+                [$rewardPart, $riskPart] = array_map('floatval', explode(':', $minRrStr));
+                if ($riskPart <= 0) { $riskPart = 1.0; }
+                $ratioMultiple = $rewardPart / $riskPart; // e.g. 3:1 => 3.0
+                // Require: tpDistance >= ratioMultiple * slDistance
+                if ($tpDistance < ($ratioMultiple * $slDistance)) {
+                    return back()->withErrors(['tp' => "حد سود باید حداقل نسبت {$minRrStr} نسبت به حد ضرر باشد."])->withInput();
+                }
             }
             $amount = $maxLossUSD / $slDistance;
 
@@ -599,6 +614,23 @@ class FuturesController extends Controller
                 $trade->pnl = 0;
                 $trade->closed_at = now();
                 $trade->save();
+                // Create manual-close ban (strict mode only)
+                try {
+                    if ($user->future_strict_mode) {
+                        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                        $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                        if (!\App\Models\UserBan::where('trade_id', $trade->id)->where('ban_type', 'manual_close')->exists()) {
+                            \App\Models\UserBan::create([
+                                'user_id' => $user->id,
+                                'is_demo' => $isDemo,
+                                'trade_id' => $trade->id,
+                                'ban_type' => 'manual_close',
+                                'starts_at' => now(),
+                                'ends_at' => now()->addDays(3),
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {}
                 return redirect()->route('futures.pnl_history')->with('success', 'موقعیت به صورت آزمایشی در محیط محلی بسته شد.');
             }
             return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
@@ -622,12 +654,7 @@ class FuturesController extends Controller
                 return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'اطلاعات موقعیت برای بستن ناقص است.']);
             }
 
-            $lastClosedTrade = Trade::where('closed_by_user' , 1)->latest('closed_at')->first();
-            if($user->future_strict_mode && $lastClosedTrade && now()->diffInHours($lastClosedTrade->closed_at) < 24*7)
-            {
-                $remainingTime = 7 - now()->diffInDays($lastClosedTrade->closed_at);
-                return redirect()->route('futures.pnl_history')->withErrors(['msg' => "به دلیل بستن دستی معامله اخیر، تا {$remainingTime} روز دیگر نمی‌توانید معامله ای را دستی ببندید. (حالت سخت‌گیرانه فعال)"]);
-            }
+            // Note: manual close limits are enforced via bans; no inline cooldown here
 
             // ارسال دستور بستن موقعیت از طریق رابط واحد صرافی‌ها
             $exchangeService->closePosition($symbol, $openSide, $qty);
@@ -705,6 +732,23 @@ class FuturesController extends Controller
                         : now();
                     $trade->closed_by_user = 1;
                     $trade->save();
+                    // Manual-close ban (strict mode only)
+                    try {
+                        if ($user->future_strict_mode) {
+                            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                            $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                            if (!\App\Models\UserBan::where('trade_id', $trade->id)->where('ban_type', 'manual_close')->exists()) {
+                                \App\Models\UserBan::create([
+                                    'user_id' => $user->id,
+                                    'is_demo' => $isDemo,
+                                    'trade_id' => $trade->id,
+                                    'ban_type' => 'manual_close',
+                                    'starts_at' => now(),
+                                    'ends_at' => now()->addDays(3),
+                                ]);
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 } else {
                     // حداقل بروزرسانی در صورت نبود رویداد
                     $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
@@ -712,6 +756,23 @@ class FuturesController extends Controller
                     $trade->closed_at = now();
                     $trade->closed_by_user = 1;
                     $trade->save();
+                    // Manual-close ban (strict mode only)
+                    try {
+                        if ($user->future_strict_mode) {
+                            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                            $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                            if (!\App\Models\UserBan::where('trade_id', $trade->id)->where('ban_type', 'manual_close')->exists()) {
+                                \App\Models\UserBan::create([
+                                    'user_id' => $user->id,
+                                    'is_demo' => $isDemo,
+                                    'trade_id' => $trade->id,
+                                    'ban_type' => 'manual_close',
+                                    'starts_at' => now(),
+                                    'ends_at' => now()->addDays(3),
+                                ]);
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
             }
 
