@@ -79,7 +79,7 @@
             box-shadow: 0 0 8px rgba(0,123,255,0.25);
             outline: none;
         }
-        button {
+        #login-btn {
             width: 100%;
             padding: 14px;
             border: none;
@@ -90,7 +90,7 @@
             cursor: pointer;
             transition: opacity 0.3s;
         }
-        button:hover {
+        #login-btn:hover {
             opacity: 0.9;
         }
         .invalid-feedback {
@@ -125,12 +125,34 @@
         .alert-danger, .alert-error { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
         .alert-warning { background: rgba(245,158,11,0.12); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
         .alert-info { background: rgba(59,130,246,0.12); color: #3b82f6; border-color: rgba(59,130,246,0.25); }
+
+        /* Info button and modal */
+        .header-row { display: flex; align-items: center; justify-content: center; }
+        .info-btn { background: transparent; border: none; color: var(--primary-color); cursor: pointer; font-size: 20px; padding: 6px; }
+        .info-btn:hover { opacity: 0.85; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 2s ease; }
+        .modal-overlay.show { opacity: 1; visibility: visible; pointer-events: auto; }
+        .modal-card { background: rgba(255,255,255,0.98); color: #111827; width: 100%; max-width: 520px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); overflow: hidden; transform: translateY(6px); transition: transform 0.3s ease; }
+        .modal-overlay.show .modal-card { transform: translateY(0); }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e5e7eb; }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; color: #111827; }
+        .modal-close { background: transparent; border: none; cursor: pointer; font-size: 20px; color: #6b7280; }
+        .modal-body { padding: 16px; text-align: right; direction: rtl; }
+        .modal-body ul { margin: 0; padding-right: 18px; }
+        .modal-body li { margin: 8px 0; color: #374151; }
+        .modal-footer { padding: 14px 16px; border-top: 1px solid #e5e7eb; text-align: left; }
+        .modal-footer .btn-primary { background: #111827; color: white; border-radius: 8px; padding: 10px 14px; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container glass-card fade-in">
-    <h2>ورود به سیستم</h2>
+    <div class="header-row">
+        <h2>ورود به سیستم</h2>
+        <button type="button" class="info-btn" onclick="openInfoModal()" aria-label="اطلاعات" title="اطلاعات">
+            <i class="fas fa-info-circle"></i>
+        </button>
+    </div>
 
     <form method="POST" action="{{ route('login') }}">
         @csrf
@@ -178,7 +200,7 @@
             </label>
         </div>
 
-        <button type="submit">ورود</button>
+        <button type="submit" id="login-btn">ورود</button>
 
         <div style="text-align: center; margin-top: 20px;">
             <a href="{{ route('register') }}" style="color: var(--primary-color); text-decoration: none; margin-left: 15px;">
@@ -218,5 +240,60 @@ function togglePassword(fieldId) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady); else onReady();
 })();
 </script>
+
+<!-- Info Modal -->
+<div id="siteInfoModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="siteInfoTitle">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="siteInfoTitle">آشنایی با Trader Bridge</h3>
+            <button class="modal-close" onclick="closeInfoModal()" aria-label="بستن">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p>
+                Trader Bridge ابزارهای قدرتمندی برای تریدرهای حرفه‌ای ارائه می‌دهد. با اتصال به صرافی‌های فعال
+                Binance، Bybit و BingX، امکان مدیریت همزمان چند اکانت کاربری فراهم شده و از طریق API، قابلیت اتوماسیون
+                و توسعه یکپارچه در اختیار شما قرار می‌گیرد.
+            </p>
+            <ul>
+                <li>مدیریت سفارش‌ها بدون وابستگی به اینترنت: عملکرد پایدار حتی با قطع VPN یا کندی اینترنت، مناسب برای تریدرهای فعال در Binance، Bybit و BingX.</li>
+                <li>امنیت بالا: اتصال با IP ثابت و حذف ریسک بلاک شدن اکانت به دلیل تغییر IP.</li>
+                <li>کنترل احساسات با Strict Mode: تعریف قوانین سخت‌گیرانه (مانند حد ضرر اتوماتیک) برای کاهش ضرر.</li>
+                <li>معاملات گروهی در فیوچرز: همکاری آسان‌تر و توزیع ریسک بین تریدرها در صرافی‌های پشتیبانی‌شده.</li>
+                <li>پشتیبانی از چند کاربر و اکانت: مدیریت چندین اکانت به‌صورت همزمان.</li>
+            </ul>
+            <p class="help-text">
+                با ورود، شما در محیطی چندصرافی و یکپارچه برای معاملات اسپات و فیوچرز فعالیت می‌کنید.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" onclick="closeInfoModal()">متوجه شدم</button>
+        </div>
+    </div>
+    </div>
+
+<script>
+    function openInfoModal() {
+        var el = document.getElementById('siteInfoModal');
+        if (el) {
+            el.classList.add('show');
+        }
+    }
+    function closeInfoModal() {
+        var el = document.getElementById('siteInfoModal');
+        if (el) {
+            el.classList.remove('show');
+        }
+    }
+    // Auto-show for new IPs
+    document.addEventListener('DOMContentLoaded', function() {
+        var autoShow = {{ isset($showInfoModal) && $showInfoModal ? 'true' : 'false' }};
+        if (autoShow) {
+            setTimeout(() => openInfoModal(), 3000);
+        }
+    });
+</script>
+
 </body>
 </html>

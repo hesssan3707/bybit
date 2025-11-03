@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Models\VisitorLog;
 
 class ApiAuthController extends Controller
 {
@@ -96,6 +97,19 @@ class ApiAuthController extends Controller
                 'api_token_expires_at' => $expiresAt,
                 'current_exchange_id' => $userExchange->id, // Track which exchange this token is for
             ]);
+
+            // Log API login event
+            try {
+                VisitorLog::create([
+                    'ip' => $request->ip(),
+                    'user_id' => $user->id,
+                    'event_type' => 'login',
+                    'route' => $request->route() ? $request->route()->getName() : 'api.auth.login',
+                    'referrer' => $request->headers->get('referer'),
+                    'user_agent' => $request->header('User-Agent'),
+                    'occurred_at' => now(),
+                ]);
+            } catch (\Exception $e) {}
 
             return response()->json([
                 'success' => true,
@@ -274,6 +288,19 @@ class ApiAuthController extends Controller
                 'is_active' => true, // Users are active immediately
                 'email_verified_at' => null, // Require email verification
             ]);
+
+            // Log API signup event
+            try {
+                VisitorLog::create([
+                    'ip' => $request->ip(),
+                    'user_id' => $user->id,
+                    'event_type' => 'signup',
+                    'route' => $request->route() ? $request->route()->getName() : 'api.auth.register',
+                    'referrer' => $request->headers->get('referer'),
+                    'user_agent' => $request->header('User-Agent'),
+                    'occurred_at' => now(),
+                ]);
+            } catch (\Exception $e) {}
 
             // Generate email verification token
             $verificationToken = $user->generateEmailVerificationToken();

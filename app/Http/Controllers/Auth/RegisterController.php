@@ -64,6 +64,19 @@ class RegisterController extends Controller
             'is_active' => true,
             'email_verified_at' => now(),
         ]);
+
+        // Log signup event
+        try {
+            \App\Models\VisitorLog::create([
+                'ip' => $request->ip(),
+                'user_id' => $user->id,
+                'event_type' => 'signup',
+                'route' => $request->route() ? $request->route()->getName() : 'register.verify',
+                'referrer' => $request->headers->get('referer'),
+                'user_agent' => $request->header('User-Agent'),
+                'occurred_at' => now(),
+            ]);
+        } catch (\Exception $e) {}
         session()->forget('pending_registration');
         return redirect()->route('login')->with('success', 'ثبت نام با موفقیت انجام شد! اکنون می‌توانید وارد شوید.');
     }
