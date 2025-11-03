@@ -16,6 +16,53 @@ use Illuminate\Support\Facades\Log;
 
 class FuturesController extends Controller
 {
+    private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
+    {
+        if (app()->environment('local')) {
+            return 1000.0;
+        }
+
+        try {
+            $exchangeName = strtolower(method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : '');
+
+            if ($exchangeName === 'binance') {
+                $balanceData = $exchangeService->getWalletBalance('FUTURES', 'USDT');
+                $row = $balanceData['list'][0] ?? null;
+                if ($row) {
+                    $walletBase = (float)($row['crossWalletBalance'] ?? ($row['balance'] ?? ($row['availableBalance'] ?? ($row['maxWithdrawAmount'] ?? 0))));
+                    $equity = isset($row['marginBalance']) ? (float)$row['marginBalance'] : ($walletBase + (float)($row['crossUnPnl'] ?? 0));
+                    return max(0.0, min($equity, $walletBase));
+                }
+            } elseif ($exchangeName === 'bingx') {
+                $balanceData = $exchangeService->getWalletBalance('FUTURES');
+                $obj = $balanceData['list'][0] ?? null;
+                if ($obj) {
+                    $equity = (float)($obj['equity'] ?? (((float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? 0))) + (float)($obj['unrealizedPnl'] ?? 0)));
+                    $wallet = (float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? ($obj['availableBalance'] ?? 0)));
+                    return max(0.0, min($equity, $wallet));
+                }
+            } else { // bybit or default
+                $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+                $usdt = $balanceInfo['list'][0] ?? null;
+                if ($usdt && isset($usdt['totalEquity'])) {
+                    $equity = (float)$usdt['totalEquity'];
+                    $wallet = (float)($usdt['totalWalletBalance'] ?? $equity);
+                    return max(0.0, min($equity, $wallet));
+                }
+                $accountInfo = $exchangeService->getWalletBalance('UNIFIED');
+                $account = $accountInfo['list'][0] ?? null;
+                if ($account && isset($account['totalEquity'])) {
+                    $equity = (float)$account['totalEquity'];
+                    $wallet = (float)($account['totalWalletBalance'] ?? $equity);
+                    return max(0.0, min($equity, $wallet));
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to resolve capitalUSD: ' . $e->getMessage());
+        }
+
+        return 1000.0;
+    }
     use HandlesExchangeAccess, ParsesExchangeErrors;
     /**
      * Get the exchange service for the authenticated user
@@ -324,13 +371,7 @@ class FuturesController extends Controller
             }
 
             // Fetch live wallet balance instead of using a static .env variable
-            $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
-            $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-
-            if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
-                throw new \Exception('امکان دریافت موجودی کیف پول از صرافی وجود ندارد.');
-            }
-            $capitalUSD = min((float) $usdtBalanceData['totalWalletBalance'] , (float) $usdtBalanceData['totalEquity']);
+            $capitalUSD = $this->resolveCapitalUSD($exchangeService);
 
             $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
 
@@ -864,22 +905,36 @@ class FuturesController extends Controller
         if ($initialCapital == 1000) {
             try {
                 $exchangeService = $this->getExchangeService();
-                $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
-                $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-                if ($usdtBalanceData && !empty($usdtBalanceData['totalEquity'])) {
-                    $initialCapital = (float) $usdtBalanceData['totalEquity'] - $totalPnl;
+                $resolvedCurrent = $this->resolveCapitalUSD($exchangeService);
+                if ($resolvedCurrent > 0) {
+                    $initialCapital = $resolvedCurrent - $totalPnl;
                 }
             } catch (\Exception $e) {
-                Log::error('Could not fetch wallet balance for journal page: ' . $e->getMessage());
+                Log::error('Could not resolve initial capital for journal page: ' . $e->getMessage());
             }
         }
 
         // Avoid division by zero
         $initialCapital = $initialCapital > 0 ? $initialCapital : 1;
 
-        $totalPnlPercent = ($totalPnl / $initialCapital) * 100;
-        $totalProfitPercent = ($totalProfits / $initialCapital) * 100;
-        $totalLossPercent = ($totalLosses / $initialCapital) * 100;
+        // Per-trade percent calculations based on each trade's balance_at_creation
+        $perTradePercents = $trades->map(function ($trade) use ($initialCapital) {
+            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
+                ? (float)$trade->order->balance_at_creation
+                : $initialCapital;
+            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
+        });
+
+        // Aggregate percents
+        $totalPnlPercent = $perTradePercents->sum();
+        $totalProfitPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
+            [$trade, $percent] = $pair;
+            return $carry + ($trade->pnl > 0 ? $percent : 0);
+        }, 0);
+        $totalLossPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
+            [$trade, $percent] = $pair;
+            return $carry + ($trade->pnl < 0 ? $percent : 0);
+        }, 0);
 
 
         // Prepare data for charts
@@ -891,7 +946,9 @@ class FuturesController extends Controller
             ];
         })->values();
 
-        $cumulativePnl = $trades->sortBy('closed_at')->reduce(function ($carry, $trade) {
+        $sortedTrades = $trades->sortBy('closed_at');
+
+        $cumulativePnl = $sortedTrades->reduce(function ($carry, $trade) {
             $lastPnl = $carry->last()['y'] ?? 0;
             $carry->push([
                 'x' => $trade->closed_at->format('Y-m-d H:i'),
@@ -900,12 +957,24 @@ class FuturesController extends Controller
             return $carry;
         }, collect())->values();
 
-        $cumulativePnlPercent = $cumulativePnl->map(function ($dataPoint) use ($initialCapital) {
-            return [
-                'x' => $dataPoint['x'],
-                'y' => ($dataPoint['y'] / $initialCapital) * 100,
-            ];
-        })->values();
+        // Cumulative percent as running sum of per-trade percents (ordered by closed_at)
+        $sortedPercents = $sortedTrades->values()->map(function ($trade) use ($initialCapital) {
+            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
+                ? (float)$trade->order->balance_at_creation
+                : $initialCapital;
+            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
+        });
+
+        $cumulativePnlPercent = $sortedPercents->reduce(function ($carry, $percent) use ($sortedTrades) {
+            $index = $carry->count();
+            $trade = $sortedTrades->values()->get($index);
+            $last = $carry->last()['y'] ?? 0;
+            $carry->push([
+                'x' => $trade->closed_at->format('Y-m-d H:i'),
+                'y' => $last + $percent,
+            ]);
+            return $carry;
+        }, collect())->values();
 
 
         // Get available months for the filter dropdown
@@ -961,13 +1030,17 @@ class FuturesController extends Controller
         $allTrades = $allTradesQuery->get();
 
         $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
-            $totalPnl = $userTrades->sum('pnl');
-            $firstTrade = $userTrades->sortBy('closed_at')->first();
-            $initialCapital = (float) $firstTrade->balance_at_creation;
+            // Sum per-trade percents for user
+            $sumPercent = $userTrades->reduce(function ($carry, $t) {
+                $capital = (float) $t->balance_at_creation;
+                $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
+                return $carry + $percent;
+            }, 0.0);
 
+            $firstTrade = $userTrades->sortBy('closed_at')->first();
             return [
                 'user_id' => $firstTrade->user_id,
-                'pnl_percent' => ($initialCapital > 0) ? ($totalPnl / $initialCapital) * 100 : 0,
+                'pnl_percent' => $sumPercent,
             ];
         });
 

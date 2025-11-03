@@ -1209,20 +1209,18 @@ function handleResize() {
     const buttons = document.querySelectorAll('.endpoint-toggle');
 
     if (window.innerWidth > 768) {
-        // Desktop view - show all content
+        // Desktop view - show all content via class (no inline display)
         contents.forEach(content => {
             content.classList.add('active');
-            content.style.display = 'block';
         });
         buttons.forEach(btn => {
             btn.style.background = '#007bff';
             btn.textContent = btn.textContent.replace(' ✓', '');
         });
     } else {
-        // Mobile view - collapse all initially
+        // Mobile view - collapse all initially via class (no inline display)
         contents.forEach(content => {
             content.classList.remove('active');
-            content.style.display = 'none';
         });
         buttons.forEach(btn => {
             btn.style.background = '#007bff';

@@ -149,12 +149,7 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const symbolSelect = document.getElementById('symbol');
-                let exchangeName = "{{ $exchangeAccess['current_exchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
-
-                // Map specific exchange names to their TradingView equivalents
-                if (exchangeName === 'BYBIT_V5') {
-                    exchangeName = 'BYBIT';
-                }
+                let exchangeName = "{{ $user['currentExchange']['exchange_name'] ?? 'BINANCE' }}".toUpperCase();
 
                 function updateTradingViewWidget(symbol) {
                     if (!symbol) return;
@@ -164,7 +159,7 @@
                         "width": "100%",
                         "height": 400,
                         "symbol": tradingViewSymbol,
-                        "interval": "D",
+                        "interval": "5",
                         "timezone": "Etc/UTC",
                         "theme": "dark",
                         "style": "1",
@@ -173,9 +168,6 @@
                         "enable_publishing": false,
                         "allow_symbol_change": false,
                         "hide_side_toolbar": true,
-                        "studies_overrides": {
-                            "volume.volume.visible": false,
-                        },
                         "container_id": "tradingview_12345"
                     });
                 }

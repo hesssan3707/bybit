@@ -13,6 +13,56 @@ use Illuminate\Support\Facades\Log;
 
 class FuturesController extends Controller
 {
+    private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
+    {
+        // Skip live exchange calls in local environment
+        if (app()->environment('local')) {
+            return 1000.0;
+        }
+
+        try {
+            $exchangeName = strtolower(method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : '');
+
+            if ($exchangeName === 'binance') {
+                $balanceData = $exchangeService->getWalletBalance('FUTURES', 'USDT');
+                $row = $balanceData['list'][0] ?? null;
+                if ($row) {
+                    $walletBase = (float)($row['crossWalletBalance'] ?? ($row['balance'] ?? ($row['availableBalance'] ?? ($row['maxWithdrawAmount'] ?? 0))));
+                    $equity = isset($row['marginBalance']) ? (float)$row['marginBalance'] : ($walletBase + (float)($row['crossUnPnl'] ?? 0));
+                    return max(0.0, min($equity, $walletBase));
+                }
+            } elseif ($exchangeName === 'bingx') {
+                $balanceData = $exchangeService->getWalletBalance('FUTURES');
+                $obj = $balanceData['list'][0] ?? null;
+                if ($obj) {
+                    $equity = (float)($obj['equity'] ?? (((float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? 0))) + (float)($obj['unrealizedPnl'] ?? 0)));
+                    $wallet = (float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? ($obj['availableBalance'] ?? 0)));
+                    return max(0.0, min($equity, $wallet));
+                }
+            } else { // bybit or default
+                $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
+                $usdt = $balanceInfo['list'][0] ?? null;
+                if ($usdt && isset($usdt['totalEquity'])) {
+                    $equity = (float)$usdt['totalEquity'];
+                    $wallet = (float)($usdt['totalWalletBalance'] ?? $equity);
+                    return max(0.0, min($equity, $wallet));
+                }
+                // Fallback to account-level if coin-specific missing
+                $accountInfo = $exchangeService->getWalletBalance('UNIFIED');
+                $account = $accountInfo['list'][0] ?? null;
+                if ($account && isset($account['totalEquity'])) {
+                    $equity = (float)$account['totalEquity'];
+                    $wallet = (float)($account['totalWalletBalance'] ?? $equity);
+                    return max(0.0, min($equity, $wallet));
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to resolve capitalUSD: ' . $e->getMessage());
+        }
+
+        return 1000.0;
+    }
+
     private function getExchangeService(): ExchangeApiServiceInterface
     {
         if (!auth()->check()) {
@@ -74,14 +124,7 @@ class FuturesController extends Controller
             $steps = ($entry1 === $entry2) ? 1 : (int)$validated['steps'];
             $avgEntry = ($entry1 + $entry2) / 2.0;
             $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
-
-            $balanceInfo = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
-            $usdtBalanceData = $balanceInfo['list'][0] ?? null;
-
-            if (!$usdtBalanceData || ! $usdtBalanceData['totalEquity']) {
-                throw new \Exception('Could not retrieve wallet balance from the exchange.');
-            }
-            $capitalUSD = min((float) $usdtBalanceData['totalWalletBalance'] , (float) $usdtBalanceData['totalEquity']);
+            $capitalUSD = $this->resolveCapitalUSD($exchangeService);
             $maxLossUSD = $capitalUSD * ((float)$validated['risk_percentage'] / 100.0);
             $slDistance = abs($avgEntry - (float) $validated['sl']);
 
@@ -149,6 +192,7 @@ class FuturesController extends Controller
                     'status'           => 'pending',
                     'side'             => strtolower($side),
                     'amount'           => $finalQty,
+                    'balance_at_creation' => $capitalUSD,
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
