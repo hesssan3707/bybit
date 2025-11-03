@@ -747,10 +747,10 @@
                 <div class="form-group">
                     <label for="minRrRatio">حداقل نسبت سود به ضرر (RR) در حالت سخت‌گیرانه:</label>
                     <select id="minRrRatio" class="form-control">
-                        <option value="3:1" selected>3:1 (سود سه برابر ضرر)</option>
-                        <option value="2:1">2:1 (سود دو برابر ضرر)</option>
-                        <option value="1:1">1:1 (سود برابر ضرر)</option>
-                        <option value="1:2">1:2 (سود نصف ضرر)</option>
+                        <option value="3:1" selected>3:1 (ضرر سه برابر سود)</option>
+                        <option value="2:1">2:1 (ضرر دو برابر سود)</option>
+                        <option value="1:1">1:1 (ضرر برابر سود)</option>
+                        <option value="1:2">1:2 (ضرر نصف سود)</option>
                     </select>
                 </div>
 

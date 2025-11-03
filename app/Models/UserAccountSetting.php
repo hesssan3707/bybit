@@ -153,11 +153,21 @@ class UserAccountSetting extends Model
     }
 
     /**
-     * Get minimum RR ratio for strict mode (e.g., "3:1")
+     * Get minimum RR ratio for strict mode (loss:profit minima, e.g., "3:1")
      */
     public static function getMinRrRatio($userId)
     {
-        return static::getUserSetting($userId, 'min_rr_ratio', '3:1');
+        // Default to 3:1 (ضرر سه برابر سود)
+        $val = static::getUserSetting($userId, 'min_rr_ratio', '3:1');
+        // Normalize any previously stored reversed values to standard loss:profit minima
+        $map = [
+            '1:3' => '3:1',
+            '1:2' => '2:1',
+        ];
+        if (isset($map[$val])) {
+            $val = $map[$val];
+        }
+        return $val;
     }
 
     /**

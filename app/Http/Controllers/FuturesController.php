@@ -390,14 +390,15 @@ class FuturesController extends Controller
             if ($user->future_strict_mode) {
                 $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id);
                 if (!is_string($minRrStr) || !preg_match('/^\d+:\d+$/', $minRrStr)) {
-                    $minRrStr = '3:1';
+                    $minRrStr = '3:1'; // loss:profit minima (e.g., 3:1 => loss three times profit)
                 }
-                [$rewardPart, $riskPart] = array_map('floatval', explode(':', $minRrStr));
-                if ($riskPart <= 0) { $riskPart = 1.0; }
-                $ratioMultiple = $rewardPart / $riskPart; // e.g. 3:1 => 3.0
-                // Require: tpDistance >= ratioMultiple * slDistance
-                if ($tpDistance < ($ratioMultiple * $slDistance)) {
-                    return back()->withErrors(['tp' => "حد سود باید حداقل نسبت {$minRrStr} نسبت به حد ضرر باشد."])->withInput();
+                // Interpret value as loss:profit minima => require profit/loss strictly greater than (profitPart/lossPart)
+                [$lossPart, $profitPart] = array_map('floatval', explode(':', $minRrStr));
+                if ($lossPart <= 0) { $lossPart = 1.0; }
+                $minProfitOverLoss = $profitPart / $lossPart; // e.g. 3:1 => 1/3; 1:2 => 2.0
+                // Strictly greater-than: tpDistance > minProfitOverLoss * slDistance
+                if ($tpDistance <= ($minProfitOverLoss * $slDistance)) {
+                    return back()->withErrors(['tp' => "در حالت سخت‌گیرانه، حد سود باید بیشتر از نسبت انتخاب‌شده باشد. نسبت حداقل (ضرر:سود): {$minRrStr}"])->withInput();
                 }
             }
             $amount = $maxLossUSD / $slDistance;

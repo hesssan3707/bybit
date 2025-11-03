@@ -30,10 +30,11 @@ class SettingsController extends Controller
             'request_data' => $request->all()
         ]);
 
-        try {
+            try {
             $request->validate([
                 'selected_market' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
-                'min_rr_ratio' => 'nullable|string|in:3:1,2:1,1:1,1:2'
+                // Accept loss:profit minima values (3:1, 2:1, 1:1, 1:2)
+                'min_rr_ratio' => 'required|string|in:3:1,2:1,1:1,1:2'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation failed for strict mode activation', [
