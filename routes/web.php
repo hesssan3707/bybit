@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
         Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
+        Route::post('/orders/close-all', [FuturesController::class, 'closeAll'])->name('orders.close_all');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
         Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('pnl_history');
         Route::get('/journal', [FuturesController::class, 'journal'])->name('journal');

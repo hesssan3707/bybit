@@ -7,7 +7,7 @@
                     <i class="fas fa-info-circle"></i>
                 </div>
                 <h3 id="alertModalTitle">اطلاع‌رسانی</h3>
-                <button class="alert-modal-close" onclick="closeAlertModal(false)">
+                <button class="alert-modal-close" onclick="closeAlertModal('cancel')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -15,10 +15,13 @@
                 <p id="alertModalMessage">پیام شما اینجا نمایش داده می‌شود</p>
             </div>
             <div class="alert-modal-footer">
-                <button id="alertModalConfirm" class="btn btn-primary" onclick="closeAlertModal(true)">
+                <button id="alertModalSecondaryConfirm" class="btn btn-danger" onclick="closeAlertModal('secondary')" style="display: none;">
+                    اقدام اضافی
+                </button>
+                <button id="alertModalConfirm" class="btn btn-primary" onclick="closeAlertModal('confirm')">
                     تأیید
                 </button>
-                <button id="alertModalCancel" class="btn btn-secondary" onclick="closeAlertModal(false)" style="display: none;">
+                <button id="alertModalCancel" class="btn btn-secondary" onclick="closeAlertModal('cancel')" style="display: none;">
                     انصراف
                 </button>
             </div>
@@ -191,6 +194,17 @@
     transform: translateY(-1px);
 }
 
+.alert-modal-footer .btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.alert-modal-footer .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
 /* Animation keyframes */
 @keyframes modalSlideIn {
     from {
@@ -250,7 +264,10 @@ function showAlertModal(options = {}) {
         confirmText = 'تأیید',
         cancelText = 'انصراف',
         showCancel = false,
+        secondaryConfirmText = '',
+        showSecondaryConfirm = false,
         onConfirm = null,
+        onSecondaryConfirm = null,
         onCancel = null
     } = options;
 
@@ -259,6 +276,7 @@ function showAlertModal(options = {}) {
     document.getElementById('alertModalMessage').textContent = message;
     document.getElementById('alertModalConfirm').textContent = confirmText;
     document.getElementById('alertModalCancel').textContent = cancelText;
+    document.getElementById('alertModalSecondaryConfirm').textContent = secondaryConfirmText || 'اقدام اضافی';
 
     // Set icon and styling based on type
     const iconElement = document.getElementById('alertModalIcon');
@@ -288,10 +306,13 @@ function showAlertModal(options = {}) {
     // Show/hide cancel button
     const cancelBtn = document.getElementById('alertModalCancel');
     cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
+    const secondaryBtn = document.getElementById('alertModalSecondaryConfirm');
+    secondaryBtn.style.display = showSecondaryConfirm ? 'inline-block' : 'none';
 
     // Set callbacks
     alertModalCallback = {
         onConfirm: onConfirm,
+        onSecondaryConfirm: onSecondaryConfirm,
         onCancel: onCancel
     };
 
@@ -308,7 +329,7 @@ function showAlertModal(options = {}) {
     }, 300);
 }
 
-function closeAlertModal(isConfirm = true) {
+function closeAlertModal(which = 'confirm') {
     const modal = document.getElementById('alertModal');
     modal.classList.remove('show');
     
@@ -317,9 +338,11 @@ function closeAlertModal(isConfirm = true) {
         
         // Execute callback if exists
         if (alertModalCallback) {
-            if (isConfirm && alertModalCallback.onConfirm) {
+            if (which === 'confirm' && alertModalCallback.onConfirm) {
                 alertModalCallback.onConfirm();
-            } else if (!isConfirm && alertModalCallback.onCancel) {
+            } else if (which === 'secondary' && alertModalCallback.onSecondaryConfirm) {
+                alertModalCallback.onSecondaryConfirm();
+            } else if (which === 'cancel' && alertModalCallback.onCancel) {
                 alertModalCallback.onCancel();
             }
             alertModalCallback = null;
@@ -330,17 +353,19 @@ function closeAlertModal(isConfirm = true) {
 // Handle confirm button click
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('alertModalConfirm').addEventListener('click', function() {
-        closeAlertModal(true);
+        closeAlertModal('confirm');
     });
-    
     document.getElementById('alertModalCancel').addEventListener('click', function() {
-        closeAlertModal(false);
+        closeAlertModal('cancel');
+    });
+    document.getElementById('alertModalSecondaryConfirm').addEventListener('click', function() {
+        closeAlertModal('secondary');
     });
     
     // Close modal when clicking outside
     document.getElementById('alertModal').addEventListener('click', function(e) {
         if (e.target === this) {
-            closeAlertModal(false);
+            closeAlertModal('cancel');
         }
     });
     
@@ -349,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Escape') {
             const modal = document.getElementById('alertModal');
             if (modal.style.display !== 'none') {
-                closeAlertModal(false);
+                closeAlertModal('cancel');
             }
         }
     });
