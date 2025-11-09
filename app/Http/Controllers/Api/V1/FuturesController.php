@@ -108,7 +108,7 @@ class FuturesController extends Controller
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
-            'expire' => 'nullable|integer|min:1|max=999',
+            'expire' => 'nullable|integer|min:1|max:999',
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
         ]);

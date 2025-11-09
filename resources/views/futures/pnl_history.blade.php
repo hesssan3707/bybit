@@ -101,6 +101,7 @@
         box-shadow: 0 6px 16px rgba(220,53,69,0.5);
     }
 
+
     /* Open positions card layout (mobile-first) */
     .open-positions-table { display: block; }
 
@@ -296,6 +297,9 @@
     </div>
 
     {{ $closedTrades->links() }}
+    <form id="closeAllForm" action="{{ route('futures.orders.close_all') }}" method="POST" style="display:none;">
+        @csrf
+    </form>
 </div>
 @endsection
 
@@ -303,14 +307,43 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('.close-position-form');
+    const openCount = {{ count($openTrades) }};
+    const manualCloseBanActive = {{ $manualCloseBanActive ? 'true' : 'false' }};
+    const manualCloseBanEndsAt = @json(optional($manualCloseBanEndsAt)->format('Y-m-d H:i'));
     forms.forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            modernConfirm(
-                'بستن موقعیت',
-                'آیا از بستن این موقعیت مطمئن هستید؟',
-                function() { form.submit(); }
-            );
+            if (manualCloseBanActive) {
+                showAlertModal({
+                    title: 'خطا',
+                    message: 'شما مجاز به بستن دستی موقعیت نیستید تا تاریخ ' + manualCloseBanEndsAt,
+                    type: 'error',
+                    confirmText: 'متوجه شدم',
+                    showCancel: false
+                });
+                return;
+            }
+
+            if (openCount > 1) {
+                showAlertModal({
+                    title: 'بستن موقعیت',
+                    message: 'کدام اقدام را می‌خواهید انجام دهید؟',
+                    type: 'warning',
+                    confirmText: 'بستن پوزیشن فعلی',
+                    cancelText: 'انصراف',
+                    showCancel: true,
+                    secondaryConfirmText: 'بستن تمام پوزیشن ها',
+                    showSecondaryConfirm: true,
+                    onConfirm: function() { form.submit(); },
+                    onSecondaryConfirm: function() { document.getElementById('closeAllForm').submit(); }
+                });
+            } else {
+                modernConfirm(
+                    'بستن موقعیت',
+                    'آیا از بستن این موقعیت مطمئن هستید؟',
+                    function() { form.submit(); }
+                );
+            }
         });
     });
 });
