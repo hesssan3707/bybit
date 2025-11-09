@@ -289,7 +289,7 @@ class FuturesController extends Controller
         $validated = $request->validate([
             'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
             'entry1' => 'required|numeric',
-            'entry2' => 'required|numeric',
+            'entry2' => 'nullable|numeric',
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1|max:8',
@@ -297,6 +297,11 @@ class FuturesController extends Controller
             'risk_percentage' => 'required|numeric|min:0.1',
             'cancel_price' => 'nullable|numeric',
         ]);
+
+        // If entry2 is not provided (steps=1 case), set it equal to entry1
+        if (!isset($validated['entry2'])) {
+            $validated['entry2'] = $validated['entry1'];
+        }
 
         try {
             // Get user's active exchange service
@@ -1019,7 +1024,7 @@ class FuturesController extends Controller
             return $carry;
         }, collect())->values();
 
-        // Cumulative percent as running sum of per-trade percents (ordered by closed_at)
+        // Cumulative percent as running compound of per-trade percents (ordered by closed_at)
         $sortedPercents = $sortedTrades->values()->map(function ($trade) use ($initialCapital) {
             $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
                 ? (float)$trade->order->balance_at_creation
@@ -1031,9 +1036,12 @@ class FuturesController extends Controller
             $index = $carry->count();
             $trade = $sortedTrades->values()->get($index);
             $last = $carry->last()['y'] ?? 0;
+            // Convert percentage to multiplier and compound multiplicatively
+            $multiplier = 1 + ($percent / 100.0);
+            $newValue = ($last / 100.0 + 1) * $multiplier - 1; // Convert last to multiplier, multiply, convert back to percent
             $carry->push([
                 'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => $last + $percent,
+                'y' => $newValue * 100.0,
             ]);
             return $carry;
         }, collect())->values();
