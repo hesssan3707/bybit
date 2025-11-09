@@ -122,10 +122,16 @@
     </div>
 
     <form method="GET" action="{{ route('futures.journal') }}" class="filters">
-        <select name="month" class="form-control">
-            <option value="last6months" {{ $month == 'last6months' ? 'selected' : '' }}>6 ماه گذشته</option>
-            @foreach($availableMonths as $m)
-                <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>{{ \Carbon\Carbon::parse($m . '-01')->format('F Y') }}</option>
+        <select name="period_id" class="form-control">
+            @foreach($periods as $p)
+                <option value="{{ $p->id }}" {{ ($selectedPeriod && $selectedPeriod->id === $p->id) ? 'selected' : '' }}>
+                    {{ $p->name }}
+                    —
+                    {{ optional($p->started_at)->format('Y-m-d') }}
+                    تا
+                    {{ $p->ended_at ? $p->ended_at->format('Y-m-d') : 'جاری' }}
+                    {{ $p->is_default ? '(پیش‌فرض)' : '' }}
+                </option>
             @endforeach
         </select>
         <select name="side" class="form-control">
@@ -133,8 +139,44 @@
             <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>معامله های خرید</option>
             <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>معامله های فروش</option>
         </select>
+        <select name="user_exchange_id" class="form-control">
+            <option value="all" {{ $userExchangeId == 'all' ? 'selected' : '' }}>همه صرافی‌ها</option>
+            @foreach($exchangeOptions as $ex)
+                <option value="{{ $ex->id }}" {{ (string)$userExchangeId === (string)$ex->id ? 'selected' : '' }}>
+                    {{ strtoupper($ex->exchange_name) }} — {{ $ex->is_demo_active ? 'دمو' : 'واقعی' }}
+                </option>
+            @endforeach
+        </select>
         <button type="submit" class="btn btn-primary">فیلتر</button>
     </form>
+
+    <div class="glass-card" style="margin-bottom:20px;padding:15px;border-radius:10px;background: rgba(255, 255, 255, 0.05);">
+        <form method="POST" action="{{ route('futures.periods.start') }}" class="d-flex" style="gap:10px;align-items:center;justify-content:center;">
+            @csrf
+            <input type="text" name="name" class="form-control" placeholder="نام دوره (اختیاری)" style="max-width:280px;" />
+            <button type="submit" class="btn btn-success">شروع دوره</button>
+        </form>
+        <div style="margin-top:10px;text-align:center;color:#adb5bd">حداکثر ۵ دوره فعال (به‌جز دوره‌های پیش‌فرض)</div>
+        <div style="margin-top:15px;">
+            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
+                @foreach($periods->where('is_default', false)->where('is_active', true) as $cp)
+                    <div class="glass-card" style="padding:10px 15px;border-radius:8px;background: rgba(255, 255, 255, 0.06);">
+                        <span style="margin-left:10px;">{{ $cp->name }} — {{ optional($cp->started_at)->format('Y-m-d') }} تا {{ $cp->ended_at ? $cp->ended_at->format('Y-m-d') : 'جاری' }}</span>
+                        <form method="POST" action="{{ route('futures.periods.end', ['period' => $cp->id]) }}" style="display:inline;">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-danger">پایان دوره</button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+        @if(session('success'))
+            <div class="alert alert-success" style="margin-top:10px;">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-danger" style="margin-top:10px;">{{ session('error') }}</div>
+        @endif
+    </div>
 
     <div class="stats-grid">
         <!-- Row 1: PNL -->

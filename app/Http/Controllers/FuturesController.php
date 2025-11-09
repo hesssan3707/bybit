@@ -1112,248 +1112,272 @@ class FuturesController extends Controller
     {
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
-        // Base query for synchronized trades
-        $tradesQuery = Trade::forUser($user->id)
-            ->where('synchronized', 1)
-            ->whereNotNull('closed_at');
+        $side = $request->input('side', 'all'); // 'all' | 'buy' | 'sell'
+        $userExchangeId = $request->input('user_exchange_id', 'all');
 
-        if ($currentExchange) {
-            $tradesQuery->accountType($currentExchange->is_demo_active);
+        // Ensure default period exists and pick selected period
+        $service = new \App\Services\JournalPeriodService();
+        $service->ensureDefaultPeriod($user->id, $isDemo);
+
+        $selectedPeriodId = $request->input('period_id');
+        $selectedPeriod = null;
+        if ($selectedPeriodId) {
+            $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->where('id', $selectedPeriodId)
+                ->first();
+        }
+        if (!$selectedPeriod) {
+            $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->default()
+                ->orderBy('started_at', 'desc')
+                ->first();
         }
 
-        // Filtering logic
-        $month = $request->input('month', 'last6months');
-        $side = $request->input('side', 'all');
+        // Load metrics (precomputed for all exchanges, computed on-demand for a specific account)
+        $metrics = [
+            'trade_count' => 0,
+            'total_pnl' => 0.0,
+            'profits_sum' => 0.0,
+            'losses_sum' => 0.0,
+            'biggest_profit' => 0.0,
+            'biggest_loss' => 0.0,
+            'wins' => 0,
+            'losses' => 0,
+            'avg_risk_percent' => 0.0,
+            'avg_rrr' => 0.0,
+            'pnl_per_trade' => [],
+            'per_trade_percent' => [],
+            'cum_pnl' => [],
+            'cum_pnl_percent' => [],
+        ];
 
-        if ($month === 'last6months') {
-            $tradesQuery->where('closed_at', '>=', now()->subMonths(6));
-        } else {
-            // Assumes month is in 'YYYY-MM' format
-            $tradesQuery->whereYear('closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('closed_at', '=', substr($month, 5, 2));
-        }
-
-        if ($side !== 'all') {
-            $tradesQuery->where('side', $side);
-        }
-
-        $trades = $tradesQuery->with('order')->latest('closed_at')->get();
-
-        // Calculate statistics
-        $totalPnl = $trades->sum('pnl');
-        $totalProfits = $trades->where('pnl', '>', 0)->sum('pnl');
-        $totalLosses = $trades->where('pnl', '<', 0)->sum('pnl');
-        $totalTrades = $trades->count();
-        $biggestProfit = $trades->max('pnl') ?? 0;
-        $biggestLoss = $trades->min('pnl') ?? 0;
-
-        $profitableTrades = $trades->where('pnl', '>', 0);
-        $losingTrades = $trades->where('pnl', '<', 0);
-
-        $profitableTradesCount = $profitableTrades->count();
-        $losingTradesCount = $losingTrades->count();
-
-        // Calculate average risk percentage and Risk/Reward Ratio from related orders
-        $totalRiskPercentage = 0;
-        $totalRRR = 0;
-        $riskCalculatedTrades = 0;
-        $rrrCalculatedTrades = 0;
-
-        foreach ($trades as $trade) {
-            if ($trade->order && $trade->order->entry_price > 0) {
-                // Average Risk %
-                $totalRiskPercentage += abs($trade->order->entry_price - $trade->order->sl) / $trade->order->entry_price * 100;
-                $riskCalculatedTrades++;
-
-                // Risk/Reward Ratio
-                $slDistance = abs($trade->order->entry_price - $trade->order->sl);
-                if ($slDistance > 0) {
-                    $tpDistance = abs($trade->order->tp - $trade->order->entry_price);
-                    $totalRRR += $tpDistance / $slDistance;
-                    $rrrCalculatedTrades++;
+        if ($selectedPeriod) {
+            if ($userExchangeId !== 'all') {
+                // Validate ownership and compute metrics for specific account
+                $ue = \App\Models\UserExchange::where('id', $userExchangeId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                if ($ue) {
+                    $metrics = (new \App\Services\JournalPeriodService())->
+                        computeMetricsFor($selectedPeriod, [$ue->id], $side);
+                }
+            } else {
+                // Use precomputed metrics on the period
+                if ($side === 'buy') {
+                    $metrics = $selectedPeriod->metrics_buy ?? $metrics;
+                } elseif ($side === 'sell') {
+                    $metrics = $selectedPeriod->metrics_sell ?? $metrics;
+                } else {
+                    $metrics = $selectedPeriod->metrics_all ?? $metrics;
                 }
             }
         }
-        $averageRisk = $riskCalculatedTrades > 0 ? $totalRiskPercentage / $riskCalculatedTrades : 0;
-        $averageRRR = $rrrCalculatedTrades > 0 ? $totalRRR / $rrrCalculatedTrades : 0;
 
-        // Get the first trade in the period to find the initial capital
-        $firstTrade = $trades->sortBy('closed_at')->first();
-        $initialCapital = $firstTrade && $firstTrade->order ? (float) $firstTrade->order->balance_at_creation : 1000;
+        // Map metrics to view variables
+        $totalPnl = (float)($metrics['total_pnl'] ?? 0.0);
+        $totalProfits = (float)($metrics['profits_sum'] ?? 0.0);
+        $totalLosses = (float)($metrics['losses_sum'] ?? 0.0);
+        $totalTrades = (int)($metrics['trade_count'] ?? 0);
+        $biggestProfit = (float)($metrics['biggest_profit'] ?? 0.0);
+        $biggestLoss = (float)($metrics['biggest_loss'] ?? 0.0);
+        $profitableTradesCount = (int)($metrics['wins'] ?? 0);
+        $losingTradesCount = (int)($metrics['losses'] ?? 0);
+        $averageRisk = (float)($metrics['avg_risk_percent'] ?? 0.0);
+        $averageRRR = (float)($metrics['avg_rrr'] ?? 0.0);
 
-        // Fallback for older trades without balance_at_creation
-        if ($initialCapital == 1000) {
-            try {
-                $exchangeService = $this->getExchangeService();
-                $resolvedCurrent = $this->resolveCapitalUSD($exchangeService);
-                if ($resolvedCurrent > 0) {
-                    $initialCapital = $resolvedCurrent - $totalPnl;
-                }
-            } catch (\Exception $e) {
-                Log::error('Could not resolve initial capital for journal page: ' . $e->getMessage());
+        $pnlChartData = $metrics['pnl_per_trade'] ?? [];
+        $cumulativePnl = $metrics['cum_pnl'] ?? [];
+        $cumulativePnlPercent = $metrics['cum_pnl_percent'] ?? [];
+
+        // Percent aggregates from series
+        $perTradePercent = collect($metrics['per_trade_percent'] ?? []);
+        $pnlPerTrade = collect($metrics['pnl_per_trade'] ?? []);
+        $totalPnlPercent = (float) $perTradePercent->sum('y');
+        $totalProfitPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+            [$pnlItem, $percentItem] = $pair;
+            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
+            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
+            return $carry + ($pnlVal > 0 ? $percentVal : 0);
+        }, 0.0);
+        $totalLossPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+            [$pnlItem, $percentItem] = $pair;
+            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
+            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
+            return $carry + ($pnlVal < 0 ? $percentVal : 0);
+        }, 0.0);
+
+        // Rankings within the selected period window and filters
+        $pnlRank = null;
+        $pnlPercentRank = null;
+        if ($selectedPeriod) {
+            $rankBase = DB::table('trades')
+                ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+                ->where('trades.synchronized', 1)
+                ->whereNotNull('trades.closed_at')
+                ->where('trades.is_demo', $isDemo)
+                ->whereBetween('trades.closed_at', [
+                    $selectedPeriod->started_at,
+                    $selectedPeriod->ended_at ?? now(),
+                ]);
+
+            if ($side !== 'all') {
+                $rankBase->where('trades.side', $side);
             }
+            if ($userExchangeId !== 'all') {
+                $rankBase->where('trades.user_exchange_id', $userExchangeId);
+            }
+
+            $rankings = $rankBase
+                ->select('user_exchanges.user_id', DB::raw('SUM(trades.pnl) as total_pnl'))
+                ->groupBy('user_exchanges.user_id')
+                ->orderBy('total_pnl', 'desc')
+                ->get();
+
+            $pIndex = $rankings->search(fn($r) => $r->user_id == $user->id);
+            $pnlRank = $pIndex !== false ? ($pIndex + 1) : null;
+
+            // Percent ranking
+            $percentQuery = DB::table('trades')
+                ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+                ->join('orders', 'trades.order_id', '=', 'orders.order_id')
+                ->where('trades.synchronized', 1)
+                ->whereNotNull('trades.closed_at')
+                ->where('trades.is_demo', $isDemo)
+                ->whereNotNull('orders.balance_at_creation')
+                ->where('orders.balance_at_creation', '>', 0)
+                ->whereBetween('trades.closed_at', [
+                    $selectedPeriod->started_at,
+                    $selectedPeriod->ended_at ?? now(),
+                ])
+                ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
+
+            if ($side !== 'all') {
+                $percentQuery->where('trades.side', $side);
+            }
+            if ($userExchangeId !== 'all') {
+                $percentQuery->where('trades.user_exchange_id', $userExchangeId);
+            }
+
+            $allTrades = $percentQuery->get();
+            $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
+                $sumPercent = $userTrades->reduce(function ($carry, $t) {
+                    $capital = (float) $t->balance_at_creation;
+                    $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
+                    return $carry + $percent;
+                }, 0.0);
+                $firstTrade = $userTrades->sortBy('closed_at')->first();
+                return [
+                    'user_id' => $firstTrade->user_id,
+                    'pnl_percent' => $sumPercent,
+                ];
+            });
+
+            $percentRankings = $userStats->sortByDesc('pnl_percent')->values();
+            $ppIndex = $percentRankings->search(fn($r) => $r['user_id'] == $user->id);
+            $pnlPercentRank = $ppIndex !== false ? ($ppIndex + 1) : null;
         }
 
-        // Avoid division by zero
-        $initialCapital = $initialCapital > 0 ? $initialCapital : 1;
-
-        // Per-trade percent calculations based on each trade's balance_at_creation
-        $perTradePercents = $trades->map(function ($trade) use ($initialCapital) {
-            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
-                ? (float)$trade->order->balance_at_creation
-                : $initialCapital;
-            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
-        });
-
-        // Aggregate percents
-        $totalPnlPercent = $perTradePercents->sum();
-        $totalProfitPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
-            [$trade, $percent] = $pair;
-            return $carry + ($trade->pnl > 0 ? $percent : 0);
-        }, 0);
-        $totalLossPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
-            [$trade, $percent] = $pair;
-            return $carry + ($trade->pnl < 0 ? $percent : 0);
-        }, 0);
-
-
-        // Prepare data for charts
-        $pnlChartData = $trades->sortBy('closed_at')->map(function ($trade, $index) {
-            return [
-                'x' => 'Trade ' . ($index + 1), // Use trade index as category
-                'y' => (float)$trade->pnl,
-                'date' => $trade->closed_at->format('Y-m-d H:i') // For tooltip
-            ];
-        })->values();
-
-        $sortedTrades = $trades->sortBy('closed_at');
-
-        $cumulativePnl = $sortedTrades->reduce(function ($carry, $trade) {
-            $lastPnl = $carry->last()['y'] ?? 0;
-            $carry->push([
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => $lastPnl + (float)$trade->pnl,
-            ]);
-            return $carry;
-        }, collect())->values();
-
-        // Cumulative percent as running sum of per-trade percents (ordered by closed_at)
-        $sortedPercents = $sortedTrades->values()->map(function ($trade) use ($initialCapital) {
-            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
-                ? (float)$trade->order->balance_at_creation
-                : $initialCapital;
-            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
-        });
-
-        $cumulativePnlPercent = $sortedPercents->reduce(function ($carry, $percent) use ($sortedTrades) {
-            $index = $carry->count();
-            $trade = $sortedTrades->values()->get($index);
-            $last = $carry->last()['y'] ?? 0;
-            $carry->push([
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => $last + $percent,
-            ]);
-            return $carry;
-        }, collect())->values();
-
-
-        // Get available months for the filter dropdown
-        $availableMonths = Trade::forUser($user->id)
-            ->where('synchronized', 1)
-            ->whereNotNull('closed_at')
-            ->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') as month")
-            ->distinct()
-            ->orderBy('month', 'desc')
-            ->pluck('month');
-
-        // User Rankings
-        $isDemo = $currentExchange ? $currentExchange->is_demo_active : 0;
-
-        $baseQuery = DB::table('trades')
-            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
-            ->where('trades.synchronized', 1)
-            ->whereNotNull('trades.closed_at');
-
-        if ($month === 'last6months') {
-            $baseQuery->where('trades.closed_at', '>=', now()->subMonths(6));
-        } else {
-            $baseQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
-        }
-
-        $rankings = $baseQuery
-            ->select('user_exchanges.user_id', DB::raw('SUM(trades.pnl) as total_pnl'))
-            ->groupBy('user_exchanges.user_id')
-            ->orderBy('total_pnl', 'desc')
+        // Build selectors: periods and exchanges
+        $periods = \App\Models\UserPeriod::forUser($user->id)
+            ->accountType($isDemo)
+            ->orderByDesc('is_default')
+            ->orderBy('started_at', 'desc')
             ->get();
 
-        $pnlRank = $rankings->search(fn($r) => $r->user_id == $user->id);
-        $pnlRank = $pnlRank !== false ? $pnlRank + 1 : null;
+        $exchanges = \App\Models\UserExchange::where('user_id', $user->id)->get();
 
-        // PNL Percentage Ranking
-        $allTradesQuery = DB::table('trades')
-            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
-            ->join('orders', 'trades.order_id', '=', 'orders.order_id')
-            ->where('trades.synchronized', 1)
-            ->whereNotNull('trades.closed_at')
-            ->whereNotNull('orders.balance_at_creation')
-            ->where('orders.balance_at_creation', '>', 0)
-            ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
+        return view('futures.journal', [
+            'side' => $side,
+            'selectedPeriod' => $selectedPeriod,
+            'periods' => $periods,
+            'exchangeOptions' => $exchanges,
+            'userExchangeId' => $userExchangeId,
+            'totalPnl' => $totalPnl,
+            'totalProfits' => $totalProfits,
+            'totalLosses' => $totalLosses,
+            'totalTrades' => $totalTrades,
+            'biggestProfit' => $biggestProfit,
+            'biggestLoss' => $biggestLoss,
+            'averageRisk' => $averageRisk,
+            'averageRRR' => $averageRRR,
+            'profitableTradesCount' => $profitableTradesCount,
+            'losingTradesCount' => $losingTradesCount,
+            'pnlChartData' => $pnlChartData,
+            'cumulativePnl' => $cumulativePnl,
+            'totalPnlPercent' => $totalPnlPercent,
+            'totalProfitPercent' => $totalProfitPercent,
+            'totalLossPercent' => $totalLossPercent,
+            'pnlRank' => $pnlRank,
+            'pnlPercentRank' => $pnlPercentRank,
+            'cumulativePnlPercent' => $cumulativePnlPercent,
+        ]);
+    }
 
-        if ($month === 'last6months') {
-            $allTradesQuery->where('trades.closed_at', '>=', now()->subMonths(6));
-        } else {
-            $allTradesQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+    /**
+     * Start a new custom period (non-default). Limit 5 active per user per account type.
+     */
+    public function startPeriod(Request $request)
+    {
+        $user = auth()->user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+
+        // Enforce limit of 5 active non-default periods
+        $activeCount = \App\Models\UserPeriod::forUser($user->id)
+            ->accountType($isDemo)
+            ->where('is_default', false)
+            ->where('is_active', true)
+            ->count();
+
+        if ($activeCount >= 5) {
+            return back()->with('error', 'حداکثر ۵ دوره فعال مجاز است. ابتدا یکی را پایان دهید.');
         }
 
-        $allTrades = $allTradesQuery->get();
+        $name = trim((string) $request->input('name', 'دوره جدید'));
+        if ($name === '') { $name = 'دوره جدید'; }
 
-        $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
-            // Sum per-trade percents for user
-            $sumPercent = $userTrades->reduce(function ($carry, $t) {
-                $capital = (float) $t->balance_at_creation;
-                $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
-                return $carry + $percent;
-            }, 0.0);
+        $period = new \App\Models\UserPeriod([
+            'user_id' => $user->id,
+            'is_demo' => $isDemo,
+            'name' => mb_substr($name, 0, 64),
+            'started_at' => now(),
+            'ended_at' => null,
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $period->save();
 
-            $firstTrade = $userTrades->sortBy('closed_at')->first();
-            return [
-                'user_id' => $firstTrade->user_id,
-                'pnl_percent' => $sumPercent,
-            ];
-        });
+        // Compute initial metrics (will update as trades close)
+        (new \App\Services\JournalPeriodService())->updatePeriodMetrics($period);
 
-        $percentRankings = $userStats->sortByDesc('pnl_percent')->values();
-        $pnlPercentRank = $percentRankings->search(fn($r) => $r['user_id'] == $user->id);
-        $pnlPercentRank = $pnlPercentRank !== false ? $pnlPercentRank + 1 : null;
+        return back()->with('success', 'دوره جدید شروع شد.');
+    }
 
+    /**
+     * End a custom period. Default periods cannot be ended manually.
+     */
+    public function endPeriod(\App\Models\UserPeriod $period)
+    {
+        $user = auth()->user();
 
-        return view('futures.journal', compact(
-            'trades',
-            'totalPnl',
-            'totalProfits',
-            'totalLosses',
-            'totalTrades',
-            'biggestProfit',
-            'biggestLoss',
-            'averageRisk',
-            'averageRRR',
-            'profitableTradesCount',
-            'losingTradesCount',
-            'pnlChartData',
-            'cumulativePnl',
-            'availableMonths',
-            'month',
-            'side',
-            'totalPnlPercent',
-            'totalProfitPercent',
-            'totalLossPercent',
-            'pnlRank',
-            'pnlPercentRank',
-            'cumulativePnlPercent'
-        ));
+        if ($period->user_id !== $user->id) {
+            abort(403);
+        }
+        if ($period->is_default) {
+            return back()->with('error', 'پایان دوره پیش‌فرض مجاز نیست.');
+        }
+
+        $period->ended_at = now();
+        $period->is_active = false;
+        $period->save();
+
+        (new \App\Services\JournalPeriodService())->updatePeriodMetrics($period);
+
+        return back()->with('success', 'دوره با موفقیت پایان یافت.');
     }
     /**
      * Add hedge mode parameters to order based on exchange
