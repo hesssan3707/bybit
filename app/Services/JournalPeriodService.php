@@ -42,10 +42,18 @@ class JournalPeriodService
                 return null;
             }
 
+            // Ensure default name uniqueness across all periods of this account type
+            $baseName = '۱ ساله';
+            $existingCount = UserPeriod::forUser($userId)
+                ->accountType($isDemo)
+                ->where('name', 'like', $baseName . '%')
+                ->count();
+            $uniqueName = $existingCount > 0 ? ($baseName . ' (' . ($existingCount + 1) . ')') : $baseName;
+
             $period = new UserPeriod([
                 'user_id' => $userId,
                 'is_demo' => $isDemo,
-                'name' => '۱ ساله',
+                'name' => $uniqueName,
                 'started_at' => $firstClosedTrade->closed_at,
                 'ended_at' => $firstClosedTrade->closed_at->copy()->addYear(),
                 'is_default' => true,
@@ -63,10 +71,19 @@ class JournalPeriodService
             $existingActiveDefault->save();
 
             $start = $existingActiveDefault->ended_at->copy();
+
+            // Ensure default name uniqueness when auto-starting new default
+            $baseName = '۱ ساله';
+            $existingCount = UserPeriod::forUser($userId)
+                ->accountType($isDemo)
+                ->where('name', 'like', $baseName . '%')
+                ->count();
+            $uniqueName = $existingCount > 0 ? ($baseName . ' (' . ($existingCount + 1) . ')') : $baseName;
+
             $period = new UserPeriod([
                 'user_id' => $userId,
                 'is_demo' => $isDemo,
-                'name' => '۱ ساله',
+                'name' => $uniqueName,
                 'started_at' => $start,
                 'ended_at' => $start->copy()->addYear(),
                 'is_default' => true,

@@ -1112,6 +1112,7 @@ class FuturesController extends Controller
     {
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        // Use current exchange account type (demo/real)
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         $side = $request->input('side', 'all'); // 'all' | 'buy' | 'sell'
@@ -1130,11 +1131,19 @@ class FuturesController extends Controller
                 ->first();
         }
         if (!$selectedPeriod) {
+            // Prefer the most recently started active period; fallback to latest default
             $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
                 ->accountType($isDemo)
-                ->default()
+                ->where('is_active', true)
                 ->orderBy('started_at', 'desc')
                 ->first();
+            if (!$selectedPeriod) {
+                $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                    ->accountType($isDemo)
+                    ->default()
+                    ->orderBy('started_at', 'desc')
+                    ->first();
+            }
         }
 
         // Load metrics (precomputed for all exchanges, computed on-demand for a specific account)
@@ -1161,7 +1170,7 @@ class FuturesController extends Controller
                 $ue = \App\Models\UserExchange::where('id', $userExchangeId)
                     ->where('user_id', $user->id)
                     ->first();
-                if ($ue) {
+                if ($ue && ((bool)$ue->is_demo_active === $isDemo)) {
                     $metrics = (new \App\Services\JournalPeriodService())->
                         computeMetricsFor($selectedPeriod, [$ue->id], $side);
                 }
@@ -1225,7 +1234,7 @@ class FuturesController extends Controller
                 ]);
 
             if ($side !== 'all') {
-                $rankBase->where('trades.side', $side);
+                $rankBase->whereIn('trades.side', [$side, ucfirst($side)]);
             }
             if ($userExchangeId !== 'all') {
                 $rankBase->where('trades.user_exchange_id', $userExchangeId);
@@ -1256,7 +1265,7 @@ class FuturesController extends Controller
                 ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
 
             if ($side !== 'all') {
-                $percentQuery->where('trades.side', $side);
+                $percentQuery->whereIn('trades.side', [$side, ucfirst($side)]);
             }
             if ($userExchangeId !== 'all') {
                 $percentQuery->where('trades.user_exchange_id', $userExchangeId);
@@ -1282,13 +1291,28 @@ class FuturesController extends Controller
         }
 
         // Build selectors: periods and exchanges
+        // Cleanup: remove ended periods with no records (trade_count = 0)
+        try {
+            \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->where('is_active', false)
+                ->whereNotNull('ended_at')
+                ->get()
+                ->each(function ($p) {
+                    $tc = (int)($p->metrics_all['trade_count'] ?? 0);
+                    if ($tc === 0) { $p->delete(); }
+                });
+        } catch (\Throwable $e) {}
+
         $periods = \App\Models\UserPeriod::forUser($user->id)
             ->accountType($isDemo)
             ->orderByDesc('is_default')
             ->orderBy('started_at', 'desc')
             ->get();
 
-        $exchanges = \App\Models\UserExchange::where('user_id', $user->id)->get();
+        $exchanges = \App\Models\UserExchange::where('user_id', $user->id)
+            ->where('is_demo_active', $isDemo)
+            ->get();
 
         return view('futures.journal', [
             'side' => $side,
@@ -1337,8 +1361,21 @@ class FuturesController extends Controller
             return back()->with('error', 'حداکثر ۵ دوره فعال مجاز است. ابتدا یکی را پایان دهید.');
         }
 
-        $name = trim((string) $request->input('name', 'دوره جدید'));
-        if ($name === '') { $name = 'دوره جدید'; }
+        // Backend validation: enforce non-empty, trimmed period name
+        $nameRaw = $request->input('name', '');
+        $name = trim((string) $nameRaw);
+        if ($name === '') {
+            return back()->with('error', 'نام دوره نمی‌تواند خالی باشد.');
+        }
+
+        // Prevent duplicate names across all periods of this account type (active + ended, default included)
+        $duplicate = \App\Models\UserPeriod::forUser($user->id)
+            ->accountType($isDemo)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->exists();
+        if ($duplicate) {
+            return back()->with('error', 'نام دوره تکراری است. لطفاً نام دیگری انتخاب کنید.');
+        }
 
         $period = new \App\Models\UserPeriod([
             'user_id' => $user->id,
@@ -1376,6 +1413,13 @@ class FuturesController extends Controller
         $period->save();
 
         (new \App\Services\JournalPeriodService())->updatePeriodMetrics($period);
+
+        // If no records in this period, remove from DB level
+        $tc = (int)($period->metrics_all['trade_count'] ?? 0);
+        if ($tc === 0) {
+            $period->delete();
+            return back()->with('success', 'دوره با موفقیت پایان یافت و به دلیل نبود رکورد حذف شد.');
+        }
 
         return back()->with('success', 'دوره با موفقیت پایان یافت.');
     }
