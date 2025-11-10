@@ -345,24 +345,27 @@ class DemoFuturesLifecycleManager extends Command
                         $userId = $userExchange->user_id;
                         $isDemo = true;
 
-                        // Heuristic: external manual close detected if exit far from both TP and SL (>0.2%)
+                        // Heuristic: exchange force close detected if exit far from both TP and SL (>0.2%)
                         $order = $trade->order;
                         if ($order && $trade->avg_exit_price) {
                             $exit = (float)$trade->avg_exit_price;
                             $tpDelta = isset($order->tp) ? abs(((float)$order->tp - $exit) / $exit) : null;
                             $slDelta = isset($order->sl) ? abs(((float)$order->sl - $exit) / $exit) : null;
-                            if ($tpDelta !== null && $slDelta !== null && $tpDelta > 0.002 && $slDelta > 0.002) {
-                                $existsOpenManual = \App\Models\UserBan::active()
+                            if ($trade->closed_at !== null
+                                && ((int)($trade->closed_by_user ?? 0) !== 1)
+                                && $tpDelta !== null && $slDelta !== null
+                                && $tpDelta > 0.002 && $slDelta > 0.002) {
+                                $existsExchangeForceClose = \App\Models\UserBan::active()
                                     ->forUser($userId)
                                     ->accountType($isDemo)
-                                    ->where('ban_type', 'open_ban_exchange_manual_close_3d')
+                                    ->where('ban_type', 'exchange_force_close')
                                     ->exists();
-                                if (!$existsOpenManual) {
+                                if (!$existsExchangeForceClose) {
                                     \App\Models\UserBan::create([
                                         'user_id' => $userId,
                                         'is_demo' => $isDemo,
                                         'trade_id' => $trade->id,
-                                        'ban_type' => 'open_ban_exchange_manual_close_3d',
+                                        'ban_type' => 'exchange_force_close',
                                         'starts_at' => now(),
                                         'ends_at' => now()->addDays(3),
                                     ]);
@@ -863,20 +866,27 @@ class DemoFuturesLifecycleManager extends Command
                         $userId = $userExchange->user_id;
                         $isDemo = (bool)$trade->is_demo;
 
-                        // Heuristic: manual close detected if exit far from both TP and SL (>0.2%)
+                        // Heuristic: exchange force close detected if exit far from both TP and SL (>0.2%)
                         $order = $trade->order;
                         if ($order && $trade->avg_exit_price) {
                             $exit = (float)$trade->avg_exit_price;
                             $tpDelta = isset($order->tp) ? abs(((float)$order->tp - $exit) / $exit) : null;
                             $slDelta = isset($order->sl) ? abs(((float)$order->sl - $exit) / $exit) : null;
-                            if ($tpDelta !== null && $slDelta !== null && $tpDelta > 0.002 && $slDelta > 0.002) {
-                                $existsManual = UserBan::where('trade_id', $trade->id)->where('ban_type', 'manual_close')->exists();
-                                if (!$existsManual && ($trade->closed_at !== null)) {
+                            if ($trade->closed_at !== null
+                                && ((int)($trade->closed_by_user ?? 0) !== 1)
+                                && $tpDelta !== null && $slDelta !== null
+                                && $tpDelta > 0.002 && $slDelta > 0.002) {
+                                $existsExchangeForceClose = UserBan::active()
+                                    ->forUser($userId)
+                                    ->accountType($isDemo)
+                                    ->where('ban_type', 'exchange_force_close')
+                                    ->exists();
+                                if (!$existsExchangeForceClose) {
                                     UserBan::create([
                                         'user_id' => $userId,
                                         'is_demo' => $isDemo,
                                         'trade_id' => $trade->id,
-                                        'ban_type' => 'manual_close',
+                                        'ban_type' => 'exchange_force_close',
                                         'starts_at' => now(),
                                         'ends_at' => now()->addDays(3),
                                     ]);

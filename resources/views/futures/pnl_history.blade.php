@@ -309,14 +309,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('.close-position-form');
     const openCount = {{ count($openTrades) }};
     const manualCloseBanActive = {{ $manualCloseBanActive ? 'true' : 'false' }};
-    const manualCloseBanEndsAt = @json(optional($manualCloseBanEndsAt)->format('Y-m-d H:i'));
+    const strictModeActive = {{ $strictModeActive ? 'true' : 'false' }};
+    const manualCloseBanRemainingFa = @json($manualCloseBanRemainingFa);
     forms.forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            if (manualCloseBanActive) {
+            if (strictModeActive && manualCloseBanActive) {
+                const msg = manualCloseBanRemainingFa
+                    ? ('شما مجاز به بستن دستی موقعیت نیستید. لطفاً ' + manualCloseBanRemainingFa + ' صبر کنید.')
+                    : 'شما مجاز به بستن دستی موقعیت نیستید.';
                 showAlertModal({
                     title: 'خطا',
-                    message: 'شما مجاز به بستن دستی موقعیت نیستید تا تاریخ ' + manualCloseBanEndsAt,
+                    message: msg,
                     type: 'error',
                     confirmText: 'متوجه شدم',
                     showCancel: false

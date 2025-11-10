@@ -230,7 +230,7 @@ class FuturesController extends Controller
                 $activeBan = UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'open_ban_exchange_manual_close_3d'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
@@ -274,13 +274,14 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'open_ban_exchange_manual_close_3d'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
-                    $remaining = $activeBan->ends_at->diffForHumans(null, true);
+                    $remainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $remainingFa = $this->formatFaDuration($remainingSeconds);
                     return back()
-                        ->withErrors(['msg' => 'ثبت سفارش جدید موقتاً محدود شده است. لطفاً ' . $remaining . ' صبر کنید.'])
+                        ->withErrors(['msg' => 'ثبت سفارش جدید موقتاً محدود شده است. لطفاً ' . $remainingFa . ' صبر کنید.'])
                         ->withInput();
                 }
             }
@@ -606,8 +607,10 @@ class FuturesController extends Controller
                 ->orderByDesc('ends_at')
                 ->first();
             if ($activeBan) {
+                $remainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                $remainingFa = $this->formatFaDuration($remainingSeconds);
                 return redirect()->route('futures.pnl_history')
-                    ->withErrors(['msg' => 'شما مجاز به بستن دستی موقعیت نیستید تا تاریخ ' . $activeBan->ends_at->format('Y-m-d H:i') . '']);
+                    ->withErrors(['msg' => 'شما مجاز به بستن دستی موقعیت نیستید. لطفاً ' . $remainingFa . ' صبر کنید.']);
             }
         } catch (\Throwable $e) {}
 
@@ -1080,6 +1083,7 @@ class FuturesController extends Controller
         $strictModeActive = (bool)($user->future_strict_mode ?? false);
         $manualCloseBanActive = false;
         $manualCloseBanEndsAt = null;
+        $manualCloseBanRemainingFa = null;
         if ($currentExchange) {
             try {
                 $activeBan = UserBan::where('user_id', $user->id)
@@ -1091,6 +1095,8 @@ class FuturesController extends Controller
                 if ($activeBan) {
                     $manualCloseBanActive = true;
                     $manualCloseBanEndsAt = $activeBan->ends_at;
+                    $secs = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $manualCloseBanRemainingFa = $this->formatFaDuration($secs);
                 }
             } catch (\Throwable $e) {}
         }
@@ -1102,6 +1108,7 @@ class FuturesController extends Controller
             'strictModeActive' => $strictModeActive,
             'manualCloseBanActive' => $manualCloseBanActive,
             'manualCloseBanEndsAt' => $manualCloseBanEndsAt,
+            'manualCloseBanRemainingFa' => $manualCloseBanRemainingFa,
         ]);
     }
 
@@ -1373,5 +1380,22 @@ class FuturesController extends Controller
                 $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
                 break;
         }
+    }
+
+    /**
+     * Format a duration in seconds into Persian words: X روز و Y ساعت و Z دقیقه
+     */
+    private function formatFaDuration(int $seconds): string
+    {
+        $days = intdiv($seconds, 86400);
+        $hours = intdiv($seconds % 86400, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+
+        $parts = [];
+        if ($days > 0) { $parts[] = $days . ' روز'; }
+        if ($hours > 0 || $days > 0) { $parts[] = $hours . ' ساعت'; }
+        $parts[] = $minutes . ' دقیقه';
+
+        return implode(' و ', $parts);
     }
 }
