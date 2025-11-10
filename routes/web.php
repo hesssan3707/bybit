@@ -60,6 +60,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
+        Route::get('/orders/{order}/edit', [FuturesController::class, 'edit'])->name('order.edit');
         Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
         Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');

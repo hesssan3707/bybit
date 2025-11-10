@@ -257,6 +257,86 @@ class FuturesController extends Controller
         ]);
     }
 
+    public function edit(\App\Models\Order $order)
+    {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'شما مجاز به ویرایش این سفارش نیستید.']);
+        }
+
+        // Only allow editing of pending orders
+        if ($order->status !== 'pending') {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'تنها سفارش‌های در انتظار قابل ویرایش هستند.']);
+        }
+
+        $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
+        $selectedMarket = null;
+        $symbol = $order->symbol;
+
+        if ($user->future_strict_mode && $user->selected_market) {
+            // Strict mode: enforce selected market
+            $selectedMarket = $user->selected_market;
+            $symbol = $selectedMarket;
+        }
+
+        // Prefill values from order
+        $entry1 = (float)($order->entry_low ?? $order->entry_price);
+        $entry2 = (float)($order->entry_high ?? $order->entry_price);
+        $sl = (float)$order->sl;
+        $tp = (float)$order->tp;
+        $steps = (int)($order->steps ?? 1);
+        $expireMinutes = $order->expire_minutes;
+        $cancelPrice = $order->cancel_price;
+
+        // Compute a reasonable default risk percentage using saved balance
+        $avgEntry = ($entry1 + $entry2) / 2.0;
+        $slDistance = abs($avgEntry - $sl);
+        $capitalUSD = (float)($order->balance_at_creation ?? 0);
+        $defaultRisk = null;
+        if ($capitalUSD > 0 && $slDistance > 0) {
+            $defaultRisk = round(($order->amount * $slDistance / $capitalUSD) * 100, 2);
+        } else {
+            $defaultRisk = \App\Models\UserAccountSetting::getDefaultRisk($user->id) ?? 10;
+        }
+
+        // Apply strict mode cap
+        if ($user->future_strict_mode) {
+            $defaultRisk = min($defaultRisk, 10);
+        }
+
+        return view('futures.edit_order', [
+            'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
+            'exchangeMessage' => $exchangeStatus['message'],
+            'user' => $user,
+            'availableMarkets' => $availableMarkets,
+            'selectedMarket' => $selectedMarket,
+            'prefill' => [
+                'symbol' => $order->symbol,
+                'entry1' => $entry1,
+                'entry2' => $entry2,
+                'sl' => $sl,
+                'tp' => $tp,
+                'steps' => $steps,
+                'expire' => $expireMinutes,
+                'risk_percentage' => $defaultRisk,
+                'cancel_price' => $cancelPrice,
+            ],
+            'order' => $order,
+            'currentSymbol' => $symbol,
+        ]);
+    }
+
     public function store(Request $request)
     {
         // Check if user has active exchange

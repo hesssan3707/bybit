@@ -213,6 +213,7 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
+                                <a href="{{ route('futures.order.edit', $order) }}" class="close-btn" style="margin-left:8px">ویرایش</a>
                                 <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')
