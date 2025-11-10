@@ -127,6 +127,16 @@
         font-size: 22px;
         margin-bottom: 2px;
     }
+    .mobile-footer-nav .icon svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
 
     .dropup-menu {
         position: fixed;
@@ -236,23 +246,50 @@
 </div>
 <nav class="mobile-footer-nav">
     <a href="{{ route('futures.order.create') }}">
-        <span class="icon">➕</span>
+        <span class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 8v8M8 12h8"></path>
+            </svg>
+        </span>
         <span>جدید</span>
     </a>
     <a href="{{ route('spot.orders.view') }}">
-        <span class="icon">💰</span>
+        <span class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10" cy="12" r="5"></circle>
+                <circle cx="15" cy="10" r="5"></circle>
+            </svg>
+        </span>
         <span>اسپات</span>
     </a>
     <a href="{{ route('balance') }}">
-        <span class="icon">💳</span>
+        <span class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="6" width="18" height="12" rx="3"></rect>
+                <path d="M3 10h18"></path>
+                <path d="M7 14h5"></path>
+            </svg>
+        </span>
         <span>موجودی</span>
     </a>
     <a href="{{ route('profile.index') }}">
-        <span class="icon">👤</span>
+        <span class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8" r="4"></circle>
+                <path d="M6 20c0-3 3-5 6-5s6 2 6 5"></path>
+            </svg>
+        </span>
         <span>پروفایل</span>
     </a>
     <button class="dropup-toggle" onclick="toggleDropUpMenu()">
-        <span class="icon">☰</span>
+        <span class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16"></path>
+                <path d="M4 12h16"></path>
+                <path d="M4 17h16"></path>
+            </svg>
+        </span>
         <span>بیشتر</span>
     </button>
 </nav>
