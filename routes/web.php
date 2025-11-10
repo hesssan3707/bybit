@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FuturesController;
+use App\Http\Controllers\PeriodController;
 use App\Http\Controllers\MACDStrategyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -66,9 +67,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
         Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('pnl_history');
         Route::get('/journal', [FuturesController::class, 'journal'])->name('journal');
-        // Period management
-        Route::post('/periods/start', [FuturesController::class, 'startPeriod'])->name('periods.start');
-        Route::post('/periods/{period}/end', [FuturesController::class, 'endPeriod'])->name('periods.end');
+        // Period management (moved to dedicated controller)
+        Route::post('/periods/start', [PeriodController::class, 'start'])->name('periods.start');
+        Route::post('/periods/{period}/end', [PeriodController::class, 'end'])->name('periods.end');
     });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
