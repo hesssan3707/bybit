@@ -98,6 +98,22 @@
     .close-btn:hover {
         background-color: var(--primary-hover);
     }
+    .edit-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .edit-btn:hover {
+        background-color: var(--primary-hover);
+        color: white;
+        text-decoration: none;
+    }
     .pagination {
         margin-top: 20px;
         display: flex;
@@ -213,7 +229,7 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
-                                <a href="{{ route('futures.order.edit', $order) }}" class="close-btn" style="margin-left:8px">ویرایش</a>
+                                <a href="{{ route('futures.order.edit', $order) }}" class="edit-btn" style="margin-left:8px">ویرایش</a>
                                 <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')

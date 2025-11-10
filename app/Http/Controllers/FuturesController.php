@@ -290,6 +290,26 @@ class FuturesController extends Controller
             $symbol = $selectedMarket;
         }
 
+        // Fetch market price for TradingView initialization (match create())
+        $marketPrice = '0';
+        if ($exchangeStatus['hasActiveExchange']) {
+            try {
+                $exchangeService = $this->getExchangeService();
+                $tickerInfo = $exchangeService->getTickerInfo($symbol);
+                $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+                $marketPrice = (string)$price;
+            } catch (\Exception $e) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if ($currentExchange) {
+                    try {
+                        $this->handleApiException($e, $currentExchange, 'futures');
+                    } catch (\Exception $handledException) {
+                        \Illuminate\Support\Facades\Log::error("Could not fetch market price (edit): " . $e->getMessage());
+                    }
+                }
+            }
+        }
+
         // Prefill values from order
         $entry1 = (float)($order->entry_low ?? $order->entry_price);
         $entry2 = (float)($order->entry_high ?? $order->entry_price);
@@ -314,8 +334,34 @@ class FuturesController extends Controller
         if ($user->future_strict_mode) {
             $defaultRisk = min($defaultRisk, 10);
         }
+        
+        // Get user defaults (to mirror create page behavior in UI)
+        $defaultFutureOrderSteps = \App\Models\UserAccountSetting::getDefaultFutureOrderSteps($user->id);
+        $defaultExpirationMinutes = \App\Models\UserAccountSetting::getDefaultExpirationTime($user->id);
+
+        // Compute active opening-ban for UI when strict mode is active
+        $activeBan = null;
+        $banRemainingSeconds = null;
+        try {
+            if ($user && ($user->future_strict_mode ?? false)) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                $activeBan = \App\Models\UserBan::active()
+                    ->forUser($user->id)
+                    ->accountType($isDemo)
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                    ->orderBy('ends_at', 'desc')
+                    ->first();
+                if ($activeBan) {
+                    $banRemainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                }
+            }
+        } catch (\Throwable $e) {
+            // silent failure for UI rendering
+        }
 
         return view('futures.edit_order', [
+            'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message'],
             'user' => $user,
@@ -334,6 +380,11 @@ class FuturesController extends Controller
             ],
             'order' => $order,
             'currentSymbol' => $symbol,
+            'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
+            'defaultExpiration' => $defaultExpirationMinutes,
+            'defaultRisk' => $defaultRisk,
+            'activeBan' => $activeBan,
+            'banRemainingSeconds' => $banRemainingSeconds,
         ]);
     }
 
@@ -442,12 +493,16 @@ class FuturesController extends Controller
             // an existing pending order or an open trade on the same side (for current exchange & symbol)
             $currentExchange = $user->currentExchange ?? $user->defaultExchange;
             if ($currentExchange) {
-                $hasPendingSameSide = Order::where('user_exchange_id', $currentExchange->id)
+                $pendingQuery = Order::where('user_exchange_id', $currentExchange->id)
                     ->where('is_demo', $currentExchange->is_demo_active)
                     ->where('status', 'pending')
                     ->where('symbol', $symbol)
-                    ->where('side', $sideLower)
-                    ->exists();
+                    ->where('side', $sideLower);
+                // Exclude the order being edited if provided
+                if ($request->filled('order_id')) {
+                    $pendingQuery->where('id', '!=', (int)$request->input('order_id'));
+                }
+                $hasPendingSameSide = $pendingQuery->exists();
 
                 $hasOpenSameSideTrade = Trade::where('user_exchange_id', $currentExchange->id)
                     ->where('is_demo', $currentExchange->is_demo_active)
@@ -607,6 +662,93 @@ class FuturesController extends Controller
         }
 
         return back()->with('success', "سفارش شما با موفقیت ثبت شد.");
+    }
+
+    public function update(Request $request, Order $order)
+    {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return back()->withErrors(['msg' => 'شما مجاز به ویرایش این سفارش نیستید.'])->withInput();
+        }
+
+        // Only allow editing of pending orders
+        if ($order->status !== 'pending') {
+            return back()->withErrors(['msg' => 'تنها سفارش‌های در انتظار قابل ویرایش هستند.'])->withInput();
+        }
+
+        $validated = $request->validate([
+            'entry1' => 'required|numeric',
+            'entry2' => 'nullable|numeric',
+            'tp'     => 'required|numeric',
+            'sl'     => 'required|numeric',
+            'steps'  => 'nullable|integer|min:1|max:8',
+            'expire' => 'nullable|integer|min:1|max:999',
+            'risk_percentage' => 'nullable|numeric|min:0.1',
+            'cancel_price' => 'nullable|numeric',
+        ]);
+
+        if (!isset($validated['entry2'])) {
+            $validated['entry2'] = $validated['entry1'];
+        }
+
+        // Strict mode: keep symbol unchanged; only validate if user's selected market conflicts
+        if ($user->future_strict_mode && $user->selected_market) {
+            // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
+        }
+
+        // Validate entry price against market price when not in local environment
+        $pricePrec = 2;
+        $avgEntry = ((float)$validated['entry1'] + (float)$validated['entry2']) / 2.0;
+        if (!app()->environment('local')) {
+            try {
+                $exchangeService = $this->getExchangeService();
+                $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
+
+                $instrumentData = null;
+                if (!empty($instrumentInfo['list'])) {
+                    foreach ($instrumentInfo['list'] as $instrument) {
+                        if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
+                    }
+                }
+                if ($instrumentData && isset($instrumentData['priceScale'])) {
+                    $pricePrec = (int)$instrumentData['priceScale'];
+                }
+
+                $tickerInfo = $exchangeService->getTickerInfo($order->symbol);
+                $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+                if ($marketPrice > 0) {
+                    $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
+                    if ($side === 'Buy' && $avgEntry > $marketPrice) {
+                        return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    }
+                    if ($side === 'Sell' && $avgEntry < $marketPrice) {
+                        return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    }
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Update validation skipped due to market fetch error: ' . $e->getMessage());
+            }
+        }
+
+        // Apply DB-only update of order fields
+        $order->entry_price = round((float)$validated['entry1'], $pricePrec);
+        $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
+        $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
+        $order->sl          = round((float)$validated['sl'], $pricePrec);
+        $order->tp          = round((float)$validated['tp'], $pricePrec);
+        $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
+        $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
+        $order->save();
+
+        return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
     }
 
     public function destroy(Order $order)
