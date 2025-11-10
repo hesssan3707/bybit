@@ -302,7 +302,7 @@
                     @csrf
                     <div class="alert-modal-body">
                         <div style="display:flex; flex-direction:column; gap:10px; text-align:start;">
-                            <label for="periodName" style="font-weight:600; color:#333;">نام دوره (اختیاری)</label>
+                            <label for="periodName" style="font-weight:600; color:#333;">نام دوره </label>
                             <input id="periodName" type="text" name="name" class="form-control modern-input" placeholder="مثلاً: فصل پاییز یا کمپین Q3" required />
                         </div>
                     </div>
