@@ -14,8 +14,8 @@ class TicketController extends Controller
             return response()->json(['success' => false, 'message' => 'لطفاً ابتدا وارد شوید.'], 401);
         }
 
-        $title = 'My journal is not updating';
-        $description = 'My journal is not updating';
+        $title = 'مشکل ژورنال';
+        $description = 'ژورنال من کار نمی کند';
 
         $exists = Ticket::where('user_id', $user->id)
             ->where('title', $title)

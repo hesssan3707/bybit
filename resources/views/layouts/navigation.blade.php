@@ -224,6 +224,7 @@
                 <a href="{{ route('admin.all-users') }}">همه کاربران</a>
                 <a href="{{ route('admin.pending-exchanges') }}">درخواست‌های صرافی</a>
                 <a href="{{ route('admin.all-exchanges') }}">همه صرافی‌ها</a>
+                <a href="{{ route('admin.tickets') }}">تیکت‌ها</a>
             </div>
         </div>
         @endif
