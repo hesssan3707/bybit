@@ -16,6 +16,7 @@ use App\Http\Controllers\ExchangeController;
 use App\Http\Controllers\WalletBalanceController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\Admin\TicketController as AdminTicketController;
+use App\Http\Controllers\CompanyExchangeRequestController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -109,6 +110,9 @@ Route::prefix('exchanges')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
         Route::get('/create', [ExchangeController::class, 'create'])->name('exchanges.create');
         Route::post('/', [ExchangeController::class, 'store'])->name('exchanges.store');
+        // Company-provided exchange request (no user API keys)
+        Route::post('/company-request', [CompanyExchangeRequestController::class, 'store'])
+            ->name('exchanges.company-request.store');
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
@@ -143,6 +147,16 @@ Route::prefix('exchanges')->group(function () {
         Route::post('/exchanges/{exchange}/reject', [UserManagementController::class, 'rejectExchange'])->name('admin.reject-exchange');
         Route::post('/exchanges/{exchange}/deactivate', [UserManagementController::class, 'deactivateExchange'])->name('admin.deactivate-exchange');
         Route::post('/exchanges/{exchange}/test', [UserManagementController::class, 'testExchangeConnection'])->name('admin.test-exchange');
+
+        // Company-provided Exchange Requests Management
+        Route::get('/company-exchange-requests/pending', [\App\Http\Controllers\Admin\CompanyExchangeAdminController::class, 'pending'])
+            ->name('admin.company-requests.pending');
+        Route::get('/company-exchange-requests', [\App\Http\Controllers\Admin\CompanyExchangeAdminController::class, 'all'])
+            ->name('admin.company-requests.all');
+        Route::post('/company-exchange-requests/{requestItem}/approve', [\App\Http\Controllers\Admin\CompanyExchangeAdminController::class, 'approve'])
+            ->name('admin.company-requests.approve');
+        Route::post('/company-exchange-requests/{requestItem}/reject', [\App\Http\Controllers\Admin\CompanyExchangeAdminController::class, 'reject'])
+            ->name('admin.company-requests.reject');
     });
 
     // Spot Trading Routes - All require authentication

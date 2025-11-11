@@ -159,6 +159,24 @@
     .password-toggle:hover {
         color: var(--primary-color);
     }
+    /* Tabs */
+    .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .tab {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 50px;
+        cursor: pointer;
+    }
+    .tab.active {
+        background: linear-gradient(135deg, #764ba2, #667eea);
+    }
 </style>
 @endpush
 
@@ -167,6 +185,12 @@
 
     <div class="form-card">
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
+
+        <!-- تب‌های انتخاب نوع درخواست -->
+        <div class="tabs">
+            <button type="button" class="tab active" id="tab-own" onclick="switchTab('own')">اتصال با کلیدهای خود</button>
+            <button type="button" class="tab" id="tab-company" onclick="switchTab('company')">درخواست دسترسی صرافی شرکت</button>
+        </div>
 
         @if($errors->any())
             <div class="alert alert-error">
@@ -187,7 +211,8 @@
             </ul>
         </div>
 
-        <form method="POST" action="{{ route('exchanges.store') }}">
+        <!-- فرم اتصال با کلیدهای خود -->
+        <form id="own-form" method="POST" action="{{ route('exchanges.store') }}">
             @csrf
 
             <!-- Exchange Selection -->
@@ -195,7 +220,7 @@
                 <label>انتخاب صرافی:</label>
                 @if(count($availableExchanges) > 0)
                     @foreach($availableExchanges as $key => $exchange)
-                        <div class="exchange-option" onclick="selectExchange('{{ $key }}', '{{ $exchange['color'] }}')" id="exchange-{{ $key }}">
+                        <div class="exchange-option" onclick="selectExchangeOwn('{{ $key }}', '{{ $exchange['color'] }}')" id="own-exchange-{{ $key }}">
                             <div class="exchange-info">
                                 <img src="{{ asset('public/logos/' . $key . '-logo.png') }}" alt="{{ subStr($exchange['name'] , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange['color'] }};">
                                 <div>
@@ -275,16 +300,6 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="reason">دلیل درخواست (اختیاری):</label>
-                        <textarea id="reason" name="reason" rows="3"
-                                  placeholder="دلیل خود برای استفاده از این صرافی را بنویسید...">{{ old('reason') }}</textarea>
-                        @error('reason')
-                            <span class="invalid-feedback" role="alert">
-                                <strong>{{ $message }}</strong>
-                            </span>
-                        @enderror
-                    </div>
 
                     <div class="form-group" style="margin-bottom: 20px;">
                         <button type="button" onclick="testRealConnectionCreate()" class="btn" id="test-real-btn-create" style="margin-left: 10px; background-color: #007bff; color: white;">
@@ -302,20 +317,98 @@
                 </div>
             @endif
         </form>
+
+        <!-- فرم درخواست دسترسی صرافی شرکت -->
+        <form id="company-form" method="POST" action="{{ route('exchanges.company-request.store') }}" style="display:none;">
+            @csrf
+
+            <!-- انتخاب صرافی برای درخواست شرکت -->
+            <div class="form-group">
+                <label>انتخاب صرافی:</label>
+                @if(count($availableExchanges) > 0)
+                    @foreach($availableExchanges as $key => $exchange)
+                        <div class="exchange-option" onclick="selectExchangeCompany('{{ $key }}', '{{ $exchange['color'] }}')" id="company-exchange-{{ $key }}">
+                            <div class="exchange-info">
+                                <img src="{{ asset('public/logos/' . $key . '-logo.png') }}" alt="{{ subStr($exchange['name'] , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $exchange['color'] }};">
+                                <div>
+                                    <h4 style="margin: 0;">{{ $exchange['name'] }}</h4>
+                                </div>
+                            </div>
+                            <div>
+                                <input type="radio" name="exchange_name" value="{{ $key }}" style="width: auto;" required>
+                            </div>
+                        </div>
+                    @endforeach
+                @else
+                    <div style="text-align: center; padding: 20px; color: #666;">
+                        همه صرافی‌های موجود قبلاً اضافه شده‌اند
+                    </div>
+                @endif
+            </div>
+
+            <!-- نوع حساب (دمو/واقعی) -->
+            <div class="form-group">
+                <label>نوع حساب (امکان انتخاب چندگانه):</label>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <label style="cursor:pointer;">
+                        <input type="checkbox" name="account_types[]" value="live" style="margin-left:8px;"> واقعی (Live)
+                    </label>
+                    <label style="cursor:pointer;">
+                        <input type="checkbox" name="account_types[]" value="demo" style="margin-left:8px;"> دمو (Demo)
+                    </label>
+                </div>
+                <small style="color:#ddd; display:block; margin-top:8px;">لطفاً حداقل یک نوع حساب را انتخاب کنید</small>
+            </div>
+
+            <div class="warning-box" style="background:#fff3cd;border:1px solid #ffeeba;border-radius:8px;">
+                <h4>راهنمای درخواست دسترسی صرافی شرکت:</h4>
+                <ul>
+                    <li>پس از بررسی و تأیید مدیر، دسترسی حساب شرکت برای شما فعال می‌شود.</li>
+                    <li>نیازی به وارد کردن API Key و Secret نیست؛ کلیدها توسط تیم شرکت ثبت می‌شود.</li>
+                    <li>می‌توانید یکی یا هر دو نوع حساب (واقعی و دمو) را انتخاب کنید.</li>
+                    <li>در تست لوکال، اتصال به صرافی انجام نمی‌شود و بررسی‌ها روی سرور انجام خواهد شد.</li>
+                </ul>
+            </div>
+
+            <button type="submit">
+                ارسال درخواست دسترسی صرافی شرکت
+            </button>
+        </form>
     </div>
 </div>
 
 <script>
-function selectExchange(exchangeName, color) {
+function switchTab(type) {
+    const ownForm = document.getElementById('own-form');
+    const companyForm = document.getElementById('company-form');
+    const tabOwn = document.getElementById('tab-own');
+    const tabCompany = document.getElementById('tab-company');
+
+    if (type === 'company') {
+        ownForm.style.display = 'none';
+        companyForm.style.display = 'block';
+        tabOwn.classList.remove('active');
+        tabCompany.classList.add('active');
+        const credForm = document.getElementById('credentials-form');
+        if (credForm) credForm.classList.add('hidden');
+    } else {
+        ownForm.style.display = 'block';
+        companyForm.style.display = 'none';
+        tabCompany.classList.remove('active');
+        tabOwn.classList.add('active');
+    }
+}
+
+function selectExchangeOwn(exchangeName, color) {
     // Remove previous selections
-    document.querySelectorAll('.exchange-option').forEach(option => {
+    document.querySelectorAll('[id^="own-exchange-"]').forEach(option => {
         option.classList.remove('selected');
         option.style.background = '';
         option.style.color = '';
     });
 
     // Select current exchange
-    const selectedOption = document.getElementById(`exchange-${exchangeName}`);
+    const selectedOption = document.getElementById(`own-exchange-${exchangeName}`);
     selectedOption.classList.add('selected');
     selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
     selectedOption.style.color = 'white';
@@ -325,6 +418,27 @@ function selectExchange(exchangeName, color) {
 
     // Show credentials form
     document.getElementById('credentials-form').classList.remove('hidden');
+
+    // Update form styling to match exchange color
+    document.documentElement.style.setProperty('--primary-color', color);
+}
+
+function selectExchangeCompany(exchangeName, color) {
+    // Remove previous selections
+    document.querySelectorAll('[id^="company-exchange-"]').forEach(option => {
+        option.classList.remove('selected');
+        option.style.background = '';
+        option.style.color = '';
+    });
+
+    // Select current exchange
+    const selectedOption = document.getElementById(`company-exchange-${exchangeName}`);
+    selectedOption.classList.add('selected');
+    selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
+    selectedOption.style.color = 'white';
+
+    // Check the radio button
+    selectedOption.querySelector('input[type="radio"]').checked = true;
 
     // Update form styling to match exchange color
     document.documentElement.style.setProperty('--primary-color', color);
@@ -490,6 +604,23 @@ async function testDemoConnectionCreate() {
 // Check demo inputs on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkDemoInputs();
+    switchTab('own');
+
+    // Client-side validation: ensure at least one account type selected for company request
+    const companyForm = document.getElementById('company-form');
+    if (companyForm) {
+        companyForm.addEventListener('submit', function(e) {
+            const checkedCount = document.querySelectorAll('input[name="account_types[]"]:checked').length;
+            if (checkedCount === 0) {
+                e.preventDefault();
+                if (typeof modernAlert === 'function') {
+                    modernAlert('لطفاً حداقل یک نوع حساب (دمو یا واقعی) را انتخاب کنید.', 'warning', 'نوع حساب نامعتبر');
+                } else {
+                    alert('لطفاً حداقل یک نوع حساب (دمو یا واقعی) را انتخاب کنید.');
+                }
+            }
+        });
+    }
 });
 </script>
 @endsection
