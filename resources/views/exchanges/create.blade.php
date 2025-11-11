@@ -88,7 +88,7 @@
         box-shadow: 0 0 8px rgba(0,123,255,0.25);
         outline: none;
     }
-    button {
+    .btn {
         width: 100%;
         padding: 14px;
         color: #000000;
@@ -100,7 +100,7 @@
         cursor: pointer;
         transition: opacity 0.3s;
     }
-    button:hover {
+    .btn:hover {
         opacity: 0.9;
     }
     .invalid-feedback {
@@ -159,23 +159,87 @@
     .password-toggle:hover {
         color: var(--primary-color);
     }
-    /* Tabs */
-    .tabs {
+    /* Request Type Switch (Tabs) */
+    .request-switch {
         display: flex;
-        gap: 8px;
+        width: 100%;
+        gap: 0;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
         margin-bottom: 16px;
+        background: rgba(255,255,255,0.04);
+        backdrop-filter: blur(6px);
+    }
+    .request-switch__btn {
+        flex: 1;
+        background: transparent;
+        color: #fff;
+        border: none;
+        padding: 12px 16px;
+        cursor: pointer;
+        text-align: center;
+        font-weight: 600;
+        transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .request-switch__btn + .request-switch__btn { border-right: 1px solid var(--border-color); }
+    .request-switch__btn:hover { background: rgba(255,255,255,0.08); }
+    .request-switch__btn.active {
+        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
+        color: #000;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    }
+    .request-switch__btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+    }
+    /* Account type toggles */
+    .account-type-group {
+        display: flex;
+        gap: 12px;
         flex-wrap: wrap;
     }
-    .tab {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        padding: 10px 16px;
-        border-radius: 50px;
+    .account-type {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
         cursor: pointer;
     }
-    .tab.active {
-        background: linear-gradient(135deg, #764ba2, #667eea);
+    .account-type input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .account-type__box {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid var(--border-color);
+        border-radius: 22px;
+        background: #1f2937;
+        color: #fff;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .account-type__dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #6b7280;
+        box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2);
+    }
+    .account-type:hover .account-type__box { background: #243142; }
+    .account-type input:checked + .account-type__box {
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
+        color: #000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .account-type input:checked + .account-type__box .account-type__dot {
+        background: #111827;
+        box-shadow: inset 0 0 0 2px rgba(0,0,0,0.2);
     }
 </style>
 @endpush
@@ -187,9 +251,9 @@
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
 
         <!-- تب‌های انتخاب نوع درخواست -->
-        <div class="tabs">
-            <button type="button" class="tab active" id="tab-own" onclick="switchTab('own')">اتصال با کلیدهای خود</button>
-            <button type="button" class="tab" id="tab-company" onclick="switchTab('company')">درخواست دسترسی صرافی شرکت</button>
+        <div class="request-switch">
+            <button type="button" class="request-switch__btn active" id="switch-own" onclick="switchTab('own')">اتصال با کلیدهای خود</button>
+            <button type="button" class="request-switch__btn" id="switch-company" onclick="switchTab('company')">درخواست دسترسی صرافی شرکت</button>
         </div>
 
         @if($errors->any())
@@ -199,15 +263,16 @@
                 @endforeach
             </div>
         @endif
-
-        <div class="warning-box">
+        
+        <!-- هشدار اختصاصی برای تب اتصال با کلیدهای خود -->
+        <div id="own-warning" class="warning-box" style="display:block;">
             <h4>⚠️ نکات مهم:</h4>
             <ul>
                 <li>API Key و Secret شما به صورت امن و رمزگذاری شده ذخیره می‌شود</li>
                 <li>درخواست شما نیاز به تأیید مدیر سیستم دارد</li>
                 <li>حتماً API Key دارای مجوزهای معاملات اسپات و فیوچرز باشد</li>
                 <li>از IP WhiteList استفاده نکنید یا آدرس سرور را اضافه کنید</li>
-				<li>شما میتوانید اطلاعات حساب دمو یا واقعی یا هردو را وارد کنید</li>
+                <li>شما می‌توانید اطلاعات حساب دمو یا واقعی یا هر دو را وارد کنید</li>
             </ul>
         </div>
 
@@ -311,16 +376,27 @@
                         </button>
                     </div>
 
-                    <button type="submit">
+                    <button type="submit" class="btn">
                         ارسال درخواست فعال‌سازی
                     </button>
                 </div>
             @endif
         </form>
 
-        <!-- فرم درخواست دسترسی صرافی شرکت -->
-        <form id="company-form" method="POST" action="{{ route('exchanges.company-request.store') }}" style="display:none;">
-            @csrf
+            <!-- هشدار اختصاصی برای تب درخواست دسترسی صرافی شرکت -->
+            <div id="company-warning" class="warning-box" style="display:none;border-radius:8px;">
+                <h4>راهنمای درخواست دسترسی صرافی شرکت:</h4>
+                <ul>
+                    <li>پس از بررسی و تأیید مدیر، دسترسی حساب شرکت برای شما فعال می‌شود.</li>
+                    <li>نیازی به وارد کردن API Key و Secret نیست؛ کلیدها توسط تیم شرکت ثبت می‌شود.</li>
+                    <li>می‌توانید یکی یا هر دو نوع حساب (واقعی و دمو) را انتخاب کنید.</li>
+                    <li>در تست لوکال، اتصال به صرافی انجام نمی‌شود و بررسی‌ها روی سرور انجام خواهد شد.</li>
+                </ul>
+            </div>
+
+            <!-- فرم درخواست دسترسی صرافی شرکت -->
+            <form id="company-form" method="POST" action="{{ route('exchanges.company-request.store') }}" style="display:none;">
+                @csrf
 
             <!-- انتخاب صرافی برای درخواست شرکت -->
             <div class="form-group">
@@ -349,28 +425,27 @@
             <!-- نوع حساب (دمو/واقعی) -->
             <div class="form-group">
                 <label>نوع حساب (امکان انتخاب چندگانه):</label>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <label style="cursor:pointer;">
-                        <input type="checkbox" name="account_types[]" value="live" style="margin-left:8px;"> واقعی (Live)
+                <div class="account-type-group">
+                    <label class="account-type">
+                        <input type="checkbox" name="account_types[]" value="live">
+                        <span class="account-type__box">
+                            <span class="account-type__dot" aria-hidden="true"></span>
+                            واقعی (Live)
+                        </span>
                     </label>
-                    <label style="cursor:pointer;">
-                        <input type="checkbox" name="account_types[]" value="demo" style="margin-left:8px;"> دمو (Demo)
+                    <label class="account-type">
+                        <input type="checkbox" name="account_types[]" value="demo">
+                        <span class="account-type__box">
+                            <span class="account-type__dot" aria-hidden="true"></span>
+                            دمو (Demo)
+                        </span>
                     </label>
                 </div>
-                <small style="color:#ddd; display:block; margin-top:8px;">لطفاً حداقل یک نوع حساب را انتخاب کنید</small>
             </div>
 
-            <div class="warning-box" style="background:#fff3cd;border:1px solid #ffeeba;border-radius:8px;">
-                <h4>راهنمای درخواست دسترسی صرافی شرکت:</h4>
-                <ul>
-                    <li>پس از بررسی و تأیید مدیر، دسترسی حساب شرکت برای شما فعال می‌شود.</li>
-                    <li>نیازی به وارد کردن API Key و Secret نیست؛ کلیدها توسط تیم شرکت ثبت می‌شود.</li>
-                    <li>می‌توانید یکی یا هر دو نوع حساب (واقعی و دمو) را انتخاب کنید.</li>
-                    <li>در تست لوکال، اتصال به صرافی انجام نمی‌شود و بررسی‌ها روی سرور انجام خواهد شد.</li>
-                </ul>
-            </div>
+            
 
-            <button type="submit">
+            <button type="submit" class="btn">
                 ارسال درخواست دسترسی صرافی شرکت
             </button>
         </form>
@@ -381,14 +456,18 @@
 function switchTab(type) {
     const ownForm = document.getElementById('own-form');
     const companyForm = document.getElementById('company-form');
-    const tabOwn = document.getElementById('tab-own');
-    const tabCompany = document.getElementById('tab-company');
+    const tabOwn = document.getElementById('switch-own');
+    const tabCompany = document.getElementById('switch-company');
+    const ownWarning = document.getElementById('own-warning');
+    const companyWarning = document.getElementById('company-warning');
 
     if (type === 'company') {
         ownForm.style.display = 'none';
         companyForm.style.display = 'block';
         tabOwn.classList.remove('active');
         tabCompany.classList.add('active');
+        if (ownWarning) ownWarning.style.display = 'none';
+        if (companyWarning) companyWarning.style.display = 'block';
         const credForm = document.getElementById('credentials-form');
         if (credForm) credForm.classList.add('hidden');
     } else {
@@ -396,6 +475,8 @@ function switchTab(type) {
         companyForm.style.display = 'none';
         tabCompany.classList.remove('active');
         tabOwn.classList.add('active');
+        if (ownWarning) ownWarning.style.display = 'block';
+        if (companyWarning) companyWarning.style.display = 'none';
     }
 }
 
