@@ -238,7 +238,7 @@
                         @if($banActive)
                             مدیریت ریسک فعال است
                         @else
-                            Edit Order
+                            ویرایش سفارش
                         @endif
                     @else
                         برای ارسال سفارش ابتدا صرافی فعال کنید
@@ -346,6 +346,57 @@
                 );
             });
         }
+
+        // --- Strict mode: update TP placeholder based on SL & RR ---
+        (function() {
+            const tpInput = document.getElementById('tp');
+            const slInput = document.getElementById('sl');
+            if (!tpInput || !slInput) return;
+
+            const minRrStr = '{{ isset($user) ? \App\Models\UserAccountSetting::getMinRrRatio($user->id) : '3:1' }}';
+
+            function parseRr(str) {
+                var parts = (str || '').split(':');
+                var loss = parseFloat(parts[0] || '1');
+                var profit = parseFloat(parts[1] || '1');
+                if (!isFinite(loss) || loss <= 0) loss = 1;
+                if (!isFinite(profit) || profit <= 0) profit = 1;
+                return { loss: loss, profit: profit };
+            }
+
+            function formatPrice(v) {
+                if (!isFinite(v)) return '';
+                return Number(v).toFixed(6).replace(/\.0+$/,'');
+            }
+
+            function computeAvgEntry() {
+                var e1 = parseFloat(entry1Input.value);
+                var e2 = parseFloat(entry2Input.value);
+                if (!isFinite(e1)) return null;
+                if (!isFinite(e2)) e2 = e1;
+                return (e1 + e2) / 2.0;
+            }
+
+            function updateTpPlaceholder() {
+                if (!isStrictMode) { tpInput.placeholder = ''; return; }
+                var avgEntry = computeAvgEntry();
+                var slVal = parseFloat(slInput.value);
+                if (!isFinite(avgEntry) || !isFinite(slVal)) { tpInput.placeholder = ''; return; }
+                var rr = parseRr(minRrStr);
+                var minProfitOverLoss = rr.profit / rr.loss;
+                var slDistance = Math.abs(avgEntry - slVal);
+                if (slDistance <= 0) { tpInput.placeholder = ''; return; }
+                var side = (slVal > avgEntry) ? 'Sell' : 'Buy';
+                var minTpDistance = minProfitOverLoss * slDistance;
+                var minTpPrice = side === 'Buy' ? (avgEntry + minTpDistance) : (avgEntry - minTpDistance);
+                tpInput.placeholder = 'حداقل مقدار باید ' + formatPrice(minTpPrice) + ' باشد';
+            }
+
+            slInput.addEventListener('input', updateTpPlaceholder);
+            entry1Input.addEventListener('input', updateTpPlaceholder);
+            entry2Input.addEventListener('input', updateTpPlaceholder);
+            updateTpPlaceholder();
+        })();
     });
 </script>
 @endpush

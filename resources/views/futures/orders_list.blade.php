@@ -78,10 +78,11 @@
         background-color: #dc3545;
         color: white;
         border: none;
-        padding: 8px 12px;
+        padding: 0 12px;
         border-radius: 6px;
         cursor: pointer;
         transition: background-color 0.3s;
+        height: 34px; 
     }
     .delete-btn:hover {
         background-color: #c82333;
@@ -102,12 +103,14 @@
         background-color: var(--primary-color);
         color: white;
         border: none;
-        padding: 8px 12px;
+        padding: 0 12px;
         border-radius: 6px;
         cursor: pointer;
         transition: background-color 0.3s;
         text-decoration: none;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        height: 34px; 
     }
     .edit-btn:hover {
         background-color: var(--primary-hover);
@@ -239,6 +242,15 @@
                                 {{-- دکمه بستن به بخش سود و زیان منتقل شد --}}
                                 -
                             @elseif($order->status === 'expired')
+                                @php
+                                    $canResend = $order->closed_at && now()->diffInMinutes($order->closed_at) <= 30;
+                                @endphp
+                                @if($canResend)
+                                    <form action="{{ route('futures.orders.resend', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="ارسال مجدد سفارش" data-message="آیا از ارسال مجدد این سفارش مطمئن هستید؟">
+                                        @csrf
+                                        <button type="submit" class="edit-btn" style="margin-left:8px">ارسال مجدد</button>
+                                    </form>
+                                @endif
                                 <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')

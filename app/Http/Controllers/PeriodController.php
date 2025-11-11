@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\UserPeriod;
 use App\Services\JournalPeriodService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class PeriodController extends Controller
 {
@@ -89,5 +90,38 @@ class PeriodController extends Controller
         }
 
         return back()->with('success', 'دوره با موفقیت پایان یافت.');
+    }
+
+    /**
+     * Recompute metrics for all periods of the current account type (demo/real).
+     * Limits invocations to once every 10 minutes per user/account type.
+     */
+    public function recomputeAll(Request $request)
+    {
+        $user = auth()->user();
+
+        // Determine account type from current or default exchange
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool) $currentExchange->is_demo_active : false;
+
+        // Cooldown key per user + account type
+        $cooldownKey = 'periods:recompute_all:' . $user->id . ':' . ($isDemo ? 'demo' : 'real');
+        if (Cache::has($cooldownKey)) {
+            return back()->with('error', 'این عملیات اخیراً انجام شده است. لطفاً پس از ۱۵ دقیقه دوباره تلاش کنید. در صورت عدم به‌روزرسانی، به ادمین اطلاع دهید.');
+        }
+
+        $service = new JournalPeriodService();
+        $periods = UserPeriod::forUser($user->id)
+            ->accountType($isDemo)
+            ->get();
+
+        foreach ($periods as $period) {
+            $service->updatePeriodMetrics($period);
+        }
+
+        // Set cooldown for 10 minutes
+        Cache::put($cooldownKey, 1, now()->addMinutes(10));
+
+        return back()->with('success', 'به‌روزرسانی ژورنال برای همه دوره‌ها انجام شد. اگر تغییرات را نمی‌بینید، بعد از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.');
     }
 }

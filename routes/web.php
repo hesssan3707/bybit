@@ -64,6 +64,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
         Route::post('/set-order', [FuturesController::class, 'store'])->name('order.store');
         Route::put('/orders/{order}', [FuturesController::class, 'update'])->name('order.update');
+        // Resend expired order within allowed window
+        Route::post('/orders/{order}/resend', [FuturesController::class, 'resend'])->name('orders.resend');
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
         Route::post('/orders/close-all', [FuturesController::class, 'closeAll'])->name('orders.close_all');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
@@ -72,6 +74,8 @@ Route::middleware('auth')->group(function () {
         // Period management (moved to dedicated controller)
         Route::post('/periods/start', [PeriodController::class, 'start'])->name('periods.start');
         Route::post('/periods/{period}/end', [PeriodController::class, 'end'])->name('periods.end');
+        // Recompute all periods metrics for current account type (backfill)
+        Route::post('/periods/recompute-all', [PeriodController::class, 'recomputeAll'])->name('periods.recompute_all');
     });
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');

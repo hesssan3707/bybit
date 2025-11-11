@@ -249,7 +249,17 @@
                 <i class="fas fa-hourglass-start" style="margin-inline-end:8px;"></i>
                 شروع دوره جدید
             </button>
+            <form method="POST" action="{{ route('futures.periods.recompute_all') }}" style="display:inline;" id="recomputeAllForm">
+                @csrf
+                <button type="submit" class="btn btn-primary" id="recomputeAllBtn">
+                    <i class="fas fa-sync" style="margin-inline-end:8px;"></i>
+                    بروزرسانی همه دوره‌ها
+                </button>
+            </form>
         </div>
+        <p style="text-align:center;margin-top:10px;color:#adb5bd;font-size:0.95rem;">
+            اگر ژورنال شما به‌روز نشد، پس از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.
+        </p>
         <div style="margin-top:15px;">
             <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
                 @foreach($recentPeriods->take(5) as $per)
@@ -399,6 +409,45 @@
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Client-side cooldown to prevent repeated presses within 10 minutes
+        (function(){
+            const btn = document.getElementById('recomputeAllBtn');
+            const form = document.getElementById('recomputeAllForm');
+            if (!btn || !form) return;
+
+            const userId = '{{ auth()->id() }}';
+            const accType = '{{ ($selectedPeriod && $selectedPeriod->is_demo) ? 'demo' : 'real' }}';
+            const key = `journalRecomputeCooldown:${userId}:${accType}`;
+
+            function isCooldownActive() {
+                const until = localStorage.getItem(key);
+                if (!until) return false;
+                const ts = parseInt(until, 10);
+                return !isNaN(ts) && Date.now() < ts;
+            }
+            function updateBtnState() {
+                if (isCooldownActive()) {
+                    btn.disabled = true;
+                    btn.textContent = 'منتظر بمانید...';
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = 'بروزرسانی همه دوره‌ها';
+                }
+            }
+            updateBtnState();
+            setInterval(updateBtnState, 5000);
+            form.addEventListener('submit', function(e) {
+                if (isCooldownActive()) {
+                    e.preventDefault();
+                    alert('این عملیات اخیراً انجام شده است. لطفاً پس از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.');
+                    return false;
+                }
+                const tenMinutesMs = 10 * 60 * 1000;
+                localStorage.setItem(key, String(Date.now() + tenMinutesMs));
+                updateBtnState();
+            });
+        })();
+
         // Select period helper
         window.selectPeriod = function(id) {
             const form = document.getElementById('journalFiltersForm');

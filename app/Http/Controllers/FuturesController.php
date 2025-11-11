@@ -815,6 +815,125 @@ class FuturesController extends Controller
         return redirect()->route('futures.orders')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
     }
 
+    /**
+     * Resend an expired order (reactivate existing record) within 30 minutes of expiration
+     * - Multi-exchange: use the order's own exchange for API calls
+     * - Local environment: skip exchange calls, just reset DB state
+     */
+    public function resend(Order $order)
+    {
+        // Check active exchange (for user messaging and access consistency)
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'شما مجاز به ارسال مجدد این سفارش نیستید.']);
+        }
+
+        // Only allow resend for expired orders within window
+        if ($order->status !== 'expired' || !$order->closed_at) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'فقط سفارش‌های منقضی قابل ارسال مجدد هستند.']);
+        }
+        $minutesSinceClose = now()->diffInMinutes($order->closed_at);
+        if ($minutesSinceClose > 30) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'مهلت ارسال مجدد این سفارش به پایان رسیده است.']);
+        }
+
+        // Resolve exchange service bound to the original order's account
+        $userExchange = $order->userExchange;
+        if (!$userExchange || !$userExchange->is_active) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'حساب صرافی مرتبط با این سفارش فعال نیست.']);
+        }
+
+        // Prepare new link id and parameters
+        $newOrderLinkId = (string) \Illuminate\Support\Str::uuid();
+
+        try {
+            // Get precision info when not in local environment
+            $pricePrec = 2;
+            $qtyStr = (string) $order->amount; // already stored as final precision at creation
+
+            if (!app()->environment('local')) {
+                $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($userExchange);
+
+                // Validate market vs entry consistency
+                try {
+                    $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
+                    $instrumentData = null;
+                    if (!empty($instrumentInfo['list'])) {
+                        foreach ($instrumentInfo['list'] as $instrument) {
+                            if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
+                        }
+                    }
+                    if ($instrumentData && isset($instrumentData['priceScale'])) {
+                        $pricePrec = (int)$instrumentData['priceScale'];
+                    }
+                } catch (\Throwable $e) {
+                    // Continue with defaults if instrument info fails
+                }
+
+                $finalPrice = round((float)$order->entry_price, $pricePrec);
+
+                // Build order params (limit order, same SL)
+                $sideUpper = ($order->side === 'sell') ? 'Sell' : 'Buy';
+                $params = [
+                    'category' => 'linear',
+                    'symbol' => $order->symbol,
+                    'side' => $sideUpper,
+                    'orderType' => 'Limit',
+                    'qty' => $qtyStr,
+                    'price' => (string) $finalPrice,
+                    'timeInForce' => 'GTC',
+                    'stopLoss'  => (string) round((float)$order->sl, $pricePrec),
+                    'orderLinkId' => $newOrderLinkId,
+                ];
+
+                // Hedge mode parameters per exchange
+                $this->addHedgeModeParameters($params, $userExchange->exchange_name, $sideUpper);
+
+                // Create order on exchange
+                $responseData = $exchangeService->createOrder($params);
+
+                // Reset the DB record as reactivated pending
+                $order->order_id = $responseData['orderId'] ?? null;
+                $order->order_link_id = $newOrderLinkId;
+                $order->status = 'pending';
+                $order->created_at = now();
+                $order->closed_at = null;
+                $order->filled_at = null;
+                $order->filled_quantity = null;
+                $order->save();
+            } else {
+                // Local: skip exchange calls, just reset DB state
+                $finalPrice = round((float)$order->entry_price, $pricePrec);
+                $order->order_id = null; // no remote id
+                $order->order_link_id = $newOrderLinkId;
+                $order->status = 'pending';
+                $order->created_at = now();
+                $order->closed_at = null;
+                $order->filled_at = null;
+                $order->filled_quantity = null;
+                $order->save();
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Futures order resend failed: ' . $e->getMessage());
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
+            return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
+        }
+
+        return redirect()->route('futures.orders')->with('success', 'ارسال مجدد سفارش با موفقیت انجام شد.');
+    }
+
     public function close(Request $request, Order $order)
     {
         // Strict-mode: block manual closes if an active close-only ban exists for current account type
