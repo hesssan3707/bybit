@@ -236,6 +236,7 @@
             @foreach($exchangeOptions as $ex)
                 <option value="{{ $ex->id }}" {{ (string)$userExchangeId === (string)$ex->id ? 'selected' : '' }}>
                     {{ strtoupper($ex->exchange_name) }} — {{ $ex->is_demo_active ? 'دمو' : 'واقعی' }}
+                    
                 </option>
             @endforeach
         </select>
@@ -251,7 +252,7 @@
             </button>
             <form method="POST" action="{{ route('futures.periods.recompute_all') }}" style="display:inline;" id="recomputeAllForm">
                 @csrf
-                <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" style="padding:6px 12px;">
+                <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" style="padding:10px 18px;">
                     <i class="fas fa-sync" style="margin-inline-end:8px;"></i>
                     بروزرسانی همه دوره‌ها
                 </button>
