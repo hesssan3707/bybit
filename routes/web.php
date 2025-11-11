@@ -14,6 +14,8 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\ExchangeController;
 use App\Http\Controllers\WalletBalanceController;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\Admin\TicketController as AdminTicketController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -56,9 +58,9 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-Route::middleware('auth')->group(function () {
+    Route::middleware('auth')->group(function () {
 
-    Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
+        Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
         Route::get('/orders/{order}/edit', [FuturesController::class, 'edit'])->name('order.edit');
         Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
@@ -76,7 +78,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/periods/{period}/end', [PeriodController::class, 'end'])->name('periods.end');
         // Recompute all periods metrics for current account type (backfill)
         Route::post('/periods/recompute-all', [PeriodController::class, 'recomputeAll'])->name('periods.recompute_all');
-    });
+        });
+
+        // User Tickets
+        Route::post('/tickets/report-journal', [TicketController::class, 'reportJournalIssue'])->name('tickets.report_journal');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
 
@@ -120,6 +125,10 @@ Route::prefix('exchanges')->group(function () {
 
     // Admin Routes (requires authentication and admin privileges)
     Route::prefix('admin')->middleware('admin')->group(function () {
+        // Tickets Management
+        Route::get('/tickets', [AdminTicketController::class, 'index'])->name('admin.tickets');
+        Route::post('/tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
+        Route::post('/tickets/{ticket}/close', [AdminTicketController::class, 'close'])->name('admin.tickets.close');
         // User Management
         Route::get('/pending-users', [UserManagementController::class, 'pendingUsers'])->name('admin.pending-users');
         Route::get('/all-users', [UserManagementController::class, 'allUsers'])->name('admin.all-users');

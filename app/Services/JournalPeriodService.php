@@ -164,6 +164,9 @@ class JournalPeriodService
         $losses = (float) $trades->where('pnl', '<', 0)->sum('pnl');
         $biggestProfit = (float) ($trades->max('pnl') ?? 0);
         $biggestLoss = (float) ($trades->min('pnl') ?? 0);
+        // Clamp per requested logic: do not consider positive numbers as losses or negative numbers as profits
+        if ($biggestLoss > 0) { $biggestLoss = 0.0; }
+        if ($biggestProfit < 0) { $biggestProfit = 0.0; }
         $wins = $trades->where('pnl', '>', 0)->count();
         $lossesCount = $trades->where('pnl', '<', 0)->count();
 

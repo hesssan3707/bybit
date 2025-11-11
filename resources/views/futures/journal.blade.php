@@ -251,7 +251,7 @@
             </button>
             <form method="POST" action="{{ route('futures.periods.recompute_all') }}" style="display:inline;" id="recomputeAllForm">
                 @csrf
-                <button type="submit" class="btn btn-primary" id="recomputeAllBtn">
+                <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" style="padding:6px 12px;">
                     <i class="fas fa-sync" style="margin-inline-end:8px;"></i>
                     بروزرسانی همه دوره‌ها
                 </button>
@@ -259,6 +259,7 @@
         </div>
         <p style="text-align:center;margin-top:10px;color:#adb5bd;font-size:0.95rem;">
             اگر ژورنال شما به‌روز نشد، پس از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.
+            <a href="#" id="reportJournalIssue" style="margin-inline-start:8px; text-decoration: underline;">گزارش مشکل</a>
         </p>
         <div style="margin-top:15px;">
             <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
@@ -445,6 +446,44 @@
                 const tenMinutesMs = 10 * 60 * 1000;
                 localStorage.setItem(key, String(Date.now() + tenMinutesMs));
                 updateBtnState();
+            });
+        })();
+
+        // Report Journal Issue (AJAX create ticket, prevent duplicate)
+        (function(){
+            const reportLink = document.getElementById('reportJournalIssue');
+            if (!reportLink) return;
+            function getCsrf(){
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta) return meta.getAttribute('content');
+                const tokenInput = document.querySelector('#recomputeAllForm input[name="_token"]');
+                return tokenInput ? tokenInput.value : '';
+            }
+            reportLink.addEventListener('click', function(e){
+                e.preventDefault();
+                const csrf = getCsrf();
+                fetch('{{ route('tickets.report_journal') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrf,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(r => r.json())
+                .then(function(data){
+                    const msg = (data && data.message) ? data.message : (data && data.success ? 'گزارش شما ثبت شد. تیم پشتیبانی بررسی می‌کند.' : 'امکان ثبت گزارش وجود ندارد.');
+                    try { modernAlert(msg, data && data.success ? 'success' : 'error'); } catch(_) { alert(msg); }
+                    if (data && data.success) {
+                        reportLink.style.pointerEvents = 'none';
+                        reportLink.style.opacity = '0.6';
+                        reportLink.textContent = 'گزارش ثبت شد';
+                    }
+                })
+                .catch(function(){
+                    try { modernAlert('خطا در ارتباط با سرور', 'error'); } catch(_) { alert('خطا در ارتباط با سرور'); }
+                });
             });
         })();
 
