@@ -72,6 +72,8 @@ Route::get('/', function () {
         Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('orders.close');
         Route::post('/orders/close-all', [FuturesController::class, 'closeAll'])->name('orders.close_all');
         Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('orders.destroy');
+        // Static chart snapshot data for filled orders
+        Route::get('/orders/{order}/chart-data', [FuturesController::class, 'chartData'])->name('orders.chart_data');
         Route::get('/pnl-history', [FuturesController::class, 'pnlHistory'])->name('pnl_history');
         Route::get('/journal', [FuturesController::class, 'journal'])->name('journal');
         // Period management (moved to dedicated controller)

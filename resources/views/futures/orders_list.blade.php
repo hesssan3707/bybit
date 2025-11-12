@@ -117,6 +117,55 @@
         color: white;
         text-decoration: none;
     }
+    /* Icon-only button for viewing order chart */
+    .icon-btn {
+        background: linear-gradient(135deg, #6f42c1, #8c6df0); /* slight color shift to stand out */
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 34px;
+        width: 34px;
+        padding: 0;
+        box-shadow: 0 4px 12px rgba(111,66,193,0.25);
+    }
+    .icon-btn:hover { 
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(111,66,193,0.35);
+    }
+    .icon-btn svg { width: 18px; height: 18px; }
+
+    /* Timeframe switcher styles */
+    .tf-switch {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 6px;
+        background: rgba(255,255,255,0.9);
+        border: 1px solid #eee;
+        border-radius: 8px;
+        padding: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        z-index: 2;
+    }
+    .tf-switch .tf-item {
+        font-size: 12px;
+        color: #333;
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .tf-switch .tf-item:hover { background: #f1f3f5; }
+    .tf-switch .tf-item.active {
+        background: #6f42c1;
+        color: #fff;
+    }
     .pagination {
         margin-top: 20px;
         display: flex;
@@ -240,7 +289,18 @@
                                 </form>
                             @elseif($order->status === 'filled')
                                 {{-- دکمه بستن به بخش سود و زیان منتقل شد --}}
-                                -
+                                <button type="button" class="icon-btn view-order-btn" data-order-id="{{ $order->id }}" title="نمایش نمودار سفارش" aria-label="نمایش نمودار سفارش" style="margin-left:8px">
+                                    <!-- trend line chart icon -->
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <path d="M4 19V5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                        <path d="M20 19H4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                        <path d="M7 15l4-4 3 3 5-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <circle cx="7" cy="15" r="1.5" fill="currentColor"/>
+                                        <circle cx="11" cy="11" r="1.5" fill="currentColor"/>
+                                        <circle cx="14" cy="14" r="1.5" fill="currentColor"/>
+                                        <circle cx="19" cy="8" r="1.5" fill="currentColor"/>
+                                    </svg>
+                                </button>
                             @elseif($order->status === 'expired')
                                 @php
                                     $canResend = $order->closed_at && now()->diffInMinutes($order->closed_at) <= 30;
@@ -320,5 +380,138 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 @endpush
+
+@push('scripts')
+    <!-- Lightweight Charts CDN -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const backdrop = document.getElementById('orderChartBackdrop');
+        const container = document.getElementById('order-chart-container');
+        const tfPanel = document.getElementById('order-chart-tf');
+        const closeBtn = document.getElementById('closeChartModalBtn');
+        const TF_LIST = ['1m','5m','15m','1h','4h'];
+
+        function openBackdrop() {
+            backdrop.style.display = 'flex';
+        }
+        function closeBackdrop() {
+            backdrop.style.display = 'none';
+            container.innerHTML = '';
+            if (tfPanel) tfPanel.innerHTML = '';
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeBackdrop);
+        }
+        if (backdrop) {
+            backdrop.addEventListener('click', function(e) {
+                if (e.target === backdrop) { closeBackdrop(); }
+            });
+        }
+
+        function renderChart(data) {
+            // Initialize chart
+            const chart = LightweightCharts.createChart(container, {
+                height: 420,
+                layout: { background: { type: 'solid', color: '#ffffff' }, textColor: '#333' },
+                grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+                rightPriceScale: { borderVisible: false },
+                timeScale: { borderVisible: false },
+                localization: { locale: 'fa-IR' }
+            });
+
+            const series = chart.addCandlestickSeries();
+            const candles = (data.candles || []).map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+            series.setData(candles);
+
+            // Overlay price lines
+            if (data.entry) {
+                series.createPriceLine({ price: data.entry, color: '#1e90ff', lineWidth: 2, title: 'ورود' });
+            }
+            if (data.tp) {
+                series.createPriceLine({ price: data.tp, color: '#20c997', lineWidth: 2, title: 'حد سود' });
+            }
+            if (data.sl) {
+                series.createPriceLine({ price: data.sl, color: '#dc3545', lineWidth: 2, title: 'حد ضرر' });
+            }
+            if (data.exit) {
+                series.createPriceLine({ price: data.exit, color: '#ffc107', lineWidth: 2, title: 'خروج' });
+            }
+
+            // Fit content
+            chart.timeScale().fitContent();
+        }
+
+        function renderTfSwitch(activeTf, onSelect) {
+            if (!tfPanel) return;
+            tfPanel.innerHTML = '';
+            TF_LIST.forEach(tf => {
+                const el = document.createElement('div');
+                el.className = 'tf-item' + (tf === activeTf ? ' active' : '');
+                el.textContent = tf;
+                el.addEventListener('click', () => onSelect(tf));
+                tfPanel.appendChild(el);
+            });
+        }
+
+        async function fetchChartData(orderId, tf) {
+            const url = tf ? `/futures/orders/${orderId}/chart-data?tf=${encodeURIComponent(tf)}` : `/futures/orders/${orderId}/chart-data`;
+            const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            return await resp.json();
+        }
+
+        async function fetchAndRender(orderId, tf) {
+            try {
+                const json = await fetchChartData(orderId, tf);
+                if (!json.success) {
+                    alert(json.message || 'خطا در دریافت داده‌های نمودار');
+                    return;
+                }
+                renderChart(json.data || {});
+            } catch (e) {
+                alert('خطا در ارتباط با سرور');
+            }
+        }
+
+        // Attach click handlers
+        document.querySelectorAll('.view-order-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const id = this.dataset.orderId;
+                openBackdrop();
+                try {
+                    const initial = await fetchChartData(id);
+                    if (!initial.success) {
+                        alert(initial.message || 'خطا در دریافت داده‌های نمودار');
+                        return;
+                    }
+                    const activeTf = (initial.data && initial.data.timeframe) ? initial.data.timeframe : '15m';
+                    renderTfSwitch(activeTf, async (tf) => {
+                        renderTfSwitch(tf, () => {});
+                        await fetchAndRender(id, tf);
+                    });
+                    renderChart(initial.data || {});
+                } catch (e) {
+                    alert('خطا در ارتباط با سرور');
+                }
+            });
+        });
+    });
+    </script>
+@endpush
+
+<!-- Chart Modal Backdrop -->
+<div id="orderChartBackdrop" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1050;">
+    <div style="background: #fff; color:#222; border-radius: 12px; width: 95%; max-width: 960px; padding: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.25);">
+        <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="font-weight:600;">نمایش سفارش</div>
+            <button id="closeChartModalBtn" class="delete-btn" style="height:auto; padding:6px 10px;">بستن</button>
+        </div>
+        <div id="order-chart-wrapper" style="position:relative; height: 420px; width: 100%;">
+            <div id="order-chart-container" style="height: 100%; width: 100%;"></div>
+            <div id="order-chart-tf" class="tf-switch" aria-label="انتخاب تایم‌فریم"></div>
+        </div>
+    </div>
+</div>
 
 @include('partials.alert-modal')
