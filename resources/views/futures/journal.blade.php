@@ -258,10 +258,6 @@
                 </button>
             </form>
         </div>
-        <p style="text-align:center;margin-top:10px;color:#adb5bd;font-size:0.95rem;">
-            اگر ژورنال شما به‌روز نشد، پس از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.
-            <a href="#" id="reportJournalIssue" style="margin-inline-start:8px; text-decoration: underline;">گزارش مشکل</a>
-        </p>
         <div style="margin-top:15px;">
             <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
                 @foreach($recentPeriods->take(5) as $per)
@@ -290,7 +286,7 @@
             </div>
         </div>
         @if(session('success'))
-            <div class="alert alert-success" style="margin-top:10px;">{{ session('success') }}</div>
+            <div class="alert alert-success" style="margin-top:10px;">{!! session('success') !!}</div>
         @endif
         @if(session('error'))
             <div class="alert alert-danger" style="margin-top:10px;">{{ session('error') }}</div>
@@ -631,6 +627,24 @@
         var pnlChart = new ApexCharts(document.querySelector("#pnlChart"), pnlOptions);
         pnlChart.render();
 
+        // Prepare cumulative series data as datetime
+        var cumulativePnlRaw = {!! json_encode($cumulativePnl) !!};
+        // Deduplicate by date: keep only the last trade per day
+        var cumulativePnlData = (function(){
+            var items = (cumulativePnlRaw || []).filter(function(i){ return i && i.date; });
+            var lastByDay = {};
+            for (var k = 0; k < items.length; k++) {
+                var it = items[k];
+                // Use the provided day string (YYYY-MM-DD) as key; later items override earlier ones
+                lastByDay[it.date] = it;
+            }
+            var days = Object.keys(lastByDay).sort();
+            return days.map(function(d){
+                var it = lastByDay[d];
+                return { x: new Date(d).getTime(), y: it.y };
+            });
+        })();
+
         // Cumulative PnL Chart
         var cumulativePnlOptions = {
             chart: {
@@ -651,7 +665,7 @@
             },
             series: [{
                 name: 'Cumulative PnL',
-                data: {!! json_encode($cumulativePnl) !!}
+                data: cumulativePnlData
             }],
             title: {
                 text: 'سود/زیان تجمعی معاملات',
@@ -701,6 +715,32 @@
         var cumulativePnlChart = new ApexCharts(document.querySelector("#cumulativePnlChart"), cumulativePnlOptions);
         cumulativePnlChart.render();
 
+        // Prepare cumulative percent series as datetime
+        var cumulativePnlPercentRaw = {!! json_encode($cumulativePnlPercent) !!};
+        // Build compounded cumulative percent with per-day dedup (keep last trade of day)
+        var cumulativePnlPercentData = (function(){
+            var items = (cumulativePnlPercentRaw || []).filter(function(i){ return i && i.date; });
+            // Deduplicate by day: last item per YYYY-MM-DD wins
+            var lastByDay = {};
+            for (var k = 0; k < items.length; k++) {
+                var it = items[k];
+                lastByDay[it.date] = it;
+            }
+            var days = Object.keys(lastByDay).sort();
+            var dailyItems = days.map(function(d){ return lastByDay[d]; });
+            var compound = 1.0;
+            var out = [];
+            for (var i = 0; i < dailyItems.length; i++) {
+                var cur = dailyItems[i];
+                var prevY = i > 0 ? (dailyItems[i-1].y || 0) : 0;
+                var perTradePercent = i === 0 ? (cur.y || 0) : ((cur.y || 0) - prevY);
+                var factor = 1 + (perTradePercent / 100.0);
+                compound = compound * factor;
+                out.push({ x: new Date(cur.date).getTime(), y: (compound - 1) * 100.0 });
+            }
+            return out;
+        })();
+
         // Cumulative PnL Percent Chart
         var cumulativePnlPercentOptions = {
             chart: {
@@ -711,7 +751,7 @@
             },
             series: [{
                 name: 'Cumulative PnL %',
-                data: {!! json_encode($cumulativePnlPercent) !!}
+                data: cumulativePnlPercentData
             }],
             title: {
                 text: 'درصد سود/زیان تجمعی',

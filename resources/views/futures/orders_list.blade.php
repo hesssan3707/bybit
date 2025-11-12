@@ -178,6 +178,17 @@
     .alert-success { background: #d1e7dd; color: #0f5132; }
     .alert-danger { background: #f8d7da; color: #842029; }
 
+    /* Inline loader for chart overlay */
+    .loader {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(0,0,0,0.15);
+        border-top-color: #6f42c1;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     @media screen and (max-width: 768px) {
         .mobile-redirect-section {
             display: block;
@@ -390,15 +401,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('order-chart-container');
         const tfPanel = document.getElementById('order-chart-tf');
         const closeBtn = document.getElementById('closeChartModalBtn');
+        const loadingEl = document.getElementById('order-chart-loading');
         const TF_LIST = ['1m','5m','15m','1h','4h'];
+        let currentChart = null;
+        let isLoading = false;
 
         function openBackdrop() {
             backdrop.style.display = 'flex';
+            setLoading(true);
         }
         function closeBackdrop() {
             backdrop.style.display = 'none';
             container.innerHTML = '';
             if (tfPanel) tfPanel.innerHTML = '';
+            if (currentChart && typeof currentChart.remove === 'function') {
+                try { currentChart.remove(); } catch (e) {}
+            }
+            currentChart = null;
+            setLoading(false);
         }
 
         if (closeBtn) {
@@ -408,6 +428,12 @@ document.addEventListener('DOMContentLoaded', function() {
             backdrop.addEventListener('click', function(e) {
                 if (e.target === backdrop) { closeBackdrop(); }
             });
+        }
+
+        function setLoading(flag) {
+            isLoading = !!flag;
+            if (!loadingEl) return;
+            loadingEl.style.display = isLoading ? 'flex' : 'none';
         }
 
         function renderChart(data) {
@@ -439,8 +465,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 series.createPriceLine({ price: data.exit, color: '#ffc107', lineWidth: 2, title: 'خروج' });
             }
 
+            // Entry/Exit markers on candles if timestamps are available
+            try {
+                const tfMap = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400 };
+                const tfSec = tfMap[(data.timeframe || '15m')] || 900;
+                const candleTimes = new Set(candles.map(c => c.time));
+                const markers = [];
+
+                if (data.filled_at) {
+                    const entryTime = Math.floor((data.filled_at) / tfSec) * tfSec;
+                    if (candleTimes.has(entryTime)) {
+                        const buySide = (String(data.side || '').toLowerCase() === 'buy');
+                        markers.push({
+                            time: entryTime,
+                            position: buySide ? 'belowBar' : 'aboveBar',
+                            color: '#1e90ff',
+                            shape: buySide ? 'arrowUp' : 'arrowDown',
+                            text: 'ورود'
+                        });
+                    }
+                }
+                if (data.exit_at) {
+                    const exitTime = Math.floor((data.exit_at) / tfSec) * tfSec;
+                    if (candleTimes.has(exitTime)) {
+                        markers.push({
+                            time: exitTime,
+                            position: 'aboveBar',
+                            color: '#ffc107',
+                            shape: 'arrowDown',
+                            text: 'خروج'
+                        });
+                    }
+                }
+                if (markers.length) { series.setMarkers(markers); }
+            } catch (e) { /* ignore marker failures */ }
+
             // Fit content
             chart.timeScale().fitContent();
+            return chart;
         }
 
         function renderTfSwitch(activeTf, onSelect) {
@@ -463,14 +525,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         async function fetchAndRender(orderId, tf) {
             try {
+                setLoading(true);
                 const json = await fetchChartData(orderId, tf);
                 if (!json.success) {
                     alert(json.message || 'خطا در دریافت داده‌های نمودار');
                     return;
                 }
-                renderChart(json.data || {});
+                if (currentChart && typeof currentChart.remove === 'function') {
+                    try { currentChart.remove(); } catch (e) {}
+                }
+                container.innerHTML = '';
+                currentChart = renderChart(json.data || {});
+                setLoading(false);
             } catch (e) {
                 alert('خطا در ارتباط با سرور');
+                setLoading(false);
             }
         }
 
@@ -480,19 +549,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 const id = this.dataset.orderId;
                 openBackdrop();
                 try {
+                    setLoading(true);
                     const initial = await fetchChartData(id);
                     if (!initial.success) {
                         alert(initial.message || 'خطا در دریافت داده‌های نمودار');
                         return;
                     }
-                    const activeTf = (initial.data && initial.data.timeframe) ? initial.data.timeframe : '15m';
-                    renderTfSwitch(activeTf, async (tf) => {
-                        renderTfSwitch(tf, () => {});
+                    let activeTf = (initial.data && initial.data.timeframe) ? initial.data.timeframe : '15m';
+                    const onTfSelect = async (tf) => {
+                        if (isLoading) return; // prevent concurrent fetches
+                        activeTf = tf;
+                        renderTfSwitch(activeTf, onTfSelect);
                         await fetchAndRender(id, tf);
-                    });
-                    renderChart(initial.data || {});
+                    };
+                    renderTfSwitch(activeTf, onTfSelect);
+                    if (currentChart && typeof currentChart.remove === 'function') {
+                        try { currentChart.remove(); } catch (e) {}
+                    }
+                    container.innerHTML = '';
+                    currentChart = renderChart(initial.data || {});
+                    setLoading(false);
                 } catch (e) {
                     alert('خطا در ارتباط با سرور');
+                    setLoading(false);
                 }
             });
         });
@@ -507,8 +586,11 @@ document.addEventListener('DOMContentLoaded', function() {
             <div style="font-weight:600;">نمایش سفارش</div>
             <button id="closeChartModalBtn" class="delete-btn" style="height:auto; padding:6px 10px;">بستن</button>
         </div>
-        <div id="order-chart-wrapper" style="position:relative; height: 420px; width: 100%;">
+        <div id="order-chart-wrapper" style="position:relative; height: 420px; width: 100%; overflow:hidden;">
             <div id="order-chart-container" style="height: 100%; width: 100%;"></div>
+            <div id="order-chart-loading" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255,255,255,0.85); z-index: 2;">
+                <div class="loader" aria-label="Loading"></div>
+            </div>
             <div id="order-chart-tf" class="tf-switch" aria-label="انتخاب تایم‌فریم"></div>
         </div>
     </div>

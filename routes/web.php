@@ -59,9 +59,9 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-    Route::middleware('auth')->group(function () {
+Route::middleware('auth')->group(function () {
 
-        Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
+    Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
         Route::get('/orders/{order}/edit', [FuturesController::class, 'edit'])->name('order.edit');
         Route::get('/set-order', [FuturesController::class, 'create'])->name('order.create');
@@ -81,10 +81,10 @@ Route::get('/', function () {
         Route::post('/periods/{period}/end', [PeriodController::class, 'end'])->name('periods.end');
         // Recompute all periods metrics for current account type (backfill)
         Route::post('/periods/recompute-all', [PeriodController::class, 'recomputeAll'])->name('periods.recompute_all');
-        });
+    });
 
-        // User Tickets
-        Route::post('/tickets/report-journal', [TicketController::class, 'reportJournalIssue'])->name('tickets.report_journal');
+    // User Tickets
+    Route::post('/tickets/report-journal', [TicketController::class, 'reportJournalIssue'])->name('tickets.report_journal');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
 
@@ -108,7 +108,7 @@ Route::get('/', function () {
     });
 
     // Exchange Management Routes (requires authentication)
-Route::prefix('exchanges')->group(function () {
+    Route::prefix('exchanges')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('exchanges.index');
         Route::get('/create', [ExchangeController::class, 'create'])->name('exchanges.create');
         Route::post('/', [ExchangeController::class, 'store'])->name('exchanges.store');
@@ -118,12 +118,12 @@ Route::prefix('exchanges')->group(function () {
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
-    Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
-    Route::post('/{exchange}/enable-hedge', [ExchangeController::class, 'enableHedgeMode'])->name('exchanges.enable-hedge');
+        Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
+        Route::post('/{exchange}/enable-hedge', [ExchangeController::class, 'enableHedgeMode'])->name('exchanges.enable-hedge');
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
         Route::post('/{exchange}/test-real-connection', [ExchangeController::class, 'testRealConnection'])->name('exchanges.test-real-connection');
         Route::post('/{exchange}/test-demo-connection', [ExchangeController::class, 'testDemoConnection'])->name('exchanges.test-demo-connection');
-        
+
         // Routes for testing connections during creation (without existing exchange)
         Route::post('/test-real-connection', [ExchangeController::class, 'testConnectionApi'])->name('exchanges.test-real-connection-create');
         Route::post('/test-demo-connection', [ExchangeController::class, 'testConnectionApi'])->name('exchanges.test-demo-connection-create');
@@ -175,95 +175,95 @@ Route::prefix('exchanges')->group(function () {
     // Maintenance Routes (should also be protected)
 
 });
-Route::get('/schedule', function() {
+Route::get('/schedule', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}.separator{color:#007cba;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#e7f3ff;border-radius:5px;}</style></head><body>';
-    
+
     Artisan::call('futures:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-    
+
     Artisan::call('futures:enforce');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-    
+
     Artisan::call('futures:sync-sltp');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
-    
+
     sleep(10);
-    
+
     Artisan::call('futures:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-    
+
     Artisan::call('futures:enforce');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-    
+
     Artisan::call('futures:sync-sltp');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
-    
+
     sleep(10);
-    
+
     Artisan::call('futures:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-    
+
     Artisan::call('futures:enforce');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-    
+
     Artisan::call('futures:sync-sltp');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
-    
+
     sleep(10);
-    
+
     Artisan::call('futures:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-    
+
     Artisan::call('futures:enforce');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-    
+
     Artisan::call('futures:sync-sltp');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
-    
+
     echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">************************************************************DONE*******************************************************</div>';
     echo '</body></html>';
     return '';
 })->middleware('throttle:4');
 
-Route::get('/demo-schedule', function() {
+Route::get('/demo-schedule', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}.separator{color:#ff6b35;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#fff3e0;border-radius:5px;}</style></head><body>';
-    
+
     Artisan::call('demo:futures:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------------------ demo lifecycle done -----------------------------------------</div>';
-    
+
     Artisan::call('demo:futures:enforce');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">-------------------------------------- demo enforce done -------------------------------------------------</div>';
-    
+
     Artisan::call('demo:futures:sync-sltp');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ demo sync sl tp done --------------------------------------------------</div>';
-    
+
     Artisan::call('demo:spot:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div class="separator">------------------------------------------ demo spot lifecycle done --------------------------------------------------</div>';
-    
+
     echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">************************************************************DEMO DONE*******************************************************</div>';
     echo '</body></html>';
     return '';
 })->middleware('throttle:4');
 
-Route::get('/get-prices', function() {
+Route::get('/get-prices', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #28a745;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
-    
+
     Artisan::call('prices:save');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
@@ -271,9 +271,9 @@ Route::get('/get-prices', function() {
     return '';
 })->middleware('throttle:4');
 
-Route::get('/validate-exchanges', function() {
+Route::get('/validate-exchanges', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
-    
+
     Artisan::call('exchanges:validate-active --force');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div style="text-align:center;color:#007cba;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
@@ -281,9 +281,9 @@ Route::get('/validate-exchanges', function() {
     return '';
 })->middleware('throttle:2');
 
-Route::get('/demo-validate-exchanges', function() {
+Route::get('/demo-validate-exchanges', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
-    
+
     Artisan::call('demo:exchanges:validate-active --force');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">DEMO VALIDATION DONE</div>';
@@ -291,9 +291,9 @@ Route::get('/demo-validate-exchanges', function() {
     return '';
 })->middleware('throttle:2');
 
-Route::get('/spot-lifecycle', function() {
+Route::get('/spot-lifecycle', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #6f42c1;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
-    
+
     Artisan::call('spot:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div style="text-align:center;color:#6f42c1;font-weight:bold;font-size:18px;margin-top:20px;">DONE</div>';
@@ -301,9 +301,9 @@ Route::get('/spot-lifecycle', function() {
     return '';
 })->middleware('throttle:2');
 
-Route::get('/demo-spot-lifecycle', function() {
+Route::get('/demo-spot-lifecycle', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
-    
+
     Artisan::call('demo:spot:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
     echo '<div style="text-align:center;color:#ff6b35;font-weight:bold;font-size:18px;margin-top:20px;">DEMO SPOT LIFECYCLE DONE</div>';

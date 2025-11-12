@@ -122,6 +122,6 @@ class PeriodController extends Controller
         // Set cooldown for 10 minutes
         Cache::put($cooldownKey, 1, now()->addMinutes(10));
 
-        return back()->with('success', 'به‌روزرسانی ژورنال برای همه دوره‌ها انجام شد. اگر تغییرات را نمی‌بینید، بعد از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید.');
+        return back()->with('success', 'به‌روزرسانی ژورنال برای همه دوره‌ها انجام شد. اگر تغییرات را نمی‌بینید، بعد از ۱۵ دقیقه دوباره تلاش کنید. در صورت تداوم مشکل به ادمین اطلاع دهید. <a href="#" id="reportJournalIssue" class="btn btn-link" style="margin-inline-start:8px; text-decoration: underline;">گزارش مشکل</a>');
     }
 }

@@ -1406,6 +1406,22 @@ class FuturesController extends Controller
                     $metrics = $selectedPeriod->metrics_all ?? $metrics;
                 }
             }
+
+            // Fallback: if series arrays are empty (e.g., stale cache), compute on-demand
+            $seriesEmpty = empty($metrics['pnl_per_trade']) && empty($metrics['cum_pnl']) && empty($metrics['cum_pnl_percent']);
+            if ($seriesEmpty) {
+                $service = new \App\Services\JournalPeriodService();
+                $ids = null;
+                if ($userExchangeId !== 'all') {
+                    $ueValid = \App\Models\UserExchange::where('id', $userExchangeId)
+                        ->where('user_id', $user->id)
+                        ->first();
+                    if ($ueValid && ((bool)$ueValid->is_demo_active === $isDemo)) {
+                        $ids = [$ueValid->id];
+                    }
+                }
+                $metrics = $service->computeMetricsFor($selectedPeriod, $ids, $side);
+            }
         }
 
         // Map metrics to view variables
