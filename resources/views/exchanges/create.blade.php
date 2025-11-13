@@ -307,6 +307,12 @@
             @if(count($availableExchanges) > 0)
                 <!-- API Credentials Form -->
                 <div id="credentials-form" class="form-group hidden">
+                    <div class="form-group" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                        <div style="font-weight:600; color:#e5e7eb;">راهنمای دریافت کلیدهای API</div>
+                        <button type="button" id="open-api-help" class="btn" style="padding:6px 10px; background:#374151; color:#fff; border:1px solid rgba(255,255,255,0.1);">
+                            راهنمای دریافت API Key/Secret
+                        </button>
+                    </div>
                     <div class="form-group">
                         <label for="api_key">کلید API (API Key):</label>
                         <input id="api_key" type="text" name="api_key" autocomplete="off" value="{{ old('api_key') }}"
@@ -682,10 +688,153 @@ async function testDemoConnectionCreate() {
     }
 }
 
+// ------- API Help Modal (Create) ---------
+const ApiHelpCreate = (function(){
+    let modal, overlay, body;
+    function ensureModal() {
+        if (modal) return modal;
+        body = document.body;
+        overlay = document.createElement('div');
+        overlay.id = 'api-help-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.background = 'rgba(0,0,0,0.6)';
+        overlay.style.display = 'none';
+        overlay.style.zIndex = '9998';
+
+        modal = document.createElement('div');
+        modal.id = 'api-help-modal';
+        modal.style.position = 'fixed';
+        modal.style.inset = '10% 5% auto 5%';
+        modal.style.maxHeight = '80vh';
+        modal.style.overflow = 'auto';
+        modal.style.background = '#111827';
+        modal.style.border = '1px solid rgba(255,255,255,0.1)';
+        modal.style.borderRadius = '10px';
+        modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        modal.style.padding = '16px';
+        modal.style.color = '#e5e7eb';
+        modal.style.display = 'none';
+        modal.style.zIndex = '9999';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.justifyContent = 'space-between';
+        header.style.marginBottom = '10px';
+
+        const title = document.createElement('h3');
+        title.textContent = 'راهنمای دریافت API Key و Secret';
+        title.style.margin = '0';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.setAttribute('aria-label','بستن');
+        closeBtn.style.fontSize = '20px';
+        closeBtn.style.lineHeight = '20px';
+        closeBtn.style.padding = '6px 10px';
+        closeBtn.style.background = '#1f2937';
+        closeBtn.style.color = '#fff';
+        closeBtn.style.border = '1px solid rgba(255,255,255,0.1)';
+        closeBtn.style.borderRadius = '6px';
+        closeBtn.addEventListener('click', hide);
+
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        const content = document.createElement('div');
+        content.id = 'api-help-content';
+
+        modal.appendChild(header);
+        modal.appendChild(content);
+        body.appendChild(overlay);
+        body.appendChild(modal);
+
+        overlay.addEventListener('click', hide);
+        return modal;
+    }
+
+    function getSelectedExchange() {
+        const el = document.querySelector('#own-form input[name="exchange_name"]:checked');
+        return el ? el.value.toLowerCase() : null;
+    }
+
+    function helpHtmlFor(exchangeKey){
+        const commonWarn = '<div style="margin:10px 0; padding:10px; background:#1f2937; border:1px dashed rgba(255,255,255,0.15); border-radius:8px;">' +
+          'توجه: هنگام ساخت کلیدها، دسترسی معاملات (Trade)، اطلاعات بازار (Market Data) و فیوچرز را فعال کنید. IP WhiteList را غیرفعال کنید یا IP سرور را در لیست مجاز قرار دهید.'+
+        '</div>';
+
+        switch((exchangeKey||'').toLowerCase()){
+            case 'binance':
+                return `
+                <div>
+                    <h4 style="margin:6px 0 10px 0;">Binance</h4>
+                    <ol style="line-height:1.9; padding-right:18px;">
+                        <li>ورود به حساب: binance.com</li>
+                        <li>Profile → API Management</li>
+                        <li>Create API را بزنید و یک نام تعیین کنید</li>
+                        <li>در API Restrictions گزینه <b>Enable Futures</b> را فعال کنید</li>
+                        <li>مجوز معاملات Spot و Futures (Trade) را فعال کنید</li>
+                        <li>برای Testnet: futures-testnet.binancefuture.com → ایجاد API</li>
+                        <li>API Key و Secret را در فرم وارد کنید</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            case 'bybit':
+                return `
+                <div>
+                    <h4 style="margin:6px 0 10px 0;">Bybit</h4>
+                    <ol style="line-height:1.9; padding-right:18px;">
+                        <li>User Center → API Management</li>
+                        <li>Create New Key (System-generated)</li>
+                        <li>نوع حساب: <b>Unified Trading / Derivatives</b></li>
+                        <li>دسترسی‌های Order/Trade و Market Data را فعال کنید</li>
+                        <li>برای Testnet: testnet.bybit.com → API Management</li>
+                        <li>کلیدها را در فرم وارد کنید</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            case 'bingx':
+                return `
+                <div>
+                    <h4 style="margin:6px 0 10px 0;">BingX</h4>
+                    <ol style="line-height:1.9; padding-right:18px;">
+                        <li>User Center → API Management</li>
+                        <li>Create New API → تعیین نام</li>
+                        <li>مجوزهای Spot و Futures با سطح دسترسی معاملات</li>
+                        <li>در صورت نیاز، محیط Test فعال شود</li>
+                        <li>کلیدها را در فرم وارد کنید</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            default:
+                return `<div>لطفاً ابتدا صرافی را انتخاب کنید تا راهنما نمایش داده شود.</div>`;
+        }
+    }
+
+    function show(){
+        const m = ensureModal();
+        const key = getSelectedExchange();
+        const content = document.getElementById('api-help-content');
+        content.innerHTML = helpHtmlFor(key);
+        overlay.style.display = 'block';
+        m.style.display = 'block';
+    }
+    function hide(){
+        if (!modal) return;
+        overlay.style.display = 'none';
+        modal.style.display = 'none';
+    }
+    return { show, hide };
+})();
+
 // Check demo inputs on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkDemoInputs();
     switchTab('own');
+
+    const helpBtn = document.getElementById('open-api-help');
+    if (helpBtn) helpBtn.addEventListener('click', function(){ ApiHelpCreate.show(); });
 
     // Client-side validation: ensure at least one account type selected for company request
     const companyForm = document.getElementById('company-form');

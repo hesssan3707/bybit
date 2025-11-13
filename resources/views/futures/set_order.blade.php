@@ -654,8 +654,8 @@
 
             function formatPrice(v) {
                 if (!isFinite(v)) return '';
-                // Limit to 6 decimals for readability across exchanges
-                return Number(v).toFixed(6).replace(/\.0+$/,'');
+                // Shorter placeholder: show 2 decimals
+                return Number(v).toFixed(2).replace(/\.0+$/,'');
             }
 
             function computeAvgEntry() {
@@ -684,7 +684,7 @@
                 var minTpDistance = minProfitOverLoss * slDistance;
                 var minTpPrice = side === 'Buy' ? (avgEntry + minTpDistance) : (avgEntry - minTpDistance);
 
-                tpInput.placeholder = 'حداقل مقدار باید ' + formatPrice(minTpPrice) + ' باشد';
+                tpInput.placeholder = 'حداقل مقدار ' + formatPrice(minTpPrice);
             }
 
             // Update on SL change, and also when entry changes to keep guidance fresh

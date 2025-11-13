@@ -366,7 +366,8 @@
 
             function formatPrice(v) {
                 if (!isFinite(v)) return '';
-                return Number(v).toFixed(6).replace(/\.0+$/,'');
+                // Shorter placeholder: show 2 decimals
+                return Number(v).toFixed(2).replace(/\.0+$/,'');
             }
 
             function computeAvgEntry() {
@@ -389,7 +390,7 @@
                 var side = (slVal > avgEntry) ? 'Sell' : 'Buy';
                 var minTpDistance = minProfitOverLoss * slDistance;
                 var minTpPrice = side === 'Buy' ? (avgEntry + minTpDistance) : (avgEntry - minTpDistance);
-                tpInput.placeholder = 'حداقل مقدار باید ' + formatPrice(minTpPrice) + ' باشد';
+                tpInput.placeholder = 'حداقل مقدار ' + formatPrice(minTpPrice);
             }
 
             slInput.addEventListener('input', updateTpPlaceholder);
