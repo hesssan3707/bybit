@@ -13,7 +13,8 @@ class Order extends Model
     protected $guarded = [];
     protected $fillable = [
         'user_exchange_id', 'is_demo', 'order_id', 'order_link_id', 'symbol', 'entry_price', 'tp', 'sl', 'steps',
-        'expire_minutes', 'status', 'closed_at', 'filled_at', 'side', 'amount','filled_quantity','balance_at_creation', 'entry_low', 'entry_high','cancel_price'
+        'expire_minutes', 'status', 'closed_at', 'filled_at', 'side', 'amount','filled_quantity','balance_at_creation',
+        'initial_risk_percent', 'entry_low', 'entry_high','cancel_price'
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class Order extends Model
         'entry_high' => 'decimal:10',
         'filled_quantity' => 'decimal:8',
         'average_price' => 'decimal:4',
+        'initial_risk_percent' => 'decimal:2',
     ];
 
     /**

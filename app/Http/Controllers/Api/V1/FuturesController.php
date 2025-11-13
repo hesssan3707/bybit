@@ -109,7 +109,7 @@ class FuturesController extends Controller
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
             'expire' => 'nullable|integer|min:1|max:999',
-            'risk_percentage' => 'required|numeric|min:0.1',
+            'risk_percentage' => 'required|numeric|min:0.1|max:100',
             'cancel_price' => 'nullable|numeric',
         ]);
 
@@ -198,6 +198,7 @@ class FuturesController extends Controller
                     'side'             => strtolower($side),
                     'amount'           => $finalQty,
                     'balance_at_creation' => $capitalUSD,
+                    'initial_risk_percent' => round((float)$validated['risk_percentage'], 2),
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
