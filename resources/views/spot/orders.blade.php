@@ -209,6 +209,22 @@
         </div>
     @endif
 
+    @php
+        $symbols = isset($filterSymbols) && is_array($filterSymbols) && count($filterSymbols) > 0
+            ? $filterSymbols
+            : (collect($orders->items() ?? [])->pluck('symbol')->filter()->unique()->values()->all());
+    @endphp
+
+    @include('partials.filter-bar', [
+        'action' => route('spot.orders.view'),
+        'method' => 'GET',
+        'from' => request('from'),
+        'to' => request('to'),
+        'symbol' => request('symbol'),
+        'symbols' => $symbols,
+        'resetUrl' => route('spot.orders.view')
+    ])
+
     <div class="stats-row">
         <div class="stat-card">
             <h4>کل سفارش‌ها</h4>
@@ -313,7 +329,7 @@
         </table>
     </div>
 
-    {{ $orders->links() }}
+    {{ $orders->appends(request()->except('page'))->links() }}
 </div>
 @endsection
 

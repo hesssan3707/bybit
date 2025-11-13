@@ -14,46 +14,7 @@
         margin-bottom: 25px;
     }
 
-    /* Mobile redirect buttons */
-    .mobile-redirect-section {
-        display: none;
-        margin-bottom: 20px;
-    }
-
-    .redirect-buttons {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-
-    .redirect-btn {
-        flex: 1;
-        padding: 15px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-        color: white;
-        text-decoration: none;
-        border-radius: 10px;
-        text-align: center;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,123,255,0.3);
-    }
-
-    .redirect-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,123,255,0.4);
-        color: white;
-        text-decoration: none;
-    }
-
-    .redirect-btn.secondary {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-    }
-
-    .redirect-btn.secondary:hover {
-        box-shadow: 0 6px 20px rgba(40,167,69,0.4);
-    }
+    /* (Old mobile redirect buttons removed; now using compact tabs partial) */
 
     .table-responsive {
         overflow-x: auto;
@@ -190,20 +151,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media screen and (max-width: 768px) {
-        .mobile-redirect-section {
-            display: block;
-        }
-
-        .redirect-buttons {
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .redirect-btn {
-            padding: 18px;
-            font-size: 16px;
-        }
-
         table thead { display: none; }
         table tr {
             display: block;
@@ -254,20 +201,24 @@
         </div>
     @endif
 
-    <!-- Mobile redirect buttons (only visible on mobile) -->
-    <div class="mobile-redirect-section">
-        <div class="redirect-buttons">
-            <a href="{{ route('futures.orders') }}" class="redirect-btn">
-                📊 سفارش‌های آتی
-            </a>
-            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
-                📈 سود و زیان
-            </a>
-            <a href="{{ route('futures.journal') }}" class="redirect-btn">
-                📓 ژورنال
-            </a>
-        </div>
-    </div>
+    @include('partials.mobile-tabs-futures')
+
+    @php
+        $symbols = isset($filterSymbols) && is_array($filterSymbols) && count($filterSymbols) > 0
+            ? $filterSymbols
+            : (collect($orders->items() ?? [])->pluck('symbol')->filter()->unique()->values()->all());
+    @endphp
+
+    @include('partials.filter-bar', [
+        'action' => route('futures.orders'),
+        'method' => 'GET',
+        'from' => request('from'),
+        'to' => request('to'),
+        'symbol' => request('symbol'),
+        'symbols' => $symbols,
+        'hideSymbol' => (auth()->user()->future_strict_mode ?? false),
+        'resetUrl' => route('futures.orders')
+    ])
 
     <!-- Orders Table -->
     <div class="table-responsive">
@@ -340,7 +291,7 @@
             </tbody>
         </table>
     </div>
-    {{ $orders->links() }}
+    {{ $orders->appends(request()->except('page'))->links() }}
 </div>
 @endsection
 

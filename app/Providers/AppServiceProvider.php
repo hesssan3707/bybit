@@ -30,5 +30,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Register observers
         Trade::observe(TradeObserver::class);
+
+        // Optionally override session lifetime (including remember-me) via env
+        $rememberLifetime = env('REMEMBER_ME_LIFETIME_MINUTES');
+        if (is_numeric($rememberLifetime) && (int)$rememberLifetime > 0) {
+            config(['session.lifetime' => (int)$rememberLifetime]);
+        }
     }
 }

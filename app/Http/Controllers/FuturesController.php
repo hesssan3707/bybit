@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class FuturesController extends Controller
 {
@@ -134,7 +135,7 @@ class FuturesController extends Controller
 
 
 
-    public function index()
+    public function index(Request $request)
     {
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
@@ -152,17 +153,60 @@ class FuturesController extends Controller
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
 
-        $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
-            $query->whereIn('status', ['pending', 'filled'])
-                ->orWhere('updated_at', '>=', $threeDaysAgo);
-        })
-            ->latest('updated_at')
-            ->paginate(20);
+        // Read filters
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $symbol = $request->input('symbol');
+        $hasAnyFilter = filled($from) || filled($to) || filled($symbol);
+
+        // Apply filters when present
+        if ($hasAnyFilter) {
+            // Apply symbol filter unless strict mode is active
+            $strict = (bool) ($user->future_strict_mode ?? false);
+            if (!$strict && filled($symbol)) {
+                $ordersQuery->where('symbol', $symbol);
+            }
+
+            // Date range filters on updated_at
+            if (filled($from)) {
+                try {
+                    $fromDate = Carbon::createFromFormat('Y-m-d', $from)->startOfDay();
+                    $ordersQuery->where('updated_at', '>=', $fromDate);
+                } catch (\Throwable $e) {}
+            }
+            if (filled($to)) {
+                try {
+                    $toDate = Carbon::createFromFormat('Y-m-d', $to)->endOfDay();
+                    $ordersQuery->where('updated_at', '<=', $toDate);
+                } catch (\Throwable $e) {}
+            }
+        } else {
+            // Default window: show pending/filled or recent updates (last 3 days)
+            $ordersQuery->where(function ($query) use ($threeDaysAgo) {
+                $query->whereIn('status', ['pending', 'filled'])
+                    ->orWhere('updated_at', '>=', $threeDaysAgo);
+            });
+        }
+
+        $orders = $ordersQuery->latest('updated_at')->paginate(20);
+
+        // Build symbol options for filter dropdown (distinct for user + account type)
+        $symbolOptions = Order::forUser(auth()->id())
+            ->when($currentExchange, function ($q) use ($currentExchange) {
+                $q->accountType($currentExchange->is_demo_active);
+            })
+            ->whereNotNull('symbol')
+            ->select('symbol')
+            ->distinct()
+            ->orderBy('symbol')
+            ->pluck('symbol')
+            ->toArray();
 
         return view('futures.orders_list', [
             'orders' => $orders,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
-            'exchangeMessage' => $exchangeStatus['message']
+            'exchangeMessage' => $exchangeStatus['message'],
+            'filterSymbols' => $symbolOptions,
         ]);
     }
 
@@ -1257,7 +1301,7 @@ class FuturesController extends Controller
     /**
      * Display P&L history for the authenticated user
      */
-    public function pnlHistory()
+    public function pnlHistory(Request $request)
     {
         $tradesQuery = Trade::forUser(auth()->id());
 
@@ -1268,14 +1312,39 @@ class FuturesController extends Controller
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
 
+        // Read filters
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $symbol = $request->input('symbol');
+        $strict = (bool) ($user->future_strict_mode ?? false);
+
         // Closed trades (paginate) and order by closed_at desc
         $closedTradesQuery = clone $tradesQuery;
-        $closedTrades = $closedTradesQuery->whereNotNull('closed_at')->latest('closed_at')->paginate(20);
+        $closedTradesQuery->whereNotNull('closed_at');
+        if (!$strict && filled($symbol)) {
+            $closedTradesQuery->where('symbol', $symbol);
+        }
+        if (filled($from)) {
+            try {
+                $fromDate = Carbon::createFromFormat('Y-m-d', $from)->startOfDay();
+                $closedTradesQuery->where('closed_at', '>=', $fromDate);
+            } catch (\Throwable $e) {}
+        }
+        if (filled($to)) {
+            try {
+                $toDate = Carbon::createFromFormat('Y-m-d', $to)->endOfDay();
+                $closedTradesQuery->where('closed_at', '<=', $toDate);
+            } catch (\Throwable $e) {}
+        }
+        $closedTrades = $closedTradesQuery->latest('closed_at')->paginate(20);
 
         // Open trades (closed_at is null)
         $openTradesQuery = Trade::forUser(auth()->id());
         if ($currentExchange) {
             $openTradesQuery->accountType($currentExchange->is_demo_active);
+        }
+        if (!$strict && filled($symbol)) {
+            $openTradesQuery->where('symbol', $symbol);
         }
         $openTrades = $openTradesQuery->whereNull('closed_at')->get();
 
@@ -1317,6 +1386,18 @@ class FuturesController extends Controller
             } catch (\Throwable $e) {}
         }
 
+        // Build symbol options for filter dropdown (distinct for user + account type)
+        $symbolOptions = Trade::forUser(auth()->id())
+            ->when($currentExchange, function ($q) use ($currentExchange) {
+                $q->accountType($currentExchange->is_demo_active);
+            })
+            ->whereNotNull('symbol')
+            ->select('symbol')
+            ->distinct()
+            ->orderBy('symbol')
+            ->pluck('symbol')
+            ->toArray();
+
         return view('futures.pnl_history', [
             'closedTrades' => $closedTrades,
             'openTrades' => $openTrades,
@@ -1325,6 +1406,7 @@ class FuturesController extends Controller
             'manualCloseBanActive' => $manualCloseBanActive,
             'manualCloseBanEndsAt' => $manualCloseBanEndsAt,
             'manualCloseBanRemainingFa' => $manualCloseBanRemainingFa,
+            'filterSymbols' => $symbolOptions,
         ]);
     }
 

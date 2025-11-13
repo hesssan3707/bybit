@@ -143,20 +143,6 @@
       .pnl-badge { font-size: 1.05em; padding: 6px 12px; }
     }
     @media screen and (max-width: 768px) {
-        .mobile-redirect-section {
-            display: block;
-        }
-
-        .redirect-buttons {
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .redirect-btn {
-            padding: 18px;
-            font-size: 16px;
-        }
-
         /* Turn tables into cards on mobile */
         table thead { display: none; }
         table tr {
@@ -213,20 +199,26 @@
         </div>
     @endif
 
-    <!-- Mobile redirect buttons (only visible on mobile) -->
-    <div class="mobile-redirect-section">
-        <div class="redirect-buttons">
-            <a href="{{ route('futures.orders') }}" class="redirect-btn">
-                📊 سفارش‌های آتی
-            </a>
-            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
-                📈 سود و زیان
-            </a>
-            <a href="{{ route('futures.journal') }}" class="redirect-btn">
-                📓 ژورنال
-            </a>
-        </div>
-    </div>
+    @include('partials.mobile-tabs-futures')
+
+    @php
+        $symbols = isset($filterSymbols) && is_array($filterSymbols) && count($filterSymbols) > 0
+            ? $filterSymbols
+            : (collect($openTrades ?? [])->pluck('symbol')
+                ->merge(collect(($closedTrades ?? null) && method_exists($closedTrades, 'items') ? $closedTrades->items() : ($closedTrades ?? []))->pluck('symbol'))
+                ->filter()->unique()->values()->all());
+    @endphp
+
+    @include('partials.filter-bar', [
+        'action' => route('futures.pnl_history'),
+        'method' => 'GET',
+        'from' => request('from'),
+        'to' => request('to'),
+        'symbol' => request('symbol'),
+        'symbols' => $symbols,
+        'hideSymbol' => (auth()->user()->future_strict_mode ?? false),
+        'resetUrl' => route('futures.pnl_history')
+    ])
 
     <div class="table-responsive">
         <table>
@@ -296,7 +288,7 @@
         </table>
     </div>
 
-    {{ $closedTrades->links() }}
+    {{ $closedTrades->appends(request()->except('page'))->links() }}
     <form id="closeAllForm" action="{{ route('futures.orders.close_all') }}" method="POST" style="display:none;">
         @csrf
     </form>

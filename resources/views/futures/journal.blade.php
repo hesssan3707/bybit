@@ -73,21 +73,7 @@
         margin-bottom: 30px;
         overflow-x: hidden;
     }
-    .mobile-redirect-section { display: none; }
-    .redirect-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
-    .redirect-btn {
-        flex: 1; padding: 15px; background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-        color: white; text-decoration: none; border-radius: 10px; text-align: center; font-weight: bold;
-        transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,123,255,0.3);
-    }
-    .redirect-btn:hover {
-        transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,123,255,0.4);
-        color: white; text-decoration: none;
-    }
-    .redirect-btn.secondary {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-    }
+    /* (Old mobile redirect buttons removed; now using compact tabs partial) */
     /* Badges for period state */
     .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; margin-inline-start:8px; }
     .badge-active { background: #ffffff; color:#111; border: 1px solid rgba(0,0,0,0.25); }
@@ -179,9 +165,7 @@
         .stats-grid {
             grid-template-columns: 1fr;
         }
-        .mobile-redirect-section { display: block; }
-        .redirect-buttons { flex-direction: column; gap: 15px; }
-        .redirect-btn { padding: 18px; font-size: 16px; }
+        /* Compact tabs partial handles mobile navigation */
         .modal-content { max-width: 92vw; }
         /* Mobile: fixed same-size width for period chips and glassy filters box */
         .period-chip { width: 100%; }
@@ -199,50 +183,23 @@
 <div class="glass-card container">
     <h2>ژورنال معاملاتی</h2>
 
-    <!-- Mobile redirect buttons (only visible on mobile) -->
-    <div class="mobile-redirect-section">
-        <div class="redirect-buttons">
-            <a href="{{ route('futures.orders') }}" class="redirect-btn">
-                📊 سفارش‌های آتی
-            </a>
-            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
-                📈 سود و زیان
-            </a>
-            <a href="{{ route('futures.journal') }}" class="redirect-btn">
-                📓 ژورنال
-            </a>
-        </div>
-    </div>
+    @include('partials.mobile-tabs-futures')
 
-    @php($recentPeriods = $periods->sortByDesc(function($p){ return $p->ended_at ?? $p->started_at; })->take(10))
+    @php
+        $recentPeriods = $periods->sortByDesc(function($p){ return $p->ended_at ?? $p->started_at; })->take(10);
+    @endphp
 
-    <form method="GET" action="{{ route('futures.journal') }}" class="filters" id="journalFiltersForm">
-        <select name="period_id" class="form-control">
-            @foreach($recentPeriods as $p)
-                <option value="{{ $p->id }}" {{ ($selectedPeriod && $selectedPeriod->id === $p->id) ? 'selected' : '' }}>
-                    {{ $p->name }} — {{ optional($p->started_at)->format('Y-m-d') }} تا {{ $p->ended_at ? $p->ended_at->format('Y-m-d') : 'جاری' }}
-                    {{ $p->is_default ? ' • پیش‌فرض' : '' }}
-                    {{ $p->is_active ? ' • فعال' : ' • پایان‌یافته' }}
-                </option>
-            @endforeach
-        </select>
-        <select name="side" class="form-control">
-            <option value="all" {{ $side == 'all' ? 'selected' : '' }}>همه</option>
-            <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>معامله های خرید</option>
-            <option value="sell" {{ $side == 'sell' ? 'selected' : '' }}>معامله های فروش</option>
-        </select>
-        <select name="user_exchange_id" class="form-control">
-            <option value="all" {{ $userExchangeId == 'all' ? 'selected' : '' }}>همه صرافی‌ها</option>
-            @foreach($exchangeOptions as $ex)
-                <option value="{{ $ex->id }}" {{ (string)$userExchangeId === (string)$ex->id ? 'selected' : '' }}>
-                    {{ strtoupper($ex->exchange_name) }} — {{ $ex->is_demo_active ? 'دمو' : 'واقعی' }}
-                    
-                </option>
-            @endforeach
-        </select>
-        
-        <button type="submit" class="btn btn-primary">فیلتر</button>
-    </form>
+    @php
+        $extraHtml = view('partials.journal-extra-filters', compact('recentPeriods', 'selectedPeriod', 'side', 'exchangeOptions', 'userExchangeId'))->render();
+    @endphp
+    @include('partials.filter-bar', [
+        'action' => route('futures.journal'),
+        'method' => 'GET',
+        'hideDate' => true,
+        'hideSymbol' => true,
+        'extraHtml' => $extraHtml,
+        'resetUrl' => route('futures.journal')
+    ])
 
     <div class="glass-card" style="margin-bottom:20px;padding:15px;border-radius:10px;background: rgba(255, 255, 255, 0.05);">
         <div style="display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;">
@@ -486,10 +443,11 @@
 
         // Select period helper
         window.selectPeriod = function(id) {
-            const form = document.getElementById('journalFiltersForm');
+            const form = document.querySelector('.filter-bar');
+            if (!form) return;
             const selectEl = form.querySelector('select[name="period_id"]');
             if (selectEl) {
-                selectEl.value = id;
+                selectEl.value = String(id);
                 form.submit();
             }
         };

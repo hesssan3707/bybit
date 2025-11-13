@@ -138,13 +138,39 @@ class SpotTradingController extends Controller
         if ($currentExchange) {
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
+
+        // Read filters
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $symbol = $request->input('symbol');
         
+        if (filled($symbol)) {
+            $ordersQuery->where('symbol', $symbol);
+        }
+        if (filled($from)) {
+            try { $ordersQuery->where('created_at', '>=', \Carbon\Carbon::createFromFormat('Y-m-d', $from)->startOfDay()); } catch (\Throwable $e) {}
+        }
+        if (filled($to)) {
+            try { $ordersQuery->where('created_at', '<=', \Carbon\Carbon::createFromFormat('Y-m-d', $to)->endOfDay()); } catch (\Throwable $e) {}
+        }
+
         $orders = $ordersQuery->latest('created_at')->paginate(20);
+
+        // Build symbol options for filter dropdown (distinct for user + account type)
+        $symbolOptions = SpotOrder::forUser(auth()->id())
+            ->when($currentExchange, function ($q) use ($currentExchange) { $q->accountType($currentExchange->is_demo_active); })
+            ->whereNotNull('symbol')
+            ->select('symbol')
+            ->distinct()
+            ->orderBy('symbol')
+            ->pluck('symbol')
+            ->toArray();
 
         return view('spot.orders', [
             'orders' => $orders,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
-            'exchangeMessage' => $exchangeStatus['message']
+            'exchangeMessage' => $exchangeStatus['message'],
+            'filterSymbols' => $symbolOptions,
         ]);
     }
 
