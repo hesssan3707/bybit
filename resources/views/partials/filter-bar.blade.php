@@ -15,7 +15,7 @@
 <style>
     .filter-bar {
         margin: 12px 0 18px 0;
-        background: rgba(255,255,255,0.06);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         border: 0 solid rgba(255,255,255,0.12);
         border-radius: 12px;
         padding: 12px;
