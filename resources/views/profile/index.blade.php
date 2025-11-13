@@ -297,7 +297,7 @@
 
         /* Exchanges Section */
         .exchanges-section {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.05))
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.05));
             backdrop-filter: blur(15px);
             border-radius: 20px;
             padding: 30px;
