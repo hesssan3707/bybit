@@ -1,6 +1,5 @@
 <div style="display:grid; grid-template-columns: repeat(12, 1fr); gap:10px;">
     <div style="grid-column: span 4;">
-        <label class="filter-label">دوره</label>
         <select name="period_id" class="filter-select">
             @foreach($recentPeriods as $p)
                 <option value="{{ $p->id }}" {{ ($selectedPeriod && $selectedPeriod->id === $p->id) ? 'selected' : '' }}>
@@ -12,7 +11,6 @@
         </select>
     </div>
     <div style="grid-column: span 4;">
-        <label class="filter-label">جهت</label>
         <select name="side" class="filter-select">
             <option value="all" {{ $side == 'all' ? 'selected' : '' }}>همه</option>
             <option value="buy" {{ $side == 'buy' ? 'selected' : '' }}>معامله های خرید</option>
@@ -20,7 +18,6 @@
         </select>
     </div>
     <div style="grid-column: span 4;">
-        <label class="filter-label">صرافی</label>
         <select name="user_exchange_id" class="filter-select">
             <option value="all" {{ $userExchangeId == 'all' ? 'selected' : '' }}>همه صرافی‌ها</option>
             @foreach($exchangeOptions as $ex)

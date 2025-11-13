@@ -14,46 +14,7 @@
         margin-bottom: 25px;
     }
 
-    /* Mobile redirect buttons */
-    .mobile-redirect-section {
-        display: none;
-        margin-bottom: 20px;
-    }
-
-    .redirect-buttons {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-
-    .redirect-btn {
-        flex: 1;
-        padding: 15px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-        color: white;
-        text-decoration: none;
-        border-radius: 10px;
-        text-align: center;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,123,255,0.3);
-    }
-
-    .redirect-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,123,255,0.4);
-        color: white;
-        text-decoration: none;
-    }
-
-    .redirect-btn.secondary {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-    }
-
-    .redirect-btn.secondary:hover {
-        box-shadow: 0 6px 20px rgba(40,167,69,0.4);
-    }
+    /* Old mobile redirect buttons removed; using compact tabs partial instead */
 
     .table-responsive {
         overflow-x: auto;

@@ -14,7 +14,10 @@
         margin-bottom: 25px;
     }
 
-    /* (Old mobile redirect buttons removed; now using compact tabs partial) */
+    /* Enforce new tabs by hiding any legacy mobile redirect buttons if present */
+    .mobile-redirect-section,
+    .redirect-buttons,
+    .redirect-btn { display: none !important; }
 
     .table-responsive {
         overflow-x: auto;

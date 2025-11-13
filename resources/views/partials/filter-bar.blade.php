@@ -16,7 +16,7 @@
     .filter-bar {
         margin: 12px 0 18px 0;
         background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.12);
+        border: 0 solid rgba(255,255,255,0.12);
         border-radius: 12px;
         padding: 12px;
     }
@@ -24,7 +24,7 @@
         display: grid;
         grid-template-columns: repeat(12, 1fr);
         gap: 10px;
-        align-items: end;
+        align-items: center;
     }
     .filter-field { grid-column: span 3; }
     .filter-actions { grid-column: span 3; display:flex; gap:8px; }
@@ -33,31 +33,41 @@
         width: 100%;
         background: rgba(255,255,255,0.10);
         color: #fff;
-        border: 1px solid rgba(255,255,255,0.22);
+        border: 0 solid rgba(255,255,255,0.22);
         border-radius: 8px;
         padding: 8px 10px;
+        height: 38px;
+        box-sizing: border-box;
     }
     .filter-input::placeholder { color: rgba(255,255,255,0.65); }
     .filter-button {
-        background: var(--primary-color);
+        background: rgba(255,255,255,0.10);
         color: #fff;
-        border: none;
+        border: 0 solid rgba(255,255,255,0.22);
         border-radius: 8px;
-        padding: 10px 14px;
+        padding: 8px 14px;
         font-weight: 600;
-        transition: background-color 0.2s ease;
+        transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
-    .filter-button:hover { background: var(--primary-hover); }
+    .filter-button:hover { background: rgba(255,255,255,0.14); box-shadow: 0 6px 16px rgba(255,255,255,0.08); }
     .reset-button {
-        background: rgba(220,53,69,0.9);
+        background: rgba(255,255,255,0.10);
         color: #fff;
-        border: none;
+        border: 0 solid rgba(255,255,255,0.22);
         border-radius: 8px;
-        padding: 10px 14px;
+        padding: 8px 14px;
         font-weight: 600;
         text-decoration: none;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
+    .reset-button:hover { background: rgba(255,255,255,0.14); box-shadow: 0 6px 16px rgba(255,255,255,0.08); }
     @media (max-width: 992px) {
         .filter-field { grid-column: span 6; }
         .filter-actions { grid-column: span 12; }
@@ -79,20 +89,15 @@
     <div class="filter-grid">
         @unless($hideDate)
             <div class="filter-field">
-                <label class="filter-label">از تاریخ</label>
                 <input type="date" name="from" class="filter-input" value="{{ $fromVal }}" />
-                <span class="filter-hint">YYYY-MM-DD</span>
             </div>
             <div class="filter-field">
-                <label class="filter-label">تا تاریخ</label>
                 <input type="date" name="to" class="filter-input" value="{{ $toVal }}" />
-                <span class="filter-hint">YYYY-MM-DD</span>
             </div>
         @endunless
 
         @unless($hideSymbol)
             <div class="filter-field">
-                <label class="filter-label">نماد</label>
                 <select name="symbol" class="filter-select">
                     <option value="">همه نمادها</option>
                     @foreach($symbols as $sym)

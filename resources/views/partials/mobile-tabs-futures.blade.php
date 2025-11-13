@@ -38,11 +38,12 @@
     }
     .mobile-tabs .request-switch__btn + .request-switch__btn { border-right: 1px solid var(--border-color); }
     .mobile-tabs .request-switch__btn:hover { background: rgba(255,255,255,0.08); }
+    /* Subtle glassy active state */
     .mobile-tabs .request-switch__btn.active {
-        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
-        color: #000;
+        background: rgba(255,255,255,0.14);
+        color: #fff;
         font-weight: 700;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 16px rgba(255,255,255,0.08);
         text-decoration: none;
     }
     .mobile-tabs .request-switch__btn:focus-visible {
@@ -64,17 +65,17 @@
         <a href="{{ route('futures.orders') }}"
            class="request-switch__btn {{ request()->routeIs('futures.orders') ? 'active' : '' }}"
            aria-current="{{ request()->routeIs('futures.orders') ? 'page' : 'false' }}">
-            📊 سفارش‌های آتی
+             سفارش‌های آتی
         </a>
         <a href="{{ route('futures.pnl_history') }}"
            class="request-switch__btn {{ request()->routeIs('futures.pnl_history') ? 'active' : '' }}"
            aria-current="{{ request()->routeIs('futures.pnl_history') ? 'page' : 'false' }}">
-            📈 سود و زیان
+             سود و زیان
         </a>
         <a href="{{ route('futures.journal') }}"
            class="request-switch__btn {{ request()->routeIs('futures.journal') ? 'active' : '' }}"
            aria-current="{{ request()->routeIs('futures.journal') ? 'page' : 'false' }}">
-            📓 ژورنال
+             ژورنال
         </a>
     </nav>
     <div style="height: 6px;"></div>
