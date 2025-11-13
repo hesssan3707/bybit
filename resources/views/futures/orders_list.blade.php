@@ -406,6 +406,15 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentChart = null;
         let isLoading = false;
 
+        function renderNoData(message) {
+            const msg = message || 'داده‌های مورد نیاز در دسترس نیست.';
+            container.innerHTML = '';
+            const box = document.createElement('div');
+            box.style.cssText = 'height:100%;display:flex;align-items:center;justify-content:center;color:#6c757d;font-weight:600;font-size:14px;text-align:center;padding:16px;';
+            box.textContent = msg;
+            container.appendChild(box);
+        }
+
         function openBackdrop() {
             backdrop.style.display = 'flex';
             setLoading(true);
@@ -528,7 +537,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 setLoading(true);
                 const json = await fetchChartData(orderId, tf);
                 if (!json.success) {
-                    alert(json.message || 'خطا در دریافت داده‌های نمودار');
+                    renderNoData(json.message);
+                    setLoading(false);
                     return;
                 }
                 if (currentChart && typeof currentChart.remove === 'function') {
@@ -538,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentChart = renderChart(json.data || {});
                 setLoading(false);
             } catch (e) {
-                alert('خطا در ارتباط با سرور');
+                renderNoData('خطا در ارتباط با سرور');
                 setLoading(false);
             }
         }
@@ -551,11 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     setLoading(true);
                     const initial = await fetchChartData(id);
-                    if (!initial.success) {
-                        alert(initial.message || 'خطا در دریافت داده‌های نمودار');
-                        return;
-                    }
-                    let activeTf = (initial.data && initial.data.timeframe) ? initial.data.timeframe : '15m';
+                    let activeTf = (initial.success && initial.data && initial.data.timeframe) ? initial.data.timeframe : '15m';
                     const onTfSelect = async (tf) => {
                         if (isLoading) return; // prevent concurrent fetches
                         activeTf = tf;
@@ -563,14 +569,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         await fetchAndRender(id, tf);
                     };
                     renderTfSwitch(activeTf, onTfSelect);
-                    if (currentChart && typeof currentChart.remove === 'function') {
-                        try { currentChart.remove(); } catch (e) {}
+                    if (!initial.success) {
+                        renderNoData(initial.message);
+                        setLoading(false);
+                        return;
                     }
+                    if (currentChart && typeof currentChart.remove === 'function') { try { currentChart.remove(); } catch (e) {} }
                     container.innerHTML = '';
                     currentChart = renderChart(initial.data || {});
                     setLoading(false);
                 } catch (e) {
-                    alert('خطا در ارتباط با سرور');
+                    renderNoData('خطا در ارتباط با سرور');
                     setLoading(false);
                 }
             });

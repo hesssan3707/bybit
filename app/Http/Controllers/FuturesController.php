@@ -1746,78 +1746,37 @@ class FuturesController extends Controller
         }
 
         try {
-            // Use the exchange account tied to this order
-            $userExchange = $order->userExchange;
-            $exchangeService = ExchangeFactory::createForUserExchange($userExchange);
-            $exchangeName = method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : 'bybit';
-
             // Determine timeframe: query param or user default, allowed list
             $allowedTfs = ['1m','5m','15m','1h','4h'];
             $userDefaultTf = \App\Models\UserAccountSetting::getUserSetting($user->id, 'default_timeframe', '15m');
             $tfRequested = strtolower((string)$request->query('tf', $userDefaultTf));
             $timeframe = in_array($tfRequested, $allowedTfs, true) ? $tfRequested : '15m';
 
-            // Compute window anchored to entry and exit
-            $tfSeconds = match ($timeframe) {
-                '1m' => 60,
-                '5m' => 300,
-                '15m' => 900,
-                '1h' => 3600,
-                '4h' => 14400,
-                default => 900,
-            };
-            // Entry timestamp: prefer filled_at, then created_at; final fallback resolved after candle fetch
-            $entryAt = $order->filled_at ? $order->filled_at->getTimestamp() : ($order->created_at ? $order->created_at->getTimestamp() : null);
-            $trade = $order->trade; // hasOne relation
-            $exitAt = $trade ? ($trade->closed_at ? $trade->closed_at->getTimestamp() : null) : null;
+            // Read-only path: use stored snapshot only
+            $snapshot = $order->candleData;
+            $tfToColumn = [
+                '1m' => 'candles_m1',
+                '5m' => 'candles_m5',
+                '15m' => 'candles_m15',
+                '1h' => 'candles_h1',
+                '4h' => 'candles_h4',
+            ];
+            $column = $tfToColumn[$timeframe] ?? 'candles_m15';
 
-            // Provisional window: if entry missing, anchor around "now"; will re-anchor after candle fetch
-            $provisionalEntry = $entryAt ?? (int) floor(now()->getTimestamp());
-            $startTs = $provisionalEntry - (60 * $tfSeconds);
-            $endTs = ($exitAt ?? ($provisionalEntry + (10 * $tfSeconds))) + 0; // include 10 candles after exit; if no exit, after entry
-
-            // Request enough candles to cover window; filter afterwards
-            $barsBetween = ($exitAt && $entryAt) ? max(0, (int)floor(($exitAt - $entryAt) / $tfSeconds)) : 10;
-            $limit = min(500, 60 + $barsBetween + 10 + 50); // add margin
-
-            if (!method_exists($exchangeService, 'getKlines')) {
-                throw new \Exception('این صرافی از دریافت کندل‌ها پشتیبانی نمی‌کند.');
-            }
-            // Localhost: skip exchange call and generate synthetic candles
-            if (app()->environment('local')) {
-                $candles = $this->generateSyntheticCandles($startTs, $endTs, $tfSeconds, (float)$order->entry_price, $order->side);
-            } else {
-                $raw = $exchangeService->getKlines($order->symbol, $timeframe, $limit);
-                $candles = $this->normalizeKlines($exchangeName, $raw);
-                // Filter to requested time window
-                $candles = array_values(array_filter($candles, function($c) use ($startTs, $endTs) {
-                    $t = (int)($c['time'] ?? 0);
-                    return $t >= (int)floor($startTs) && $t <= (int)floor($endTs);
-                }));
-                // Fallback: if empty due to API window/limit, synthesize
-                if (count($candles) === 0) {
-                    $candles = $this->generateSyntheticCandles($startTs, $endTs, $tfSeconds, (float)$order->entry_price, $order->side);
-                }
+            if (!$snapshot || empty($snapshot->$column)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'داده‌های مورد نیاز در دسترس نیست.',
+                ]);
             }
 
-            // If original entry timestamp was missing, re-anchor window to earliest candle
-            if (!$entryAt && count($candles) > 0) {
-                $earliest = $candles[0]['time'];
-                // Recompute window relative to earliest candle
-                $entryAt = (int) $earliest;
-                $startTs = $entryAt - (60 * $tfSeconds);
-                $endTs = ($exitAt ?? ($entryAt + (10 * $tfSeconds)));
-                // Re-filter candles to the re-anchored window
-                $candles = array_values(array_filter($candles, function($c) use ($startTs, $endTs) {
-                    $t = (int)($c['time'] ?? 0);
-                    return $t >= (int)floor($startTs) && $t <= (int)floor($endTs);
-                }));
-            }
-
-            // Build overlay levels and exit info
+            $candles = $snapshot->$column;
+            $startTs = (int)($candles[0]['time'] ?? ($snapshot->entry_time?->getTimestamp() ?? 0));
+            $endTs = (int)($candles[count($candles)-1]['time'] ?? ($snapshot->exit_time?->getTimestamp() ?? 0));
+            $trade = $order->trade;
             $exitPrice = $trade ? (float)($trade->avg_exit_price ?? 0) : 0;
 
-            $payload = [
+            return response()->json([
                 'success' => true,
                 'data' => [
                     'symbol' => $order->symbol,
@@ -1827,15 +1786,12 @@ class FuturesController extends Controller
                     'tp' => (float)$order->tp,
                     'sl' => (float)$order->sl,
                     'exit' => $exitPrice > 0 ? $exitPrice : null,
-                    'exit_at' => $exitAt,
-                    // Provide the resolved anchor for frontend alignment; keep original filled_at for metadata
+                    'exit_at' => $trade ? ($trade->closed_at ? $trade->closed_at->getTimestamp() : null) : null,
                     'filled_at' => $order->filled_at ? $order->filled_at->getTimestamp() : null,
                     'window' => ['start' => (int)$startTs, 'end' => (int)$endTs],
                     'candles' => $candles,
                 ],
-            ];
-
-            return response()->json($payload);
+            ]);
         } catch (\Exception $e) {
             $msg = $this->parseExchangeError($e->getMessage());
             return response()->json(['success' => false, 'message' => $msg], 500);

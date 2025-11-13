@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Trade;
 use App\Models\UserBan;
 use App\Services\Exchanges\ExchangeFactory;
+use App\Jobs\CollectOrderCandlesJob;
 use Exception;
 
 class FuturesLifecycleManager extends Command
@@ -338,6 +339,11 @@ class FuturesLifecycleManager extends Command
                     $trade->save();
 
                     // Note: ban creation is consolidated later after finalize to avoid duplication
+                    try {
+                        CollectOrderCandlesJob::dispatch($trade->id);
+                    } catch (\Throwable $e) {
+                        $this->warn('[Real] خطا در صف کردن کار جمع‌آوری کندل‌ها: ' . $e->getMessage());
+                    }
                 }
             }
         } catch (Exception $e) {

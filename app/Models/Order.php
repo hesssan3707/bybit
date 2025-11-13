@@ -31,6 +31,11 @@ class Order extends Model
         'initial_risk_percent' => 'decimal:2',
     ];
 
+    public function candleData()
+    {
+        return $this->hasOne(\App\Models\OrderCandleData::class);
+    }
+
     /**
      * Get the user exchange that owns the order
      */
