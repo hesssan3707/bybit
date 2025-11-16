@@ -48,7 +48,6 @@
         padding: 8px 14px;
         font-weight: 600;
         transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-        height: 38px;
         display: inline-flex;
         align-items: center;
         justify-content: center;

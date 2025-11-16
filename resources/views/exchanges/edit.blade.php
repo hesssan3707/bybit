@@ -93,7 +93,7 @@
         box-shadow: 0 0 8px rgba(0,123,255,0.25);
         outline: none;
     }
-    button {
+    .btn {
         width: 100%;
         padding: 14px;
         color: #000000;
@@ -105,7 +105,7 @@
         cursor: pointer;
         transition: opacity 0.3s;
     }
-    button:hover {
+    .btn:hover {
         opacity: 0.9;
     }
     .invalid-feedback {
@@ -316,7 +316,7 @@
                 @enderror
             </div>
 
-            <button type="submit">
+            <button type="submit" class="btn">
                 ارسال درخواست به‌روزرسانی
             </button>
         </form>

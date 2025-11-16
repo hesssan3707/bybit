@@ -54,7 +54,8 @@ return [
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            // Write to general daily logs and a separate error-only channel
+            'channels' => ['daily', 'errors'],
             'ignore_exceptions' => false,
         ],
 
@@ -68,9 +69,23 @@ return [
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
+            // Keep all levels here but auto-rotate/cleanup based on env
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 14,
+            'days' => env('LOG_DAYS', 7),
             'replace_placeholders' => true,
+            // Suppress repeated duplicates via Monolog tap
+            'tap' => [App\Logging\DedupTap::class],
+        ],
+
+        // Dedicated error channel with longer retention for incidents
+        'errors' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/errors.log'),
+            'level' => 'error',
+            'days' => env('LOG_ERRORS_DAYS', 30),
+            'replace_placeholders' => true,
+            // Also suppress duplicates for errors to avoid flood
+            'tap' => [App\Logging\DedupTap::class],
         ],
 
         'slack' => [

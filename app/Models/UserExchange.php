@@ -365,12 +365,7 @@ class UserExchange extends Model
                 try {
                     $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($nextExchange);
                     $exchangeService->switchPositionMode(true);
-                    \Illuminate\Support\Facades\Log::info('Hedge mode activated for new default exchange during deactivation', [
-                        'user_id' => $this->user_id,
-                        'new_default_exchange_id' => $nextExchange->id,
-                        'new_default_exchange_name' => $nextExchange->exchange_name,
-                        'deactivated_exchange_id' => $this->id
-                    ]);
+                    // Duplicate info log removed; controller-level logging covers this state change
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::warning('Failed to activate hedge mode for new default exchange during deactivation', [
                         'user_id' => $this->user_id,

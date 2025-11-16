@@ -137,11 +137,19 @@
         .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e5e7eb; }
         .modal-header h3 { margin: 0; font-size: 1.1rem; color: #111827; }
         .modal-close { background: transparent; border: none; cursor: pointer; font-size: 20px; color: #6b7280; }
-        .modal-body { padding: 16px; text-align: right; direction: rtl; }
+        .modal-body { padding: 16px; text-align: right; direction: rtl; max-height: 65vh; overflow-y: auto; }
         .modal-body ul { margin: 0; padding-right: 18px; }
         .modal-body li { margin: 8px 0; color: #374151; }
         .modal-footer { padding: 14px 16px; border-top: 1px solid #e5e7eb; text-align: left; }
         .modal-footer .btn-primary { background: #111827; color: white; border-radius: 8px; padding: 10px 14px; border: none; cursor: pointer; }
+
+        /* Improve modal usability on short viewports */
+        .modal-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+        .modal-card { max-height: 90vh; display: flex; flex-direction: column; }
+        @media (max-height: 600px) {
+            .modal-overlay { align-items: flex-start; }
+            .modal-card { margin-top: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -245,28 +253,26 @@ function togglePassword(fieldId) {
 <div id="siteInfoModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="siteInfoTitle">
     <div class="modal-card">
         <div class="modal-header">
-            <h3 id="siteInfoTitle">آشنایی با Trader Bridge</h3>
+            <h3 id="siteInfoTitle">Trader Bridge چیست و چگونه کمک می‌کند؟</h3>
             <button class="modal-close" onclick="closeInfoModal()" aria-label="بستن">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="modal-body">
             <p>
-                Trader Bridge ابزارهای قدرتمندی برای تریدرهای حرفه‌ای ارائه می‌دهد. با اتصال به صرافی‌های فعال
-                Binance، Bybit و BingX، امکان مدیریت همزمان چند اکانت کاربری فراهم شده و از طریق API، قابلیت اتوماسیون
-                و توسعه یکپارچه در اختیار شما قرار می‌گیرد.
+                Trader Bridge یک محیط یکپارچه و چند‌صرافی برای مدیریت معاملاتی شماست؛ ساده، امن و مخصوص
+                تریدرهایی که می‌خواهند بدون دغدغهٔ اجرا، روی کیفیت تصمیم‌ها تمرکز کنند.
             </p>
             <ul>
-                <li>مدیریت سفارش‌ها بدون وابستگی به اینترنت: عملکرد پایدار حتی با قطع VPN یا کندی اینترنت، مناسب برای تریدرهای فعال در Binance، Bybit و BingX.</li>
-                <li>امنیت بالا: اتصال با IP ثابت و حذف ریسک بلاک شدن اکانت به دلیل تغییر IP.</li>
-                <li>کنترل احساسات با Strict Mode: تعریف قوانین سخت‌گیرانه (مانند حد ضرر اتوماتیک) برای کاهش ضرر.</li>
-                <li>معاملات گروهی در فیوچرز: همکاری آسان‌تر و توزیع ریسک بین تریدرها در صرافی‌های پشتیبانی‌شده.</li>
-                <li>پشتیبانی از چند کاربر و اکانت: مدیریت چندین اکانت به‌صورت همزمان.</li>
-                <li>ثبت پوزیشن فیوچرز به روش نو: به‌جای وارد کردن حجم/Amount، فقط قیمت‌های ورود (Entry)، حد سود (TP) و حد ضرر (SL) را ثبت می‌کنید؛ مدیریت ریسک ساده‌تر و دقیق‌تر.</li>
-                <li>معامله در هر صرافی بدون داشتن حساب شخصی: از طریق دسترسی «صرافی شرکت»، در Binance، Bybit و BingX با کارمزدهای بهتر و نقدینگی بالاتر معامله کنید.</li>
+                <li>پشتیبانی چند‌صرافی: مدیریت همزمان حساب‌ها در Binance، Bybit و BingX.</li>
+                <li>اجرای پایدار سفارش‌ها: حتی با قطع VPN یا کندی اینترنت، سفارش‌ها مطمئن اجرا می‌شوند.</li>
+                <li>امنیت حرفه‌ای: اتصال با IP ثابت و دسترسی‌های کنترل‌شده برای محافظت از حساب‌ها.</li>
+                <li>ثبت ساده پوزیشن فیوچرز: فقط Entry، TP و SL را وارد کنید؛ مدیریت ریسک دقیق‌تر.</li>
+                <li>اتوماسیون و توسعه‌پذیری: دسترسی API برای یکپارچه‌سازی و ساخت ابزارهای اختصاصی.</li>
+                <li>دسترسی «صرافی شرکت»: کارمزد بهتر و نقدینگی بالاتر بدون نیاز به حساب شخصی.</li>
             </ul>
-            <p class="help-text">
-                با ورود، شما در محیطی چندصرافی و یکپارچه برای معاملات اسپات و فیوچرز فعالیت می‌کنید.
+            <p>
+                بسیاری از تریدرها پایبندی به قوانین معاملاتی خود را دشوار می‌دانند و همین موضوع گاهی به تصمیم‌های احساسی منجر می‌شود. در Trader Bridge، وقتی Strict Mode را فعال کنید، «کنترل کافی» روی معاملات شما اعمال می‌شود و هرگز لیکویید نمی‌شوید. اگر استراتژی‌تان سودده باشد، می‌توانید آن را اینجا به‌درستی تست کنید؛ و با ژورنالینگ، جزئیات معاملات و عملکرد استراتژی‌تان را در هر بازهٔ زمانی دلخواه مرور کنید.
             </p>
         </div>
         <div class="modal-footer">

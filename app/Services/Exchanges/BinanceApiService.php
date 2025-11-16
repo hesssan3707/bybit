@@ -167,11 +167,7 @@ class BinanceApiService implements ExchangeApiServiceInterface
             'dualSidePosition' => $hedgeMode ? 'true' : 'false'
         ], true);
 
-        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'hedge_mode' => $hedgeMode,
-            'exchange' => 'binance',
-            'user_exchange_id' => $this->userExchange->id
-        ]);
+        // Duplicate info log removed; rely on higher-level controller logging
 
         return $result;
     }

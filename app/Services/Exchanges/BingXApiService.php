@@ -136,11 +136,7 @@ class BingXApiService implements ExchangeApiServiceInterface
             'dualSidePosition' => $hedgeMode ? 'true' : 'false'
         ]);
 
-        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'hedge_mode' => $hedgeMode,
-            'exchange' => 'bingx',
-            'user_exchange_id' => $this->userExchange->id
-        ]);
+        // Duplicate info log removed; rely on higher-level controller logging
 
         return $result;
     }
