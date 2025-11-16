@@ -31,9 +31,10 @@
         box-shadow: 0 4px 15px rgba(0,123,255,0.15);
     }
     .exchange-option.selected {
-        border-color: var(--primary-color);
-        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
-        color: white;
+        border-color: rgba(59,130,246,0.35);
+        background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08));
+        color: #e5e7eb;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.18);
     }
     .exchange-info {
         display: flex;
@@ -185,10 +186,10 @@
     .request-switch__btn + .request-switch__btn { border-right: 1px solid var(--border-color); }
     .request-switch__btn:hover { background: rgba(255,255,255,0.08); }
     .request-switch__btn.active {
-        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
-        color: #000;
+        background: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.10));
+        color: #e5e7eb;
         font-weight: 700;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.18);
     }
     .request-switch__btn:focus-visible {
         outline: none;
@@ -216,10 +217,10 @@
         align-items: center;
         gap: 8px;
         padding: 10px 14px;
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--glass-border);
         border-radius: 22px;
-        background: #1f2937;
-        color: #fff;
+        background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+        color: #e5e7eb;
         transition: all 0.2s ease;
         user-select: none;
     }
@@ -232,10 +233,10 @@
     }
     .account-type:hover .account-type__box { background: #243142; }
     .account-type input:checked + .account-type__box {
-        border-color: var(--primary-color);
-        background: linear-gradient(135deg, var(--primary-color), rgba(255,255,255,0.9));
-        color: #000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: rgba(59,130,246,0.35);
+        background: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.10));
+        color: #f3f4f6;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.18);
     }
     .account-type input:checked + .account-type__box .account-type__dot {
         background: #111827;
@@ -248,12 +249,15 @@
 <div class="glass-card container">
 
     <div class="form-card">
+        <a href="{{ route('exchanges.index') }}" class="btn btn-glass btn-glass-primary is-active" style="width:95%; margin-bottom:12px;text-decoration:none">
+            بازگشت به مدیریت صرافی‌ها
+        </a>
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
 
         <!-- تب‌های انتخاب نوع درخواست -->
         <div class="request-switch">
-            <button type="button" class="request-switch__btn active" id="switch-own" onclick="switchTab('own')">اتصال با کلیدهای خود</button>
-            <button type="button" class="request-switch__btn" id="switch-company" onclick="switchTab('company')">درخواست دسترسی صرافی شرکت</button>
+<button type="button" class="request-switch__btn active" id="switch-own" onclick="switchTab('own')">درخواست اتصال صرافی شخصی</button>
+<button type="button" class="request-switch__btn" id="switch-company" onclick="switchTab('company')">درخواست ایجاد صرافی </button>
         </div>
 
         @if($errors->any())
@@ -307,9 +311,8 @@
             @if(count($availableExchanges) > 0)
                 <!-- API Credentials Form -->
                 <div id="credentials-form" class="form-group hidden">
-                    <div class="form-group" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                        <div style="font-weight:600; color:#e5e7eb;">راهنمای دریافت کلیدهای API</div>
-                        <button type="button" id="open-api-help" class="btn" style="padding:6px 10px; background:#374151; color:#fff; border:1px solid rgba(255,255,255,0.1);">
+                    <div class="form-group" style="display:flex; align-items:center; justify-content:flex-start; gap:12px;">
+                        <button type="button" id="open-api-help" class="btn btn-glass btn-glass-muted is-active" style="padding:6px 10px;">
                             راهنمای دریافت API Key/Secret
                         </button>
                     </div>
@@ -372,17 +375,20 @@
                     </div>
 
 
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <button type="button" onclick="testRealConnectionCreate()" class="btn" id="test-real-btn-create" style="margin-left: 10px; background-color: #007bff; color: white;">
-                            تست اتصال حساب واقعی
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <button type="button" onclick="testRealConnectionCreate()" class="btn btn-glass btn-glass-info is-active" id="test-real-btn-create" style="margin-left: 10px;">
+                            <i class="fas fa-plug"></i> تست اتصال حساب واقعی
                         </button>
                         
-                        <button type="button" onclick="testDemoConnectionCreate()" class="btn" id="test-demo-btn-create" style="background-color: #28a745; color: white; display: none;">
-                            تست اتصال حساب دمو
+                        <button type="button" onclick="testDemoConnectionCreate()" class="btn btn-glass btn-glass-success is-active" id="test-demo-btn-create" style="display: none;">
+                            <i class="fas fa-vial"></i> تست اتصال حساب دمو
                         </button>
                     </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <small style="color:#6b7280;">این دکمه‌ها فقط تست اتصال هستند و درخواست ارسال نمی‌شود.</small>
+                    </div>
 
-                    <button type="submit" class="btn">
+                    <button type="submit" class="btn btn-glass btn-glass-primary is-active">
                         ارسال درخواست فعال‌سازی
                     </button>
                 </div>
@@ -391,12 +397,11 @@
 
             <!-- هشدار اختصاصی برای تب درخواست دسترسی صرافی شرکت -->
             <div id="company-warning" class="warning-box" style="display:none;border-radius:8px;">
-                <h4>راهنمای درخواست دسترسی صرافی شرکت:</h4>
+                <h4>راهنمای درخواست دسترسی صرافی شرکتی:</h4>
                 <ul>
-                    <li>پس از بررسی و تأیید مدیر، دسترسی حساب شرکت برای شما فعال می‌شود.</li>
-                    <li>نیازی به وارد کردن API Key و Secret نیست؛ کلیدها توسط تیم شرکت ثبت می‌شود.</li>
+                    <li>پس از بررسی و تأیید مدیر، دسترسی حساب شرکتی برای شما فعال می‌شود.</li>
+                    <li>نیازی به وارد کردن API Key و Secret نیست؛ کلیدها توسط سایت ایجاد و به شما اختصاص داده میشود.</li>
                     <li>می‌توانید یکی یا هر دو نوع حساب (واقعی و دمو) را انتخاب کنید.</li>
-                    <li>در تست لوکال، اتصال به صرافی انجام نمی‌شود و بررسی‌ها روی سرور انجام خواهد شد.</li>
                 </ul>
             </div>
 
@@ -433,25 +438,26 @@
                 <label>نوع حساب (امکان انتخاب چندگانه):</label>
                 <div class="account-type-group">
                     <label class="account-type">
-                        <input type="checkbox" name="account_types[]" value="live">
-                        <span class="account-type__box">
-                            <span class="account-type__dot" aria-hidden="true"></span>
+                        <input id="company-type-live" type="checkbox" name="account_types[]" value="live">
+                        <span class="account-type__box radio-glass">
+                            <span class="account-type__dot radio-dot" aria-hidden="true"></span>
                             واقعی (Live)
                         </span>
                     </label>
                     <label class="account-type">
-                        <input type="checkbox" name="account_types[]" value="demo">
-                        <span class="account-type__box">
-                            <span class="account-type__dot" aria-hidden="true"></span>
+                        <input id="company-type-demo" type="checkbox" name="account_types[]" value="demo">
+                        <span class="account-type__box radio-glass">
+                            <span class="account-type__dot radio-dot" aria-hidden="true"></span>
                             دمو (Demo)
                         </span>
                     </label>
                 </div>
+                <div id="company-pending-info" style="color:#6b7280; margin-top:8px; display:none; font-size:13px;"></div>
             </div>
 
             
 
-            <button type="submit" class="btn">
+            <button type="submit" class="btn btn-glass btn-glass-primary is-active">
                 ارسال درخواست دسترسی صرافی شرکت
             </button>
         </form>
@@ -497,8 +503,8 @@ function selectExchangeOwn(exchangeName, color) {
     // Select current exchange
     const selectedOption = document.getElementById(`own-exchange-${exchangeName}`);
     selectedOption.classList.add('selected');
-    selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
-    selectedOption.style.color = 'white';
+    selectedOption.style.background = '';
+    selectedOption.style.color = '';
 
     // Check the radio button
     selectedOption.querySelector('input[type="radio"]').checked = true;
@@ -521,14 +527,17 @@ function selectExchangeCompany(exchangeName, color) {
     // Select current exchange
     const selectedOption = document.getElementById(`company-exchange-${exchangeName}`);
     selectedOption.classList.add('selected');
-    selectedOption.style.background = `linear-gradient(135deg, ${color}, rgba(255,255,255,0.9))`;
-    selectedOption.style.color = 'white';
+    selectedOption.style.background = '';
+    selectedOption.style.color = '';
 
     // Check the radio button
     selectedOption.querySelector('input[type="radio"]').checked = true;
 
     // Update form styling to match exchange color
     document.documentElement.style.setProperty('--primary-color', color);
+
+    // Apply locks for pending company requests on selected exchange
+    applyCompanyTypeLocks(exchangeName);
 }
 
 function checkDemoInputs() {
@@ -597,28 +606,34 @@ async function testRealConnectionCreate() {
 
         if (data.success) {
             btn.textContent = '✓ موفق';
-            btn.style.backgroundColor = '#28a745';
+            btn.classList.remove('btn-glass-info','btn-glass-danger');
+            btn.classList.add('btn-glass-success');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#007bff';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-info');
                 btn.disabled = false;
             }, 2000);
         } else {
             btn.textContent = '✗ خطا';
-            btn.style.backgroundColor = '#dc3545';
+            btn.classList.remove('btn-glass-info','btn-glass-success');
+            btn.classList.add('btn-glass-danger');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#007bff';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-info');
                 btn.disabled = false;
             }, 2000);
             modernAlert(data.message || 'خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
-        btn.style.backgroundColor = '#dc3545';
+        btn.classList.remove('btn-glass-info','btn-glass-success');
+        btn.classList.add('btn-glass-danger');
         setTimeout(() => {
             btn.textContent = originalText;
-            btn.style.backgroundColor = '#007bff';
+            btn.classList.remove('btn-glass-success','btn-glass-danger');
+            btn.classList.add('btn-glass-info');
             btn.disabled = false;
         }, 2000);
         modernAlert('خطا در برقراری ارتباط با سرور', 'error', 'خطا در تست اتصال');
@@ -659,29 +674,35 @@ async function testDemoConnectionCreate() {
 
         if (data.success) {
             button.textContent = '✓ موفق';
-            button.style.backgroundColor = '#28a745';
+            button.classList.remove('btn-glass-info','btn-glass-danger');
+            button.classList.add('btn-glass-success');
             setTimeout(() => {
                 button.textContent = originalText;
-                button.style.backgroundColor = '#28a745';
+                button.classList.remove('btn-glass-success','btn-glass-danger');
+                button.classList.add('btn-glass-success');
                 button.disabled = false;
             }, 2000);
             modernAlert(data.message || 'تست اتصال حساب دمو موفق بود', 'success', 'تست اتصال موفق');
         } else {
             button.textContent = '✗ خطا';
-            button.style.backgroundColor = '#dc3545';
+            button.classList.remove('btn-glass-info','btn-glass-success');
+            button.classList.add('btn-glass-danger');
             setTimeout(() => {
                 button.textContent = originalText;
-                button.style.backgroundColor = '#28a745';
+                button.classList.remove('btn-glass-success','btn-glass-danger');
+                button.classList.add('btn-glass-success');
                 button.disabled = false;
             }, 2000);
             modernAlert(data.message || 'خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         button.textContent = '✗ خطا';
-        button.style.backgroundColor = '#dc3545';
+        button.classList.remove('btn-glass-success');
+        button.classList.add('btn-glass-danger');
         setTimeout(() => {
             button.textContent = originalText;
-            button.style.backgroundColor = '#28a745';
+            button.classList.remove('btn-glass-danger');
+            button.classList.add('btn-glass-success');
             button.disabled = false;
         }, 2000);
         modernAlert('خطا در برقراری ارتباط با سرور', 'error', 'خطا در تست اتصال');
@@ -690,92 +711,25 @@ async function testDemoConnectionCreate() {
 
 // ------- API Help Modal (Create) ---------
 const ApiHelpCreate = (function(){
-    let modal, overlay, body;
-    function ensureModal() {
-        if (modal) return modal;
-        body = document.body;
-        overlay = document.createElement('div');
-        overlay.id = 'api-help-overlay';
-        overlay.style.position = 'fixed';
-        overlay.style.inset = '0';
-        overlay.style.background = 'rgba(0,0,0,0.6)';
-        overlay.style.display = 'none';
-        overlay.style.zIndex = '9998';
-
-        modal = document.createElement('div');
-        modal.id = 'api-help-modal';
-        modal.style.position = 'fixed';
-        modal.style.inset = '10% 5% auto 5%';
-        modal.style.maxHeight = '80vh';
-        modal.style.overflow = 'auto';
-        modal.style.background = '#111827';
-        modal.style.border = '1px solid rgba(255,255,255,0.1)';
-        modal.style.borderRadius = '10px';
-        modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-        modal.style.padding = '16px';
-        modal.style.color = '#e5e7eb';
-        modal.style.display = 'none';
-        modal.style.zIndex = '9999';
-
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.alignItems = 'center';
-        header.style.justifyContent = 'space-between';
-        header.style.marginBottom = '10px';
-
-        const title = document.createElement('h3');
-        title.textContent = 'راهنمای دریافت API Key و Secret';
-        title.style.margin = '0';
-
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '×';
-        closeBtn.setAttribute('aria-label','بستن');
-        closeBtn.style.fontSize = '20px';
-        closeBtn.style.lineHeight = '20px';
-        closeBtn.style.padding = '6px 10px';
-        closeBtn.style.background = '#1f2937';
-        closeBtn.style.color = '#fff';
-        closeBtn.style.border = '1px solid rgba(255,255,255,0.1)';
-        closeBtn.style.borderRadius = '6px';
-        closeBtn.addEventListener('click', hide);
-
-        header.appendChild(title);
-        header.appendChild(closeBtn);
-
-        const content = document.createElement('div');
-        content.id = 'api-help-content';
-
-        modal.appendChild(header);
-        modal.appendChild(content);
-        body.appendChild(overlay);
-        body.appendChild(modal);
-
-        overlay.addEventListener('click', hide);
-        return modal;
-    }
-
     function getSelectedExchange() {
         const el = document.querySelector('#own-form input[name="exchange_name"]:checked');
         return el ? el.value.toLowerCase() : null;
     }
-
     function helpHtmlFor(exchangeKey){
-        const commonWarn = '<div style="margin:10px 0; padding:10px; background:#1f2937; border:1px dashed rgba(255,255,255,0.15); border-radius:8px;">' +
+        const commonWarn = '<div style="margin:10px 0; padding:10px; background:#f9fafb; border:1px dashed #e5e7eb; border-radius:8px; color:#111;">' +
           'توجه: هنگام ساخت کلیدها، دسترسی معاملات (Trade)، اطلاعات بازار (Market Data) و فیوچرز را فعال کنید. IP WhiteList را غیرفعال کنید یا IP سرور را در لیست مجاز قرار دهید.'+
         '</div>';
-
         switch((exchangeKey||'').toLowerCase()){
             case 'binance':
                 return `
                 <div>
                     <h4 style="margin:6px 0 10px 0;">Binance</h4>
-                    <ol style="line-height:1.9; padding-right:18px;">
+                    <ol style="line-height:1.9; padding-right:18px; text-align:right;">
                         <li>ورود به حساب: binance.com</li>
                         <li>Profile → API Management</li>
                         <li>Create API را بزنید و یک نام تعیین کنید</li>
-                        <li>در API Restrictions گزینه <b>Enable Futures</b> را فعال کنید</li>
-                        <li>مجوز معاملات Spot و Futures (Trade) را فعال کنید</li>
-                        <li>برای Testnet: futures-testnet.binancefuture.com → ایجاد API</li>
+                        <li>مجوزهای معاملات Spot و Futures را فعال کنید</li>
+                        <li>برای Testnet: futures-testnet.binancefuture.com</li>
                         <li>API Key و Secret را در فرم وارد کنید</li>
                     </ol>
                     ${commonWarn}
@@ -784,13 +738,11 @@ const ApiHelpCreate = (function(){
                 return `
                 <div>
                     <h4 style="margin:6px 0 10px 0;">Bybit</h4>
-                    <ol style="line-height:1.9; padding-right:18px;">
+                    <ol style="line-height:1.9; padding-right:18px; text-align:right;">
                         <li>User Center → API Management</li>
-                        <li>Create New Key (System-generated)</li>
-                        <li>نوع حساب: <b>Unified Trading / Derivatives</b></li>
-                        <li>دسترسی‌های Order/Trade و Market Data را فعال کنید</li>
-                        <li>برای Testnet: testnet.bybit.com → API Management</li>
-                        <li>کلیدها را در فرم وارد کنید</li>
+                        <li>Create New Key → تعیین نام</li>
+                        <li>Unified/Derivatives را انتخاب و مجوزها را فعال کنید</li>
+                        <li>برای Testnet: testnet.bybit.com</li>
                     </ol>
                     ${commonWarn}
                 </div>`;
@@ -798,7 +750,7 @@ const ApiHelpCreate = (function(){
                 return `
                 <div>
                     <h4 style="margin:6px 0 10px 0;">BingX</h4>
-                    <ol style="line-height:1.9; padding-right:18px;">
+                    <ol style="line-height:1.9; padding-right:18px; text-align:right;">
                         <li>User Center → API Management</li>
                         <li>Create New API → تعیین نام</li>
                         <li>مجوزهای Spot و Futures با سطح دسترسی معاملات</li>
@@ -811,21 +763,14 @@ const ApiHelpCreate = (function(){
                 return `<div>لطفاً ابتدا صرافی را انتخاب کنید تا راهنما نمایش داده شود.</div>`;
         }
     }
-
     function show(){
-        const m = ensureModal();
         const key = getSelectedExchange();
-        const content = document.getElementById('api-help-content');
-        content.innerHTML = helpHtmlFor(key);
-        overlay.style.display = 'block';
-        m.style.display = 'block';
+        const html = helpHtmlFor(key);
+        showAlertModal({ title: 'راهنمای دریافت API Key و Secret', message: '', type: 'info' });
+        const msgEl = document.getElementById('alertModalMessage');
+        if (msgEl) { msgEl.innerHTML = html; }
     }
-    function hide(){
-        if (!modal) return;
-        overlay.style.display = 'none';
-        modal.style.display = 'none';
-    }
-    return { show, hide };
+    return { show };
 })();
 
 // Check demo inputs on page load
@@ -851,6 +796,47 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Inject pending company requests map for gating
+    window.pendingCompanyMap = window.pendingCompanyMap || @json($pendingCompanyMap ?? []);
 });
+
+function applyCompanyTypeLocks(exchangeName) {
+    const map = window.pendingCompanyMap || {};
+    const pendingTypes = map[exchangeName] || [];
+    const liveCb = document.getElementById('company-type-live');
+    const demoCb = document.getElementById('company-type-demo');
+    const infoEl = document.getElementById('company-pending-info');
+
+    // Reset state
+    [liveCb, demoCb].forEach(cb => {
+        if (!cb) return;
+        cb.disabled = false;
+        cb.checked = false;
+        const box = cb.closest('.account-type')?.querySelector('.account-type__box');
+        if (box) box.style.opacity = '1';
+    });
+    if (infoEl) { infoEl.style.display = 'none'; infoEl.textContent = ''; }
+
+    // Apply locks
+    let messages = [];
+    if (pendingTypes.includes('live') && liveCb) {
+        liveCb.disabled = true;
+        const box = liveCb.closest('.account-type')?.querySelector('.account-type__box');
+        if (box) box.style.opacity = '0.5';
+        messages.push('واقعی');
+    }
+    if (pendingTypes.includes('demo') && demoCb) {
+        demoCb.disabled = true;
+        const box = demoCb.closest('.account-type')?.querySelector('.account-type__box');
+        if (box) box.style.opacity = '0.5';
+        messages.push('دمو');
+    }
+
+    if (messages.length > 0 && infoEl) {
+        infoEl.style.display = 'block';
+        infoEl.textContent = 'برای این صرافی درخواست در انتظار بررسی دارید؛ نوع ' + messages.join(' و ') + ' غیرفعال شد.';
+    }
+}
 </script>
 @endsection

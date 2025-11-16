@@ -115,11 +115,16 @@ Route::middleware('auth')->group(function () {
         // Company-provided exchange request (no user API keys)
         Route::post('/company-request', [CompanyExchangeRequestController::class, 'store'])
             ->name('exchanges.company-request.store');
+        // Withdraw company-provided exchange request (user-initiated)
+        Route::post('/company-request/{requestItem}/withdraw', [CompanyExchangeRequestController::class, 'withdraw'])
+            ->name('exchanges.company-request.withdraw');
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
         Route::post('/{exchange}/switch-mode', [ExchangeController::class, 'switchMode'])->name('exchanges.switch-mode');
         Route::post('/{exchange}/enable-hedge', [ExchangeController::class, 'enableHedgeMode'])->name('exchanges.enable-hedge');
+        // Cancel a pending activation/update request (user-initiated)
+        Route::post('/{exchange}/cancel-request', [ExchangeController::class, 'cancelRequest'])->name('exchanges.cancel-request');
         Route::post('/{exchange}/test-connection', [ExchangeController::class, 'testConnection'])->name('exchanges.test');
         Route::post('/{exchange}/test-real-connection', [ExchangeController::class, 'testRealConnection'])->name('exchanges.test-real-connection');
         Route::post('/{exchange}/test-demo-connection', [ExchangeController::class, 'testDemoConnection'])->name('exchanges.test-demo-connection');

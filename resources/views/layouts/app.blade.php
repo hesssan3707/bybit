@@ -138,6 +138,73 @@
             opacity: 0;
             visibility: hidden;
         }
+
+        /* Glass theme buttons */
+        .btn-glass {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            border: 1px solid var(--glass-border);
+            background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+            color: #e5e7eb;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            transition: background .2s ease, transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+        }
+        .btn-glass:hover { background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.10)); transform: translateY(-1px); }
+        .btn-glass:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(60%) contrast(0.9) saturate(0.7); }
+        .btn-glass.is-active {
+            background: linear-gradient(135deg, rgba(255,255,255,0.20), rgba(255,255,255,0.12));
+            border-color: rgba(59,130,246,0.45);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+            color: #ffffff;
+        }
+        .btn-glass.is-disabled {
+            opacity: .45;
+            filter: grayscale(80%) contrast(0.85) saturate(0.6);
+            pointer-events: none;
+        }
+
+        .btn-glass-primary   { background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(255,255,255,0.06)); border-color: rgba(59,130,246,0.35); }
+        .btn-glass-success   { background: linear-gradient(135deg, rgba(34,197,94,0.22), rgba(255,255,255,0.06)); border-color: rgba(34,197,94,0.35); }
+        .btn-glass-danger    { background: linear-gradient(135deg, rgba(239,68,68,0.22), rgba(255,255,255,0.06)); border-color: rgba(239,68,68,0.35); }
+        .btn-glass-warning   { background: linear-gradient(135deg, rgba(245,158,11,0.22), rgba(255,255,255,0.06)); border-color: rgba(245,158,11,0.35); }
+        .btn-glass-info      { background: linear-gradient(135deg, rgba(14,165,233,0.22), rgba(255,255,255,0.06)); border-color: rgba(14,165,233,0.35); }
+        .btn-glass-muted     { background: linear-gradient(135deg, rgba(31,41,55,0.50), rgba(255,255,255,0.06)); border-color: rgba(255,255,255,0.12); }
+
+        /* Radio / toggle glass styles */
+        .radio-glass-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .radio-glass {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 22px;
+            border: 1px solid var(--glass-border);
+            background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+            color: #e5e7eb;
+            cursor: pointer;
+            user-select: none;
+            transition: background .2s ease, box-shadow .2s ease, transform .12s ease, border-color .2s ease;
+        }
+        .radio-glass:hover { background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.10)); transform: translateY(-1px); }
+        .radio-glass input[type="radio"], .radio-glass input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+        .radio-glass.is-active {
+            background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10));
+            border-color: rgba(59,130,246,0.35);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+            color: #f3f4f6;
+        }
+        .radio-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #6b7280; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+        }
+        .radio-glass.is-active .radio-dot { background: #111827; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.20); }
     </style>
     @stack('styles')
 </head>

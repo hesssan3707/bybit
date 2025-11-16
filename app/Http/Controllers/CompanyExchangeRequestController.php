@@ -114,4 +114,36 @@ class CompanyExchangeRequestController extends Controller
                 ->withInput();
         }
     }
+
+    /**
+     * Withdraw a pending company-provided exchange request (user-initiated).
+     */
+    public function withdraw(CompanyExchangeRequest $requestItem)
+    {
+        try {
+            if ($requestItem->user_id !== auth()->id()) {
+                abort(403, 'دسترسی غیرمجاز');
+            }
+
+            if ($requestItem->status !== 'pending') {
+                return redirect()->route('exchanges.index')
+                    ->withErrors(['msg' => 'امکان لغو درخواست وجود ندارد یا قبلاً بررسی شده است.']);
+            }
+
+            $requestItem->update([
+                'status' => 'rejected',
+                'processed_at' => now(),
+                'processed_by' => null,
+                'admin_notes' => 'لغو درخواست توسط کاربر',
+            ]);
+
+            return redirect()->route('exchanges.index')
+                ->with('success', 'درخواست شرکت برای صرافی با موفقیت لغو شد.');
+
+        } catch (\Exception $e) {
+            Log::error('Company exchange request withdraw failed: ' . $e->getMessage());
+            return redirect()->route('exchanges.index')
+                ->withErrors(['general' => 'خطا در لغو درخواست. لطفاً دوباره تلاش کنید.']);
+        }
+    }
 }

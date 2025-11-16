@@ -34,11 +34,12 @@ class SavePrices extends Command
 
         $markets = [
             'BTCUSDT', 'ETHUSDT', 'CAKEUSDT', 'ATOMUSDT', 'SOLUSDT', 'ADAUSDT',
-            'DOTUSDT', 'DOGEUSDT', 'SHIBUSDT', 'MATICUSDT', 'LTCUSDT', 'LINKUSDT',
-            'UNIUSDT', 'AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT'
+            'DOTUSDT', 'DOGEUSDT', 'XRPUSDT', 'LTCUSDT', 'LINKUSDT'
         ];
 
-        $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
+        $timeframes = ['5m', '15m', '1h', '4h', '1d'];
+        $inactiveMarkets = ['AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT','UNIUSDT','SHIBUSDT'];
+        $inactiveTimeframes = ['1m'];
 
         // Fetch latest timestamps for all markets and timeframes at once
         $this->info('Fetching latest timestamps for all markets...');
