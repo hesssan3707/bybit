@@ -239,7 +239,7 @@
         box-shadow: 0 6px 16px rgba(0,0,0,0.18);
     }
     .account-type input:checked + .account-type__box .account-type__dot {
-        background: #111827;
+        background: #17d80dff;
         box-shadow: inset 0 0 0 2px rgba(0,0,0,0.2);
     }
 </style>

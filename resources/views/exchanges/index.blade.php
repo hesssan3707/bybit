@@ -414,6 +414,15 @@
                                     </button>
                                 </form>
                             @endif
+                            @if($req->status === 'rejected')
+                                <form method="POST" action="{{ route('exchanges.company-request.destroy', $req) }}" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger" style="width:auto;">
+                                        <i class="fas fa-trash-alt"></i> حذف درخواست رد شده
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                         @if($req->status === 'pending')
                             <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>

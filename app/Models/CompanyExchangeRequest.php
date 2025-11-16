@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CompanyExchangeRequest extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'company_exchange_requests';
 
@@ -63,6 +64,29 @@ class CompanyExchangeRequest extends Model
     public function scopeForUser($query, $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope to show only items visible to end-users:
+     * - All non-rejected requests
+     * - Rejected requests for up to 7 days from rejection (processed_at) or request time if processed_at is null
+     */
+    public function scopeVisibleToUser($query)
+    {
+        $threshold = now()->subDays(7);
+
+        return $query->where(function ($q) use ($threshold) {
+            $q->where('status', '<>', 'rejected')
+              ->orWhere(function ($q2) use ($threshold) {
+                  $q2->where('status', 'rejected')
+                     ->where(function ($q3) use ($threshold) {
+                         $q3->whereNotNull('processed_at')->where('processed_at', '>=', $threshold)
+                            ->orWhere(function ($q4) use ($threshold) {
+                                $q4->whereNull('processed_at')->where('requested_at', '>=', $threshold);
+                            });
+                     });
+              });
+        });
     }
 
     /**

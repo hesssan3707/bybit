@@ -146,4 +146,30 @@ class CompanyExchangeRequestController extends Controller
                 ->withErrors(['general' => 'خطا در لغو درخواست. لطفاً دوباره تلاش کنید.']);
         }
     }
+
+    /**
+     * Soft delete a rejected company-provided exchange request (user-initiated).
+     */
+    public function destroy(CompanyExchangeRequest $requestItem)
+    {
+        try {
+            if ($requestItem->user_id !== auth()->id()) {
+                abort(403, 'دسترسی غیرمجاز');
+            }
+
+            if ($requestItem->status !== 'rejected') {
+                return redirect()->route('exchanges.index')
+                    ->withErrors(['msg' => 'فقط درخواست‌های رد شده قابل حذف هستند.']);
+            }
+
+            $requestItem->delete();
+
+            return redirect()->route('exchanges.index')
+                ->with('success', 'درخواست رد شده حذف شد.');
+        } catch (\Exception $e) {
+            Log::error('Company exchange request delete failed: ' . $e->getMessage());
+            return redirect()->route('exchanges.index')
+                ->withErrors(['general' => 'خطا در حذف درخواست. لطفاً دوباره تلاش کنید.']);
+        }
+    }
 }

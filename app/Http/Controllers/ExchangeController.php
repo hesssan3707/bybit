@@ -27,7 +27,9 @@ class ExchangeController extends Controller
         $availableExchanges = UserExchange::getAvailableExchanges();
         
         // Include company-provided exchange requests for display in index
+        // Only show visible items: hide soft-deleted and rejected older than 7 days
         $companyRequests = CompanyExchangeRequest::forUser($user->id)
+            ->visibleToUser()
             ->orderByDesc('requested_at')
             ->get();
 

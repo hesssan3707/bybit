@@ -118,6 +118,9 @@ Route::middleware('auth')->group(function () {
         // Withdraw company-provided exchange request (user-initiated)
         Route::post('/company-request/{requestItem}/withdraw', [CompanyExchangeRequestController::class, 'withdraw'])
             ->name('exchanges.company-request.withdraw');
+        // Delete a rejected company-provided exchange request (user-initiated, soft delete)
+        Route::delete('/company-request/{requestItem}', [CompanyExchangeRequestController::class, 'destroy'])
+            ->name('exchanges.company-request.destroy');
         Route::get('/{exchange}/edit', [ExchangeController::class, 'edit'])->name('exchanges.edit');
         Route::put('/{exchange}', [ExchangeController::class, 'update'])->name('exchanges.update');
         Route::post('/{exchange}/switch', [ExchangeController::class, 'switchTo'])->name('exchanges.switch');
