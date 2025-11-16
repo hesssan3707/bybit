@@ -191,17 +191,27 @@
         transform: translateY(-1px);
     }
 
-    /* Form disabling styles */
-    .access-restricted form,
-    .access-restricted .form-control,
-    .access-restricted .submit-btn,
-    .access-restricted .side-btn,
-    .access-restricted button:not(.alert-link) {
+    /* Action-only disabling (keep tables, filters, pagination active) */
+    .access-restricted main .submit-form-button,
+    .access-restricted main .submit-btn,
+    .access-restricted main .create-order-btn,
+    .access-restricted main .edit-btn,
+    .access-restricted main .delete-btn,
+    .access-restricted main .cancel-btn,
+    .access-restricted main .modern-confirm-form button {
         opacity: 0.6;
         pointer-events: none;
         cursor: not-allowed;
     }
-    .access-restricted .submit-btn { background: #6c757d !important; }
+    .access-restricted main .submit-btn,
+    .access-restricted main .submit-form-button { background: #6c757d !important; }
+
+    /* Ensure mobile footer dropup toggle remains interactive */
+    .access-restricted .mobile-footer-nav .dropup-toggle {
+        opacity: 1;
+        pointer-events: auto;
+        cursor: pointer;
+    }
 </style>
 @endpush
 
