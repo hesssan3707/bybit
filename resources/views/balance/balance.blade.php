@@ -166,14 +166,9 @@
     <div class="balance-container">
         <h1 style="text-align: center; margin-bottom: 50px; color: #ffffff;"> موجودی حساب {{ $exchangeInfo['name'] ?? '' }}</h1>
 
-    @if(isset($error))
-        <div class="alert alert-info" style="text-align: center;">
-            <div style="margin-bottom: 8px;"><strong>{{ $error }}</strong></div>
-            @if(str_contains($error, 'صرافی'))
-                <a href="{{ route('profile.show') }}" class="alert-link">برای فعال‌سازی صرافی کلیک کنید</a>
-            @endif
-        </div>
-    @else
+    @include('partials.exchange-access-check')
+
+    @if(!isset($error))
         <div class="balance-type-tabs">
             <button class="balance-tab active" onclick="switchTab('spot')">
                 کیف پول اسپات
