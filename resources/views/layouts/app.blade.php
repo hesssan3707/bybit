@@ -39,17 +39,17 @@
         body.bg-general {
             background-image:
                 linear-gradient(rgba(2,6,23,0.65), rgba(2,6,23,0.65)),
-                url("{{ asset('public/images/background.png') }}");
+                url("{{ asset('public/images/background.webp') }}");
         }
         body.bg-spot {
             background-image:
                 linear-gradient(rgba(2,6,23,0.65), rgba(2,6,23,0.65)),
-                url("{{ asset('public/images/background2.png') }}");
+                url("{{ asset('public/images/background2.webp') }}");
         }
         body.bg-auth {
             background-image:
                 linear-gradient(rgba(2,6,23,0.55), rgba(2,6,23,0.55)),
-                url("{{ asset('public/images/auth-background2.png') }}");
+                url("{{ asset('public/images/auth-background2.webp') }}");
         }
         body.bg-admin {
             background: var(--admin-bg);

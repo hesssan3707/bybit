@@ -21,7 +21,7 @@ class FuturesController extends Controller
     private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
     {
         if (app()->environment('local')) {
-            return 1000.0;
+            return 10.0;
         }
 
         try {
