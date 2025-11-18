@@ -64,6 +64,14 @@
             padding-right: 12px;
             padding-left: 12px;
         }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
         h1,h2
         {
             text-shadow: black 0 6px 4px;
