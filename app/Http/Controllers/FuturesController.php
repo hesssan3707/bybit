@@ -20,10 +20,6 @@ class FuturesController extends Controller
 {
     private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
     {
-        if (app()->environment('local')) {
-            return 10.0;
-        }
-
         try {
             $exchangeName = strtolower(method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : '');
 
@@ -482,6 +478,8 @@ class FuturesController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             // Get user's active exchange service
             $exchangeService = $this->getExchangeService();
 
@@ -492,10 +490,10 @@ class FuturesController extends Controller
             if ($user->future_strict_mode) {
 
                 if (!$user->selected_market) {
-                    return back()->withErrors(['msg' => 'برای حالت سخت‌گیرانه، باید بازار انتخابی تنظیم شده باشد.'])->withInput();
+                    throw new \Exception('برای حالت سخت‌گیرانه، باید بازار انتخابی تنظیم شده باشد.');
                 }
                 if ($validated['symbol'] !== $user->selected_market) {
-                    return back()->withErrors(['symbol' => "در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید."])->withInput();
+                    throw new \Exception("در حالت سخت‌گیرانه، تنها می‌توانید در بازار {$user->selected_market} معامله کنید.");
                 }
             }
             // Apply strict mode risk percentage cap (only in strict mode)
@@ -526,10 +524,10 @@ class FuturesController extends Controller
 
             if ($marketPrice > 0) {
                 if ($side === 'Buy' && $avgEntry > $marketPrice) {
-                    return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    throw new \Exception("برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد.");
                 }
                 if ($side === 'Sell' && $avgEntry < $marketPrice) {
-                    return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    throw new \Exception("برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد.");
                 }
             }
 
@@ -556,9 +554,7 @@ class FuturesController extends Controller
                     ->exists();
 
                 if ($hasPendingSameSide || $hasOpenSameSideTrade) {
-                    return back()->withErrors([
-                        'msg' => 'ثبت سفارش جدید در همین جهت امکان‌پذیر نیست؛ شما یک سفارش در انتظار یا معامله باز در همین جهت دارید. لطفاً ابتدا آن را لغو یا ببندید.'
-                    ])->withInput();
+                    throw new \Exception('ثبت سفارش جدید در همین جهت امکان‌پذیر نیست؛ شما یک سفارش در انتظار یا معامله باز در همین جهت دارید. لطفاً ابتدا آن را لغو یا ببندید.');
                 }
             }
 
@@ -571,15 +567,15 @@ class FuturesController extends Controller
             $tpDistance = abs($avgEntry - (float) $validated['tp']);
 
             if ($slDistance <= 0) {
-                return back()->withErrors(['sl' => 'حد ضرر باید متفاوت از قیمت ورود باشد.'])->withInput();
+                throw new \Exception('حد ضرر باید متفاوت از قیمت ورود باشد.');
             }
             // Enforce minimum SL/TP distance of 0.2% of entry price (avgEntry)
             $minDistance = 0.002 * $avgEntry;
             if ($slDistance < $minDistance) {
-                return back()->withErrors(['sl' => 'حد ضرر باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'])->withInput();
+                throw new \Exception('حد ضرر باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.');
             }
             if ($tpDistance < $minDistance) {
-                return back()->withErrors(['tp' => 'حد سود باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'])->withInput();
+                throw new \Exception('حد سود باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.');
             }
             // Enforce configured minimum RR ratio when strict mode is active
             if ($user->future_strict_mode) {
@@ -593,7 +589,7 @@ class FuturesController extends Controller
                 $minProfitOverLoss = $profitPart / $lossPart; // e.g. 3:1 => 1/3; 1:2 => 2.0
                 // Strictly greater-than: tpDistance > minProfitOverLoss * slDistance
                 if ($tpDistance <= ($minProfitOverLoss * $slDistance)) {
-                    return back()->withErrors(['tp' => "در حالت سخت‌گیرانه، حد سود باید بیشتر از نسبت انتخاب‌شده باشد. نسبت حداقل (ضرر:سود): {$minRrStr}"])->withInput();
+                    throw new \Exception("در حالت سخت‌گیرانه، حد سود باید بیشتر از نسبت انتخاب‌شده باشد. نسبت حداقل (ضرر:سود): {$minRrStr}");
                 }
             }
             // Base quantity from risk
@@ -717,7 +713,10 @@ class FuturesController extends Controller
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
                 ]);
             }
+            
+            DB::commit();
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Futures order creation failed: ' . $e->getMessage());
 
             // Parse Bybit error message for user-friendly response
@@ -804,8 +803,10 @@ class FuturesController extends Controller
             $params['takeProfit'] = (string)$newTp;
         }
 
-        if (count($params) > 2) {
-            try {
+        try {
+            DB::beginTransaction();
+
+            if (count($params) > 2) {
                 $exchangeService = $this->getExchangeService();
                 $result = $exchangeService->amendOrder($params);
                 
@@ -813,31 +814,44 @@ class FuturesController extends Controller
                 if (isset($result['orderId']) && $result['orderId'] != $order->order_id) {
                     $order->order_id = $result['orderId'];
                 }
-            } catch (\Exception $e) {
-                $msg = $e->getMessage();
-                // Handle Cancel-Replace failure (BingX)
-                if (str_contains($msg, 'REPLACE_FAILED')) {
-                    // The original order was canceled, but new one failed.
-                    // We must delete the local order to stay in sync.
-                    $order->delete();
-                    return redirect()->route('futures.orders')->withErrors(['msg' => 'سفارش در صرافی لغو شد اما ایجاد سفارش جدید با خطا مواجه شد. سفارش محلی حذف گردید. جزئیات: ' . $msg]);
-                }
-                
-                return redirect()->back()->withErrors(['msg' => 'خطا در ویرایش سفارش در صرافی: ' . $msg]);
             }
+
+            // If successful (or no API call needed), update DB
+            $order->entry_price = $newEntryPrice;
+            $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
+            $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
+            $order->sl          = $newSl;
+            $order->tp          = $newTp;
+            $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
+            $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
+            
+            $order->save();
+            
+            DB::commit();
+
+            return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $msg = $e->getMessage();
+            // Handle Cancel-Replace failure (BingX)
+            if (str_contains($msg, 'REPLACE_FAILED')) {
+                // The original order was canceled, but new one failed.
+                // We must delete the local order to stay in sync.
+                // Note: We are in a transaction that rolled back. 
+                // So the local order is still in its original state in DB (not deleted).
+                // But the exchange order is canceled!
+                // We should probably delete it now.
+                // Since we rolled back, we need to start a new transaction or just delete it.
+                // But wait, if we rolled back, the $order object is still valid.
+                try {
+                    $order->delete();
+                } catch (\Throwable $t) {}
+                return redirect()->route('futures.orders')->withErrors(['msg' => 'سفارش در صرافی لغو شد اما ایجاد سفارش جدید با خطا مواجه شد. سفارش محلی حذف گردید. جزئیات: ' . $msg]);
+            }
+            
+            return redirect()->back()->withErrors(['msg' => 'خطا در ویرایش سفارش: ' . $msg]);
         }
-
-        $order->entry_price = $newEntryPrice;
-        $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
-        $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
-        $order->sl          = $newSl;
-        $order->tp          = $newTp;
-        $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
-        $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
-        
-        $order->save();
-
-        return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
     }
 
     public function destroy(Order $order)
@@ -860,48 +874,67 @@ class FuturesController extends Controller
 
         $status = $order->status;
 
-        // Logic for 'pending' orders (Revoke)
-        if ($status === 'pending') {
-            Log::info("Attempting to cancel pending order {$order->id} with exchange order ID: {$order->order_id}");
-            try {
+        try {
+            DB::beginTransaction();
+
+            // Logic for 'pending' orders (Revoke)
+            if ($status === 'pending') {
+                Log::info("Attempting to cancel pending order {$order->id} with exchange order ID: {$order->order_id}");
                 if ($order->order_id) {
                     $exchangeService = $this->getExchangeService();
-                    $exchangeService->cancelOrderWithSymbol($order->order_id, $order->symbol);
-                    Log::info("Successfully cancelled order {$order->order_id} on exchange", [
-                        'local_order_id' => $order->id,
-                        'exchange_order_id' => $order->order_id,
-                        'symbol' => $order->symbol,
-                        'user_exchange_id' => $order->user_exchange_id
-                    ]);
+                    // Note: cancelOrderWithSymbol might throw. If it does, we catch it.
+                    // But for 'destroy', if exchange cancel fails (e.g. already filled), 
+                    // we usually want to proceed with DB delete anyway?
+                    // The original code caught exception and proceeded.
+                    // If we use transaction, if we catch and proceed, we commit.
+                    // If we rethrow, we rollback (order not deleted).
+                    // User wants "Process complete or not at all".
+                    // If exchange cancel fails, we probably shouldn't delete locally unless it's a "not found" error.
+                    // But original logic was: "If cancellation fails... log it but proceed to delete".
+                    // I will maintain this behavior but wrap the delete in transaction.
+                    try {
+                        $exchangeService->cancelOrderWithSymbol($order->order_id, $order->symbol);
+                        Log::info("Successfully cancelled order {$order->order_id} on exchange", [
+                            'local_order_id' => $order->id,
+                            'exchange_order_id' => $order->order_id,
+                            'symbol' => $order->symbol,
+                            'user_exchange_id' => $order->user_exchange_id
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. It might have been already filled/canceled. Error: " . $e->getMessage(), [
+                            'local_order_id' => $order->id,
+                            'exchange_order_id' => $order->order_id,
+                            'symbol' => $order->symbol,
+                            'user_exchange_id' => $order->user_exchange_id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 } else {
                     Log::warning("Order {$order->id} has no exchange order ID, skipping exchange cancellation");
                 }
-            } catch (\Exception $e) {
-                // If cancellation fails (e.g., order already filled or canceled), log it but proceed to delete from our DB.
-                Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. It might have been already filled/canceled. Error: " . $e->getMessage(), [
-                    'local_order_id' => $order->id,
-                    'exchange_order_id' => $order->order_id,
-                    'symbol' => $order->symbol,
-                    'user_exchange_id' => $order->user_exchange_id,
-                    'error' => $e->getMessage()
-                ]);
             }
-        }
-        // For 'expired' orders, we just delete them from the DB.
-        // For 'pending' orders, we also delete them after trying to cancel.
 
-        if ($status === 'pending' || $status === 'expired') {
-            $order->delete();
-            Log::info("Successfully deleted order {$order->id} from database", [
-                'order_id' => $order->order_id,
-                'status' => $status,
-                'user_exchange_id' => $order->user_exchange_id
-            ]);
-            return redirect()->route('futures.orders')->with('success', "سفارش {$status} با موفقیت حذف شد.");
-        }
+            if ($status === 'pending' || $status === 'expired') {
+                $order->delete();
+                Log::info("Successfully deleted order {$order->id} from database", [
+                    'order_id' => $order->order_id,
+                    'status' => $status,
+                    'user_exchange_id' => $order->user_exchange_id
+                ]);
+                
+                DB::commit();
+                return redirect()->route('futures.orders')->with('success', "سفارش {$status} با موفقیت حذف شد.");
+            }
 
-        // For any other status, do nothing.
-        return redirect()->route('futures.orders')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
+            DB::commit(); // Nothing done if not pending or expired
+            // For any other status, do nothing.
+            return redirect()->route('futures.orders')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Order deletion failed: ' . $e->getMessage());
+            return redirect()->route('futures.orders')->withErrors(['msg' => 'خطا در حذف سفارش: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -948,73 +981,67 @@ class FuturesController extends Controller
         $newOrderLinkId = (string) \Illuminate\Support\Str::uuid();
 
         try {
+            DB::beginTransaction();
+
             // Get precision info when not in local environment
             $pricePrec = 2;
             $qtyStr = (string) $order->amount; // already stored as final precision at creation
 
-            if (!app()->environment('local')) {
-                $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($userExchange);
 
-                // Validate market vs entry consistency
-                try {
-                    $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
-                    $instrumentData = null;
-                    if (!empty($instrumentInfo['list'])) {
-                        foreach ($instrumentInfo['list'] as $instrument) {
-                            if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
-                        }
+
+            $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($userExchange);
+
+            // Validate market vs entry consistency
+            try {
+                $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
+                $instrumentData = null;
+                if (!empty($instrumentInfo['list'])) {
+                    foreach ($instrumentInfo['list'] as $instrument) {
+                        if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
                     }
-                    if ($instrumentData && isset($instrumentData['priceScale'])) {
-                        $pricePrec = (int)$instrumentData['priceScale'];
-                    }
-                } catch (\Throwable $e) {
-                    // Continue with defaults if instrument info fails
                 }
-
-                $finalPrice = round((float)$order->entry_price, $pricePrec);
-
-                // Build order params (limit order, same SL)
-                $sideUpper = ($order->side === 'sell') ? 'Sell' : 'Buy';
-                $params = [
-                    'category' => 'linear',
-                    'symbol' => $order->symbol,
-                    'side' => $sideUpper,
-                    'orderType' => 'Limit',
-                    'qty' => $qtyStr,
-                    'price' => (string) $finalPrice,
-                    'timeInForce' => 'GTC',
-                    'stopLoss'  => (string) round((float)$order->sl, $pricePrec),
-                    'orderLinkId' => $newOrderLinkId,
-                ];
-
-                // Hedge mode parameters per exchange
-                $this->addHedgeModeParameters($params, $userExchange->exchange_name, $sideUpper);
-
-                // Create order on exchange
-                $responseData = $exchangeService->createOrder($params);
-
-                // Reset the DB record as reactivated pending
-                $order->order_id = $responseData['orderId'] ?? null;
-                $order->order_link_id = $newOrderLinkId;
-                $order->status = 'pending';
-                $order->created_at = now();
-                $order->closed_at = null;
-                $order->filled_at = null;
-                $order->filled_quantity = null;
-                $order->save();
-            } else {
-                // Local: skip exchange calls, just reset DB state
-                $finalPrice = round((float)$order->entry_price, $pricePrec);
-                $order->order_id = null; // no remote id
-                $order->order_link_id = $newOrderLinkId;
-                $order->status = 'pending';
-                $order->created_at = now();
-                $order->closed_at = null;
-                $order->filled_at = null;
-                $order->filled_quantity = null;
-                $order->save();
+                if ($instrumentData && isset($instrumentData['priceScale'])) {
+                    $pricePrec = (int)$instrumentData['priceScale'];
+                }
+            } catch (\Throwable $e) {
+                // Continue with defaults if instrument info fails
             }
+
+            $finalPrice = round((float)$order->entry_price, $pricePrec);
+
+            // Build order params (limit order, same SL)
+            $sideUpper = ($order->side === 'sell') ? 'Sell' : 'Buy';
+            $params = [
+                'category' => 'linear',
+                'symbol' => $order->symbol,
+                'side' => $sideUpper,
+                'orderType' => 'Limit',
+                'qty' => $qtyStr,
+                'price' => (string) $finalPrice,
+                'timeInForce' => 'GTC',
+                'stopLoss'  => (string) round((float)$order->sl, $pricePrec),
+                'orderLinkId' => $newOrderLinkId,
+            ];
+
+            // Hedge mode parameters per exchange
+            $this->addHedgeModeParameters($params, $userExchange->exchange_name, $sideUpper);
+
+            // Create order on exchange
+            $responseData = $exchangeService->createOrder($params);
+
+            // Reset the DB record as reactivated pending
+            $order->order_id = $responseData['orderId'] ?? null;
+            $order->order_link_id = $newOrderLinkId;
+            $order->status = 'pending';
+            $order->created_at = now();
+            $order->closed_at = null;
+            $order->filled_at = null;
+            $order->filled_quantity = null;
+            $order->save();
+            
+            DB::commit();
         } catch (\Exception $e) {
+            DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Futures order resend failed: ' . $e->getMessage());
             $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
             return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
@@ -1067,39 +1094,11 @@ class FuturesController extends Controller
             ->where('user_exchange_id', $order->user_exchange_id)
             ->first();
 
-        // محیط محلی: عدم اتصال به صرافی و بروزرسانی حداقلی معامله
-        if (app()->environment('local')) {
-            if ($trade) {
-                $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
-                $trade->pnl = 0;
-                $trade->closed_at = now();
-                $trade->save();
-                // Create manual-close ban (close-only) only in strict mode
-                try {
-                    if ($user->future_strict_mode) {
-                        $hasActive = \App\Models\UserBan::active()
-                            ->forUser($user->id)
-                            ->accountType($isDemo)
-                            ->where('ban_type', 'manual_close')
-                            ->exists();
-                        if (!$hasActive) {
-                            \App\Models\UserBan::create([
-                                'user_id' => $user->id,
-                                'is_demo' => $isDemo,
-                                'trade_id' => $trade->id,
-                                'ban_type' => 'manual_close',
-                                'starts_at' => now(),
-                                'ends_at' => now()->addDays(7),
-                            ]);
-                        }
-                    }
-                } catch (\Throwable $e) {}
-                return redirect()->route('futures.pnl_history')->with('success', 'موقعیت به صورت آزمایشی در محیط محلی بسته شد.');
-            }
-            return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
-        }
+
 
         try {
+            DB::beginTransaction();
+            
             $exchangeService = $this->getExchangeService();
             $symbol = $order->symbol;
 
@@ -1114,6 +1113,9 @@ class FuturesController extends Controller
             $qty = $trade ? (float)$trade->qty : (float)($order->filled_quantity ?? $order->amount ?? 0);
 
             if (!$openSide || $qty <= 0) {
+                // We must rollback if we throw, but here we return redirect.
+                // Since we haven't done any DB changes yet, rollback is cheap.
+                DB::rollBack();
                 return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'اطلاعات موقعیت برای بستن ناقص است.']);
             }
 
@@ -1150,9 +1152,11 @@ class FuturesController extends Controller
                 }
             } catch (\Throwable $e) {}
 
+            DB::commit();
             return redirect()->route('futures.pnl_history')->with('success', 'درخواست بستن موقعیت ارسال شد و سوابق PnL به‌روزرسانی شد.');
 
         } catch (\Exception $e) {
+            DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Futures market close failed: ' . $e->getMessage());
 
             $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
@@ -1191,39 +1195,12 @@ class FuturesController extends Controller
                 ->withErrors(['msg' => $exchangeStatus['message']]);
         }
 
-        // Local environment: simulate closes, skip exchange calls
-        if (app()->environment('local')) {
-            $openTradesQuery = Trade::forUser($user->id);
-            if ($currentExchange) {
-                $openTradesQuery->accountType($isDemo);
-            }
-            $openTrades = $openTradesQuery->whereNull('closed_at')->get();
-            foreach ($openTrades as $trade) {
-                $trade->avg_exit_price = $trade->avg_entry_price;
-                $trade->pnl = 0;
-                $trade->closed_at = now();
-                $trade->closed_by_user = 1;
-                $trade->save();
-            }
-            // Create a single manual_close ban (7 days) in strict mode
-            try {
-                if ($user->future_strict_mode) {
-                    UserBan::create([
-                        'user_id' => $user->id,
-                        'is_demo' => $isDemo,
-                        'trade_id' => null,
-                        'ban_type' => 'manual_close',
-                        'starts_at' => now(),
-                        'ends_at' => now()->addDays(7),
-                    ]);
-                }
-            } catch (\Throwable $e) {}
 
-            return redirect()->route('futures.pnl_history')->with('success', 'همه موقعیت‌ها در محیط محلی به‌صورت آزمایشی بسته شدند.');
-        }
 
         // Production: close all open positions via exchange services
         try {
+            DB::beginTransaction();
+            
             $exchangeService = $this->getExchangeService();
             $positionsRaw = $exchangeService->getPositions();
 
@@ -1285,8 +1262,10 @@ class FuturesController extends Controller
                 }
             } catch (\Throwable $e) {}
 
+            DB::commit();
             return redirect()->route('futures.pnl_history')->with('success', 'درخواست بستن همه موقعیت‌ها ارسال شد.');
         } catch (\Exception $e) {
+            DB::rollBack();
             $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
             return redirect()->route('futures.pnl_history')->withErrors(['msg' => $userFriendlyMessage]);
         }

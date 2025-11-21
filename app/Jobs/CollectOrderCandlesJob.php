@@ -63,13 +63,13 @@ class CollectOrderCandlesJob implements ShouldQueue
             ];
 
             // Prepare exchange service if needed
+            // Prepare exchange service
             $exchangeService = null;
             $exchangeName = strtolower((string)($userExchange->exchange_name ?? 'bybit'));
-            if (!app()->environment('local')) {
-                $exchangeService = ExchangeFactory::createForUserExchange($userExchange);
-                if (!method_exists($exchangeService, 'getKlines')) { return; }
-                $exchangeName = method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : $exchangeName;
-            }
+
+            $exchangeService = ExchangeFactory::createForUserExchange($userExchange);
+            if (!method_exists($exchangeService, 'getKlines')) { return; }
+            $exchangeName = method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : $exchangeName;
 
             // Upsert snapshot row for this order (we will fill columns below)
             $snapshot = OrderCandleData::firstOrNew(['order_id' => $order->id]);
@@ -93,20 +93,18 @@ class CollectOrderCandlesJob implements ShouldQueue
                 $endTs   = $alignedExit + ($after * $tfSeconds);
 
                 $candles = [];
-                if (app()->environment('local')) {
-                    $candles = $this->generateSyntheticCandles($startTs, $endTs, $tfSeconds, (float)$order->entry_price, $order->side);
-                } else {
-                    $barsBetween = max(0, (int)floor(($endTs - $startTs) / $tfSeconds));
-                    // add buffer to be safe with exchange windowing behavior
-                    $limit = min(1000, $barsBetween + $before + $after + 50);
-                    $raw = $exchangeService->getKlines($order->symbol, $tf, $limit);
-                    $candles = $this->normalizeKlines($exchangeName, $raw);
-                    // Filter to the requested window
-                    $candles = array_values(array_filter($candles, function ($c) use ($startTs, $endTs) {
-                        $t = (int)($c['time'] ?? 0);
-                        return $t >= $startTs && $t <= $endTs;
-                    }));
-                }
+
+                
+                $barsBetween = max(0, (int)floor(($endTs - $startTs) / $tfSeconds));
+                // add buffer to be safe with exchange windowing behavior
+                $limit = min(1000, $barsBetween + $before + $after + 50);
+                $raw = $exchangeService->getKlines($order->symbol, $tf, $limit);
+                $candles = $this->normalizeKlines($exchangeName, $raw);
+                // Filter to the requested window
+                $candles = array_values(array_filter($candles, function ($c) use ($startTs, $endTs) {
+                    $t = (int)($c['time'] ?? 0);
+                    return $t >= $startTs && $t <= $endTs;
+                }));
 
                 if (count($candles) > 0) {
                     // Re-index and store

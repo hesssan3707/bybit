@@ -33,14 +33,10 @@ class ProfileController extends Controller
             try {
                 $exchangeService = $this->exchangeFactory->createForUserExchange($defaultExchange);
 
-                // In local environment, skip calling exchanges entirely
-                if (app()->environment('local')) {
-                    $totalEquity = 'N/A';
-                    $totalBalance = 'N/A';
-                } else {
-                    $name = $defaultExchange->exchange_name;
 
-                    if ($name === 'bybit') {
+                $name = $defaultExchange->exchange_name;
+
+                if ($name === 'bybit') {
                         // BYBIT (UNIFIED, USDT):
                         // موجودی کل (Total Equity) = equity (includes unrealized PnL)
                         // کیف پول (Wallet) = wallet balance = equity - unrealizedPnl
@@ -92,7 +88,8 @@ class ProfileController extends Controller
                             }
                         }
                     }
-                }
+
+                // }
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Could not fetch wallet balance for profile: " . $e->getMessage());
             }

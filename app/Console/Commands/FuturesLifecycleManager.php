@@ -10,6 +10,7 @@ use App\Models\Trade;
 use App\Models\UserBan;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Jobs\CollectOrderCandlesJob;
+use Illuminate\Support\Facades\DB;
 use Exception;
 
 class FuturesLifecycleManager extends Command
@@ -121,12 +122,6 @@ class FuturesLifecycleManager extends Command
      */
     private function syncLifecycleForExchange($exchangeService, User $user, UserExchange $userExchange)
     {
-        // در محیط محلی اتصال به صرافی انجام نمی‌شود
-        if (app()->environment('local')) {
-            $this->info("در محیط محلی، اتصال به صرافی {$userExchange->exchange_name} انجام نمی‌شود");
-            return;
-        }
-        // Get the oldest pending/filled order date for this user exchange
         // Only consider orders that have an open trade (closed_at is null) or have no trade record
         $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
@@ -191,65 +186,66 @@ class FuturesLifecycleManager extends Command
             ->first();
 
         if ($order) {
-            $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
-            if ($order->status !== $newStatus) {
-                $order->status = $newStatus;
+            DB::transaction(function () use ($order, $exchangeOrder, $userExchange, $orderId) {
+                $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
+                if ($order->status !== $newStatus) {
+                    $order->status = $newStatus;
 
-                $filledQty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
-                if ($filledQty !== null) {
-                    $order->filled_quantity = $filledQty;
-                }
-                $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
-                if ($avgPrice !== null) {
-                    $order->average_price = $avgPrice;
-                }
-
-                if (in_array($newStatus, ['filled','canceled', 'expired', 'closed'])) {
-                    $order->closed_at = now();
-                }
-                $order->save();
-                $this->info("وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
-
-                // ایجاد/به‌روزرسانی معامله باز در حالت FILLED
-                if ($newStatus === 'filled') {
-                    $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name);
-                    $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
-                    $qty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
+                    $filledQty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
+                    if ($filledQty !== null) {
+                        $order->filled_quantity = $filledQty;
+                    }
                     $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
+                    if ($avgPrice !== null) {
+                        $order->average_price = $avgPrice;
+                    }
 
-                    if ($symbol && $side && $qty !== null && $avgPrice !== null) {
-                        $existingOpen = Trade::where('user_exchange_id', $userExchange->id)
-                            ->where('is_demo', false)
-                            ->where('order_id', $order->order_id)
-                            ->whereNull('closed_at')
-                            ->first();
+                    if (in_array($newStatus, ['filled','canceled', 'expired', 'closed'])) {
+                        $order->closed_at = now();
+                    }
+                    $order->save();
+                    $this->info("وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
 
-                        if ($existingOpen) {
-                            $existingOpen->qty = (float)$qty;
-                            $existingOpen->avg_entry_price = (float)$avgPrice;
-                            $existingOpen->save();
-                            $this->info("معامله باز برای سفارش {$orderId} به‌روزرسانی شد");
-                        } else {
-                            Trade::create([
-                                'user_exchange_id' => $userExchange->id,
-                                'is_demo' => false,
-                                'symbol' => $symbol,
-                                'side' => $side,
-                                'order_type' => 'Market',
-                                'leverage' => 1.0,
-                                'qty' => (float)$qty,
-                                'avg_entry_price' => (float)$avgPrice,
-                                'avg_exit_price' => 0,
-                                'pnl' => 0,
-                                'order_id' => $order->order_id,
-                                'closed_at' => null,
-                            ]);
-                            $this->info("معامله باز برای سفارش {$orderId} ثبت شد");
+                    // ایجاد/به‌روزرسانی معامله باز در حالت FILLED
+                    if ($newStatus === 'filled') {
+                        $symbol = $this->extractSymbol($exchangeOrder, $userExchange->exchange_name);
+                        $side = $this->extractSide($exchangeOrder, $userExchange->exchange_name);
+                        $qty = $this->extractFilledQuantity($exchangeOrder, $userExchange->exchange_name);
+                        $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
+
+                        if ($symbol && $side && $qty !== null && $avgPrice !== null) {
+                            $existingOpen = Trade::where('user_exchange_id', $userExchange->id)
+                                ->where('is_demo', false)
+                                ->where('order_id', $order->order_id)
+                                ->whereNull('closed_at')
+                                ->first();
+
+                            if ($existingOpen) {
+                                $existingOpen->qty = (float)$qty;
+                                $existingOpen->avg_entry_price = (float)$avgPrice;
+                                $existingOpen->save();
+                                $this->info("معامله باز برای سفارش {$orderId} به‌روزرسانی شد");
+                            } else {
+                                Trade::create([
+                                    'user_exchange_id' => $userExchange->id,
+                                    'is_demo' => false,
+                                    'symbol' => $symbol,
+                                    'side' => $side,
+                                    'order_type' => 'Market',
+                                    'leverage' => 1.0,
+                                    'qty' => (float)$qty,
+                                    'avg_entry_price' => (float)$avgPrice,
+                                    'avg_exit_price' => 0,
+                                    'pnl' => 0,
+                                    'order_id' => $order->order_id,
+                                    'closed_at' => null,
+                                ]);
+                                $this->info("معامله باز برای سفارش {$orderId} ثبت شد");
+                            }
                         }
                     }
                 }
-
-            }
+            });
         } else {
             // Skip unknown orders to enforce only system-created orders, without logging
             return;
@@ -260,11 +256,6 @@ class FuturesLifecycleManager extends Command
 
     private function syncPnlRecords($exchangeService, UserExchange $userExchange)
     {
-        // Skip exchange connectivity on localhost
-        if (app()->environment('local')) {
-            $this->info("[Real] در محیط محلی، همگام‌سازی PnL نادیده گرفته شد");
-            return;
-        }
 
         try {
             $positionsRaw = $exchangeService->getPositions();
@@ -286,65 +277,60 @@ class FuturesLifecycleManager extends Command
                 ->get();
 
             foreach ($openTrades as $trade) {
-                // تلاش برای یافتن تطابق در موقعیت‌های باز صرافی
-                $matchedPosition = null;
-                foreach ($normalized as $p) {
-                    if (($p['symbol'] ?? null) === $trade->symbol
-                        && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
-                        && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
-                        $matchedPosition = $p;
-                        break;
+                DB::transaction(function () use ($trade, $normalized, $exchangeService, $userExchange) {
+                    // تلاش برای یافتن تطابق در موقعیت‌های باز صرافی
+                    $matchedPosition = null;
+                    foreach ($normalized as $p) {
+                        if (($p['symbol'] ?? null) === $trade->symbol
+                            && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
+                            && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
+                            $matchedPosition = $p;
+                            break;
+                        }
                     }
-                }
 
-                if ($matchedPosition) {
-                    if (array_key_exists('leverage', $matchedPosition) && $matchedPosition['leverage'] !== null) {
-                        $trade->leverage = $matchedPosition['leverage'];
+                    if ($matchedPosition) {
+                        if (array_key_exists('leverage', $matchedPosition) && $matchedPosition['leverage'] !== null) {
+                            $trade->leverage = $matchedPosition['leverage'];
+                        }
+                        if (array_key_exists('unrealizedPnl', $matchedPosition) && $matchedPosition['unrealizedPnl'] !== null) {
+                            $trade->pnl = $matchedPosition['unrealizedPnl'];
+                        }
+                        $trade->updated_at = now();
+                        $trade->save();
+                        return; // Continue to next trade in loop (return from closure)
                     }
-                    if (array_key_exists('unrealizedPnl', $matchedPosition) && $matchedPosition['unrealizedPnl'] !== null) {
-                        $trade->pnl = $matchedPosition['unrealizedPnl'];
-                    }
-                    $trade->updated_at = now();
-                    $trade->save();
-                    continue;
-                }
 
-                // تلاش برای یافتن در تاریخچه PnL بسته
-                $symbol = $trade->symbol;
-                $closedRaw = $exchangeService->getClosedPnl($symbol, 100, null);
-                $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
+                    // تلاش برای یافتن در تاریخچه PnL بسته
+                    $symbol = $trade->symbol;
+                    $closedRaw = $exchangeService->getClosedPnl($symbol, 100, null);
+                    $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
 
-                $matchedClosed = null;
-                foreach ($closedList as $c) {
-                    $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
-                    $fieldsMatch = (($c['symbol'] ?? null) === $symbol)
-                        && isset($c['qty']) && (float)$c['qty'] == (float)$trade->qty
-                        && isset($c['avgEntryPrice']) && (float)$c['avgEntryPrice'] == (float)$trade->avg_entry_price;
-                    if ($idMatch || $fieldsMatch) {
-                        $matchedClosed = $c;
-                        break;
+                    $matchedClosed = null;
+                    foreach ($closedList as $c) {
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $fieldsMatch = (($c['symbol'] ?? null) === $symbol)
+                            && isset($c['qty']) && (float)$c['qty'] == (float)$trade->qty
+                            && isset($c['avgEntryPrice']) && (float)$c['avgEntryPrice'] == (float)$trade->avg_entry_price;
+                        if ($idMatch || $fieldsMatch) {
+                            $matchedClosed = $c;
+                            break;
+                        }
                     }
-                }
 
-                if ($matchedClosed) {
-                    if (array_key_exists('avgExitPrice', $matchedClosed) && $matchedClosed['avgExitPrice'] !== null) {
-                        $trade->avg_exit_price = $matchedClosed['avgExitPrice'];
+                    if ($matchedClosed) {
+                        if (array_key_exists('avgExitPrice', $matchedClosed) && $matchedClosed['avgExitPrice'] !== null) {
+                            $trade->avg_exit_price = $matchedClosed['avgExitPrice'];
+                        }
+                        if (array_key_exists('realizedPnl', $matchedClosed) && $matchedClosed['realizedPnl'] !== null) {
+                            $trade->pnl = $matchedClosed['realizedPnl'];
+                        }
+                        $trade->closed_at = now();
+                        $trade->synchronized = 1; // verified sync with exchange
+                        $trade->updated_at = now();
+                        $trade->save();
                     }
-                    if (array_key_exists('realizedPnl', $matchedClosed) && $matchedClosed['realizedPnl'] !== null) {
-                        $trade->pnl = $matchedClosed['realizedPnl'];
-                    }
-                    $trade->closed_at = now();
-                    $trade->synchronized = 1; // verified sync with exchange
-                    $trade->updated_at = now();
-                    $trade->save();
-
-                    // Note: ban creation is consolidated later after finalize to avoid duplication
-                    try {
-                        CollectOrderCandlesJob::dispatch($trade->id);
-                    } catch (\Throwable $e) {
-                        $this->warn('[Real] خطا در صف کردن کار جمع‌آوری کندل‌ها: ' . $e->getMessage());
-                    }
-                }
+                });
             }
         } catch (Exception $e) {
             $this->warn("[Real] خطا در همگام‌سازی سوابق PnL: " . $e->getMessage());
@@ -494,12 +480,10 @@ class FuturesLifecycleManager extends Command
             $list = $positionsRaw;
         }
         if (!is_array($list)) {
-            if (!app()->environment('local')) {
-                $this->warn("[Real] شکل لیست موقعیت‌ها نامعتبر برای صرافی {$exchangeName}");
-            }
+            $this->warn("[Real] شکل لیست موقعیت‌ها نامعتبر برای صرافی {$exchangeName}");
             return [];
         }
-        if (is_array($list) && empty($list) && !app()->environment('local')) {
+        if (is_array($list) && empty($list)) {
             $this->info("[Real] لیست موقعیت‌ها خالی برای صرافی {$exchangeName}");
         }
         return $list;
@@ -509,9 +493,7 @@ class FuturesLifecycleManager extends Command
     {
         $symbol = $raw['symbol'] ?? null;
         if (!$symbol) {
-            if (!app()->environment('local')) {
-                $this->warn("[Real] نماد نامشخص در موقعیت خام صرافی {$exchangeName}");
-            }
+            $this->warn("[Real] نماد نامشخص در موقعیت خام صرافی {$exchangeName}");
             return null;
         }
     
@@ -532,7 +514,7 @@ class FuturesLifecycleManager extends Command
             elseif (in_array($s, ['SHORT','SELL'])) { $side = 'Sell'; }
             else { $side = null; }
         }
-        if ($side === null && !app()->environment('local')) {
+        if ($side === null) {
             $this->warn("[Real] جهت پوزیشن نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
         }
     
@@ -543,14 +525,14 @@ class FuturesLifecycleManager extends Command
         } elseif (isset($raw['positionAmt'])) {
             $size = abs((float)$raw['positionAmt']);
         }
-        if (($size === null || $size == 0.0) && !app()->environment('local')) {
+        if (($size === null || $size == 0.0)) {
             $this->info("[Real] حجم/سایز موقعیت نامشخص یا صفر برای نماد {$symbol} در صرافی {$exchangeName}");
         }
     
         // Entry price
         $entryPrice = $raw['entryPrice'] ?? ($raw['avgPrice'] ?? ($raw['avg_entry_price'] ?? null));
         if ($entryPrice !== null) { $entryPrice = (float)$entryPrice; }
-        if ($entryPrice === null && !app()->environment('local')) {
+        if ($entryPrice === null) {
             $this->info("[Real] قیمت ورود نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
         }
     
@@ -567,7 +549,7 @@ class FuturesLifecycleManager extends Command
         // Leverage
         $leverage = null;
         if (isset($raw['leverage'])) { $leverage = (float)$raw['leverage']; }
-        if ($leverage === null && !app()->environment('local')) {
+        if ($leverage === null) {
             $this->info("[Real] لورج نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
         }
     
@@ -593,15 +575,11 @@ class FuturesLifecycleManager extends Command
         }
         $list = (is_array($raw) && isset($raw['list'])) ? $raw['list'] : $raw;
         if (!is_array($list)) {
-            if (!app()->environment('local')) {
-                $this->warn("[Real] شکل لیست PnL بسته نامعتبر برای {$exchangeName}");
-            }
+            $this->warn("[Real] شکل لیست PnL بسته نامعتبر برای {$exchangeName}");
             return [];
         }
         if (empty($list)) {
-            if (!app()->environment('local')) {
-                $this->info("[Real] لیست PnL بسته خالی برای {$exchangeName}");
-            }
+            $this->info("[Real] لیست PnL بسته خالی برای {$exchangeName}");
             return [];
         }
     
@@ -627,15 +605,11 @@ class FuturesLifecycleManager extends Command
             }
     
             if (!$orderId || !$symbol) {
-                if (!app()->environment('local')) {
-                    $this->warn("[Real] رویداد PnL بسته فاقد شناسه سفارش یا نماد؛ نادیده گرفته شد");
-                }
+                $this->warn("[Real] رویداد PnL بسته فاقد شناسه سفارش یا نماد؛ نادیده گرفته شد");
                 continue;
             }
             if ($avgEntry === null || $avgExit === null) {
-                if (!app()->environment('local')) {
-                    $this->warn("[Real] رویداد PnL بسته برای {$symbol} دارای مقادیر ناقص قیمت ورود/خروج است");
-                }
+                $this->warn("[Real] رویداد PnL بسته برای {$symbol} دارای مقادیر ناقص قیمت ورود/خروج است");
             }
     
             $out[] = [
@@ -681,11 +655,6 @@ class FuturesLifecycleManager extends Command
     // Within syncLifecycleForExchange after syncing orders, invoke open positions sync
     private function syncOpenPositions($exchangeService, \App\Models\UserExchange $userExchange): void
     {
-        // Skip exchange calls in local environment
-        if (app()->environment('local')) {
-            $this->info("[Real] در محیط محلی، همگام‌سازی موقعیت‌های باز انجام نمی‌شود");
-            return;
-        }
         // Enforce hedge-only mode for open position syncing
         if (($userExchange->position_mode ?? null) !== 'hedge') {
             $this->warn("[Real] حالت موقعیت کاربر ({$userExchange->position_mode}) پشتیبانی نمی‌شود؛ همگام‌سازی موقعیت‌های باز فقط در حالت hedge انجام می‌شود");
@@ -710,17 +679,19 @@ class FuturesLifecycleManager extends Command
     
                 // Avoid creating dummy trades: only update existing open trade
                 if ($trade) {
-                    $trade->qty = (float)$position['size'];
-                    if ($position['entryPrice'] !== null) {
-                        $trade->avg_entry_price = $position['entryPrice'];
-                    }
-                    if ($position['leverage'] !== null) {
-                        $trade->leverage = $position['leverage'];
-                    }
-                    if ($position['unrealizedPnl'] !== null) {
-                        $trade->pnl = $position['unrealizedPnl'];
-                    }
-                    $trade->save();
+                    DB::transaction(function () use ($trade, $position) {
+                        $trade->qty = (float)$position['size'];
+                        if ($position['entryPrice'] !== null) {
+                            $trade->avg_entry_price = $position['entryPrice'];
+                        }
+                        if ($position['leverage'] !== null) {
+                            $trade->leverage = $position['leverage'];
+                        }
+                        if ($position['unrealizedPnl'] !== null) {
+                            $trade->pnl = $position['unrealizedPnl'];
+                        }
+                        $trade->save();
+                    });
                 }
             }
         } catch (\Exception $e) {
@@ -733,10 +704,7 @@ class FuturesLifecycleManager extends Command
      */
     private function verifyClosedTradesSynchronization($exchangeService, UserExchange $userExchange): void
     {
-        if (app()->environment('local')) {
-            $this->info("[Real] در محیط محلی، تأیید همگام‌سازی معاملات بسته نادیده گرفته شد");
-            return;
-        }
+
 
         try {
             $trades = Trade::where('user_exchange_id', $userExchange->id)

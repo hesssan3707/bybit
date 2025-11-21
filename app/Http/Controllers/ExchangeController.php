@@ -9,6 +9,7 @@ use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ExchangeController extends Controller
 {
@@ -110,52 +111,49 @@ class ExchangeController extends Controller
         }
 
         try {
-            $user = auth()->user();
-            
-            // Check if exchange already exists for user
-            $existing = $user->exchanges()->where('exchange_name', $request->exchange_name)->first();
-            
-            if ($existing) {
-                if ($existing->is_active) {
-                    return back()->withErrors(['exchange_name' => 'این صرافی قبلاً فعال است.']);
-                }
-                if ($existing->status === 'pending') {
-                    return back()->withErrors(['exchange_name' => 'درخواست فعال‌سازی این صرافی در انتظار بررسی است.']);
-                }
+            DB::transaction(function () use ($user, $request) {
+                // Check if exchange already exists for user
+                $existing = $user->exchanges()->where('exchange_name', $request->exchange_name)->first();
                 
-                // Update existing rejected/suspended exchange
-                $existing->update([
-                    'api_key' => $request->api_key,
-                    'api_secret' => $request->api_secret,
-                    'demo_api_key' => $request->demo_api_key,
-                    'demo_api_secret' => $request->demo_api_secret,
-                    'status' => 'pending',
-                    'activation_requested_at' => now(),
-                    'user_reason' => $request->reason,
-                    'admin_notes' => null,
-                ]);
-                
-                return redirect()->route('exchanges.index')
-                    ->with('success', 'درخواست به‌روزرسانی صرافی ارسال شد.');
-            }
-
-            // Create new exchange request
-            UserExchange::createExchangeRequest(
-                $user->id,
-                $request->exchange_name,
-                $request->api_key,
-                $request->api_secret,
-                $request->reason,
-                $request->demo_api_key,
-                $request->demo_api_secret
-            );
+                if ($existing) {
+                    if ($existing->is_active) {
+                        throw new \Exception('این صرافی قبلاً فعال است.');
+                    }
+                    if ($existing->status === 'pending') {
+                        throw new \Exception('درخواست فعال‌سازی این صرافی در انتظار بررسی است.');
+                    }
+                    
+                    // Update existing rejected/suspended exchange
+                    $existing->update([
+                        'api_key' => $request->api_key,
+                        'api_secret' => $request->api_secret,
+                        'demo_api_key' => $request->demo_api_key,
+                        'demo_api_secret' => $request->demo_api_secret,
+                        'status' => 'pending',
+                        'activation_requested_at' => now(),
+                        'user_reason' => $request->reason,
+                        'admin_notes' => null,
+                    ]);
+                } else {
+                    // Create new exchange request
+                    UserExchange::createExchangeRequest(
+                        $user->id,
+                        $request->exchange_name,
+                        $request->api_key,
+                        $request->api_secret,
+                        $request->reason,
+                        $request->demo_api_key,
+                        $request->demo_api_secret
+                    );
+                }
+            });
 
             return redirect()->route('exchanges.index')
                 ->with('success', 'درخواست فعال‌سازی صرافی ارسال شد و در انتظار تأیید مدیر است.');
 
         } catch (\Exception $e) {
             Log::error('Exchange activation request failed: ' . $e->getMessage());
-            return back()->withErrors(['general' => 'خطا در ارسال درخواست.'])->withInput();
+            return back()->withErrors(['general' => $e->getMessage()])->withInput();
         }
     }
 
@@ -173,7 +171,9 @@ class ExchangeController extends Controller
                 return back()->withErrors(['msg' => 'این صرافی فعال نیست.']);
             }
 
-            $exchange->makeDefault();
+            DB::transaction(function () use ($exchange) {
+                $exchange->makeDefault();
+            });
 
             // Switch to hedge mode after making exchange default
             try {
@@ -219,13 +219,7 @@ class ExchangeController extends Controller
                 ]);
             }
 
-            // Local environment: skip real exchange connection calls
-            if (app()->environment('local')) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'محیط لوکال: تست اتصال شبیه‌سازی شد'
-                ]);
-            }
+
 
             $isConnected = ExchangeFactory::testUserExchangeConnection($exchange);
 
@@ -271,13 +265,7 @@ class ExchangeController extends Controller
                 ]);
             }
 
-            // Local environment: skip real exchange connection calls
-            if (app()->environment('local')) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'محیط لوکال: اتصال حساب واقعی شبیه‌سازی شد'
-                ]);
-            }
+
 
             // Test with real credentials using ExchangeFactory
             $exchangeService = ExchangeFactory::create($exchange->exchange_name, $apiKey, $apiSecret, false);
@@ -332,13 +320,7 @@ class ExchangeController extends Controller
                 ]);
             }
 
-            // Local environment: skip demo exchange connection calls
-            if (app()->environment('local')) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'محیط لوکال: اتصال حساب دمو شبیه‌سازی شد'
-                ]);
-            }
+
 
             // Test with demo credentials using ExchangeFactory
             $exchangeService = ExchangeFactory::create($exchange->exchange_name, $demoApiKey, $demoApiSecret, true);
@@ -390,13 +372,7 @@ class ExchangeController extends Controller
             $apiKey = $request->api_key;
             $apiSecret = $request->api_secret;
 
-            // Local environment: skip exchange API calls
-            if (app()->environment('local')) {
-                return response()->json([
-                    'success' => true,
-                    'message' => $isDemo ? 'محیط لوکال: اتصال حساب دمو شبیه‌سازی شد' : 'محیط لوکال: اتصال حساب واقعی شبیه‌سازی شد'
-                ]);
-            }
+
 
             // Use ExchangeFactory::create for proper connection testing
             $exchangeService = ExchangeFactory::create($exchangeName, $apiKey, $apiSecret, $isDemo);
@@ -542,7 +518,9 @@ class ExchangeController extends Controller
             }
 
             // Deactivate exchange and request new approval
-            $exchange->update($updateData);
+            DB::transaction(function () use ($exchange, $updateData) {
+                $exchange->update($updateData);
+            });
 
             return redirect()->route('exchanges.index')
                 ->with('success', 'درخواست به‌روزرسانی اطلاعات صرافی ارسال شد.');
@@ -661,13 +639,15 @@ class ExchangeController extends Controller
                 return back()->withErrors(['msg' => 'درخواستی برای لغو وجود ندارد یا قبلاً بررسی شده است.']);
             }
 
-            $exchange->update([
-                'status' => 'rejected',
-                'admin_notes' => 'لغو درخواست توسط کاربر',
-                'activation_requested_at' => null,
-                'is_active' => false,
-                'is_default' => false,
-            ]);
+            DB::transaction(function () use ($exchange) {
+                $exchange->update([
+                    'status' => 'rejected',
+                    'admin_notes' => 'لغو درخواست توسط کاربر',
+                    'activation_requested_at' => null,
+                    'is_active' => false,
+                    'is_default' => false,
+                ]);
+            });
 
             return redirect()->route('exchanges.index')
                 ->with('success', 'درخواست شما لغو شد.');

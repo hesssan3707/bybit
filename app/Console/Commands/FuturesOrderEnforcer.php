@@ -9,6 +9,7 @@ use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Exception;
 
@@ -119,11 +120,6 @@ class FuturesOrderEnforcer extends Command
      */
     private function enforceForUserExchange(User $user, UserExchange $userExchange)
     {
-        // Skip live connectivity in local environment
-        if (app()->environment('local')) {
-            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود.");
-            return;
-        }
 
         try {
             $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email}");
@@ -204,8 +200,10 @@ class FuturesOrderEnforcer extends Command
 
             if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
                 try {
-                    $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                    $dbOrder->delete();
+                    DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                        $dbOrder->delete();
+                    });
                     $this->info("    حذف سفارش تغییر یافته: {$dbOrder->order_id} (عدم تطابق قیمت/مقدار)");
                 } catch (Exception $e) {
                     $this->warn("    خطا در حذف سفارش {$dbOrder->order_id}: " . $e->getMessage());
@@ -250,11 +248,13 @@ class FuturesOrderEnforcer extends Command
             $pnlRatio = $this->getPositionPnlRatio($matchingPosition);
             if ($pnlRatio !== null && abs($pnlRatio) >= 0.10) {
                 try {
-                    $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
-                    $exchangeSizeForClose = (float)($matchingPosition['size'] ?? 0);
-                    $exchangeService->closePosition($dbTrade->symbol, $closeSide, $exchangeSizeForClose);
-                    $dbTrade->closed_at = now();
-                    $dbTrade->save();
+                    DB::transaction(function () use ($exchangeService, $dbTrade, $matchingPosition) {
+                        $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                        $exchangeSizeForClose = (float)($matchingPosition['size'] ?? 0);
+                        $exchangeService->closePosition($dbTrade->symbol, $closeSide, $exchangeSizeForClose);
+                        $dbTrade->closed_at = now();
+                        $dbTrade->save();
+                    });
                     $this->info("    بستن موقعیت به دلیل سود/زیان بزرگ: {$dbTrade->symbol} (PnL=" . round($pnlRatio*100,2) . "%)");
                     continue;
                 } catch (Exception $e) {
@@ -282,11 +282,13 @@ class FuturesOrderEnforcer extends Command
             if ($sizeDiffPct > $tolerance || $priceDiffPct > $tolerance) {
                 // اختلاف قابل توجه نسبت به سفارش اصلی: بستن موقعیت و حذف از سیستم
                 try {
-                    $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
-                    $exchangeService->closePosition($dbTrade->symbol, $closeSide, (float)$exchangeSize);
+                    DB::transaction(function () use ($exchangeService, $dbTrade, $exchangeSize) {
+                        $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                        $exchangeService->closePosition($dbTrade->symbol, $closeSide, (float)$exchangeSize);
 
-                    $dbTrade->closed_at = now();
-                    $dbTrade->save();
+                        $dbTrade->closed_at = now();
+                        $dbTrade->save();
+                    });
 
                     $this->info("    بستن موقعیت تغییر یافته: {$dbTrade->symbol} (عدم تطابق >0.2% نسبت به سفارش ثبت‌شده)");
                 } catch (Exception $e) {
@@ -391,18 +393,20 @@ class FuturesOrderEnforcer extends Command
             if ($posSize <= 0) { continue; }
 
             try {
-                $exchangeService->closePosition($posSymbol, $closeSide, $posSize);
+                DB::transaction(function () use ($exchangeService, $userExchange, $posSymbol, $closeSide, $posSize) {
+                    $exchangeService->closePosition($posSymbol, $closeSide, $posSize);
 
-                // Mark any related trades in our DB as closed
-                $relatedTrades = Trade::where('user_exchange_id', $userExchange->id)
-                    ->where('is_demo', false)
-                    ->whereNull('closed_at')
-                    ->where('symbol', $posSymbol)
-                    ->get();
-                foreach ($relatedTrades as $t) {
-                    $t->closed_at = now();
-                    $t->save();
-                }
+                    // Mark any related trades in our DB as closed
+                    $relatedTrades = Trade::where('user_exchange_id', $userExchange->id)
+                        ->where('is_demo', false)
+                        ->whereNull('closed_at')
+                        ->where('symbol', $posSymbol)
+                        ->get();
+                    foreach ($relatedTrades as $t) {
+                        $t->closed_at = now();
+                        $t->save();
+                    }
+                });
 
                 $this->info("    بستن موقعیت نماد دیگر: {$posSymbol} (اندازه={$posSize})");
             } catch (Exception $e) {
@@ -538,11 +542,6 @@ class FuturesOrderEnforcer extends Command
 
     private function enforceCancelExpireOnlyForUserExchange(User $user, UserExchange $userExchange)
     {
-        // در محیط لوکال از اتصال زنده به صرافی‌ها صرف‌نظر شود
-        if (app()->environment('local')) {
-            $this->info("اجرای قوانین در محیط لوکال غیرفعال است؛ اتصال به صرافی‌ها انجام نمی‌شود.");
-            return;
-        }
 
         try {
             $this->info("پردازش صرافی {$userExchange->exchange_name} برای کاربر {$user->email} - فقط بررسی قیمت لغو/انقضا");
@@ -591,10 +590,12 @@ class FuturesOrderEnforcer extends Command
                 $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
                 if (time() >= $expireAt) {
                     try {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'expired';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
+                        DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                            $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                            $dbOrder->status = 'expired';
+                            $dbOrder->closed_at = now();
+                            $dbOrder->save();
+                        });
                         $this->info("    لغو سفارش منقضی شده: {$dbOrder->order_id}");
                     } catch (Exception $e) {
                         $this->warn("    خطا در لغو سفارش منقضی {$dbOrder->order_id}: " . $e->getMessage());
@@ -630,11 +631,17 @@ class FuturesOrderEnforcer extends Command
                                    ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
 
                     if ($shouldCancel) {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->status = 'canceled';
-                        $dbOrder->closed_at = now();
-                        $dbOrder->save();
-                        $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن: {$dbOrder->order_id}");
+                        try {
+                            DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                                $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                                $dbOrder->status = 'canceled';
+                                $dbOrder->closed_at = now();
+                                $dbOrder->save();
+                            });
+                            $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن: {$dbOrder->order_id}");
+                        } catch (Exception $e) {
+                            $this->warn("    خطا در لغو سفارش (قیمت بسته شدن) {$dbOrder->order_id}: " . $e->getMessage());
+                        }
                     }
                 } catch (Exception $e) {
                     $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش {$dbOrder->order_id}: " . $e->getMessage());

@@ -10,16 +10,12 @@ use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class FuturesController extends Controller
 {
     private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
     {
-        // Skip live exchange calls in local environment
-        if (app()->environment('local')) {
-            return 1000.0;
-        }
-
         try {
             $exchangeName = strtolower(method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : '');
 
@@ -174,56 +170,58 @@ class FuturesController extends Controller
             $stepSize = ($steps > 1) ? (($entry2 - $entry1) / ($steps - 1)) : 0;
 
             $orders = [];
-            foreach (range(0, $steps - 1) as $i) {
-                $price = $entry1 + ($stepSize * $i);
-                $orderLinkId = (string) Str::uuid();
-                $finalQty = round($amountPerStep / $qtyStep) * $qtyStep;
-                $finalQty = round($finalQty, $amountPrec);
+            DB::transaction(function () use ($steps, $entry1, $stepSize, $amountPerStep, $qtyStep, $amountPrec, $minQty, $pricePrec, $validated, $symbol, $side, $exchangeService, $user, $capitalUSD, &$orders) {
+                foreach (range(0, $steps - 1) as $i) {
+                    $price = $entry1 + ($stepSize * $i);
+                    $orderLinkId = (string) Str::uuid();
+                    $finalQty = round($amountPerStep / $qtyStep) * $qtyStep;
+                    $finalQty = round($finalQty, $amountPrec);
 
-                if ($finalQty < $minQty) {
-                    throw new \Exception("Calculated quantity ({$finalQty}) is less than the minimum allowed ({$minQty}). Please increase risk percentage.");
+                    if ($finalQty < $minQty) {
+                        throw new \Exception("Calculated quantity ({$finalQty}) is less than the minimum allowed ({$minQty}). Please increase risk percentage.");
+                    }
+
+                    $finalPrice = round($price, $pricePrec);
+                    $finalSL = round((float)$validated['sl'], $pricePrec);
+
+                    $orderParams = [
+                        'category' => 'linear',
+                        'symbol' => $symbol,
+                        'side' => $side,
+                        'orderType' => 'Limit',
+                        'qty' => (string)$finalQty,
+                        'price' => (string)$finalPrice,
+                        'timeInForce' => 'GTC',
+                        'stopLoss'  => (string)$finalSL,
+                        'orderLinkId' => $orderLinkId,
+                    ];
+
+                    $responseData = $exchangeService->createOrder($orderParams);
+                    $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+
+                    $order = Order::create([
+                        'user_exchange_id' => $currentExchange->id,
+                        'is_demo'          => $currentExchange->is_demo_active,
+                        'order_id'         => $responseData['orderId'] ?? null,
+                        'order_link_id'    => $orderLinkId,
+                        'symbol'           => $symbol,
+                        'entry_price'      => $finalPrice,
+                        'tp'               => (float)$validated['tp'],
+                        'sl'               => (float)$validated['sl'],
+                        'steps'            => $steps,
+                        'expire_minutes'   => isset($validated['expire']) ? (int)$validated['expire'] : null,
+                        'status'           => 'pending',
+                        'side'             => strtolower($side),
+                        'amount'           => $finalQty,
+                        'balance_at_creation' => $capitalUSD,
+                        'initial_risk_percent' => round((float)$validated['risk_percentage'], 2),
+                        'entry_low'        => $entry1,
+                        'entry_high'       => $entry2,
+                        'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
+                    ]);
+                    $orders[] = $order;
                 }
-
-                $finalPrice = round($price, $pricePrec);
-                $finalSL = round((float)$validated['sl'], $pricePrec);
-
-                $orderParams = [
-                    'category' => 'linear',
-                    'symbol' => $symbol,
-                    'side' => $side,
-                    'orderType' => 'Limit',
-                    'qty' => (string)$finalQty,
-                    'price' => (string)$finalPrice,
-                    'timeInForce' => 'GTC',
-                    'stopLoss'  => (string)$finalSL,
-                    'orderLinkId' => $orderLinkId,
-                ];
-
-                $responseData = $exchangeService->createOrder($orderParams);
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-
-                $order = Order::create([
-                    'user_exchange_id' => $currentExchange->id,
-                    'is_demo'          => $currentExchange->is_demo_active,
-                    'order_id'         => $responseData['orderId'] ?? null,
-                    'order_link_id'    => $orderLinkId,
-                    'symbol'           => $symbol,
-                    'entry_price'      => $finalPrice,
-                    'tp'               => (float)$validated['tp'],
-                    'sl'               => (float)$validated['sl'],
-                    'steps'            => $steps,
-                    'expire_minutes'   => isset($validated['expire']) ? (int)$validated['expire'] : null,
-                    'status'           => 'pending',
-                    'side'             => strtolower($side),
-                    'amount'           => $finalQty,
-                    'balance_at_creation' => $capitalUSD,
-                    'initial_risk_percent' => round((float)$validated['risk_percentage'], 2),
-                    'entry_low'        => $entry1,
-                    'entry_high'       => $entry2,
-                    'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
-                ]);
-                $orders[] = $order;
-            }
+            });
 
             $message = 'Order created successfully.';
             if ($downsized) {
@@ -244,16 +242,18 @@ class FuturesController extends Controller
         }
 
         if ($order->status === 'pending' || $order->status === 'expired') {
-            try {
-                if ($order->order_id && $order->status === 'pending') {
-                    $exchangeService = $this->getExchangeService();
-                    $exchangeService->cancelOrderWithSymbol($order->order_id, $order->symbol);
+            DB::transaction(function () use ($order) {
+                try {
+                    if ($order->order_id && $order->status === 'pending') {
+                        $exchangeService = $this->getExchangeService();
+                        $exchangeService->cancelOrderWithSymbol($order->order_id, $order->symbol);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. Error: " . $e->getMessage());
                 }
-            } catch (\Exception $e) {
-                Log::warning("Could not cancel order {$order->order_id} on exchange during deletion. Error: " . $e->getMessage());
-            }
 
-            $order->delete();
+                $order->delete();
+            });
             return response()->json(['success' => true, 'message' => 'Order deleted successfully.']);
         }
 

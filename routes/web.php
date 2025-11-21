@@ -319,6 +319,32 @@ Route::get('/demo-spot-lifecycle', function () {
     return '';
 })->middleware('throttle:2');
 
+Route::get('/collect-candles', function () {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #28a745;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
+    Artisan::call('futures:collect-missing-candles');
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">CANDLE COLLECTION DONE</div>';
+    echo '</body></html>';
+    return '';
+})->middleware('throttle:4');
+
+Route::get('/process-queue', function () {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #6f42c1;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
+    // Process queue jobs (max 100 jobs or 30 seconds)
+    Artisan::call('queue:work', [
+        '--stop-when-empty' => true,
+        '--max-jobs' => 100,
+        '--max-time' => 30,
+    ]);
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#6f42c1;font-weight:bold;font-size:18px;margin-top:20px;">QUEUE PROCESSING DONE</div>';
+    echo '</body></html>';
+    return '';
+})->middleware('throttle:10');
+
+
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.
 // Route::get('/re-cache', function() {
