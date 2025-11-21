@@ -127,11 +127,30 @@ class FuturesController extends Controller
             $capitalUSD = $this->resolveCapitalUSD($exchangeService);
             $maxLossUSD = $capitalUSD * ((float)$validated['risk_percentage'] / 100.0);
             $slDistance = abs($avgEntry - (float) $validated['sl']);
+            $tpDistance = abs($avgEntry - (float) $validated['tp']);
 
             if ($slDistance <= 0) {
                 return response()->json(['success' => false, 'message' => 'Stop loss must be different from the entry price.'], 422);
             }
-            $amount = $maxLossUSD / $slDistance;
+            // Enforce minimum SL/TP distance of 0.2% of entry price (avgEntry)
+            $minDistance = 0.002 * $avgEntry;
+            if ($slDistance < $minDistance) {
+                return response()->json(['success' => false, 'message' => 'حد ضرر باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'], 422);
+            }
+            if ($tpDistance < $minDistance) {
+                return response()->json(['success' => false, 'message' => 'حد سود باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'], 422);
+            }
+            // Base quantity from risk
+            $originalAmount = $maxLossUSD / $slDistance;
+            // Auto-downsize by available balance (assume leverage=1 for affordability)
+            $maxAffordableQtyTotal = ($avgEntry > 0) ? ($capitalUSD / $avgEntry) : $originalAmount;
+            $downsized = false;
+            if ($originalAmount > $maxAffordableQtyTotal) {
+                $amount = $maxAffordableQtyTotal;
+                $downsized = true;
+            } else {
+                $amount = $originalAmount;
+            }
 
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
             $instrumentData = collect($instrumentInfo['list'])->firstWhere('symbol', $symbol);
@@ -200,7 +219,11 @@ class FuturesController extends Controller
                 $orders[] = $order;
             }
 
-            return response()->json(['success' => true, 'message' => 'Order created successfully.', 'data' => $orders]);
+            $message = 'Order created successfully.';
+            if ($downsized) {
+                $message .= ' توجه: به دلیل محدودیت موجودی، اندازه موقعیت به حداکثر مقدار قابل تأمین تنظیم شد.';
+            }
+            return response()->json(['success' => true, 'message' => $message, 'downsized' => $downsized, 'data' => $orders]);
 
         } catch (\Exception $e) {
             Log::error('Futures order creation failed: ' . $e->getMessage());

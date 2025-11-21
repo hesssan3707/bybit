@@ -388,6 +388,14 @@ class FuturesController extends Controller
             if ($slDistance <= 0) {
                 return back()->withErrors(['sl' => 'حد ضرر باید متفاوت از قیمت ورود باشد.'])->withInput();
             }
+            // Enforce minimum SL/TP distance of 0.2% of entry price (avgEntry)
+            $minDistance = 0.002 * $avgEntry;
+            if ($slDistance < $minDistance) {
+                return back()->withErrors(['sl' => 'حد ضرر باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'])->withInput();
+            }
+            if ($tpDistance < $minDistance) {
+                return back()->withErrors(['tp' => 'حد سود باید حداقل ۰٫۲٪ فاصله از قیمت ورود داشته باشد.'])->withInput();
+            }
             // Enforce configured minimum RR ratio when strict mode is active
             if ($user->future_strict_mode) {
                 $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id);
@@ -403,7 +411,19 @@ class FuturesController extends Controller
                     return back()->withErrors(['tp' => "در حالت سخت‌گیرانه، حد سود باید بیشتر از نسبت انتخاب‌شده باشد. نسبت حداقل (ضرر:سود): {$minRrStr}"])->withInput();
                 }
             }
-            $amount = $maxLossUSD / $slDistance;
+            // Base quantity from risk
+            $originalAmount = $maxLossUSD / $slDistance;
+
+            // Auto-downsize by available balance to avoid insufficient margin errors
+            // Assume leverage = 1 for affordability; for USDT-margined linear contracts, initial margin ≈ notional
+            $maxAffordableQtyTotal = ($avgEntry > 0) ? ($capitalUSD / $avgEntry) : $originalAmount;
+            $downsized = false;
+            if ($originalAmount > $maxAffordableQtyTotal) {
+                $amount = $maxAffordableQtyTotal;
+                $downsized = true;
+            } else {
+                $amount = $originalAmount;
+            }
 
             // Get Market Precision via Service - request specific symbol to ensure accuracy
             $instrumentInfo = $exchangeService->getInstrumentsInfo($symbol);
@@ -520,7 +540,11 @@ class FuturesController extends Controller
             return back()->withErrors(['msg' => $userFriendlyMessage])->withInput();
         }
 
-        return back()->with('success', "سفارش شما با موفقیت ثبت شد.");
+        $successMsg = "سفارش شما با موفقیت ثبت شد.";
+        if (isset($downsized) && $downsized) {
+            $successMsg .= " توجه: به دلیل محدودیت موجودی، اندازه موقعیت به حداکثر مقدار قابل تأمین تنظیم شد.";
+        }
+        return back()->with('success', $successMsg);
     }
 
     public function destroy(Order $order)
