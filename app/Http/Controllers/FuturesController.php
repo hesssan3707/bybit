@@ -773,48 +773,68 @@ class FuturesController extends Controller
             // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
         }
 
-        // Validate entry price against market price when not in local environment
         $pricePrec = 2;
-        $avgEntry = ((float)$validated['entry1'] + (float)$validated['entry2']) / 2.0;
-        if (!app()->environment('local')) {
+        try {
+            $exchangeService = $this->getExchangeService();
+            $instruments = $exchangeService->getInstrumentsInfo($symbol);
+            $inst = $instruments['list'][0] ?? null;
+            if ($inst) {
+                // Logic to determine precision from instrument info can be added here
+            }
+        } catch (\Exception $e) {
+            // ignore
+        }
+
+        $newEntryPrice = round((float)$validated['entry1'], $pricePrec);
+        $newSl = round((float)$validated['sl'], $pricePrec);
+        $newTp = round((float)$validated['tp'], $pricePrec);
+
+        $params = [
+            'symbol' => $symbol,
+            'orderId' => $order->order_id,
+        ];
+
+        if ($newEntryPrice != $order->entry_price) {
+            $params['price'] = (string)$newEntryPrice;
+        }
+        if ($newSl != $order->sl) {
+            $params['stopLoss'] = (string)$newSl;
+        }
+        if ($newTp != $order->tp) {
+            $params['takeProfit'] = (string)$newTp;
+        }
+
+        if (count($params) > 2) {
             try {
                 $exchangeService = $this->getExchangeService();
-                $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
-
-                $instrumentData = null;
-                if (!empty($instrumentInfo['list'])) {
-                    foreach ($instrumentInfo['list'] as $instrument) {
-                        if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
-                    }
-                }
-                if ($instrumentData && isset($instrumentData['priceScale'])) {
-                    $pricePrec = (int)$instrumentData['priceScale'];
-                }
-
-                $tickerInfo = $exchangeService->getTickerInfo($order->symbol);
-                $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
-                if ($marketPrice > 0) {
-                    $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
-                    if ($side === 'Buy' && $avgEntry > $marketPrice) {
-                        return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
-                    }
-                    if ($side === 'Sell' && $avgEntry < $marketPrice) {
-                        return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
-                    }
+                $result = $exchangeService->amendOrder($params);
+                
+                // Check if orderId changed (BingX Cancel-Replace)
+                if (isset($result['orderId']) && $result['orderId'] != $order->order_id) {
+                    $order->order_id = $result['orderId'];
                 }
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('Update validation skipped due to market fetch error: ' . $e->getMessage());
+                $msg = $e->getMessage();
+                // Handle Cancel-Replace failure (BingX)
+                if (str_contains($msg, 'REPLACE_FAILED')) {
+                    // The original order was canceled, but new one failed.
+                    // We must delete the local order to stay in sync.
+                    $order->delete();
+                    return redirect()->route('futures.orders')->withErrors(['msg' => 'سفارش در صرافی لغو شد اما ایجاد سفارش جدید با خطا مواجه شد. سفارش محلی حذف گردید. جزئیات: ' . $msg]);
+                }
+                
+                return redirect()->back()->withErrors(['msg' => 'خطا در ویرایش سفارش در صرافی: ' . $msg]);
             }
         }
 
-        // Apply DB-only update of order fields
-        $order->entry_price = round((float)$validated['entry1'], $pricePrec);
+        $order->entry_price = $newEntryPrice;
         $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
         $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
-        $order->sl          = round((float)$validated['sl'], $pricePrec);
-        $order->tp          = round((float)$validated['tp'], $pricePrec);
+        $order->sl          = $newSl;
+        $order->tp          = $newTp;
         $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
         $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
+        
         $order->save();
 
         return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');

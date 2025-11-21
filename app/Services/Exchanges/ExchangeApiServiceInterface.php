@@ -55,6 +55,12 @@ interface ExchangeApiServiceInterface
     public function cancelOrderWithSymbol(string $orderId, string $symbol): array;
 
     /**
+     * Amend an existing order
+     * @param array $params - Must include orderId and symbol, plus fields to update (price, qty, etc.)
+     */
+    public function amendOrder(array $params): array;
+
+    /**
      * Cancel a spot order
      */
     public function cancelSpotOrder(string $orderId): array;

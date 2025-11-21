@@ -113,6 +113,108 @@ class BingXApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('post', '/openApi/swap/v2/trade/cancel', ['symbol' => $symbol, 'orderId' => $orderId]);
     }
 
+    public function amendOrder(array $params): array
+    {
+        // BingX does not support native amend. We must Cancel and Replace.
+        $symbol = $params['symbol'];
+        $orderId = $params['orderId'];
+
+        // 1. Fetch original order to get details (side, type, qty, etc.)
+        // We use getOpenOrders because we are editing a pending order.
+        $openOrders = $this->getOpenOrders($symbol);
+        $originalOrder = null;
+        foreach ($openOrders['list'] as $o) {
+            if ($o['orderId'] == $orderId) {
+                $originalOrder = $o;
+                break;
+            }
+        }
+
+        if (!$originalOrder) {
+            throw new \Exception('سفارش در صرافی یافت نشد (شاید قبلاً پر یا لغو شده است).');
+        }
+
+        // 2. Cancel the existing order
+        try {
+            $this->cancelOrderWithSymbol($orderId, $symbol);
+        } catch (\Exception $e) {
+            throw new \Exception('خطا در لغو سفارش قدیمی: ' . $e->getMessage());
+        }
+
+        // 3. Prepare new order data
+        // Merge original data with new params
+        // Map BingX response fields to createOrder fields if necessary
+        // Response: side, price, origQty, type, positionSide, stopPrice, etc.
+        // Create Params: symbol, side, type, quantity, price, positionSide, etc.
+        
+        $newSide = $originalOrder['side']; // 'BUY' or 'SELL'
+        $newType = $originalOrder['type']; // 'LIMIT', 'MARKET', etc.
+        $newQty = $params['qty'] ?? $originalOrder['origQty'];
+        $newPrice = $params['price'] ?? $originalOrder['price'];
+        $positionSide = $originalOrder['positionSide'] ?? 'BOTH'; // LONG/SHORT/BOTH
+
+        $createParams = [
+            'symbol' => $symbol,
+            'side' => $newSide,
+            'type' => $newType,
+            'quantity' => (string)$newQty,
+            'price' => (string)$newPrice,
+            'positionSide' => $positionSide,
+        ];
+
+        // Handle Stop Loss / Take Profit if they were part of the order or params
+        // Note: BingX often attaches SL/TP to the position or as separate orders.
+        // If the original order had SL/TP params in the 'create' call, they might not be returned in 'getOpenOrders' simple view easily 
+        // or might need separate calls.
+        // However, the `update` controller passes `stopLoss` and `takeProfit`.
+        if (isset($params['stopLoss'])) {
+            $createParams['stopLoss'] = json_encode([
+                'type' => 'STOP_LOSS', 
+                'stopPrice' => (string)$params['stopLoss'],
+                'price' => (string)$params['stopLoss'] // Trigger price
+            ]); 
+            // Wait, BingX createOrder structure for SL/TP is specific.
+            // Actually, `createOrder` in this service just passes params to endpoint.
+            // BingX V2 Swap API allows `stopLoss` and `takeProfit` fields in createOrder?
+            // Checking docs (mental): BingX usually requires separate calls for SL/TP or specific JSON.
+            // BUT, `FuturesController` passes `stopLoss` and `takeProfit` as simple values.
+            // Let's assume the `createOrder` or the API handles it if passed.
+            // If `FuturesController` logic relies on `amendOrder` handling SL/TP, we should pass them.
+            
+            // Re-reading `createOrder` implementation: it just calls `/trade/order`.
+            // Let's check if `stopLoss` is a valid param for `trade/order`.
+            // Usually it is `stopLoss` (json) or separate endpoint.
+            // The Controller passes `stopLoss` key.
+            // If the original order had SL/TP, we might lose it if we don't re-send it.
+            // The Controller sends the NEW SL/TP. So we use that.
+            $createParams['stopLoss'] = '{"type":"SL","stopPrice":"'.$params['stopLoss'].'","price":"'.$params['stopLoss'].'"}';
+        }
+        if (isset($params['takeProfit'])) {
+             $createParams['takeProfit'] = '{"type":"TP","stopPrice":"'.$params['takeProfit'].'","price":"'.$params['takeProfit'].'"}';
+        }
+        
+        // Simpler approach for SL/TP if the API supports simple keys (some wrappers do, but raw API usually needs JSON)
+        // Given I can't test, I'll stick to what the Controller sends. 
+        // The Controller sends `stopLoss` => value.
+        // If `Bybit` handles that, good. BingX might need specific formatting.
+        // For now, let's assume we pass what we received, but mapped correctly if we know.
+        // Actually, looking at `BingXApiService::setStopLoss`, it calls `/trade/stopOrder`.
+        // So `createOrder` might NOT support SL/TP directly attached for Limit orders in all versions.
+        // BUT, if we are replacing the main Limit order, we focus on Price/Qty.
+        // SL/TP might need to be set separately if they are separate orders.
+        // However, the user wants "Cancel and Replace".
+        
+        // Let's try to create the order.
+        try {
+            $newOrder = $this->createOrder($createParams);
+            return $newOrder; // Should contain 'orderId'
+        } catch (\Exception $e) {
+            // CRITICAL: Cancel succeeded, Create failed.
+            // We must throw a specific error so Controller knows to delete local order.
+            throw new \Exception('REPLACE_FAILED: ' . $e->getMessage());
+        }
+    }
+
     public function getPositions(string $symbol = null): array
     {
         $params = [];

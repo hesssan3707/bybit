@@ -140,6 +140,15 @@ class BybitApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('POST', '/v5/order/cancel', ['category' => 'linear', 'orderId' => $orderId, 'symbol' => $symbol]);
     }
 
+    public function amendOrder(array $params): array
+    {
+        // Ensure category is set
+        if (!isset($params['category'])) {
+            $params['category'] = 'linear';
+        }
+        return $this->sendRequest('POST', '/v5/order/amend', $params);
+    }
+
     public function getPositionInfo(string $symbol): array
     {
         return $this->sendRequest('GET', '/v5/position/list', ['category' => 'linear', 'symbol' => $symbol]);

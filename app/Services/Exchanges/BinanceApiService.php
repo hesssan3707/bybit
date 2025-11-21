@@ -136,6 +136,14 @@ class BinanceApiService implements ExchangeApiServiceInterface
         return $this->sendRequest('delete', '/fapi/v1/order', ['symbol' => $symbol, 'orderId' => $orderId]);
     }
 
+    public function amendOrder(array $params): array
+    {
+        // Binance Futures API uses PUT /fapi/v1/order to amend
+        // Required: symbol, orderId (or origClientOrderId)
+        // Optional: side, quantity, price, etc.
+        return $this->sendRequest('put', '/fapi/v1/order', $params, true);
+    }
+
     public function getPositions(string $symbol = null): array
     {
         $params = [];
