@@ -916,6 +916,7 @@ class FuturesLifecycleManager extends Command
                     } catch (\Throwable $e) {
                         // Do not fail lifecycle flow due to ban creation issues
                     }
+                }
             }
         } catch (\Exception $e) {
             $this->warn("[Real] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());
