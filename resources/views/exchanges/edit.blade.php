@@ -93,7 +93,7 @@
         box-shadow: 0 0 8px rgba(0,123,255,0.25);
         outline: none;
     }
-    button {
+    .btn {
         width: 100%;
         padding: 14px;
         color: #000000;
@@ -105,7 +105,7 @@
         cursor: pointer;
         transition: opacity 0.3s;
     }
-    button:hover {
+    .btn:hover {
         opacity: 0.9;
     }
     .invalid-feedback {
@@ -183,6 +183,9 @@
 @section('content')
 <div class="glass-card container">
     <div class="form-card">
+        <a href="{{ route('exchanges.index') }}" class="btn btn-glass btn-glass-primary is-active" style="width:95%; margin-bottom:12px;text-decoration:none">
+            بازگشت به مدیریت صرافی‌ها
+        </a>
         <div class="exchange-header">
             <h2>ویرایش اطلاعات {{ $exchange->exchange_display_name }}</h2>
         </div>
@@ -231,6 +234,12 @@
         <form method="POST" action="{{ route('exchanges.update', $exchange) }}">
             @csrf
             @method('PUT')
+
+            <div class="form-group" style="display:flex; align-items:center; justify-content:flex-start; gap:12px;">
+                <button type="button" id="open-api-help-edit" class="btn btn-glass btn-glass-muted is-active" style="padding:6px 10px;">
+                    راهنمای دریافت API Key/Secret
+                </button>
+            </div>
 
             <div class="form-group">
                 <label for="api_key">کلید API جدید (API Key):</label>
@@ -289,13 +298,16 @@
             </div>
 
             <div class="form-group" style="margin-bottom: 20px;">
-                <button type="button" onclick="testRealConnectionEdit()" class="btn" id="test-real-btn-edit" style="margin-left: 10px; background-color: #007bff; color: white;">
-                    تست اتصال حساب واقعی
+                <button type="button" onclick="testRealConnectionEdit()" class="btn btn-glass btn-glass-info is-active" id="test-real-btn-edit" style="margin-left: 10px;">
+                    <i class="fas fa-plug"></i> تست اتصال حساب واقعی
                 </button>
                 
-                <button type="button" onclick="testDemoConnectionEdit()" class="btn" id="test-demo-btn-edit" style="background-color: #28a745; color: white; display: none;">
-                    تست اتصال حساب دمو
+                <button type="button" onclick="testDemoConnectionEdit()" class="btn btn-glass btn-glass-success is-active" id="test-demo-btn-edit" style="display: none;">
+                    <i class="fas fa-vial"></i> تست اتصال حساب دمو
                 </button>
+                <div class="form-group" style="margin-top: 8px;">
+                    <small style="color:#6b7280;">این دکمه‌ها فقط تست اتصال هستند و درخواست ارسال نمی‌شود.</small>
+                </div>
             </div>
 
             <div class="form-group">
@@ -309,10 +321,17 @@
                 @enderror
             </div>
 
-            <button type="submit">
+            <button type="submit" class="btn btn-glass btn-glass-primary is-active">
                 ارسال درخواست به‌روزرسانی
             </button>
         </form>
+
+        @if($exchange->status === 'pending')
+        <form method="POST" action="{{ route('exchanges.cancel-request', $exchange) }}" style="margin-top: 10px;">
+            @csrf
+            <button type="submit" class="btn btn-glass btn-glass-danger">لغو درخواست در انتظار</button>
+        </form>
+        @endif
     </div>
 </div>
 
@@ -376,28 +395,34 @@ async function testRealConnectionEdit() {
 
         if (data.success) {
             btn.textContent = '✓ موفق';
-            btn.style.backgroundColor = '#28a745';
+            btn.classList.remove('btn-glass-info','btn-glass-danger');
+            btn.classList.add('btn-glass-success');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#007bff';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-info');
                 btn.disabled = false;
             }, 2000);
         } else {
             btn.textContent = '✗ خطا';
-            btn.style.backgroundColor = '#dc3545';
+            btn.classList.remove('btn-glass-info','btn-glass-success');
+            btn.classList.add('btn-glass-danger');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#007bff';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-info');
                 btn.disabled = false;
             }, 2000);
             modernAlert(data.message || 'خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
-        btn.style.backgroundColor = '#dc3545';
+        btn.classList.remove('btn-glass-info','btn-glass-success');
+        btn.classList.add('btn-glass-danger');
         setTimeout(() => {
             btn.textContent = originalText;
-            btn.style.backgroundColor = '#007bff';
+            btn.classList.remove('btn-glass-success','btn-glass-danger');
+            btn.classList.add('btn-glass-info');
             btn.disabled = false;
         }, 2000);
         modernAlert('خطا در تست اتصال حساب واقعی', 'error', 'خطا در تست اتصال');
@@ -436,28 +461,34 @@ async function testDemoConnectionEdit() {
 
         if (data.success) {
             btn.textContent = '✓ موفق';
-            btn.style.backgroundColor = '#198754';
+            btn.classList.remove('btn-glass-info','btn-glass-danger');
+            btn.classList.add('btn-glass-success');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#28a745';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-success');
                 btn.disabled = false;
             }, 2000);
         } else {
             btn.textContent = '✗ خطا';
-            btn.style.backgroundColor = '#dc3545';
+            btn.classList.remove('btn-glass-info','btn-glass-success');
+            btn.classList.add('btn-glass-danger');
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.backgroundColor = '#28a745';
+                btn.classList.remove('btn-glass-success','btn-glass-danger');
+                btn.classList.add('btn-glass-success');
                 btn.disabled = false;
             }, 2000);
             modernAlert(data.message || 'خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
         }
     } catch (error) {
         btn.textContent = '✗ خطا';
-        btn.style.backgroundColor = '#dc3545';
+        btn.classList.remove('btn-glass-success');
+        btn.classList.add('btn-glass-danger');
         setTimeout(() => {
             btn.textContent = originalText;
-            btn.style.backgroundColor = '#28a745';
+            btn.classList.remove('btn-glass-danger');
+            btn.classList.add('btn-glass-success');
             btn.disabled = false;
         }, 2000);
         modernAlert('خطا در تست اتصال حساب دمو', 'error', 'خطا در تست اتصال');
@@ -467,6 +498,62 @@ async function testDemoConnectionEdit() {
 // Check demo inputs on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkDemoInputs();
+    const helpBtn = document.getElementById('open-api-help-edit');
+    if (helpBtn) helpBtn.addEventListener('click', function(){ ApiHelpEdit.show(); });
 });
+
+// ------- API Help Modal (Edit) ---------
+const ApiHelpEdit = (function(){
+    const exchangeKey = ('{{ strtolower($exchange->exchange_name) }}' || '').toLowerCase();
+    function helpHtmlFor(exchangeKey){
+        const commonWarn = '<div style="margin:10px 0; padding:10px; background:#f9fafb; border:1px dashed #e5e7eb; border-radius:8px; color:#111;">' +
+          'توجه: هنگام ساخت کلیدها، دسترسی معاملات (Trade)، اطلاعات بازار (Market Data) و فیوچرز را فعال کنید. IP WhiteList را غیرفعال کنید یا IP سرور را در لیست مجاز قرار دهید.'+
+        '</div>';
+        switch((exchangeKey||'').toLowerCase()){
+            case 'binance':
+                return `
+                <div>
+                    <h4 style=\"margin:6px 0 10px 0;\">Binance</h4>
+                    <ol style=\"line-height:1.9; padding-right:18px; text-align:right;\">
+                        <li>Profile → API Management → Create API</li>
+                        <li>فعال‌سازی Enable Futures و مجوز معاملات Spot/Futures</li>
+                        <li>برای Testnet: futures-testnet.binancefuture.com</li>
+                        <li>API Key و Secret را در فرم وارد کنید</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            case 'bybit':
+                return `
+                <div>
+                    <h4 style=\"margin:6px 0 10px 0;\">Bybit</h4>
+                    <ol style=\"line-height:1.9; padding-right:18px; text-align:right;\">
+                        <li>User Center → API Management → Create New Key</li>
+                        <li>Unified Trading/Derivatives را انتخاب و مجوزها را فعال کنید</li>
+                        <li>برای Testnet: testnet.bybit.com</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            case 'bingx':
+                return `
+                <div>
+                    <h4 style=\"margin:6px 0 10px 0;\">BingX</h4>
+                    <ol style=\"line-height:1.9; padding-right:18px; text-align:right;\">
+                        <li>User Center → API Management → Create New API</li>
+                        <li>مجوزهای Spot/Futures با Trade را فعال کنید</li>
+                        <li>کلیدها را در فرم وارد کنید</li>
+                    </ol>
+                    ${commonWarn}
+                </div>`;
+            default:
+                return `<div>راهنمای این صرافی در حال حاضر موجود نیست.</div>`;
+        }
+    }
+    function show(){
+        showAlertModal({ title: 'راهنمای دریافت API Key و Secret', message: '', type: 'info' });
+        const contentEl = document.getElementById('alertModalMessage');
+        if (contentEl) contentEl.innerHTML = helpHtmlFor(exchangeKey);
+    }
+    return { show };
+})();
 </script>
 @endsection

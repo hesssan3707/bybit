@@ -349,6 +349,90 @@
         </a>
     </div>
 
+    @if(isset($companyRequests) && $companyRequests->count() > 0)
+        <div class="exchanges-header" style="margin-top: 10px;">
+            <h3>درخواست‌های صرافی شرکت</h3>
+        </div>
+        @foreach($companyRequests as $req)
+            <div class="exchange-card" style="--exchange-color: {{ $req->exchange_color }}">
+                <div class="exchange-header">
+                    <div class="exchange-info">
+                        <div class="exchange-logo">
+                            <img src="{{ asset('public/logos/' . strtolower($req->exchange_name) . '-logo.png') }}" alt="{{ subStr($req->exchange_display_name , 0 , 2) }}" class="exchange-logo" style="background-color: {{ $req->exchange_color }};">
+                        </div>
+                        <div class="exchange-title">
+                            <h3>{{ $req->exchange_display_name }}</h3>
+                            <div class="status-badges">
+                                <span class="status-badge status-{{ $req->status }}">
+                                    @if($req->status === 'pending')
+                                        در انتظار بررسی
+                                    @elseif($req->status === 'approved')
+                                        تأیید شده
+                                    @elseif($req->status === 'rejected')
+                                        رد شده
+                                    @endif
+                                </span>
+                                <span class="status-badge" style="background:#e9ecef;color:#333;">نوع حساب: {{ $req->account_type === 'demo' ? 'دمو' : 'واقعی' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="exchange-details">
+                    <div class="exchange-details-grid">
+                        <div class="detail-item">
+                            <div class="detail-label">تاریخ درخواست</div>
+                            <div class="detail-value">{{ $req->requested_at ? $req->requested_at->format('Y-m-d H:i') : '-' }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">یادداشت کاربر</div>
+                            <div class="detail-value">{{ $req->user_reason ?: '-' }}</div>
+                        </div>
+                    </div>
+
+                    @if($req->admin_notes)
+                        <div style="margin-bottom: 15px;">
+                            <strong>یادداشت مدیر:</strong>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin-top: 5px;">
+                                {{ $req->admin_notes }}
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="exchange-actions">
+                        <div class="action-buttons">
+                            @if($req->status === 'approved' && $req->assignedExchange)
+                                <a href="{{ route('exchanges.edit', $req->assignedExchange) }}" class="btn btn-info">
+                                    <i class="fas fa-eye"></i> مشاهده صرافی اختصاص‌یافته
+                                </a>
+                            @endif
+                            @if($req->status === 'pending')
+                                <form method="POST" action="{{ route('exchanges.company-request.withdraw', $req) }}" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-glass btn-glass-danger" style="width:auto;">
+                                        <i class="fas fa-times-circle"></i> لغو درخواست
+                                    </button>
+                                </form>
+                            @endif
+                            @if($req->status === 'rejected')
+                                <form method="POST" action="{{ route('exchanges.company-request.destroy', $req) }}" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger" style="width:auto;">
+                                        <i class="fas fa-trash-alt"></i> حذف درخواست رد شده
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                        @if($req->status === 'pending')
+                            <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
+
     @if($exchanges->count() > 0)
         @foreach($exchanges as $exchange)
             <div class="exchange-card" style="--exchange-color: {{ $exchange->exchange_color }}">
@@ -372,6 +456,12 @@
                                     @else
                                         غیرفعال
                                     @endif
+                                </span>
+                                @php
+                                    $isCompanyAssigned = isset($companyAssignedIds) && in_array($exchange->id, $companyAssignedIds, true);
+                                @endphp
+                                <span class="status-badge" title="نوع مالکیت صرافی">
+                                    {{ $isCompanyAssigned ? 'صرافی واگذار شده' : 'صرافی شخصی' }}
                                 </span>
                                 @if($exchange->is_default)
                                     <span class="status-badge default-badge">پیش‌فرض</span>
@@ -462,6 +552,12 @@
                         
                         @if($exchange->status === 'pending')
                             <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>
+                            <form method="POST" action="{{ route('exchanges.cancel-request', $exchange) }}" style="margin-top: 8px;">
+                                @csrf
+                                <button type="submit" class="btn btn-glass btn-glass-danger" style="width:auto;">
+                                    <i class="fas fa-times"></i> لغو درخواست
+                                </button>
+                            </form>
                         @endif
                     </div>
                 </div>

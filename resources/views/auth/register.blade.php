@@ -29,7 +29,7 @@
             padding: 20px;
             background-image:
                 linear-gradient(rgba(2,6,23,0.55), rgba(2,6,23,0.55)),
-                url("{{ asset('public/images/auth-background2.png') }}");
+                url("{{ asset('public/images/auth-background2.webp') }}");
             background-attachment: fixed;
             background-size: cover;
             background-position: center;

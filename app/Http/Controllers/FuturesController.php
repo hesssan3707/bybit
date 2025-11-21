@@ -14,13 +14,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class FuturesController extends Controller
 {
     private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
     {
         if (app()->environment('local')) {
-            return 1000.0;
+            return 10.0;
         }
 
         try {
@@ -134,7 +135,7 @@ class FuturesController extends Controller
 
 
 
-    public function index()
+    public function index(Request $request)
     {
         // Check if user has active exchange
         $exchangeStatus = $this->checkActiveExchange();
@@ -152,17 +153,60 @@ class FuturesController extends Controller
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
 
-        $orders = $ordersQuery->where(function ($query) use ($threeDaysAgo) {
-            $query->whereIn('status', ['pending', 'filled'])
-                ->orWhere('updated_at', '>=', $threeDaysAgo);
-        })
-            ->latest('updated_at')
-            ->paginate(20);
+        // Read filters
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $symbol = $request->input('symbol');
+        $hasAnyFilter = filled($from) || filled($to) || filled($symbol);
+
+        // Apply filters when present
+        if ($hasAnyFilter) {
+            // Apply symbol filter unless strict mode is active
+            $strict = (bool) ($user->future_strict_mode ?? false);
+            if (!$strict && filled($symbol)) {
+                $ordersQuery->where('symbol', $symbol);
+            }
+
+            // Date range filters on updated_at
+            if (filled($from)) {
+                try {
+                    $fromDate = Carbon::createFromFormat('Y-m-d', $from)->startOfDay();
+                    $ordersQuery->where('updated_at', '>=', $fromDate);
+                } catch (\Throwable $e) {}
+            }
+            if (filled($to)) {
+                try {
+                    $toDate = Carbon::createFromFormat('Y-m-d', $to)->endOfDay();
+                    $ordersQuery->where('updated_at', '<=', $toDate);
+                } catch (\Throwable $e) {}
+            }
+        } else {
+            // Default window: show pending/filled or recent updates (last 3 days)
+            $ordersQuery->where(function ($query) use ($threeDaysAgo) {
+                $query->whereIn('status', ['pending', 'filled'])
+                    ->orWhere('updated_at', '>=', $threeDaysAgo);
+            });
+        }
+
+        $orders = $ordersQuery->latest('updated_at')->paginate(20);
+
+        // Build symbol options for filter dropdown (distinct for user + account type)
+        $symbolOptions = Order::forUser(auth()->id())
+            ->when($currentExchange, function ($q) use ($currentExchange) {
+                $q->accountType($currentExchange->is_demo_active);
+            })
+            ->whereNotNull('symbol')
+            ->select('symbol')
+            ->distinct()
+            ->orderBy('symbol')
+            ->pluck('symbol')
+            ->toArray();
 
         return view('futures.orders_list', [
             'orders' => $orders,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
-            'exchangeMessage' => $exchangeStatus['message']
+            'exchangeMessage' => $exchangeStatus['message'],
+            'filterSymbols' => $symbolOptions,
         ]);
     }
 
@@ -230,7 +274,7 @@ class FuturesController extends Controller
                 $activeBan = UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'open_ban_exchange_manual_close_3d'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
@@ -257,6 +301,137 @@ class FuturesController extends Controller
         ]);
     }
 
+    public function edit(\App\Models\Order $order)
+    {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'شما مجاز به ویرایش این سفارش نیستید.']);
+        }
+
+        // Only allow editing of pending orders
+        if ($order->status !== 'pending') {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'تنها سفارش‌های در انتظار قابل ویرایش هستند.']);
+        }
+
+        $availableMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
+        $selectedMarket = null;
+        $symbol = $order->symbol;
+
+        if ($user->future_strict_mode && $user->selected_market) {
+            // Strict mode: enforce selected market
+            $selectedMarket = $user->selected_market;
+            $symbol = $selectedMarket;
+        }
+
+        // Fetch market price for TradingView initialization (match create())
+        $marketPrice = '0';
+        if ($exchangeStatus['hasActiveExchange']) {
+            try {
+                $exchangeService = $this->getExchangeService();
+                $tickerInfo = $exchangeService->getTickerInfo($symbol);
+                $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+                $marketPrice = (string)$price;
+            } catch (\Exception $e) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if ($currentExchange) {
+                    try {
+                        $this->handleApiException($e, $currentExchange, 'futures');
+                    } catch (\Exception $handledException) {
+                        \Illuminate\Support\Facades\Log::error("Could not fetch market price (edit): " . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        // Prefill values from order
+        $entry1 = (float)($order->entry_low ?? $order->entry_price);
+        $entry2 = (float)($order->entry_high ?? $order->entry_price);
+        $sl = (float)$order->sl;
+        $tp = (float)$order->tp;
+        $steps = (int)($order->steps ?? 1);
+        $expireMinutes = $order->expire_minutes;
+        $cancelPrice = $order->cancel_price;
+
+        // Compute a reasonable default risk percentage using saved balance
+        $avgEntry = ($entry1 + $entry2) / 2.0;
+        $slDistance = abs($avgEntry - $sl);
+        $capitalUSD = (float)($order->balance_at_creation ?? 0);
+        $defaultRisk = null;
+        if ($capitalUSD > 0 && $slDistance > 0) {
+            $defaultRisk = round(($order->amount * $slDistance / $capitalUSD) * 100, 2);
+        } else {
+            $defaultRisk = \App\Models\UserAccountSetting::getDefaultRisk($user->id) ?? 10;
+        }
+
+        // Apply strict mode cap
+        if ($user->future_strict_mode) {
+            $defaultRisk = min($defaultRisk, 10);
+        }
+        
+        // Get user defaults (to mirror create page behavior in UI)
+        $defaultFutureOrderSteps = \App\Models\UserAccountSetting::getDefaultFutureOrderSteps($user->id);
+        $defaultExpirationMinutes = \App\Models\UserAccountSetting::getDefaultExpirationTime($user->id);
+
+        // Compute active opening-ban for UI when strict mode is active
+        $activeBan = null;
+        $banRemainingSeconds = null;
+        try {
+            if ($user && ($user->future_strict_mode ?? false)) {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                $activeBan = \App\Models\UserBan::active()
+                    ->forUser($user->id)
+                    ->accountType($isDemo)
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                    ->orderBy('ends_at', 'desc')
+                    ->first();
+                if ($activeBan) {
+                    $banRemainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                }
+            }
+        } catch (\Throwable $e) {
+            // silent failure for UI rendering
+        }
+
+        return view('futures.edit_order', [
+            'marketPrice' => $marketPrice,
+            'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
+            'exchangeMessage' => $exchangeStatus['message'],
+            'user' => $user,
+            'availableMarkets' => $availableMarkets,
+            'selectedMarket' => $selectedMarket,
+            'prefill' => [
+                'symbol' => $order->symbol,
+                'entry1' => $entry1,
+                'entry2' => $entry2,
+                'sl' => $sl,
+                'tp' => $tp,
+                'steps' => $steps,
+                'expire' => $expireMinutes,
+                'risk_percentage' => $defaultRisk,
+                'cancel_price' => $cancelPrice,
+            ],
+            'order' => $order,
+            'currentSymbol' => $symbol,
+            'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
+            'defaultExpiration' => $defaultExpirationMinutes,
+            'defaultRisk' => $defaultRisk,
+            'activeBan' => $activeBan,
+            'banRemainingSeconds' => $banRemainingSeconds,
+        ]);
+    }
+
     public function store(Request $request)
     {
         // Check if user has active exchange
@@ -274,13 +449,14 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'open_ban_exchange_manual_close_3d'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
-                    $remaining = $activeBan->ends_at->diffForHumans(null, true);
+                    $remainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $remainingFa = $this->formatFaDuration($remainingSeconds);
                     return back()
-                        ->withErrors(['msg' => 'ثبت سفارش جدید موقتاً محدود شده است. لطفاً ' . $remaining . ' صبر کنید.'])
+                        ->withErrors(['msg' => 'ثبت سفارش جدید موقتاً محدود شده است. لطفاً ' . $remainingFa . ' صبر کنید.'])
                         ->withInput();
                 }
             }
@@ -291,14 +467,19 @@ class FuturesController extends Controller
         $validated = $request->validate([
             'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
             'entry1' => 'required|numeric',
-            'entry2' => 'required|numeric',
+            'entry2' => 'nullable|numeric',
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1|max:8',
             'expire' => 'nullable|integer|min:1|max:999',
-            'risk_percentage' => 'required|numeric|min:0.1',
+            'risk_percentage' => 'required|numeric|min:0.1|max:100',
             'cancel_price' => 'nullable|numeric',
         ]);
+
+        // If entry2 is not provided (steps=1 case), set it equal to entry1
+        if (!isset($validated['entry2'])) {
+            $validated['entry2'] = $validated['entry1'];
+        }
 
         try {
             // Get user's active exchange service
@@ -356,12 +537,16 @@ class FuturesController extends Controller
             // an existing pending order or an open trade on the same side (for current exchange & symbol)
             $currentExchange = $user->currentExchange ?? $user->defaultExchange;
             if ($currentExchange) {
-                $hasPendingSameSide = Order::where('user_exchange_id', $currentExchange->id)
+                $pendingQuery = Order::where('user_exchange_id', $currentExchange->id)
                     ->where('is_demo', $currentExchange->is_demo_active)
                     ->where('status', 'pending')
                     ->where('symbol', $symbol)
-                    ->where('side', $sideLower)
-                    ->exists();
+                    ->where('side', $sideLower);
+                // Exclude the order being edited if provided
+                if ($request->filled('order_id')) {
+                    $pendingQuery->where('id', '!=', (int)$request->input('order_id'));
+                }
+                $hasPendingSameSide = $pendingQuery->exists();
 
                 $hasOpenSameSideTrade = Trade::where('user_exchange_id', $currentExchange->id)
                     ->where('is_demo', $currentExchange->is_demo_active)
@@ -526,6 +711,7 @@ class FuturesController extends Controller
                     'side'             => strtolower($side),
                     'amount'           => $finalQty, // Use the rounded quantity that was sent to Bybit
                     'balance_at_creation' => $capitalUSD,
+                    'initial_risk_percent' => round((float)$riskPercentage, 2),
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,
@@ -545,6 +731,93 @@ class FuturesController extends Controller
             $successMsg .= " توجه: به دلیل محدودیت موجودی، اندازه موقعیت به حداکثر مقدار قابل تأمین تنظیم شد.";
         }
         return back()->with('success', $successMsg);
+    }
+
+    public function update(Request $request, Order $order)
+    {
+        // Check if user has active exchange
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return back()->withErrors(['msg' => 'شما مجاز به ویرایش این سفارش نیستید.'])->withInput();
+        }
+
+        // Only allow editing of pending orders
+        if ($order->status !== 'pending') {
+            return back()->withErrors(['msg' => 'تنها سفارش‌های در انتظار قابل ویرایش هستند.'])->withInput();
+        }
+
+        $validated = $request->validate([
+            'entry1' => 'required|numeric',
+            'entry2' => 'nullable|numeric',
+            'tp'     => 'required|numeric',
+            'sl'     => 'required|numeric',
+            'steps'  => 'nullable|integer|min:1|max:8',
+            'expire' => 'nullable|integer|min:1|max:999',
+            'risk_percentage' => 'nullable|numeric|min:0.1|max:100',
+            'cancel_price' => 'nullable|numeric',
+        ]);
+
+        if (!isset($validated['entry2'])) {
+            $validated['entry2'] = $validated['entry1'];
+        }
+
+        // Strict mode: keep symbol unchanged; only validate if user's selected market conflicts
+        if ($user->future_strict_mode && $user->selected_market) {
+            // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
+        }
+
+        // Validate entry price against market price when not in local environment
+        $pricePrec = 2;
+        $avgEntry = ((float)$validated['entry1'] + (float)$validated['entry2']) / 2.0;
+        if (!app()->environment('local')) {
+            try {
+                $exchangeService = $this->getExchangeService();
+                $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
+
+                $instrumentData = null;
+                if (!empty($instrumentInfo['list'])) {
+                    foreach ($instrumentInfo['list'] as $instrument) {
+                        if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
+                    }
+                }
+                if ($instrumentData && isset($instrumentData['priceScale'])) {
+                    $pricePrec = (int)$instrumentData['priceScale'];
+                }
+
+                $tickerInfo = $exchangeService->getTickerInfo($order->symbol);
+                $marketPrice = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
+                if ($marketPrice > 0) {
+                    $side = ($validated['sl'] > $avgEntry) ? 'Sell' : 'Buy';
+                    if ($side === 'Buy' && $avgEntry > $marketPrice) {
+                        return back()->withErrors(['msg' => "برای معامله خرید، قیمت ورود ({$avgEntry}) نمی‌تواند بالاتر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    }
+                    if ($side === 'Sell' && $avgEntry < $marketPrice) {
+                        return back()->withErrors(['msg' => "برای معامله فروش، قیمت ورود ({$avgEntry}) نمی‌تواند پایین‌تر از قیمت بازار ({$marketPrice}) باشد."])->withInput();
+                    }
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Update validation skipped due to market fetch error: ' . $e->getMessage());
+            }
+        }
+
+        // Apply DB-only update of order fields
+        $order->entry_price = round((float)$validated['entry1'], $pricePrec);
+        $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
+        $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
+        $order->sl          = round((float)$validated['sl'], $pricePrec);
+        $order->tp          = round((float)$validated['tp'], $pricePrec);
+        $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
+        $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
+        $order->save();
+
+        return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
     }
 
     public function destroy(Order $order)
@@ -611,22 +884,145 @@ class FuturesController extends Controller
         return redirect()->route('futures.orders')->withErrors(['msg' => 'این سفارش قابل حذف نیست.']);
     }
 
+    /**
+     * Resend an expired order (reactivate existing record) within 30 minutes of expiration
+     * - Multi-exchange: use the order's own exchange for API calls
+     * - Local environment: skip exchange calls, just reset DB state
+     */
+    public function resend(Order $order)
+    {
+        // Check active exchange (for user messaging and access consistency)
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => $exchangeStatus['message']]);
+        }
+
+        // Verify order belongs to authenticated user via user_exchange
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'شما مجاز به ارسال مجدد این سفارش نیستید.']);
+        }
+
+        // Only allow resend for expired orders within window
+        if ($order->status !== 'expired' || !$order->closed_at) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'فقط سفارش‌های منقضی قابل ارسال مجدد هستند.']);
+        }
+        $minutesSinceClose = now()->diffInMinutes($order->closed_at);
+        if ($minutesSinceClose > 30) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'مهلت ارسال مجدد این سفارش به پایان رسیده است.']);
+        }
+
+        // Resolve exchange service bound to the original order's account
+        $userExchange = $order->userExchange;
+        if (!$userExchange || !$userExchange->is_active) {
+            return redirect()->route('futures.orders')
+                ->withErrors(['msg' => 'حساب صرافی مرتبط با این سفارش فعال نیست.']);
+        }
+
+        // Prepare new link id and parameters
+        $newOrderLinkId = (string) \Illuminate\Support\Str::uuid();
+
+        try {
+            // Get precision info when not in local environment
+            $pricePrec = 2;
+            $qtyStr = (string) $order->amount; // already stored as final precision at creation
+
+            if (!app()->environment('local')) {
+                $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($userExchange);
+
+                // Validate market vs entry consistency
+                try {
+                    $instrumentInfo = $exchangeService->getInstrumentsInfo($order->symbol);
+                    $instrumentData = null;
+                    if (!empty($instrumentInfo['list'])) {
+                        foreach ($instrumentInfo['list'] as $instrument) {
+                            if (($instrument['symbol'] ?? null) === $order->symbol) { $instrumentData = $instrument; break; }
+                        }
+                    }
+                    if ($instrumentData && isset($instrumentData['priceScale'])) {
+                        $pricePrec = (int)$instrumentData['priceScale'];
+                    }
+                } catch (\Throwable $e) {
+                    // Continue with defaults if instrument info fails
+                }
+
+                $finalPrice = round((float)$order->entry_price, $pricePrec);
+
+                // Build order params (limit order, same SL)
+                $sideUpper = ($order->side === 'sell') ? 'Sell' : 'Buy';
+                $params = [
+                    'category' => 'linear',
+                    'symbol' => $order->symbol,
+                    'side' => $sideUpper,
+                    'orderType' => 'Limit',
+                    'qty' => $qtyStr,
+                    'price' => (string) $finalPrice,
+                    'timeInForce' => 'GTC',
+                    'stopLoss'  => (string) round((float)$order->sl, $pricePrec),
+                    'orderLinkId' => $newOrderLinkId,
+                ];
+
+                // Hedge mode parameters per exchange
+                $this->addHedgeModeParameters($params, $userExchange->exchange_name, $sideUpper);
+
+                // Create order on exchange
+                $responseData = $exchangeService->createOrder($params);
+
+                // Reset the DB record as reactivated pending
+                $order->order_id = $responseData['orderId'] ?? null;
+                $order->order_link_id = $newOrderLinkId;
+                $order->status = 'pending';
+                $order->created_at = now();
+                $order->closed_at = null;
+                $order->filled_at = null;
+                $order->filled_quantity = null;
+                $order->save();
+            } else {
+                // Local: skip exchange calls, just reset DB state
+                $finalPrice = round((float)$order->entry_price, $pricePrec);
+                $order->order_id = null; // no remote id
+                $order->order_link_id = $newOrderLinkId;
+                $order->status = 'pending';
+                $order->created_at = now();
+                $order->closed_at = null;
+                $order->filled_at = null;
+                $order->filled_quantity = null;
+                $order->save();
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Futures order resend failed: ' . $e->getMessage());
+            $userFriendlyMessage = $this->parseExchangeError($e->getMessage());
+            return redirect()->route('futures.orders')->withErrors(['msg' => $userFriendlyMessage]);
+        }
+
+        return redirect()->route('futures.orders')->with('success', 'ارسال مجدد سفارش با موفقیت انجام شد.');
+    }
+
     public function close(Request $request, Order $order)
     {
-        // Block manual closes if an active close-only ban exists for current account type
+        // Strict-mode: block manual closes if an active close-only ban exists for current account type
         try {
             $user = auth()->user();
             $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-            $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
-            $activeBan = \App\Models\UserBan::where('user_id', $user->id)
-                ->where('is_demo', $isDemo)
-                ->where('ban_type', 'manual_close')
-                ->where('ends_at', '>', now())
-                ->orderByDesc('ends_at')
-                ->first();
-            if ($activeBan) {
-                return redirect()->route('futures.pnl_history')
-                    ->withErrors(['msg' => 'شما مجاز به بستن دستی موقعیت نیستید تا تاریخ ' . $activeBan->ends_at->format('Y-m-d H:i') . '']);
+            if ($user && $user->future_strict_mode) {
+                $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                $activeBan = \App\Models\UserBan::where('user_id', $user->id)
+                    ->where('is_demo', $isDemo)
+                    ->where('ban_type', 'manual_close')
+                    ->where('ends_at', '>', now())
+                    ->orderByDesc('ends_at')
+                    ->first();
+                if ($activeBan) {
+                    $remainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $remainingFa = $this->formatFaDuration($remainingSeconds);
+                    return redirect()->route('futures.pnl_history')
+                        ->withErrors(['msg' => 'شما مجاز به بستن دستی موقعیت نیستید. لطفاً ' . $remainingFa . ' صبر کنید.']);
+                }
             }
         } catch (\Throwable $e) {}
 
@@ -658,14 +1054,26 @@ class FuturesController extends Controller
                 $trade->pnl = 0;
                 $trade->closed_at = now();
                 $trade->save();
-                \App\Models\UserBan::create([
-                    'user_id' => $user->id,
-                    'is_demo' => $isDemo,
-                    'trade_id' => $trade->id,
-                    'ban_type' => 'manual_close',
-                    'starts_at' => now(),
-                    'ends_at' => now()->addDays(7),
-                ]);
+                // Create manual-close ban (close-only) only in strict mode
+                try {
+                    if ($user->future_strict_mode) {
+                        $hasActive = \App\Models\UserBan::active()
+                            ->forUser($user->id)
+                            ->accountType($isDemo)
+                            ->where('ban_type', 'manual_close')
+                            ->exists();
+                        if (!$hasActive) {
+                            \App\Models\UserBan::create([
+                                'user_id' => $user->id,
+                                'is_demo' => $isDemo,
+                                'trade_id' => $trade->id,
+                                'ban_type' => 'manual_close',
+                                'starts_at' => now(),
+                                'ends_at' => now()->addDays(7),
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {}
                 return redirect()->route('futures.pnl_history')->with('success', 'موقعیت به صورت آزمایشی در محیط محلی بسته شد.');
             }
             return redirect()->route('futures.pnl_history')->withErrors(['msg' => 'موقعیت باز مرتبط یافت نشد.']);
@@ -694,172 +1102,33 @@ class FuturesController extends Controller
             // ارسال دستور بستن موقعیت از طریق رابط واحد صرافی‌ها
             $exchangeService->closePosition($symbol, $openSide, $qty);
 
-            // دریافت لیست PnL بسته شده و بروزرسانی معامله مشابه منطق lifecycle
-            $startTime = $order->created_at ? $order->created_at->subMinutes(15)->timestamp * 1000 : null;
-            $rawClosed = $exchangeService->getClosedPnl($symbol, 100, $startTime);
-
-            // نرمال‌سازی رویدادهای کلوز بین صرافی‌ها
-            $list = (is_array($rawClosed) && isset($rawClosed['list'])) ? $rawClosed['list'] : $rawClosed;
-            $events = [];
-            if (is_array($list)) {
-                foreach ($list as $item) {
-                    if (!is_array($item)) { continue; }
-                    $orderId = $item['orderId'] ?? ($item['order_id'] ?? null);
-                    $sym = $item['symbol'] ?? null;
-                    $sideRaw = $item['side'] ?? null;
-                    $qtyVal = $item['qty'] ?? ($item['size'] ?? null);
-                    $avgEntry = $item['avgEntryPrice'] ?? ($item['avg_entry_price'] ?? ($item['avgPrice'] ?? ($item['entryPrice'] ?? null)));
-                    $avgExit = $item['avgExitPrice'] ?? ($item['avg_exit_price'] ?? ($item['closePrice'] ?? ($item['avgPrice'] ?? null)));
-                    $pnl = $item['closedPnl'] ?? ($item['realisedPnl'] ?? ($item['realizedPnl'] ?? 0));
-                    $closedAt = $item['updatedTime'] ?? ($item['createdTime'] ?? ($item['closedAt'] ?? null));
-
-                    // Normalize side
-                    $side = null;
-                    if ($sideRaw !== null) {
-                        $s = strtolower((string)$sideRaw);
-                        if ($s === 'buy' || $s === 'long') { $side = 'Buy'; }
-                        elseif ($s === 'sell' || $s === 'short') { $side = 'Sell'; }
-                        else { $side = $sideRaw; }
-                    }
-
-                    if (!$sym) { continue; }
-
-                    $events[] = [
-                        'orderId' => $orderId,
-                        'symbol' => $sym,
-                        'side' => $side,
-                        'qty' => $qtyVal !== null ? (float)$qtyVal : null,
-                        'avgEntryPrice' => $avgEntry !== null ? (float)$avgEntry : null,
-                        'avgExitPrice' => $avgExit !== null ? (float)$avgExit : null,
-                        'realizedPnl' => (float)$pnl,
-                        'closedAt' => $closedAt ? (int)$closedAt : null,
-                    ];
-                }
-            }
-
-            // تطبیق رویداد براساس شناسه سفارش یا نماد/سمت و اندازه‌ها
-            $positionMode = $currentExchange->position_mode;
-            $matched = null;
-            foreach ($events as $e) {
-                $idMatch = isset($e['orderId']) && (string)$e['orderId'] === (string)$order->order_id;
-                $fieldsMatch = (($e['symbol'] ?? null) === $symbol)
-                    && ($positionMode === 'hedge' ? (($e['side'] ?? null) === $openSide) : true)
-                    && (isset($e['qty']) ? abs((float)$e['qty'] - (float)$qty) < 1e-8 : true)
-                    && ($trade && isset($e['avgEntryPrice']) ? abs((float)$e['avgEntryPrice'] - (float)$trade->avg_entry_price) < 1e-8 : true);
-                if ($idMatch || $fieldsMatch) {
-                    $matched = $e;
-                    break;
-                }
-            }
-
+            // Mark intent and let lifecycle settle PnL/exit details
             if ($trade) {
-                if ($matched) {
-                    if (array_key_exists('avgExitPrice', $matched) && $matched['avgExitPrice'] !== null) {
-                        $trade->avg_exit_price = $matched['avgExitPrice'];
-                    } else {
-                        $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
-                    }
-                    if (array_key_exists('realizedPnl', $matched) && $matched['realizedPnl'] !== null) {
-                        $trade->pnl = $matched['realizedPnl'];
-                    }
-                    $trade->closed_at = isset($matched['closedAt']) && $matched['closedAt']
-                        ? \Carbon\Carbon::createFromTimestampMs($matched['closedAt'])
-                        : now();
-                    $trade->closed_by_user = 1;
-                    $trade->save();
-                    // Manual-close ban (close-only), independent of strict mode
-                    try {
-                        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-                        $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
-                        if (!\App\Models\UserBan::active()
-                            ->forUser($user->id)
-                            ->accountType($isDemo)
-                            ->where('ban_type', 'manual_close')
-                            ->exists()) {
-                            \App\Models\UserBan::create([
-                                'user_id' => $user->id,
-                                'is_demo' => $isDemo,
-                                'trade_id' => $trade->id,
-                                'ban_type' => 'manual_close',
-                                'starts_at' => now(),
-                                'ends_at' => now()->addDays(7),
-                            ]);
-                        }
-                    } catch (\Throwable $e) {}
-                    // Opening bans based on losing outcomes (independent of strict mode)
-                    try {
-                        $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
-                        if ((float)$trade->pnl < 0) {
-                            // 1-hour ban after a recent losing trade
-                            if (!\App\Models\UserBan::active()
-                                ->forUser($user->id)
-                                ->accountType($isDemo)
-                                ->where('ban_type', 'single_loss')
-                                ->exists()) {
-                                \App\Models\UserBan::create([
-                                    'user_id'   => $user->id,
-                                    'is_demo'   => $isDemo,
-                                    'trade_id'  => $trade->id,
-                                    'ban_type'  => 'single_loss',
-                                    'starts_at' => now(),
-                                    'ends_at'   => now()->addHour(),
-                                ]);
-                            }
-                            // 24-hour ban for two consecutive losses within 24 hours
-                            $recentLosses = \App\Models\Trade::forUser($user->id)
-                                ->accountType($isDemo)
-                                ->whereNotNull('closed_at')
-                                ->where('closed_at', '>=', now()->subHours(24))
-                                ->where('pnl', '<', 0)
-                                ->orderBy('closed_at', 'desc')
-                                ->limit(2)
-                                ->get();
-                            if ($recentLosses->count() >= 2) {
-                                if (!\App\Models\UserBan::active()
-                                    ->forUser($user->id)
-                                    ->accountType($isDemo)
-                                    ->where('ban_type', 'double_loss')
-                                    ->exists()) {
-                                    \App\Models\UserBan::create([
-                                        'user_id'   => $user->id,
-                                        'is_demo'   => $isDemo,
-                                        'trade_id'  => $trade->id,
-                                        'ban_type'  => 'double_loss',
-                                        'starts_at' => now(),
-                                        'ends_at'   => now()->addDay(),
-                                    ]);
-                                }
-                            }
-                        }
-                    } catch (\Throwable $e) {}
-                } else {
-                    // حداقل بروزرسانی در صورت نبود رویداد
-                    $trade->avg_exit_price = $order->average_price ?? $trade->avg_entry_price;
-                    $trade->pnl = 0;
-                    $trade->closed_at = now();
-                    $trade->closed_by_user = 1;
-                    $trade->save();
-                    // Manual-close ban (close-only), independent of strict mode
-                    try {
-                        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
-                        $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
-                        if (!\App\Models\UserBan::active()
-                            ->forUser($user->id)
-                            ->accountType($isDemo)
-                            ->where('ban_type', 'manual_close')
-                            ->exists()) {
-                            \App\Models\UserBan::create([
-                                'user_id' => $user->id,
-                                'is_demo' => $isDemo,
-                                'trade_id' => $trade->id,
-                                'ban_type' => 'manual_close',
-                                'starts_at' => now(),
-                                'ends_at' => now()->addDays(7),
-                            ]);
-                        }
-                    } catch (\Throwable $e) {}
-                }
+                $trade->closed_by_user = 1;
+                $trade->save();
             }
+
+            // Manual-close ban (close-only) only in strict mode
+            try {
+                if ($user->future_strict_mode) {
+                    $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                    $hasActive = \App\Models\UserBan::active()
+                        ->forUser($user->id)
+                        ->accountType($isDemo)
+                        ->where('ban_type', 'manual_close')
+                        ->exists();
+                    if (!$hasActive) {
+                        \App\Models\UserBan::create([
+                            'user_id' => $user->id,
+                            'is_demo' => $isDemo,
+                            'trade_id' => $trade?->id,
+                            'ban_type' => 'manual_close',
+                            'starts_at' => now(),
+                            'ends_at' => now()->addDays(7),
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {}
 
             return redirect()->route('futures.pnl_history')->with('success', 'درخواست بستن موقعیت ارسال شد و سوابق PnL به‌روزرسانی شد.');
 
@@ -1056,7 +1325,7 @@ class FuturesController extends Controller
     /**
      * Display P&L history for the authenticated user
      */
-    public function pnlHistory()
+    public function pnlHistory(Request $request)
     {
         $tradesQuery = Trade::forUser(auth()->id());
 
@@ -1067,14 +1336,39 @@ class FuturesController extends Controller
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
 
+        // Read filters
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $symbol = $request->input('symbol');
+        $strict = (bool) ($user->future_strict_mode ?? false);
+
         // Closed trades (paginate) and order by closed_at desc
         $closedTradesQuery = clone $tradesQuery;
-        $closedTrades = $closedTradesQuery->whereNotNull('closed_at')->latest('closed_at')->paginate(20);
+        $closedTradesQuery->whereNotNull('closed_at');
+        if (!$strict && filled($symbol)) {
+            $closedTradesQuery->where('symbol', $symbol);
+        }
+        if (filled($from)) {
+            try {
+                $fromDate = Carbon::createFromFormat('Y-m-d', $from)->startOfDay();
+                $closedTradesQuery->where('closed_at', '>=', $fromDate);
+            } catch (\Throwable $e) {}
+        }
+        if (filled($to)) {
+            try {
+                $toDate = Carbon::createFromFormat('Y-m-d', $to)->endOfDay();
+                $closedTradesQuery->where('closed_at', '<=', $toDate);
+            } catch (\Throwable $e) {}
+        }
+        $closedTrades = $closedTradesQuery->latest('closed_at')->paginate(20);
 
         // Open trades (closed_at is null)
         $openTradesQuery = Trade::forUser(auth()->id());
         if ($currentExchange) {
             $openTradesQuery->accountType($currentExchange->is_demo_active);
+        }
+        if (!$strict && filled($symbol)) {
+            $openTradesQuery->where('symbol', $symbol);
         }
         $openTrades = $openTradesQuery->whereNull('closed_at')->get();
 
@@ -1098,6 +1392,7 @@ class FuturesController extends Controller
         $strictModeActive = (bool)($user->future_strict_mode ?? false);
         $manualCloseBanActive = false;
         $manualCloseBanEndsAt = null;
+        $manualCloseBanRemainingFa = null;
         if ($currentExchange) {
             try {
                 $activeBan = UserBan::where('user_id', $user->id)
@@ -1109,9 +1404,23 @@ class FuturesController extends Controller
                 if ($activeBan) {
                     $manualCloseBanActive = true;
                     $manualCloseBanEndsAt = $activeBan->ends_at;
+                    $secs = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $manualCloseBanRemainingFa = $this->formatFaDuration($secs);
                 }
             } catch (\Throwable $e) {}
         }
+
+        // Build symbol options for filter dropdown (distinct for user + account type)
+        $symbolOptions = Trade::forUser(auth()->id())
+            ->when($currentExchange, function ($q) use ($currentExchange) {
+                $q->accountType($currentExchange->is_demo_active);
+            })
+            ->whereNotNull('symbol')
+            ->select('symbol')
+            ->distinct()
+            ->orderBy('symbol')
+            ->pluck('symbol')
+            ->toArray();
 
         return view('futures.pnl_history', [
             'closedTrades' => $closedTrades,
@@ -1120,6 +1429,8 @@ class FuturesController extends Controller
             'strictModeActive' => $strictModeActive,
             'manualCloseBanActive' => $manualCloseBanActive,
             'manualCloseBanEndsAt' => $manualCloseBanEndsAt,
+            'manualCloseBanRemainingFa' => $manualCloseBanRemainingFa,
+            'filterSymbols' => $symbolOptions,
         ]);
     }
 
@@ -1130,249 +1441,252 @@ class FuturesController extends Controller
     {
         $user = auth()->user();
         $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        // Use current exchange account type (demo/real)
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
-        // Base query for synchronized trades
-        $tradesQuery = Trade::forUser($user->id)
-            ->where('synchronized', 1)
-            ->whereNotNull('closed_at');
+        $side = $request->input('side', 'all'); // 'all' | 'buy' | 'sell'
+        $userExchangeId = $request->input('user_exchange_id', 'all');
 
-        if ($currentExchange) {
-            $tradesQuery->accountType($currentExchange->is_demo_active);
+        // Ensure default period exists and pick selected period
+        $service = new \App\Services\JournalPeriodService();
+        $service->ensureDefaultPeriod($user->id, $isDemo);
+
+        $selectedPeriodId = $request->input('period_id');
+        $selectedPeriod = null;
+        if ($selectedPeriodId) {
+            $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->where('id', $selectedPeriodId)
+                ->first();
         }
-
-        // Filtering logic
-        $month = $request->input('month', 'last6months');
-        $side = $request->input('side', 'all');
-
-        if ($month === 'last6months') {
-            $tradesQuery->where('closed_at', '>=', now()->subMonths(6));
-        } else {
-            // Assumes month is in 'YYYY-MM' format
-            $tradesQuery->whereYear('closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('closed_at', '=', substr($month, 5, 2));
-        }
-
-        if ($side !== 'all') {
-            $tradesQuery->where('side', $side);
-        }
-
-        $trades = $tradesQuery->with('order')->latest('closed_at')->get();
-
-        // Calculate statistics
-        $totalPnl = $trades->sum('pnl');
-        $totalProfits = $trades->where('pnl', '>', 0)->sum('pnl');
-        $totalLosses = $trades->where('pnl', '<', 0)->sum('pnl');
-        $totalTrades = $trades->count();
-        $biggestProfit = $trades->max('pnl') ?? 0;
-        $biggestLoss = $trades->min('pnl') ?? 0;
-
-        $profitableTrades = $trades->where('pnl', '>', 0);
-        $losingTrades = $trades->where('pnl', '<', 0);
-
-        $profitableTradesCount = $profitableTrades->count();
-        $losingTradesCount = $losingTrades->count();
-
-        // Calculate average risk percentage and Risk/Reward Ratio from related orders
-        $totalRiskPercentage = 0;
-        $totalRRR = 0;
-        $riskCalculatedTrades = 0;
-        $rrrCalculatedTrades = 0;
-
-        foreach ($trades as $trade) {
-            if ($trade->order && $trade->order->entry_price > 0) {
-                // Average Risk %
-                $totalRiskPercentage += abs($trade->order->entry_price - $trade->order->sl) / $trade->order->entry_price * 100;
-                $riskCalculatedTrades++;
-
-                // Risk/Reward Ratio
-                $slDistance = abs($trade->order->entry_price - $trade->order->sl);
-                if ($slDistance > 0) {
-                    $tpDistance = abs($trade->order->tp - $trade->order->entry_price);
-                    $totalRRR += $tpDistance / $slDistance;
-                    $rrrCalculatedTrades++;
-                }
-            }
-        }
-        $averageRisk = $riskCalculatedTrades > 0 ? $totalRiskPercentage / $riskCalculatedTrades : 0;
-        $averageRRR = $rrrCalculatedTrades > 0 ? $totalRRR / $rrrCalculatedTrades : 0;
-
-        // Get the first trade in the period to find the initial capital
-        $firstTrade = $trades->sortBy('closed_at')->first();
-        $initialCapital = $firstTrade && $firstTrade->order ? (float) $firstTrade->order->balance_at_creation : 1000;
-
-        // Fallback for older trades without balance_at_creation
-        if ($initialCapital == 1000) {
-            try {
-                $exchangeService = $this->getExchangeService();
-                $resolvedCurrent = $this->resolveCapitalUSD($exchangeService);
-                if ($resolvedCurrent > 0) {
-                    $initialCapital = $resolvedCurrent - $totalPnl;
-                }
-            } catch (\Exception $e) {
-                Log::error('Could not resolve initial capital for journal page: ' . $e->getMessage());
+        if (!$selectedPeriod) {
+            // Prefer the most recently started active period; fallback to latest default
+            $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->where('is_active', true)
+                ->orderBy('started_at', 'desc')
+                ->first();
+            if (!$selectedPeriod) {
+                $selectedPeriod = \App\Models\UserPeriod::forUser($user->id)
+                    ->accountType($isDemo)
+                    ->default()
+                    ->orderBy('started_at', 'desc')
+                    ->first();
             }
         }
 
-        // Avoid division by zero
-        $initialCapital = $initialCapital > 0 ? $initialCapital : 1;
+        // Load metrics (precomputed for all exchanges, computed on-demand for a specific account)
+        $metrics = [
+            'trade_count' => 0,
+            'total_pnl' => 0.0,
+            'profits_sum' => 0.0,
+            'losses_sum' => 0.0,
+            'biggest_profit' => 0.0,
+            'biggest_loss' => 0.0,
+            'wins' => 0,
+            'losses' => 0,
+            'avg_risk_percent' => 0.0,
+            'avg_rrr' => 0.0,
+            'pnl_per_trade' => [],
+            'per_trade_percent' => [],
+            'cum_pnl' => [],
+            'cum_pnl_percent' => [],
+        ];
 
-        // Per-trade percent calculations based on each trade's balance_at_creation
-        $perTradePercents = $trades->map(function ($trade) use ($initialCapital) {
-            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
-                ? (float)$trade->order->balance_at_creation
-                : $initialCapital;
-            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
-        });
+        if ($selectedPeriod) {
+            if ($userExchangeId !== 'all') {
+                // Validate ownership and compute metrics for specific account
+                $ue = \App\Models\UserExchange::where('id', $userExchangeId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                if ($ue && ((bool)$ue->is_demo_active === $isDemo)) {
+                    $metrics = (new \App\Services\JournalPeriodService())->
+                        computeMetricsFor($selectedPeriod, [$ue->id], $side);
+                }
+            } else {
+                // Use precomputed metrics on the period
+                if ($side === 'buy') {
+                    $metrics = $selectedPeriod->metrics_buy ?? $metrics;
+                } elseif ($side === 'sell') {
+                    $metrics = $selectedPeriod->metrics_sell ?? $metrics;
+                } else {
+                    $metrics = $selectedPeriod->metrics_all ?? $metrics;
+                }
+            }
 
-        // Aggregate percents
-        $totalPnlPercent = $perTradePercents->sum();
-        $totalProfitPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
-            [$trade, $percent] = $pair;
-            return $carry + ($trade->pnl > 0 ? $percent : 0);
-        }, 0);
-        $totalLossPercent = $trades->zip($perTradePercents)->reduce(function ($carry, $pair) {
-            [$trade, $percent] = $pair;
-            return $carry + ($trade->pnl < 0 ? $percent : 0);
-        }, 0);
-
-
-        // Prepare data for charts
-        $pnlChartData = $trades->sortBy('closed_at')->map(function ($trade, $index) {
-            return [
-                'x' => 'Trade ' . ($index + 1), // Use trade index as category
-                'y' => (float)$trade->pnl,
-                'date' => $trade->closed_at->format('Y-m-d H:i') // For tooltip
-            ];
-        })->values();
-
-        $sortedTrades = $trades->sortBy('closed_at');
-
-        $cumulativePnl = $sortedTrades->reduce(function ($carry, $trade) {
-            $lastPnl = $carry->last()['y'] ?? 0;
-            $carry->push([
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => $lastPnl + (float)$trade->pnl,
-            ]);
-            return $carry;
-        }, collect())->values();
-
-        // Cumulative percent as running sum of per-trade percents (ordered by closed_at)
-        $sortedPercents = $sortedTrades->values()->map(function ($trade) use ($initialCapital) {
-            $capital = ($trade->order && (float)($trade->order->balance_at_creation) > 0)
-                ? (float)$trade->order->balance_at_creation
-                : $initialCapital;
-            return $capital > 0 ? ((float)$trade->pnl / $capital) * 100.0 : 0.0;
-        });
-
-        $cumulativePnlPercent = $sortedPercents->reduce(function ($carry, $percent) use ($sortedTrades) {
-            $index = $carry->count();
-            $trade = $sortedTrades->values()->get($index);
-            $last = $carry->last()['y'] ?? 0;
-            $carry->push([
-                'x' => $trade->closed_at->format('Y-m-d H:i'),
-                'y' => $last + $percent,
-            ]);
-            return $carry;
-        }, collect())->values();
-
-
-        // Get available months for the filter dropdown
-        $availableMonths = Trade::forUser($user->id)
-            ->where('synchronized', 1)
-            ->whereNotNull('closed_at')
-            ->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') as month")
-            ->distinct()
-            ->orderBy('month', 'desc')
-            ->pluck('month');
-
-        // User Rankings
-        $isDemo = $currentExchange ? $currentExchange->is_demo_active : 0;
-
-        $baseQuery = DB::table('trades')
-            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
-            ->where('trades.synchronized', 1)
-            ->whereNotNull('trades.closed_at');
-
-        if ($month === 'last6months') {
-            $baseQuery->where('trades.closed_at', '>=', now()->subMonths(6));
-        } else {
-            $baseQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
+            // Fallback: if series arrays are empty (e.g., stale cache), compute on-demand
+            $seriesEmpty = empty($metrics['pnl_per_trade']) && empty($metrics['cum_pnl']) && empty($metrics['cum_pnl_percent']);
+            if ($seriesEmpty) {
+                $service = new \App\Services\JournalPeriodService();
+                $ids = null;
+                if ($userExchangeId !== 'all') {
+                    $ueValid = \App\Models\UserExchange::where('id', $userExchangeId)
+                        ->where('user_id', $user->id)
+                        ->first();
+                    if ($ueValid && ((bool)$ueValid->is_demo_active === $isDemo)) {
+                        $ids = [$ueValid->id];
+                    }
+                }
+                $metrics = $service->computeMetricsFor($selectedPeriod, $ids, $side);
+            }
         }
 
-        $rankings = $baseQuery
-            ->select('user_exchanges.user_id', DB::raw('SUM(trades.pnl) as total_pnl'))
-            ->groupBy('user_exchanges.user_id')
-            ->orderBy('total_pnl', 'desc')
+        // Map metrics to view variables
+        $totalPnl = (float)($metrics['total_pnl'] ?? 0.0);
+        $totalProfits = (float)($metrics['profits_sum'] ?? 0.0);
+        $totalLosses = (float)($metrics['losses_sum'] ?? 0.0);
+        $totalTrades = (int)($metrics['trade_count'] ?? 0);
+        $biggestProfit = (float)($metrics['biggest_profit'] ?? 0.0);
+        $biggestLoss = (float)($metrics['biggest_loss'] ?? 0.0);
+        $profitableTradesCount = (int)($metrics['wins'] ?? 0);
+        $losingTradesCount = (int)($metrics['losses'] ?? 0);
+        $averageRisk = (float)($metrics['avg_risk_percent'] ?? 0.0);
+        $averageRRR = (float)($metrics['avg_rrr'] ?? 0.0);
+
+        $pnlChartData = $metrics['pnl_per_trade'] ?? [];
+        $cumulativePnl = $metrics['cum_pnl'] ?? [];
+        $cumulativePnlPercent = $metrics['cum_pnl_percent'] ?? [];
+
+        // Percent aggregates from series
+        $perTradePercent = collect($metrics['per_trade_percent'] ?? []);
+        $pnlPerTrade = collect($metrics['pnl_per_trade'] ?? []);
+        $totalPnlPercent = (float) $perTradePercent->sum('y');
+        $totalProfitPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+            [$pnlItem, $percentItem] = $pair;
+            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
+            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
+            return $carry + ($pnlVal > 0 ? $percentVal : 0);
+        }, 0.0);
+        $totalLossPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+            [$pnlItem, $percentItem] = $pair;
+            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
+            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
+            return $carry + ($pnlVal < 0 ? $percentVal : 0);
+        }, 0.0);
+
+        // Rankings within the selected period window and filters
+        $pnlRank = null;
+        $pnlPercentRank = null;
+        if ($selectedPeriod) {
+            $rankBase = DB::table('trades')
+                ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+                ->where('trades.synchronized', 1)
+                ->whereNotNull('trades.closed_at')
+                ->where('trades.is_demo', $isDemo)
+                ->whereBetween('trades.closed_at', [
+                    $selectedPeriod->started_at,
+                    $selectedPeriod->ended_at ?? now(),
+                ]);
+
+            if ($side !== 'all') {
+                $rankBase->whereIn('trades.side', [$side, ucfirst($side)]);
+            }
+            if ($userExchangeId !== 'all') {
+                $rankBase->where('trades.user_exchange_id', $userExchangeId);
+            }
+
+            $rankings = $rankBase
+                ->select('user_exchanges.user_id', DB::raw('SUM(trades.pnl) as total_pnl'))
+                ->groupBy('user_exchanges.user_id')
+                ->orderBy('total_pnl', 'desc')
+                ->get();
+
+            $pIndex = $rankings->search(fn($r) => $r->user_id == $user->id);
+            $pnlRank = $pIndex !== false ? ($pIndex + 1) : null;
+
+            // Percent ranking
+            $percentQuery = DB::table('trades')
+                ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
+                ->join('orders', 'trades.order_id', '=', 'orders.order_id')
+                ->where('trades.synchronized', 1)
+                ->whereNotNull('trades.closed_at')
+                ->where('trades.is_demo', $isDemo)
+                ->whereNotNull('orders.balance_at_creation')
+                ->where('orders.balance_at_creation', '>', 0)
+                ->whereBetween('trades.closed_at', [
+                    $selectedPeriod->started_at,
+                    $selectedPeriod->ended_at ?? now(),
+                ])
+                ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
+
+            if ($side !== 'all') {
+                $percentQuery->whereIn('trades.side', [$side, ucfirst($side)]);
+            }
+            if ($userExchangeId !== 'all') {
+                $percentQuery->where('trades.user_exchange_id', $userExchangeId);
+            }
+
+            $allTrades = $percentQuery->get();
+            $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
+                $sumPercent = $userTrades->reduce(function ($carry, $t) {
+                    $capital = (float) $t->balance_at_creation;
+                    $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
+                    return $carry + $percent;
+                }, 0.0);
+                $firstTrade = $userTrades->sortBy('closed_at')->first();
+                return [
+                    'user_id' => $firstTrade->user_id,
+                    'pnl_percent' => $sumPercent,
+                ];
+            });
+
+            $percentRankings = $userStats->sortByDesc('pnl_percent')->values();
+            $ppIndex = $percentRankings->search(fn($r) => $r['user_id'] == $user->id);
+            $pnlPercentRank = $ppIndex !== false ? ($ppIndex + 1) : null;
+        }
+
+        // Build selectors: periods and exchanges
+        // Cleanup: remove ended periods with no records (trade_count = 0)
+        try {
+            \App\Models\UserPeriod::forUser($user->id)
+                ->accountType($isDemo)
+                ->where('is_active', false)
+                ->whereNotNull('ended_at')
+                ->get()
+                ->each(function ($p) {
+                    $tc = (int)($p->metrics_all['trade_count'] ?? 0);
+                    if ($tc === 0) { $p->delete(); }
+                });
+        } catch (\Throwable $e) {}
+
+        $periods = \App\Models\UserPeriod::forUser($user->id)
+            ->accountType($isDemo)
+            ->orderByDesc('is_default')
+            ->orderBy('started_at', 'desc')
             ->get();
 
-        $pnlRank = $rankings->search(fn($r) => $r->user_id == $user->id);
-        $pnlRank = $pnlRank !== false ? $pnlRank + 1 : null;
+        $exchanges = \App\Models\UserExchange::where('user_id', $user->id)
+            ->where('is_demo_active', $isDemo)
+            ->get();
 
-        // PNL Percentage Ranking
-        $allTradesQuery = DB::table('trades')
-            ->join('user_exchanges', 'trades.user_exchange_id', '=', 'user_exchanges.id')
-            ->join('orders', 'trades.order_id', '=', 'orders.order_id')
-            ->where('trades.synchronized', 1)
-            ->whereNotNull('trades.closed_at')
-            ->whereNotNull('orders.balance_at_creation')
-            ->where('orders.balance_at_creation', '>', 0)
-            ->select('user_exchanges.user_id', 'trades.pnl', 'trades.closed_at', 'orders.balance_at_creation');
-
-        if ($month === 'last6months') {
-            $allTradesQuery->where('trades.closed_at', '>=', now()->subMonths(6));
-        } else {
-            $allTradesQuery->whereYear('trades.closed_at', '=', substr($month, 0, 4))
-                ->whereMonth('trades.closed_at', '=', substr($month, 5, 2));
-        }
-
-        $allTrades = $allTradesQuery->get();
-
-        $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
-            // Sum per-trade percents for user
-            $sumPercent = $userTrades->reduce(function ($carry, $t) {
-                $capital = (float) $t->balance_at_creation;
-                $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
-                return $carry + $percent;
-            }, 0.0);
-
-            $firstTrade = $userTrades->sortBy('closed_at')->first();
-            return [
-                'user_id' => $firstTrade->user_id,
-                'pnl_percent' => $sumPercent,
-            ];
-        });
-
-        $percentRankings = $userStats->sortByDesc('pnl_percent')->values();
-        $pnlPercentRank = $percentRankings->search(fn($r) => $r['user_id'] == $user->id);
-        $pnlPercentRank = $pnlPercentRank !== false ? $pnlPercentRank + 1 : null;
-
-
-        return view('futures.journal', compact(
-            'trades',
-            'totalPnl',
-            'totalProfits',
-            'totalLosses',
-            'totalTrades',
-            'biggestProfit',
-            'biggestLoss',
-            'averageRisk',
-            'averageRRR',
-            'profitableTradesCount',
-            'losingTradesCount',
-            'pnlChartData',
-            'cumulativePnl',
-            'availableMonths',
-            'month',
-            'side',
-            'totalPnlPercent',
-            'totalProfitPercent',
-            'totalLossPercent',
-            'pnlRank',
-            'pnlPercentRank',
-            'cumulativePnlPercent'
-        ));
+        return view('futures.journal', [
+            'side' => $side,
+            'selectedPeriod' => $selectedPeriod,
+            'periods' => $periods,
+            'exchangeOptions' => $exchanges,
+            'userExchangeId' => $userExchangeId,
+            'totalPnl' => $totalPnl,
+            'totalProfits' => $totalProfits,
+            'totalLosses' => $totalLosses,
+            'totalTrades' => $totalTrades,
+            'biggestProfit' => $biggestProfit,
+            'biggestLoss' => $biggestLoss,
+            'averageRisk' => $averageRisk,
+            'averageRRR' => $averageRRR,
+            'profitableTradesCount' => $profitableTradesCount,
+            'losingTradesCount' => $losingTradesCount,
+            'pnlChartData' => $pnlChartData,
+            'cumulativePnl' => $cumulativePnl,
+            'totalPnlPercent' => $totalPnlPercent,
+            'totalProfitPercent' => $totalProfitPercent,
+            'totalLossPercent' => $totalLossPercent,
+            'pnlRank' => $pnlRank,
+            'pnlPercentRank' => $pnlPercentRank,
+            'cumulativePnlPercent' => $cumulativePnlPercent,
+        ]);
     }
+
+    
     /**
      * Add hedge mode parameters to order based on exchange
      *
@@ -1404,5 +1718,218 @@ class FuturesController extends Controller
                 $orderParams['positionSide'] = ($side === 'Buy') ? 'LONG' : 'SHORT';
                 break;
         }
+    }
+
+    /**
+     * Format a duration in seconds into Persian words: X روز و Y ساعت و Z دقیقه
+     */
+    private function formatFaDuration(int $seconds): string
+    {
+        $days = intdiv($seconds, 86400);
+        $hours = intdiv($seconds % 86400, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+
+        $parts = [];
+        if ($days > 0) { $parts[] = $days . ' روز'; }
+        if ($hours > 0 || $days > 0) { $parts[] = $hours . ' ساعت'; }
+        $parts[] = $minutes . ' دقیقه';
+
+        return implode(' و ', $parts);
+    }
+
+    /**
+     * Normalize klines response from different exchanges to a unified array
+     * [ { time: epoch_seconds, open: float, high: float, low: float, close: float } ]
+     */
+    private function normalizeKlines(string $exchangeName, $raw): array
+    {
+        $name = strtolower($exchangeName);
+        $candles = [];
+
+        try {
+            if ($name === 'binance') {
+                // Raw is numeric arrays: [openTime, open, high, low, close, volume, closeTime, ...]
+                foreach ((array)$raw as $row) {
+                    if (!is_array($row) || count($row) < 5) { continue; }
+                    $candles[] = [
+                        'time' => (int) floor(((int)$row[0]) / 1000),
+                        'open' => (float) $row[1],
+                        'high' => (float) $row[2],
+                        'low'  => (float) $row[3],
+                        'close'=> (float) $row[4],
+                    ];
+                }
+            } elseif ($name === 'bybit') {
+                // Raw is result object, data may be in ['list'] with arrays: [start, open, high, low, close, volume, turnover]
+                $list = is_array($raw) && array_key_exists('list', $raw) ? ($raw['list'] ?? []) : (array)$raw;
+                foreach ((array)$list as $row) {
+                    if (is_array($row)) {
+                        // Numeric indexed array
+                        if (isset($row[0], $row[1], $row[2], $row[3], $row[4])) {
+                            $t = (int) $row[0];
+                            $candles[] = [
+                                'time' => (int) floor($t / 1000),
+                                'open' => (float) $row[1],
+                                'high' => (float) $row[2],
+                                'low'  => (float) $row[3],
+                                'close'=> (float) $row[4],
+                            ];
+                            continue;
+                        }
+                        // Associative array
+                        $t = isset($row['start']) ? (int)$row['start'] : (int)($row['openTime'] ?? $row['startTime'] ?? 0);
+                        $o = (float)($row['open'] ?? 0);
+                        $h = (float)($row['high'] ?? 0);
+                        $l = (float)($row['low'] ?? 0);
+                        $c = (float)($row['close'] ?? 0);
+                        if ($t > 0 && $o && $h && $l && $c) {
+                            $candles[] = [
+                                'time' => (int) floor($t / 1000),
+                                'open' => $o, 'high' => $h, 'low' => $l, 'close' => $c,
+                            ];
+                        }
+                    }
+                }
+            } else { // bingx
+                // Raw is ['data'] -> may be arrays: [openTime, open, high, low, close, volume]
+                $rows = is_array($raw) && array_key_exists('kline', $raw) ? ($raw['kline'] ?? []) : ((array)$raw);
+                foreach ($rows as $row) {
+                    if (!is_array($row)) { continue; }
+                    if (isset($row[0], $row[1], $row[2], $row[3], $row[4])) {
+                        $candles[] = [
+                            'time' => (int) floor(((int)$row[0]) / 1000),
+                            'open' => (float) $row[1],
+                            'high' => (float) $row[2],
+                            'low'  => (float) $row[3],
+                            'close'=> (float) $row[4],
+                        ];
+                        continue;
+                    }
+                    // Associative fallback
+                    $t = isset($row['openTime']) ? (int)$row['openTime'] : (int)($row['time'] ?? 0);
+                    $o = (float)($row['open'] ?? 0);
+                    $h = (float)($row['high'] ?? 0);
+                    $l = (float)($row['low'] ?? 0);
+                    $c = (float)($row['close'] ?? 0);
+                    if ($t && $o && $h && $l && $c) {
+                        $candles[] = [
+                            'time' => (int) floor($t / 1000),
+                            'open' => $o, 'high' => $h, 'low' => $l, 'close' => $c,
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to normalize klines: ' . $e->getMessage());
+        }
+
+        // Sort by time ascending
+        usort($candles, function($a, $b) { return $a['time'] <=> $b['time']; });
+        return $candles;
+    }
+
+    /**
+     * Provide static chart snapshot data for a filled order
+     */
+    public function chartData(Request $request, Order $order)
+    {
+        // Check active exchange access for the view route group
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return response()->json(['success' => false, 'message' => $exchangeStatus['message']], 403);
+        }
+
+        // Verify ownership
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return response()->json(['success' => false, 'message' => 'شما مجاز به مشاهده این سفارش نیستید.'], 403);
+        }
+
+        // Only for filled orders
+        if (strtolower($order->status) !== 'filled') {
+            return response()->json(['success' => false, 'message' => 'فقط برای سفارش‌های اجرا شده قابل نمایش است.'], 400);
+        }
+
+        try {
+            // Determine timeframe: query param or user default, allowed list
+            $allowedTfs = ['1m','5m','15m','1h','4h'];
+            $userDefaultTf = \App\Models\UserAccountSetting::getUserSetting($user->id, 'default_timeframe', '15m');
+            $tfRequested = strtolower((string)$request->query('tf', $userDefaultTf));
+            $timeframe = in_array($tfRequested, $allowedTfs, true) ? $tfRequested : '15m';
+
+            // Read-only path: use stored snapshot only
+            $snapshot = $order->candleData;
+            $tfToColumn = [
+                '1m' => 'candles_m1',
+                '5m' => 'candles_m5',
+                '15m' => 'candles_m15',
+                '1h' => 'candles_h1',
+                '4h' => 'candles_h4',
+            ];
+            $column = $tfToColumn[$timeframe] ?? 'candles_m15';
+
+            if (!$snapshot || empty($snapshot->$column)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'داده‌های مورد نیاز در دسترس نیست.',
+                ]);
+            }
+
+            $candles = $snapshot->$column;
+            $startTs = (int)($candles[0]['time'] ?? ($snapshot->entry_time?->getTimestamp() ?? 0));
+            $endTs = (int)($candles[count($candles)-1]['time'] ?? ($snapshot->exit_time?->getTimestamp() ?? 0));
+            $trade = $order->trade;
+            $exitPrice = $trade ? (float)($trade->avg_exit_price ?? 0) : 0;
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'symbol' => $order->symbol,
+                    'side' => $order->side,
+                    'timeframe' => $timeframe,
+                    'entry' => (float)$order->entry_price,
+                    'tp' => (float)$order->tp,
+                    'sl' => (float)$order->sl,
+                    'exit' => $exitPrice > 0 ? $exitPrice : null,
+                    'exit_at' => $trade ? ($trade->closed_at ? $trade->closed_at->getTimestamp() : null) : null,
+                    'filled_at' => $order->filled_at ? $order->filled_at->getTimestamp() : null,
+                    'window' => ['start' => (int)$startTs, 'end' => (int)$endTs],
+                    'candles' => $candles,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $msg = $this->parseExchangeError($e->getMessage());
+            return response()->json(['success' => false, 'message' => $msg], 500);
+        }
+    }
+
+    /**
+     * Generate synthetic candles for local/testing without exchange access.
+     */
+    private function generateSyntheticCandles(int $startTs, int $endTs, int $tfSeconds, float $basePrice, string $side): array
+    {
+        $candles = [];
+        $steps = max(1, (int)floor(($endTs - $startTs) / $tfSeconds));
+        $price = max(0.0001, $basePrice);
+        $bias = $side === 'Buy' ? 0.0008 : -0.0008; // small directional drift
+        for ($i = 0; $i <= $steps; $i++) {
+            $t = $startTs + ($i * $tfSeconds);
+            // random-like variation using deterministic sin pattern
+            $delta = sin($i * 0.35) * 0.003 + $bias;
+            $open = $price;
+            $close = max(0.0001, $price * (1 + $delta));
+            $high = max($open, $close) * (1 + 0.0015);
+            $low  = min($open, $close) * (1 - 0.0015);
+            $candles[] = [
+                'time' => (int)$t,
+                'open' => (float)$open,
+                'high' => (float)$high,
+                'low'  => (float)$low,
+                'close'=> (float)$close,
+            ];
+            $price = $close;
+        }
+        return $candles;
     }
 }

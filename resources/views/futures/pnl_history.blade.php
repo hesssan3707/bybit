@@ -14,46 +14,7 @@
         margin-bottom: 25px;
     }
 
-    /* Mobile redirect buttons */
-    .mobile-redirect-section {
-        display: none;
-        margin-bottom: 20px;
-    }
-
-    .redirect-buttons {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-
-    .redirect-btn {
-        flex: 1;
-        padding: 15px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-        color: white;
-        text-decoration: none;
-        border-radius: 10px;
-        text-align: center;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,123,255,0.3);
-    }
-
-    .redirect-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,123,255,0.4);
-        color: white;
-        text-decoration: none;
-    }
-
-    .redirect-btn.secondary {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        box-shadow: 0 4px 15px rgba(40,167,69,0.3);
-    }
-
-    .redirect-btn.secondary:hover {
-        box-shadow: 0 6px 20px rgba(40,167,69,0.4);
-    }
+    /* Old mobile redirect buttons removed; using compact tabs partial instead */
 
     .table-responsive {
         overflow-x: auto;
@@ -143,20 +104,6 @@
       .pnl-badge { font-size: 1.05em; padding: 6px 12px; }
     }
     @media screen and (max-width: 768px) {
-        .mobile-redirect-section {
-            display: block;
-        }
-
-        .redirect-buttons {
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .redirect-btn {
-            padding: 18px;
-            font-size: 16px;
-        }
-
         /* Turn tables into cards on mobile */
         table thead { display: none; }
         table tr {
@@ -213,20 +160,26 @@
         </div>
     @endif
 
-    <!-- Mobile redirect buttons (only visible on mobile) -->
-    <div class="mobile-redirect-section">
-        <div class="redirect-buttons">
-            <a href="{{ route('futures.orders') }}" class="redirect-btn">
-                📊 سفارش‌های آتی
-            </a>
-            <a href="{{ route('futures.pnl_history') }}" class="redirect-btn secondary">
-                📈 سود و زیان
-            </a>
-            <a href="{{ route('futures.journal') }}" class="redirect-btn">
-                📓 ژورنال
-            </a>
-        </div>
-    </div>
+    @include('partials.mobile-tabs-futures')
+
+    @php
+        $symbols = isset($filterSymbols) && is_array($filterSymbols) && count($filterSymbols) > 0
+            ? $filterSymbols
+            : (collect($openTrades ?? [])->pluck('symbol')
+                ->merge(collect(($closedTrades ?? null) && method_exists($closedTrades, 'items') ? $closedTrades->items() : ($closedTrades ?? []))->pluck('symbol'))
+                ->filter()->unique()->values()->all());
+    @endphp
+
+    @include('partials.filter-bar', [
+        'action' => route('futures.pnl_history'),
+        'method' => 'GET',
+        'from' => request('from'),
+        'to' => request('to'),
+        'symbol' => request('symbol'),
+        'symbols' => $symbols,
+        'hideSymbol' => (auth()->user()->future_strict_mode ?? false),
+        'resetUrl' => route('futures.pnl_history')
+    ])
 
     <div class="table-responsive">
         <table>
@@ -296,7 +249,7 @@
         </table>
     </div>
 
-    {{ $closedTrades->links() }}
+    {{ $closedTrades->appends(request()->except('page'))->links() }}
     <form id="closeAllForm" action="{{ route('futures.orders.close_all') }}" method="POST" style="display:none;">
         @csrf
     </form>
@@ -309,14 +262,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('.close-position-form');
     const openCount = {{ count($openTrades) }};
     const manualCloseBanActive = {{ $manualCloseBanActive ? 'true' : 'false' }};
-    const manualCloseBanEndsAt = @json(optional($manualCloseBanEndsAt)->format('Y-m-d H:i'));
+    const strictModeActive = {{ $strictModeActive ? 'true' : 'false' }};
+    const manualCloseBanRemainingFa = @json($manualCloseBanRemainingFa);
     forms.forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            if (manualCloseBanActive) {
+            if (strictModeActive && manualCloseBanActive) {
+                const msg = manualCloseBanRemainingFa
+                    ? ('شما مجاز به بستن دستی موقعیت نیستید. لطفاً ' + manualCloseBanRemainingFa + ' صبر کنید.')
+                    : 'شما مجاز به بستن دستی موقعیت نیستید.';
                 showAlertModal({
                     title: 'خطا',
-                    message: 'شما مجاز به بستن دستی موقعیت نیستید تا تاریخ ' + manualCloseBanEndsAt,
+                    message: msg,
                     type: 'error',
                     confirmText: 'متوجه شدم',
                     showCancel: false

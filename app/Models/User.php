@@ -404,11 +404,7 @@ class User extends Authenticatable
         try {
             $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($exchange);
             $exchangeService->switchPositionMode(true);
-            \Illuminate\Support\Facades\Log::info('Hedge mode activated during model exchange switch', [
-                'user_id' => $this->id,
-                'exchange_id' => $exchange->id,
-                'exchange_name' => $exchange->exchange_name
-            ]);
+            // Duplicate info log removed; controller-level logging covers this state change
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Failed to activate hedge mode during model exchange switch', [
                 'user_id' => $this->id,

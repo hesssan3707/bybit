@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\CompanyExchangeRequest;
 use App\Models\UserExchange;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Http\Request;
@@ -25,7 +26,22 @@ class ExchangeController extends Controller
         $exchanges = $user->exchanges()->latest()->get();
         $availableExchanges = UserExchange::getAvailableExchanges();
         
-        return view('exchanges.index', compact('exchanges', 'availableExchanges'));
+        // Include company-provided exchange requests for display in index
+        // Only show visible items: hide soft-deleted and rejected older than 7 days
+        $companyRequests = CompanyExchangeRequest::forUser($user->id)
+            ->visibleToUser()
+            ->orderByDesc('requested_at')
+            ->get();
+
+        // Map of company-assigned user_exchange IDs for badge display
+        $companyAssignedIds = $companyRequests->where('status', 'approved')
+            ->pluck('assigned_user_exchange_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return view('exchanges.index', compact('exchanges', 'availableExchanges', 'companyRequests', 'companyAssignedIds'));
     }
 
     /**
@@ -40,7 +56,17 @@ class ExchangeController extends Controller
         // Filter out exchanges user already has
         $availableExchanges = array_diff_key($availableExchanges, array_flip($userExchangeNames));
         
-        return view('exchanges.create', compact('availableExchanges'));
+        // Build pending company request map: exchange_name => [types]
+        $pendingCompanyMap = CompanyExchangeRequest::forUser($user->id)
+            ->pending()
+            ->get()
+            ->groupBy('exchange_name')
+            ->map(function($items){
+                return $items->pluck('account_type')->unique()->values()->all();
+            })
+            ->toArray();
+
+        return view('exchanges.create', compact('availableExchanges', 'pendingCompanyMap'));
     }
 
     /**
@@ -193,6 +219,14 @@ class ExchangeController extends Controller
                 ]);
             }
 
+            // Local environment: skip real exchange connection calls
+            if (app()->environment('local')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'محیط لوکال: تست اتصال شبیه‌سازی شد'
+                ]);
+            }
+
             $isConnected = ExchangeFactory::testUserExchangeConnection($exchange);
 
             return response()->json([
@@ -234,6 +268,14 @@ class ExchangeController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'اطلاعات حساب واقعی وارد نشده است'
+                ]);
+            }
+
+            // Local environment: skip real exchange connection calls
+            if (app()->environment('local')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'محیط لوکال: اتصال حساب واقعی شبیه‌سازی شد'
                 ]);
             }
 
@@ -290,6 +332,14 @@ class ExchangeController extends Controller
                 ]);
             }
 
+            // Local environment: skip demo exchange connection calls
+            if (app()->environment('local')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'محیط لوکال: اتصال حساب دمو شبیه‌سازی شد'
+                ]);
+            }
+
             // Test with demo credentials using ExchangeFactory
             $exchangeService = ExchangeFactory::create($exchange->exchange_name, $demoApiKey, $demoApiSecret, true);
             $balance = $exchangeService->getWalletBalance('UNIFIED', 'USDT');
@@ -339,6 +389,14 @@ class ExchangeController extends Controller
             $exchangeName = $request->exchange_name;
             $apiKey = $request->api_key;
             $apiSecret = $request->api_secret;
+
+            // Local environment: skip exchange API calls
+            if (app()->environment('local')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $isDemo ? 'محیط لوکال: اتصال حساب دمو شبیه‌سازی شد' : 'محیط لوکال: اتصال حساب واقعی شبیه‌سازی شد'
+                ]);
+            }
 
             // Use ExchangeFactory::create for proper connection testing
             $exchangeService = ExchangeFactory::create($exchangeName, $apiKey, $apiSecret, $isDemo);
@@ -586,6 +644,37 @@ class ExchangeController extends Controller
                 'success' => false,
                 'message' => 'خطا در تغییر حالت معاملاتی: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Cancel a pending activation/update request (user-initiated)
+     */
+    public function cancelRequest(UserExchange $exchange)
+    {
+        try {
+            if ($exchange->user_id !== auth()->id()) {
+                abort(403, 'دسترسی غیرمجاز');
+            }
+
+            if ($exchange->status !== 'pending') {
+                return back()->withErrors(['msg' => 'درخواستی برای لغو وجود ندارد یا قبلاً بررسی شده است.']);
+            }
+
+            $exchange->update([
+                'status' => 'rejected',
+                'admin_notes' => 'لغو درخواست توسط کاربر',
+                'activation_requested_at' => null,
+                'is_active' => false,
+                'is_default' => false,
+            ]);
+
+            return redirect()->route('exchanges.index')
+                ->with('success', 'درخواست شما لغو شد.');
+
+        } catch (\Exception $e) {
+            Log::error('Exchange cancel request failed: ' . $e->getMessage());
+            return back()->withErrors(['general' => 'خطا در لغو درخواست.']);
         }
     }
 }

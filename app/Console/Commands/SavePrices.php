@@ -31,15 +31,15 @@ class SavePrices extends Command
     public function handle()
     {
         $this->info('Starting to save k-line prices from Binance...');
-        Log::info('prices:save command started.');
 
         $markets = [
             'BTCUSDT', 'ETHUSDT', 'CAKEUSDT', 'ATOMUSDT', 'SOLUSDT', 'ADAUSDT',
-            'DOTUSDT', 'DOGEUSDT', 'SHIBUSDT', 'MATICUSDT', 'LTCUSDT', 'LINKUSDT',
-            'UNIUSDT', 'AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT'
+            'DOTUSDT', 'DOGEUSDT', 'XRPUSDT', 'LTCUSDT', 'LINKUSDT'
         ];
 
-        $timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
+        $timeframes = ['5m', '15m', '1h', '4h', '1d'];
+        $inactiveMarkets = ['AAVEUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT','UNIUSDT','SHIBUSDT'];
+        $inactiveTimeframes = ['1m'];
 
         // Fetch latest timestamps for all markets and timeframes at once
         $this->info('Fetching latest timestamps for all markets...');
@@ -86,7 +86,6 @@ class SavePrices extends Command
                     if (!empty($pricesToInsert)) {
                         Price::insert($pricesToInsert);
                         $this->info("Saved " . count($pricesToInsert) . " new k-line prices for {$market} on timeframe {$timeframe}.");
-                        Log::info("Saved " . count($pricesToInsert) . " new k-line prices for {$market} on timeframe {$timeframe}.");
                     }
 
                     // Prune old records, keeping the last 50
@@ -121,7 +120,6 @@ class SavePrices extends Command
         }
 
         $this->info('Finished saving k-line prices.');
-        Log::info('prices:save command finished.');
     }
     private function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
     {

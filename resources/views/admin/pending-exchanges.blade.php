@@ -473,12 +473,14 @@
 @section('content')
 <div class="admin-container">
     <div class="admin-header">
-        <h1>پنل مدیریت</h1>
         <nav class="admin-nav">
-            <a href="{{ route('admin.pending-exchanges') }}" class="nav-btn active">درخواست‌های در انتظار</a>
-            <a href="{{ route('admin.all-exchanges') }}" class="nav-btn">همه صرافی‌ها</a>
+            <a href="{{ route('admin.pending-users') }}" class="nav-btn">کاربران در انتظار تأیید</a>
             <a href="{{ route('admin.all-users') }}" class="nav-btn">همه کاربران</a>
-            <a href="{{ route('admin.pending-users') }}" class="nav-btn">کاربران در انتظار</a>
+            <a href="{{ route('admin.pending-exchanges') }}" class="nav-btn">درخواست‌های فعال‌سازی صرافی</a>
+            <a href="{{ route('admin.all-exchanges') }}" class="nav-btn">همه صرافی‌ها</a>
+            <a href="{{ route('admin.tickets') }}" class="nav-btn active">تیکت‌ها</a>
+            <a href="{{ route('admin.company-requests.pending') }}" class="nav-btn">در انتظار</a>
+            <a href="{{ route('admin.company-requests.all') }}" class="nav-btn active">همه درخواست‌ها</a>
         </nav>
     </div>
 

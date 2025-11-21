@@ -104,14 +104,19 @@ class FuturesController extends Controller
         $validated = $request->validate([
             'symbol' => 'required|string|in:BTCUSDT,ETHUSDT,ADAUSDT,DOTUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,LTCUSDT',
             'entry1' => 'required|numeric',
-            'entry2' => 'required|numeric',
+            'entry2' => 'nullable|numeric',
             'tp'     => 'required|numeric',
             'sl'     => 'required|numeric',
             'steps'  => 'required|integer|min:1',
             'expire' => 'nullable|integer|min:1|max:999',
-            'risk_percentage' => 'required|numeric|min:0.1',
+            'risk_percentage' => 'required|numeric|min:0.1|max:100',
             'cancel_price' => 'nullable|numeric',
         ]);
+
+        // If entry2 is not provided (steps=1 case), set it equal to entry1
+        if (!isset($validated['entry2'])) {
+            $validated['entry2'] = $validated['entry1'];
+        }
 
         try {
             $exchangeService = $this->getExchangeService();
@@ -212,6 +217,7 @@ class FuturesController extends Controller
                     'side'             => strtolower($side),
                     'amount'           => $finalQty,
                     'balance_at_creation' => $capitalUSD,
+                    'initial_risk_percent' => round((float)$validated['risk_percentage'], 2),
                     'entry_low'        => $entry1,
                     'entry_high'       => $entry2,
                     'cancel_price'     => isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null,

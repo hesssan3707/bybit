@@ -159,10 +159,7 @@ class BybitApiService implements ExchangeApiServiceInterface
             'coin' => 'USDT'
         ]);
 
-        \Illuminate\Support\Facades\Log::info('Position mode switched successfully', [
-            'hedge_mode' => $hedgeMode,
-            'exchange' => 'bybit'
-        ]);
+        // Duplicate info log removed; rely on higher-level controller logging
 
         return $result;
     }
@@ -568,15 +565,7 @@ class BybitApiService implements ExchangeApiServiceInterface
             }
         }
 
-        // Log the parameters for debugging
-        \Log::debug('BybitApiService setStopLossAdvanced called', [
-            'symbol' => $params['symbol'],
-            'tpslMode' => $params['tpslMode'],
-            'positionIdx' => $params['positionIdx'],
-            'stopLoss' => $params['stopLoss'] ?? 'not_set',
-            'takeProfit' => $params['takeProfit'] ?? 'not_set',
-            'all_params' => $params
-        ]);
+        // Removed verbose debug log to reduce noise; errors are still logged below
 
         try {
             return $this->setTradingStop($params);

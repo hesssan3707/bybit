@@ -15,14 +15,14 @@
                 <p id="alertModalMessage">پیام شما اینجا نمایش داده می‌شود</p>
             </div>
             <div class="alert-modal-footer">
-                <button id="alertModalSecondaryConfirm" class="btn btn-danger" onclick="closeAlertModal('secondary')" style="display: none;">
-                    اقدام اضافی
-                </button>
                 <button id="alertModalConfirm" class="btn btn-primary" onclick="closeAlertModal('confirm')">
                     تأیید
                 </button>
                 <button id="alertModalCancel" class="btn btn-secondary" onclick="closeAlertModal('cancel')" style="display: none;">
                     انصراف
+                </button>
+                <button id="alertModalSecondaryConfirm" class="btn btn-danger" onclick="closeAlertModal('secondary')" style="display: none;">
+                    اقدام اضافی
                 </button>
             </div>
         </div>

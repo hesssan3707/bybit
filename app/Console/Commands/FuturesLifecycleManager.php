@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Trade;
 use App\Models\UserBan;
 use App\Services\Exchanges\ExchangeFactory;
+use App\Jobs\CollectOrderCandlesJob;
 use Exception;
 
 class FuturesLifecycleManager extends Command
@@ -337,82 +338,11 @@ class FuturesLifecycleManager extends Command
                     $trade->updated_at = now();
                     $trade->save();
 
-                    // Create opening bans based on closure outcomes (mirror of verification logic)
+                    // Note: ban creation is consolidated later after finalize to avoid duplication
                     try {
-                        $userId = $userExchange->user_id;
-                        $isDemo = (bool)$trade->is_demo;
-
-                        // Heuristic: external manual close detected if exit far from both TP and SL (>0.2%)
-                        $order = $trade->order;
-                        if ($order && $trade->avg_exit_price) {
-                            $exit = (float)$trade->avg_exit_price;
-                            $tpDelta = isset($order->tp) ? abs(((float)$order->tp - $exit) / $exit) : null;
-                            $slDelta = isset($order->sl) ? abs(((float)$order->sl - $exit) / $exit) : null;
-                            if ($tpDelta !== null && $slDelta !== null && $tpDelta > 0.002 && $slDelta > 0.002) {
-                                $existsOpenManual = \App\Models\UserBan::active()
-                                    ->forUser($userId)
-                                    ->accountType($isDemo)
-                                    ->where('ban_type', 'open_ban_exchange_manual_close_3d')
-                                    ->exists();
-                                if (!$existsOpenManual) {
-                                    \App\Models\UserBan::create([
-                                        'user_id' => $userId,
-                                        'is_demo' => $isDemo,
-                                        'trade_id' => $trade->id,
-                                        'ban_type' => 'open_ban_exchange_manual_close_3d',
-                                        'starts_at' => now(),
-                                        'ends_at' => now()->addDays(3),
-                                    ]);
-                                }
-                            }
-                        }
-
-                        // Loss-based bans
-                        if ($trade->pnl !== null && (float)$trade->pnl < 0) {
-                            // Single loss: 1 hour ban
-                            $existsSingle = \App\Models\UserBan::where('trade_id', $trade->id)->where('ban_type', 'single_loss')->exists();
-                            if (!$existsSingle) {
-                                \App\Models\UserBan::create([
-                                    'user_id' => $userId,
-                                    'is_demo' => $isDemo,
-                                    'trade_id' => $trade->id,
-                                    'ban_type' => 'single_loss',
-                                    'starts_at' => now(),
-                                    'ends_at' => now()->addHour(),
-                                ]);
-                            }
-
-                            // Two consecutive losses: 24 hours ban
-                            $lastTwo = \App\Models\Trade::where('user_exchange_id', $userExchange->id)
-                                ->where('is_demo', $isDemo)
-                                ->whereNotNull('closed_at')
-                                ->orderBy('closed_at', 'desc')
-                                ->limit(2)
-                                ->get();
-                            if ($lastTwo->count() === 2
-                                && (float)$lastTwo[0]->pnl < 0
-                                && (float)$lastTwo[1]->pnl < 0
-                                && now()->diffInHours($lastTwo[0]->closed_at) < 24
-                                && now()->diffInHours($lastTwo[1]->closed_at) < 24) {
-                                $hasActiveDouble = \App\Models\UserBan::active()
-                                    ->forUser($userId)
-                                    ->accountType($isDemo)
-                                    ->where('ban_type', 'double_loss')
-                                    ->exists();
-                                if (!$hasActiveDouble) {
-                                    \App\Models\UserBan::create([
-                                        'user_id' => $userId,
-                                        'is_demo' => $isDemo,
-                                        'trade_id' => $trade->id,
-                                        'ban_type' => 'double_loss',
-                                        'starts_at' => now(),
-                                        'ends_at' => now()->addDay(),
-                                    ]);
-                                }
-                            }
-                        }
+                        CollectOrderCandlesJob::dispatch($trade->id);
                     } catch (\Throwable $e) {
-                        // Do not fail lifecycle flow due to ban creation issues
+                        $this->warn('[Real] خطا در صف کردن کار جمع‌آوری کندل‌ها: ' . $e->getMessage());
                     }
                 }
             }
@@ -906,30 +836,32 @@ class FuturesLifecycleManager extends Command
                         $trade->synchronized = 2; // mark as unverified sync
                     }
                     $trade->save();
-
                     // Create bans based on closure outcomes
                     try {
                         $userId = $userExchange->user_id;
                         $isDemo = (bool)$trade->is_demo;
 
-                        // Heuristic: external manual close detected if exit far from both TP and SL (>0.2%)
+                        // Heuristic: exchange force close detected if exit far from both TP and SL (>0.2%)
                         $order = $trade->order;
                         if ($order && $trade->avg_exit_price) {
                             $exit = (float)$trade->avg_exit_price;
                             $tpDelta = isset($order->tp) ? abs(((float)$order->tp - $exit) / $exit) : null;
                             $slDelta = isset($order->sl) ? abs(((float)$order->sl - $exit) / $exit) : null;
-                            if ($tpDelta !== null && $slDelta !== null && $tpDelta > 0.002 && $slDelta > 0.002) {
-                                $existsOpenManual = UserBan::active()
+                            if ($trade->closed_at !== null
+                                && ((int)($trade->closed_by_user ?? 0) !== 1)
+                                && $tpDelta !== null && $slDelta !== null
+                                && $tpDelta > 0.002 && $slDelta > 0.002) {
+                                $existsExchangeForceClose = UserBan::active()
                                     ->forUser($userId)
                                     ->accountType($isDemo)
-                                    ->where('ban_type', 'open_ban_exchange_manual_close_3d')
+                                    ->where('ban_type', 'exchange_force_close')
                                     ->exists();
-                                if (!$existsOpenManual && ($trade->closed_at !== null)) {
+                                if (!$existsExchangeForceClose) {
                                     UserBan::create([
                                         'user_id' => $userId,
                                         'is_demo' => $isDemo,
                                         'trade_id' => $trade->id,
-                                        'ban_type' => 'open_ban_exchange_manual_close_3d',
+                                        'ban_type' => 'exchange_force_close',
                                         'starts_at' => now(),
                                         'ends_at' => now()->addDays(3),
                                     ]);
@@ -984,7 +916,6 @@ class FuturesLifecycleManager extends Command
                     } catch (\Throwable $e) {
                         // Do not fail lifecycle flow due to ban creation issues
                     }
-                }
             }
         } catch (\Exception $e) {
             $this->warn("[Real] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());

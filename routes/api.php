@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\FuturesController;
 use App\Http\Controllers\Api\V1\MarketController;
 use App\Http\Controllers\Api\V1\SpotTradingController;
 use App\Http\Controllers\Api\V1\WalletBalanceController;
+use App\Http\Controllers\Api\V1\PeriodController as ApiPeriodController;
 use App\Http\Controllers\Api\ExchangeConfigController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,13 @@ Route::middleware(['api.auth'])->group(function () {
             Route::post('/orders', [FuturesController::class, 'store'])->name('api.v1.futures.orders.store');
             Route::post('/orders/{order}/close', [FuturesController::class, 'close'])->name('api.v1.futures.orders.close');
             Route::delete('/orders/{order}', [FuturesController::class, 'destroy'])->name('api.v1.futures.orders.destroy');
+        });
+
+        // Futures Periods
+        Route::prefix('futures/periods')->group(function () {
+            Route::get('/', [ApiPeriodController::class, 'index'])->name('api.v1.futures.periods.index');
+            Route::post('/', [ApiPeriodController::class, 'store'])->name('api.v1.futures.periods.store');
+            Route::post('/{period}/end', [ApiPeriodController::class, 'end'])->name('api.v1.futures.periods.end');
         });
 
         // Spot Trading
