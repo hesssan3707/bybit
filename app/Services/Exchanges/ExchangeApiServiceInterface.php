@@ -206,4 +206,14 @@ interface ExchangeApiServiceInterface
      * @return array ['positionMode' => string, 'hedgeMode' => bool, 'details' => array]
      */
     public function getAccountInfo(): array;
+
+    /**
+     * Get maximum leverage for a symbol
+     */
+    public function getMaxLeverage(string $symbol): int;
+
+    /**
+     * Set leverage for a symbol
+     */
+    public function setLeverage(string $symbol, int $leverage): array;
 }

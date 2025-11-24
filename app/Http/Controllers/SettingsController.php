@@ -151,7 +151,9 @@ class SettingsController extends Controller
 
             // Persist minimum RR ratio selection (default to 3:1 if not provided)
             $selectedRr = $request->input('min_rr_ratio', '3:1');
-            UserAccountSetting::setMinRrRatio($user->id, $selectedRr);
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+            UserAccountSetting::setMinRrRatio($user->id, $selectedRr, $isDemo);
 
             // Build success message
             $message = "حالت سخت‌گیرانه آتی با موفقیت فعال شد. شما تنها می‌توانید در بازار {$request->selected_market} معامله کنید. حداقل نسبت سود به ضرر روی {$selectedRr} تنظیم شد. این حالت غیرقابل بازگشت است.";

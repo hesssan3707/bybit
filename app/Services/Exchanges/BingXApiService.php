@@ -653,5 +653,37 @@ class BingXApiService implements ExchangeApiServiceInterface
             'ip' => $ipCheck,
             'overall' => $futuresCheck['success'] && $ipCheck['success']
         ];
+
+    }
+
+    /**
+     * Get maximum leverage for a symbol
+     */
+    public function getMaxLeverage(string $symbol): int
+    {
+        $info = $this->getInstrumentsInfo($symbol);
+        // Response is list of objects
+        if (is_array($info)) {
+            foreach ($info as $item) {
+                if (($item['symbol'] ?? '') === $symbol) {
+                    return (int)($item['maxLongLeverage'] ?? 20);
+                }
+            }
+        }
+        return 20;
+    }
+
+    /**
+     * Set leverage for a symbol
+     */
+    public function setLeverage(string $symbol, int $leverage): array
+    {
+        // BingX requires side. Usually LONG is enough for one-way?
+        // Let's try setting for LONG.
+        return $this->sendRequest('POST', '/openApi/swap/v2/trade/leverage', [
+            'symbol' => $symbol,
+            'leverage' => $leverage,
+            'side' => 'LONG',
+        ]);
     }
 }

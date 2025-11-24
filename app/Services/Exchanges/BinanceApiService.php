@@ -586,4 +586,39 @@ class BinanceApiService implements ExchangeApiServiceInterface
             return "خطا در API Binance: {$errorMsg} (کد: {$errorCode})";
         }
     }
+
+    /**
+     * Get maximum leverage for a symbol
+     */
+    public function getMaxLeverage(string $symbol): int
+    {
+        try {
+            $brackets = $this->sendRequest('GET', '/fapi/v1/leverageBracket', ['symbol' => $symbol]);
+            // Response is array of objects, or single object if symbol passed?
+            // Docs say: if symbol passed, returns array of 1 object.
+            if (is_array($brackets) && isset($brackets[0]['brackets'])) {
+                $max = 0;
+                foreach ($brackets[0]['brackets'] as $b) {
+                    if (isset($b['initialLeverage']) && $b['initialLeverage'] > $max) {
+                        $max = $b['initialLeverage'];
+                    }
+                }
+                return $max > 0 ? $max : 20;
+            }
+        } catch (\Exception $e) {
+            // Fallback
+        }
+        return 20;
+    }
+
+    /**
+     * Set leverage for a symbol
+     */
+    public function setLeverage(string $symbol, int $leverage): array
+    {
+        return $this->sendRequest('POST', '/fapi/v1/leverage', [
+            'symbol' => $symbol,
+            'leverage' => $leverage,
+        ], true);
+    }
 }

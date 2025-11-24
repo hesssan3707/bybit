@@ -945,4 +945,33 @@ class BybitApiService implements ExchangeApiServiceInterface
             return "خطا در API Bybit: {$errorMsg} (کد: {$errorCode})";
         }
     }
+
+    /**
+     * Get maximum leverage for a symbol
+     */
+    public function getMaxLeverage(string $symbol): int
+    {
+        $info = $this->getInstrumentsInfo($symbol);
+        if (!empty($info['list'])) {
+            foreach ($info['list'] as $item) {
+                if ($item['symbol'] === $symbol && isset($item['leverageFilter']['maxLeverage'])) {
+                    return (int)$item['leverageFilter']['maxLeverage'];
+                }
+            }
+        }
+        return 20; // Default fallback
+    }
+
+    /**
+     * Set leverage for a symbol
+     */
+    public function setLeverage(string $symbol, int $leverage): array
+    {
+        return $this->sendRequest('POST', '/v5/position/set-leverage', [
+            'category' => 'linear',
+            'symbol' => $symbol,
+            'buyLeverage' => (string)$leverage,
+            'sellLeverage' => (string)$leverage,
+        ]);
+    }
 }

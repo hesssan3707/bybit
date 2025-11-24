@@ -15,14 +15,16 @@ class AccountSettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
-        // Get current settings
-        $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
-        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id);
-        $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id);
-        $minRrRatio = UserAccountSetting::getMinRrRatio($user->id);
+        // Get current settings for current mode
+        $defaultRisk = UserAccountSetting::getDefaultRisk($user->id, $isDemo);
+        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
+        $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
+        $minRrRatio = UserAccountSetting::getMinRrRatio($user->id, $isDemo);
 
-        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps', 'minRrRatio'));
+        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps', 'minRrRatio', 'isDemo'));
     }
 
     /**
@@ -31,6 +33,8 @@ class AccountSettingsController extends Controller
     public function update(Request $request)
     {
         $user = Auth::user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         // Validate input - allow empty strings to remove default values
         $validatedData = $request->validate([
@@ -46,9 +50,9 @@ class AccountSettingsController extends Controller
                 $riskValue = $request->default_risk;
                 // Empty string or null means remove default value
                 if ($riskValue === '' || $riskValue === null) {
-                    UserAccountSetting::setDefaultRisk($user->id, null);
+                    UserAccountSetting::setDefaultRisk($user->id, null, $isDemo);
                 } else {
-                    UserAccountSetting::setDefaultRisk($user->id, $validatedData['default_risk']);
+                    UserAccountSetting::setDefaultRisk($user->id, $validatedData['default_risk'], $isDemo);
                 }
             }
 
@@ -58,9 +62,9 @@ class AccountSettingsController extends Controller
                 $futureOrderSteps = $request->default_future_order_steps;
                 // Empty string or null means remove default value
                 if ($futureOrderSteps === '' || $futureOrderSteps === null) {
-                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, 1);
+                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, 1, $isDemo);
                 } else {
-                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, $validatedData['default_future_order_steps']);
+                    UserAccountSetting::setDefaultFutureOrderSteps($user->id, $validatedData['default_future_order_steps'], $isDemo);
                 }
             }
 
@@ -70,9 +74,9 @@ class AccountSettingsController extends Controller
                 $expirationTime = $request->default_expiration_time;
                 // Empty string or null means remove default value
                 if ($expirationTime === '' || $expirationTime === null) {
-                    UserAccountSetting::setDefaultExpirationTime($user->id, null);
+                    UserAccountSetting::setDefaultExpirationTime($user->id, null, $isDemo);
                 } else {
-                    UserAccountSetting::setDefaultExpirationTime($user->id, $validatedData['default_expiration_time']);
+                    UserAccountSetting::setDefaultExpirationTime($user->id, $validatedData['default_expiration_time'], $isDemo);
                 }
             }
 
@@ -92,10 +96,12 @@ class AccountSettingsController extends Controller
     public function getSettings()
     {
         $user = Auth::user();
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         return response()->json([
-            'default_risk' => UserAccountSetting::getDefaultRisk($user->id),
-            'default_expiration_time' => UserAccountSetting::getDefaultExpirationTime($user->id),
+            'default_risk' => UserAccountSetting::getDefaultRisk($user->id, $isDemo),
+            'default_expiration_time' => UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo),
             'strict_mode' => $user->future_strict_mode,
         ]);
     }

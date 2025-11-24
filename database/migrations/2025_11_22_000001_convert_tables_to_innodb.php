@@ -18,7 +18,6 @@ return new class extends Migration
             
             try {
                 DB::statement("ALTER TABLE `{$tableName}` ENGINE=InnoDB");
-                echo "Converted {$tableName} to InnoDB\n";
             } catch (\Exception $e) {
                 echo "Failed to convert {$tableName}: " . $e->getMessage() . "\n";
             }

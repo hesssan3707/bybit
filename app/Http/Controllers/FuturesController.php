@@ -248,9 +248,11 @@ class FuturesController extends Controller
         }
 
         // Get user's default settings
-        $defaultRisk = UserAccountSetting::getDefaultRisk($user->id);
-        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id);
-        $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id);
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+        $defaultRisk = UserAccountSetting::getDefaultRisk($user->id, $isDemo);
+        $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
+        $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
 
         // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
@@ -367,7 +369,7 @@ class FuturesController extends Controller
         if ($capitalUSD > 0 && $slDistance > 0) {
             $defaultRisk = round(($order->amount * $slDistance / $capitalUSD) * 100, 2);
         } else {
-            $defaultRisk = \App\Models\UserAccountSetting::getDefaultRisk($user->id) ?? 10;
+            $defaultRisk = \App\Models\UserAccountSetting::getDefaultRisk($user->id, (bool)$order->is_demo) ?? 10;
         }
 
         // Apply strict mode cap
@@ -376,8 +378,8 @@ class FuturesController extends Controller
         }
         
         // Get user defaults (to mirror create page behavior in UI)
-        $defaultFutureOrderSteps = \App\Models\UserAccountSetting::getDefaultFutureOrderSteps($user->id);
-        $defaultExpirationMinutes = \App\Models\UserAccountSetting::getDefaultExpirationTime($user->id);
+        $defaultFutureOrderSteps = \App\Models\UserAccountSetting::getDefaultFutureOrderSteps($user->id, (bool)$order->is_demo);
+        $defaultExpirationMinutes = \App\Models\UserAccountSetting::getDefaultExpirationTime($user->id, (bool)$order->is_demo);
 
         // Compute active opening-ban for UI when strict mode is active
         $activeBan = null;
@@ -558,8 +560,59 @@ class FuturesController extends Controller
                 }
             }
 
-            // Fetch live wallet balance instead of using a static .env variable
+            // Fetch live wallet balance
             $capitalUSD = $this->resolveCapitalUSD($exchangeService);
+
+            // Resolve leverage to ensure accurate max affordable quantity calculation
+            // We fetch it once and store it in UserAccountSettings to avoid repeated API calls
+            // Cache expires after 3 days
+            $leverage = null;
+            try {
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                if ($currentExchange) {
+                    $isDemo = (bool)$currentExchange->is_demo_active;
+                    $leverageKey = "leverage_{$symbol}_{$currentExchange->id}";
+                    
+                    // Check cache with expiration (3 days)
+                    $setting = \App\Models\UserAccountSetting::where('user_id', $user->id)
+                        ->where('key', $leverageKey)
+                        ->where('is_demo', $isDemo)
+                        ->first();
+                        
+                    $isExpired = false;
+                    if ($setting) {
+                        // Check if updated_at is older than 3 days
+                        if ($setting->updated_at < now()->subDays(3)) {
+                            $isExpired = true;
+                        } else {
+                            // Cast value based on type stored
+                            $leverage = (float)$setting->value;
+                        }
+                    }
+
+                    if (!$setting || $isExpired) {
+                        // Fetch max leverage from exchange
+                        // We use max leverage to ensure user can use their full balance if they want
+                        $maxLeverage = $exchangeService->getMaxLeverage($symbol);
+                        
+                        // Set leverage on exchange to max
+                        // This ensures that if user manually reduced it, we bump it back up
+                        try {
+                            $exchangeService->setLeverage($symbol, $maxLeverage);
+                        } catch (\Exception $e) {
+                            // Ignore error if setting leverage fails (e.g. "leverage not modified")
+                            // We proceed with the max leverage we found
+                        }
+
+                        // Store in cache
+                        \App\Models\UserAccountSetting::setUserSetting($user->id, $leverageKey, $maxLeverage, 'decimal', $isDemo);
+                        $leverage = (float)$maxLeverage;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Log warning but proceed (will skip downsizing check)
+                Log::warning("Could not resolve leverage for {$symbol}: " . $e->getMessage());
+            }
 
             $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
 
@@ -579,7 +632,9 @@ class FuturesController extends Controller
             }
             // Enforce configured minimum RR ratio when strict mode is active
             if ($user->future_strict_mode) {
-                $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id);
+                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+                $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id, $isDemo);
                 if (!is_string($minRrStr) || !preg_match('/^\d+:\d+$/', $minRrStr)) {
                     $minRrStr = '3:1'; // loss:profit minima (e.g., 3:1 => loss three times profit)
                 }
@@ -596,10 +651,18 @@ class FuturesController extends Controller
             $originalAmount = $maxLossUSD / $slDistance;
 
             // Auto-downsize by available balance to avoid insufficient margin errors
-            // Assume leverage = 1 for affordability; for USDT-margined linear contracts, initial margin ≈ notional
-            $maxAffordableQtyTotal = ($avgEntry > 0) ? ($capitalUSD / $avgEntry) : $originalAmount;
+            // We use the actual leverage if available. If not, we skip this check to avoid incorrect downsizing.
+            $maxAffordableQtyTotal = $originalAmount;
+            
+            if ($leverage && $avgEntry > 0) {
+                // Max Notional = Capital * Leverage
+                // Max Qty = Max Notional / Entry Price
+                $maxAffordableQtyTotal = ($capitalUSD * $leverage) / $avgEntry;
+            }
+
             $downsized = false;
-            if ($originalAmount > $maxAffordableQtyTotal) {
+            // Only apply downsizing if we have a valid leverage and the calculated amount exceeds affordable limit
+            if ($leverage && $originalAmount > $maxAffordableQtyTotal) {
                 $amount = $maxAffordableQtyTotal;
                 $downsized = true;
             } else {
@@ -772,9 +835,52 @@ class FuturesController extends Controller
             // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
         }
 
-        $pricePrec = 2;
+        // Ensure leverage is optimized before updating order
+        $exchangeService = null;
         try {
             $exchangeService = $this->getExchangeService();
+            $symbol = $order->symbol;
+            $isDemo = (bool)$order->is_demo;
+            
+            $userExchange = $order->userExchange;
+            if ($userExchange) {
+                $leverageKey = "leverage_{$symbol}_{$userExchange->id}";
+                
+                // Check cache with expiration (3 days)
+                $setting = \App\Models\UserAccountSetting::where('user_id', $user->id)
+                    ->where('key', $leverageKey)
+                    ->where('is_demo', $isDemo)
+                    ->first();
+                    
+                $leverageNeedsUpdate = false;
+                if (!$setting || $setting->updated_at < now()->subDays(3)) {
+                    $leverageNeedsUpdate = true;
+                }
+
+                if ($leverageNeedsUpdate) {
+                    // Fetch max leverage and set it on exchange
+                    $maxLeverage = $exchangeService->getMaxLeverage($symbol);
+                    
+                    try {
+                        $exchangeService->setLeverage($symbol, $maxLeverage);
+                        // Update cache
+                        \App\Models\UserAccountSetting::setUserSetting($user->id, $leverageKey, $maxLeverage, 'decimal', $isDemo);
+                    } catch (\Exception $e) {
+                        // Ignore leverage setting errors, continue with edit
+                        Log::warning("Could not set leverage during order update for {$symbol}: " . $e->getMessage());
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Ignore leverage optimization errors, continue with edit
+            Log::warning("Leverage optimization failed during order update: " . $e->getMessage());
+        }
+
+        $pricePrec = 2;
+        try {
+            if (!$exchangeService) {
+                $exchangeService = $this->getExchangeService();
+            }
             $instruments = $exchangeService->getInstrumentsInfo($symbol);
             $inst = $instruments['list'][0] ?? null;
             if ($inst) {
@@ -990,6 +1096,41 @@ class FuturesController extends Controller
 
 
             $exchangeService = \App\Services\Exchanges\ExchangeFactory::createForUserExchange($userExchange);
+
+            // Ensure leverage is optimized before resending order
+            try {
+                $symbol = $order->symbol;
+                $isDemo = (bool)$order->is_demo;
+                $leverageKey = "leverage_{$symbol}_{$userExchange->id}";
+                
+                // Check cache with expiration (3 days)
+                $setting = \App\Models\UserAccountSetting::where('user_id', $user->id)
+                    ->where('key', $leverageKey)
+                    ->where('is_demo', $isDemo)
+                    ->first();
+                    
+                $leverageNeedsUpdate = false;
+                if (!$setting || $setting->updated_at < now()->subDays(3)) {
+                    $leverageNeedsUpdate = true;
+                }
+
+                if ($leverageNeedsUpdate) {
+                    // Fetch max leverage and set it on exchange
+                    $maxLeverage = $exchangeService->getMaxLeverage($symbol);
+                    
+                    try {
+                        $exchangeService->setLeverage($symbol, $maxLeverage);
+                        // Update cache
+                        \App\Models\UserAccountSetting::setUserSetting($user->id, $leverageKey, $maxLeverage, 'decimal', $isDemo);
+                    } catch (\Exception $e) {
+                        // Ignore leverage setting errors, continue with resend
+                        Log::warning("Could not set leverage during order resend for {$symbol}: " . $e->getMessage());
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore leverage optimization errors, continue with resend
+                Log::warning("Leverage optimization failed during order resend: " . $e->getMessage());
+            }
 
             // Validate market vs entry consistency
             try {
@@ -1853,7 +1994,9 @@ class FuturesController extends Controller
         try {
             // Determine timeframe: query param or user default, allowed list
             $allowedTfs = ['1m','5m','15m','1h','4h'];
-            $userDefaultTf = \App\Models\UserAccountSetting::getUserSetting($user->id, 'default_timeframe', '15m');
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+            $userDefaultTf = \App\Models\UserAccountSetting::getUserSetting($user->id, 'default_timeframe', '15m', $isDemo);
             $tfRequested = strtolower((string)$request->query('tf', $userDefaultTf));
             $timeframe = in_array($tfRequested, $allowedTfs, true) ? $tfRequested : '15m';
 

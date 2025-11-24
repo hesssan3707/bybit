@@ -16,6 +16,11 @@ class UserAccountSetting extends Model
         'key',
         'value',
         'type',
+        'is_demo',
+    ];
+
+    protected $casts = [
+        'is_demo' => 'boolean',
     ];
 
     /**
@@ -29,10 +34,11 @@ class UserAccountSetting extends Model
     /**
      * Get a specific setting value for a user
      */
-    public static function getUserSetting($userId, $key, $default = null)
+    public static function getUserSetting($userId, $key, $default = null, $isDemo = false)
     {
         $setting = static::where('user_id', $userId)
                          ->where('key', $key)
+                         ->where('is_demo', $isDemo)
                          ->first();
 
         if (!$setting) {
@@ -45,17 +51,18 @@ class UserAccountSetting extends Model
     /**
      * Set a setting value for a user
      */
-    public static function setUserSetting($userId, $key, $value, $type = 'string')
+    public static function setUserSetting($userId, $key, $value, $type = 'string', $isDemo = false)
     {
         // If value is null, remove the setting entirely
         if ($value === null) {
             return static::where('user_id', $userId)
                          ->where('key', $key)
+                         ->where('is_demo', $isDemo)
                          ->delete();
         }
 
         return static::updateOrCreate(
-            ['user_id' => $userId, 'key' => $key],
+            ['user_id' => $userId, 'key' => $key, 'is_demo' => $isDemo],
             ['value' => $value, 'type' => $type]
         );
     }
@@ -63,9 +70,11 @@ class UserAccountSetting extends Model
     /**
      * Get all settings for a user as an associative array
      */
-    public static function getUserSettings($userId)
+    public static function getUserSettings($userId, $isDemo = false)
     {
-        $settings = static::where('user_id', $userId)->get();
+        $settings = static::where('user_id', $userId)
+                          ->where('is_demo', $isDemo)
+                          ->get();
         $result = [];
 
         foreach ($settings as $setting) {
@@ -97,31 +106,31 @@ class UserAccountSetting extends Model
     /**
      * Get default risk setting for user
      */
-    public static function getDefaultRisk($userId)
+    public static function getDefaultRisk($userId, $isDemo = false)
     {
-        return static::getUserSetting($userId, 'default_risk', null);
+        return static::getUserSetting($userId, 'default_risk', null, $isDemo);
     }
 
     /**
      * Get default future order steps setting for user
      */
-    public static function getDefaultFutureOrderSteps($userId)
+    public static function getDefaultFutureOrderSteps($userId, $isDemo = false)
     {
-        return static::getUserSetting($userId, 'default_future_order_steps', null);
+        return static::getUserSetting($userId, 'default_future_order_steps', null, $isDemo);
     }
     /**
      * Get default expiration time setting for user
      */
-    public static function getDefaultExpirationTime($userId)
+    public static function getDefaultExpirationTime($userId, $isDemo = false)
     {
-        return static::getUserSetting($userId, 'default_expiration_time', null);
+        return static::getUserSetting($userId, 'default_expiration_time', null, $isDemo);
     }
 
 
     /**
      * Set default risk with strict mode validation
      */
-    public static function setDefaultRisk($userId, $risk)
+    public static function setDefaultRisk($userId, $risk, $isDemo = false)
     {
         // If risk is null, we're removing the default value, no validation needed
         if ($risk !== null) {
@@ -133,32 +142,32 @@ class UserAccountSetting extends Model
             }
         }
 
-        return static::setUserSetting($userId, 'default_risk', $risk, 'decimal');
+        return static::setUserSetting($userId, 'default_risk', $risk, 'decimal', $isDemo);
     }
 
     /**
      * Set default expiration time
      */
-    public static function setDefaultFutureOrderSteps($userId, $steps)
+    public static function setDefaultFutureOrderSteps($userId, $steps, $isDemo = false)
     {
-        return static::setUserSetting($userId, 'default_future_order_steps', $steps, 'integer');
+        return static::setUserSetting($userId, 'default_future_order_steps', $steps, 'integer', $isDemo);
     }
 
     /**
      * Set default expiration time
      */
-    public static function setDefaultExpirationTime($userId, $minutes)
+    public static function setDefaultExpirationTime($userId, $minutes, $isDemo = false)
     {
-        return static::setUserSetting($userId, 'default_expiration_time', $minutes, 'integer');
+        return static::setUserSetting($userId, 'default_expiration_time', $minutes, 'integer', $isDemo);
     }
 
     /**
      * Get minimum RR ratio for strict mode (loss:profit minima, e.g., "3:1")
      */
-    public static function getMinRrRatio($userId)
+    public static function getMinRrRatio($userId, $isDemo = false)
     {
         // Default to 3:1 (ضرر سه برابر سود)
-        $val = static::getUserSetting($userId, 'min_rr_ratio', '3:1');
+        $val = static::getUserSetting($userId, 'min_rr_ratio', '3:1', $isDemo);
         // Normalize any previously stored reversed values to standard loss:profit minima
         $map = [
             '1:3' => '3:1',
@@ -173,13 +182,13 @@ class UserAccountSetting extends Model
     /**
      * Set minimum RR ratio for strict mode (allowed: 3:1, 2:1, 1:1, 1:2)
      */
-    public static function setMinRrRatio($userId, $ratio)
+    public static function setMinRrRatio($userId, $ratio, $isDemo = false)
     {
         $allowed = ['3:1', '2:1', '1:1', '1:2'];
         if (!in_array($ratio, $allowed, true)) {
             throw new \InvalidArgumentException('نسبت RR نامعتبر است. از گزینه‌های 3:1، 2:1، 1:1 یا 1:2 استفاده کنید.');
         }
 
-        return static::setUserSetting($userId, 'min_rr_ratio', $ratio, 'string');
+        return static::setUserSetting($userId, 'min_rr_ratio', $ratio, 'string', $isDemo);
     }
 }
