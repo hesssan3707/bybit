@@ -350,9 +350,6 @@
     </div>
 
     @if(isset($companyRequests) && $companyRequests->count() > 0)
-        <div class="exchanges-header" style="margin-top: 10px;">
-            <h3>درخواست‌های صرافی شرکت</h3>
-        </div>
         @foreach($companyRequests as $req)
             <div class="exchange-card" style="--exchange-color: {{ $req->exchange_color }}">
                 <div class="exchange-header">
