@@ -806,7 +806,7 @@ class DemoFuturesLifecycleManager extends Command
                                     'trade_id' => $trade->id,
                                     'ban_type' => 'single_loss',
                                     'starts_at' => now(),
-                                    'ends_at' => now()->addHour(),
+                                    'ends_at' => now()->addHours(1),
                                 ]);
                             }
 
@@ -834,13 +834,15 @@ class DemoFuturesLifecycleManager extends Command
                                         'trade_id' => $trade->id,
                                         'ban_type' => 'double_loss',
                                         'starts_at' => now(),
-                                        'ends_at' => now()->addDay(),
+                                        'ends_at' => now()->addDays(1),
                                     ]);
                                 }
                             }
                         }
                     } catch (\Throwable $e) {
-                        // ignore ban creation issues in demo flow
+                        // Log ban creation errors for demo as well
+                        $this->error("[Demo][Ban] خطا در ایجاد محرومیت: " . $e->getMessage());
+                        $this->error("[Demo][Ban] Stack trace: " . $e->getTraceAsString());
                     }
                 }
             }

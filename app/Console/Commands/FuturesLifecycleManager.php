@@ -804,6 +804,7 @@ class FuturesLifecycleManager extends Command
                         $trade->synchronized = 2; // mark as unverified sync
                     }
                     $trade->save();
+                    
                     // Create bans based on closure outcomes
                     try {
                         $userId = $userExchange->user_id;
@@ -848,7 +849,7 @@ class FuturesLifecycleManager extends Command
                                     'trade_id' => $trade->id,
                                     'ban_type' => 'single_loss',
                                     'starts_at' => now(),
-                                    'ends_at' => now()->addHour(),
+                                    'ends_at' => now()->addHours(1),
                                 ]);
                             }
 
@@ -876,13 +877,15 @@ class FuturesLifecycleManager extends Command
                                         'trade_id' => $trade->id,
                                         'ban_type' => 'double_loss',
                                         'starts_at' => now(),
-                                        'ends_at' => now()->addDay(),
+                                        'ends_at' => now()->addDays(1),
                                     ]);
                                 }
                             }
                         }
                     } catch (\Throwable $e) {
-                        // Do not fail lifecycle flow due to ban creation issues
+                        // Log ban creation errors but don't fail the entire lifecycle
+                        $this->error("[Ban] خطا در ایجاد محرومیت: " . $e->getMessage());
+                        $this->error("[Ban] Stack trace: " . $e->getTraceAsString());
                     }
                 }
             }

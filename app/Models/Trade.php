@@ -61,6 +61,14 @@ class Trade extends Model
     }
 
     /**
+     * Get the bans associated with this trade
+     */
+    public function bans()
+    {
+        return $this->hasMany(UserBan::class, 'trade_id');
+    }
+
+    /**
      * Scope a query to only include trades for a specific user exchange
      */
     public function scopeForUserExchange($query, $userExchangeId)
