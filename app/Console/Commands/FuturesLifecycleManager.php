@@ -203,6 +203,9 @@ class FuturesLifecycleManager extends Command
                     if (in_array($newStatus, ['filled','canceled', 'expired', 'closed'])) {
                         $order->closed_at = now();
                     }
+                    if ($newStatus === 'filled') {
+                        $order->filled_at = now();
+                    }
                     $order->save();
                     $this->info("وضعیت سفارش {$orderId} به {$newStatus} تغییر یافت");
 

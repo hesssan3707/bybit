@@ -61,12 +61,13 @@ class CollectMissingCandleDataCommand extends Command
                 }
 
                 // Dispatch job
-                CollectOrderCandlesJob::dispatch($trade->id);
+                $job = new CollectOrderCandlesJob($trade->id);
+                $job->handle();
                 $dispatched++;
                 
-                $this->info("  ✓ Job برای معامله {$trade->id} (سفارش {$order->order_id}) dispatch شد");
+                $this->info("  ✓ پردازش کندل برای معامله {$trade->id} (سفارش {$order->order_id}) انجام شد");
             } catch (\Throwable $e) {
-                $this->error("  ✗ خطا در dispatch برای معامله {$trade->id}: " . $e->getMessage());
+                $this->error("  ✗ خطا در پردازش برای معامله {$trade->id}: " . $e->getMessage());
                 Log::error('Failed to dispatch CollectOrderCandlesJob', [
                     'trade_id' => $trade->id,
                     'error' => $e->getMessage()

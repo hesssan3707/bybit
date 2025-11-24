@@ -42,7 +42,7 @@ class CollectOrderCandlesJob implements ShouldQueue
 
             // Find the related Order by exchange order_id and user_exchange_id
             $order = Order::where('user_exchange_id', $trade->user_exchange_id)
-                ->where('is_demo', (bool)$userExchange->is_demo_active)
+                ->where('is_demo', (bool)$trade->is_demo)
                 ->where('order_id', $trade->order_id)
                 ->first();
 
@@ -67,7 +67,8 @@ class CollectOrderCandlesJob implements ShouldQueue
             $exchangeService = null;
             $exchangeName = strtolower((string)($userExchange->exchange_name ?? 'bybit'));
 
-            $exchangeService = ExchangeFactory::createForUserExchange($userExchange);
+            $credentialType = $trade->is_demo ? 'demo' : 'real';
+            $exchangeService = ExchangeFactory::createForUserExchangeWithCredentialType($userExchange, $credentialType);
             if (!method_exists($exchangeService, 'getKlines')) { return; }
             $exchangeName = method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : $exchangeName;
 
@@ -152,13 +153,25 @@ class CollectOrderCandlesJob implements ShouldQueue
         if ($name === 'bybit') {
             $list = $raw['result']['list'] ?? $raw['result'] ?? $raw['list'] ?? [];
             foreach ($list as $c) {
-                $candles[] = [
-                    'time' => (int)floor(($c['start'] ?? $c['startTime'] ?? $c['openTime'] ?? $c['t'] ?? 0) / 1000),
-                    'open' => (float)($c['open'] ?? $c['o'] ?? 0),
-                    'high' => (float)($c['high'] ?? $c['h'] ?? 0),
-                    'low'  => (float)($c['low']  ?? $c['l'] ?? 0),
-                    'close'=> (float)($c['close']?? $c['c'] ?? 0),
-                ];
+                // Bybit V5 returns [startTime, open, high, low, close, volume, turnover]
+                if (is_array($c) && isset($c[0])) {
+                    $candles[] = [
+                        'time' => (int)floor($c[0] / 1000),
+                        'open' => (float)$c[1],
+                        'high' => (float)$c[2],
+                        'low'  => (float)$c[3],
+                        'close'=> (float)$c[4],
+                    ];
+                } else {
+                    // Fallback for object/associative array format
+                    $candles[] = [
+                        'time' => (int)floor(($c['start'] ?? $c['startTime'] ?? $c['openTime'] ?? $c['t'] ?? 0) / 1000),
+                        'open' => (float)($c['open'] ?? $c['o'] ?? 0),
+                        'high' => (float)($c['high'] ?? $c['h'] ?? 0),
+                        'low'  => (float)($c['low']  ?? $c['l'] ?? 0),
+                        'close'=> (float)($c['close']?? $c['c'] ?? 0),
+                    ];
+                }
             }
         } elseif ($name === 'binance') {
             $list = $raw['data'] ?? $raw['result'] ?? $raw ?? [];
