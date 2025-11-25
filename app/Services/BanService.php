@@ -41,19 +41,13 @@ class BanService
 
     /**
      * Check if user should be banned for exchange force close (manual close on exchange)
-     * Ban duration: 3 days
+     * Ban duration: 3 days (72 hours) from trade close time
      */
     private function checkExchangeForceCloseBan(Trade $trade, int $userId, bool $isDemo): void
     {
         $order = $trade->order;
         
-        // Debug logging
-        Log::info("[BanService] Checking exchange force close for trade {$trade->id}");
-        Log::info("[BanService] Order exists: " . ($order ? 'YES' : 'NO'));
-        Log::info("[BanService] Avg exit price: " . ($trade->avg_exit_price ?? 'NULL'));
-        
         if (!$order || !$trade->avg_exit_price) {
-            Log::info("[BanService] Skipping - no order or no exit price");
             return;
         }
 
@@ -64,54 +58,34 @@ class BanService
         $tpDelta = isset($tp) ? abs(((float)$tp - $exit) / $exit) : null;
         $slDelta = isset($sl) ? abs(((float)$sl - $exit) / $exit) : null;
 
-        // Detailed debug logging
-        Log::info("[BanService] Trade {$trade->id} details:");
-        Log::info("  Exit Price: $exit");
-        Log::info("  TP: " . ($tp ?? 'NULL') . " (Delta: " . ($tpDelta ?? 'NULL') . ")");
-        Log::info("  SL: " . ($sl ?? 'NULL') . " (Delta: " . ($slDelta ?? 'NULL') . ")");
-        Log::info("  Closed At: " . ($trade->closed_at ?? 'NULL'));
-        Log::info("  Closed By User: " . ($trade->closed_by_user ?? 'NULL'));
-
-        // Check all conditions
-        $closedAtNotNull = $trade->closed_at !== null;
-        $notClosedByUser = ((int)($trade->closed_by_user ?? 0)) !== 1;
-        $deltasNotNull = $tpDelta !== null && $slDelta !== null;
-        $deltasFarEnough = $tpDelta > 0.002 && $slDelta > 0.002;
-
-        Log::info("[BanService] Condition checks:");
-        Log::info("  Closed at not null: " . ($closedAtNotNull ? 'YES' : 'NO'));
-        Log::info("  Not closed by user: " . ($notClosedByUser ? 'YES' : 'NO'));
-        Log::info("  Deltas not null: " . ($deltasNotNull ? 'YES' : 'NO'));
-        Log::info("  Deltas far enough (>0.2%): " . ($deltasFarEnough ? 'YES' : 'NO'));
-
-        if ($closedAtNotNull && $notClosedByUser && $deltasNotNull && $deltasFarEnough) {
+        if ($trade->closed_at !== null
+            && ((int)($trade->closed_by_user ?? 0)) !== 1
+            && $tpDelta !== null && $slDelta !== null
+            && $tpDelta > 0.002 && $slDelta > 0.002) {
+            
             $exists = UserBan::active()
                 ->forUser($userId)
                 ->accountType($isDemo)
                 ->where('ban_type', 'exchange_force_close')
                 ->exists();
 
-            Log::info("[BanService] Active ban already exists: " . ($exists ? 'YES' : 'NO'));
-
             if (!$exists) {
+                $closedAt = \Carbon\Carbon::parse($trade->closed_at);
                 UserBan::create([
                     'user_id' => $userId,
                     'is_demo' => $isDemo,
                     'trade_id' => $trade->id,
                     'ban_type' => 'exchange_force_close',
-                    'starts_at' => now(),
-                    'ends_at' => now()->addDays(3),
+                    'starts_at' => $closedAt,
+                    'ends_at' => $closedAt->copy()->addHours(72),
                 ]);
-                Log::info("[BanService] ✅ Created exchange_force_close ban for user {$userId}");
             }
-        } else {
-            Log::info("[BanService] ❌ Conditions not met - no ban created");
         }
     }
 
     /**
      * Check if user should be banned for single loss
-     * Ban duration: 1 hour
+     * Ban duration: 1 hour from trade close time
      */
     private function checkSingleLossBan(Trade $trade, int $userId, bool $isDemo): void
     {
@@ -120,21 +94,21 @@ class BanService
             ->exists();
 
         if (!$exists) {
+            $closedAt = \Carbon\Carbon::parse($trade->closed_at);
             UserBan::create([
                 'user_id' => $userId,
                 'is_demo' => $isDemo,
                 'trade_id' => $trade->id,
                 'ban_type' => 'single_loss',
-                'starts_at' => now(),
-                'ends_at' => now()->addHours(1),
+                'starts_at' => $closedAt,
+                'ends_at' => $closedAt->copy()->addHours(1),
             ]);
-            Log::info("[BanService] ✅ Created single_loss ban for user {$userId}");
         }
     }
 
     /**
      * Check if user should be banned for two consecutive losses
-     * Ban duration: 24 hours
+     * Ban duration: 24 hours from second trade's close time
      */
     private function checkDoubleLossBan(Trade $trade, UserExchange $userExchange, int $userId, bool $isDemo): void
     {
@@ -158,16 +132,124 @@ class BanService
                 ->exists();
 
             if (!$hasActiveDouble) {
+                // Ban starts from the second (most recent) trade's closing time
+                $closedAt = \Carbon\Carbon::parse($trade->closed_at);
                 UserBan::create([
                     'user_id' => $userId,
                     'is_demo' => $isDemo,
                     'trade_id' => $trade->id,
                     'ban_type' => 'double_loss',
-                    'starts_at' => now(),
-                    'ends_at' => now()->addDays(1),
+                    'starts_at' => $closedAt,
+                    'ends_at' => $closedAt->copy()->addHours(24),
                 ]);
-                Log::info("[BanService] ✅ Created double_loss ban for user {$userId}");
             }
         }
+    }
+
+    /**
+     * Proactively check and create bans based on user's trading history
+     * This is called when user tries to create/submit an order
+     * 
+     * @param int $userId
+     * @param bool $isDemo
+     * @return void
+     */
+    public function checkAndCreateHistoricalBans(int $userId, bool $isDemo): void
+    {
+        try {
+            // Get user's active exchange
+            $userExchange = \App\Models\UserExchange::where('user_id', $userId)
+                ->where('is_demo_active', $isDemo)
+                ->first();
+
+            if (!$userExchange) {
+                return;
+            }
+
+            // Fetch only last 2 synchronized closed trades in a single query
+            $recentTrades = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', $isDemo)
+                ->where('synchronized', 1)
+                ->whereNotNull('closed_at')
+                ->orderBy('closed_at', 'desc')
+                ->limit(2)
+                ->get();
+
+            if ($recentTrades->isEmpty()) {
+                return;
+            }
+
+            $lastTrade = $recentTrades->first();
+
+            // Check single loss ban (only if loss happened within last hour)
+            if ($lastTrade->pnl !== null && (float)$lastTrade->pnl < 0) {
+                $hoursSinceClosed = now()->diffInHours($lastTrade->closed_at);
+                if ($hoursSinceClosed < 1) {
+                    $this->checkSingleLossBan($lastTrade, $userId, $isDemo);
+                }
+            }
+
+            // Check exchange force close ban (only most recent trade)
+            $this->checkExchangeForceCloseBan($lastTrade, $userId, $isDemo);
+
+            // Check double loss ban (consecutive losses within 24 hours)
+            if ($recentTrades->count() >= 2) {
+                $secondTrade = $recentTrades->get(1);
+                
+                // Both must be losses
+                if ($lastTrade->pnl !== null && (float)$lastTrade->pnl < 0 &&
+                    $secondTrade->pnl !== null && (float)$secondTrade->pnl < 0) {
+                    
+                    // Both must be within last 24 hours
+                    $firstWithin24h = now()->diffInHours($lastTrade->closed_at) < 24;
+                    $secondWithin24h = now()->diffInHours($secondTrade->closed_at) < 24;
+                    
+                    if ($firstWithin24h && $secondWithin24h) {
+                        $this->checkDoubleLossBan($lastTrade, $userExchange, $userId, $isDemo);
+                    }
+                }
+            }
+
+        } catch (\Throwable $e) {
+            Log::error("[BanService] Error in proactive ban checking for user {$userId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get Persian ban message with remaining time
+     * 
+     * @param \App\Models\UserBan $ban
+     * @return string
+     */
+    public static function getPersianBanMessage(\App\Models\UserBan $ban): string
+    {
+        $reasonMap = [
+            'single_loss' => 'ضرر در یک معامله',
+            'double_loss' => 'دو ضرر متوالی',
+            'exchange_force_close' => 'بستن اجباری سفارش توسط صرافی',
+        ];
+
+        $reason = $reasonMap[$ban->ban_type] ?? 'دلیل نامشخص';
+        $remainingSeconds = max(0, $ban->ends_at->diffInSeconds(now()));
+        
+        // Calculate days, hours, minutes
+        $days = floor($remainingSeconds / 86400);
+        $hours = floor(($remainingSeconds % 86400) / 3600);
+        $minutes = floor(($remainingSeconds % 3600) / 60);
+
+        $timeParts = [];
+        if ($days > 0) {
+            $timeParts[] = $days . ' روز';
+        }
+        if ($hours > 0) {
+            $timeParts[] = $hours . ' ساعت';
+        }
+        if ($minutes > 0 || empty($timeParts)) {
+            $timeParts[] = $minutes . ' دقیقه';
+        }
+
+        $timeRemaining = implode(' و ', $timeParts);
+
+        return "به دلیل {$reason}، شما تا {$timeRemaining} دیگر امکان ثبت سفارش جدید را ندارید.";
     }
 }

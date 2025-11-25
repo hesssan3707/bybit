@@ -265,18 +265,47 @@ class FuturesController extends Controller
         // Compute active opening-ban for UI (independent of strict mode)
         $activeBan = null;
         $banRemainingSeconds = null;
+        $banMessage = null;
         try {
             if ($user && ($user->future_strict_mode ?? false)) {
                 $currentExchange = $user->currentExchange ?? $user->defaultExchange;
                 $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
+                
+                // First, quick check for existing active ban
                 $activeBan = UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
                     ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
+                
+                // Only run heavy ban detection if:
+                // 1. User doesn't already have a ban AND
+                // 2. User has closed trades within last 5 minutes
+                if (!$activeBan && $currentExchange) {
+                    $hasRecentClosedTrades = Trade::where('user_exchange_id', $currentExchange->id)
+                        ->where('is_demo', $isDemo)
+                        ->whereNotNull('closed_at')
+                        ->where('closed_at', '>=', now()->subMinutes(5))
+                        ->exists();
+                    
+                    if ($hasRecentClosedTrades) {
+                        $banService = new \App\Services\BanService();
+                        $banService->checkAndCreateHistoricalBans($user->id, $isDemo);
+                        
+                        // Check again after creating bans
+                        $activeBan = UserBan::active()
+                            ->forUser($user->id)
+                            ->accountType($isDemo)
+                            ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                            ->orderBy('ends_at', 'desc')
+                            ->first();
+                    }
+                }
+                
                 if ($activeBan) {
                     $banRemainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
+                    $banMessage = \App\Services\BanService::getPersianBanMessage($activeBan);
                 }
             }
         } catch (\Throwable $e) {
@@ -296,6 +325,7 @@ class FuturesController extends Controller
             'currentSymbol' => $symbol, // Pass the current symbol for proper price display
             'activeBan' => $activeBan,
             'banRemainingSeconds' => $banRemainingSeconds,
+            'banMessage' => $banMessage,
         ]);
     }
 

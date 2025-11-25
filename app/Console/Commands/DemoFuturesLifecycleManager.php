@@ -169,6 +169,9 @@ class DemoFuturesLifecycleManager extends Command
         }
         // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
         $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
+        
+        // بررسی بن‌ها بر اساس معاملات اخیراً بسته شده (مستقل از همگام‌سازی)
+        $this->checkRecentTradesForBans($userExchange);
     }
 
     /**
@@ -666,7 +669,6 @@ class DemoFuturesLifecycleManager extends Command
     private function verifyClosedTradesSynchronization($exchangeService, UserExchange $userExchange): void
     {
 
-
         try {
             $trades = Trade::where('user_exchange_id', $userExchange->id)
                 ->where('is_demo', true)
@@ -697,7 +699,13 @@ class DemoFuturesLifecycleManager extends Command
                     $epsilonQty = 1e-8;
                     $epsilonPrice = 1e-6;
 
-                    // 1) Direct match by orderId or exact fields
+                    if (!$trade->order || !$trade->avg_entry_price || !$trade->qty) {
+                        $trade->synchronized = 2;
+                        $trade->save();
+                        continue;
+                    }
+
+                    // 1) Direct match by orderId or exact fields (ORIGINAL - KEEP THIS)
                     foreach ($records as $c) {
                         $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
                         $fieldsMatch = isset($c['qty'], $c['avgEntryPrice'])
@@ -706,7 +714,7 @@ class DemoFuturesLifecycleManager extends Command
                         if ($idMatch || $fieldsMatch) { $matched = [$c]; break; }
                     }
 
-                    // 2) If not matched, try multi-record match (split closures)
+                    // 2) If not matched, try multi-record match for split closures (IMPROVED)
                     if (!$matched) {
                         $cands = array_values(array_filter($records, function($c) use ($trade, $epsilonPrice) {
                             if (!isset($c['avgEntryPrice'], $c['qty'])) { return false; }
@@ -765,14 +773,39 @@ class DemoFuturesLifecycleManager extends Command
                         $trade->synchronized = 2; // mark as unverified sync
                     }
                     $trade->save();
-
-                    // Create bans based on closure outcomes (demo)
-                    $banService = new BanService();
-                    $banService->processTradeBans($trade);
                 }
             }
         } catch (\Exception $e) {
             $this->warn("[Demo] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check for bans on recently closed trades (within last 5 minutes)
+     * This runs independently of trade synchronization
+     */
+    private function checkRecentTradesForBans(UserExchange $userExchange): void
+    {
+        try {
+            // Get all trades closed within last 5 minutes (regardless of sync status)
+            $recentlyClosedTrades = Trade::where('user_exchange_id', $userExchange->id)
+                ->where('is_demo', true)
+                ->whereNotNull('closed_at')
+                ->where('closed_at', '>=', now()->subMinutes(5))
+                ->get();
+
+            if ($recentlyClosedTrades->isEmpty()) {
+                return;
+            }
+
+            // Process each recently closed trade for ban detection
+            $banService = new \App\Services\BanService();
+            foreach ($recentlyClosedTrades as $trade) {
+                $banService->processTradeBans($trade);
+            }
+
+        } catch (\Exception $e) {
+            $this->warn("[Demo] خطا در بررسی بن‌های اخیر: " . $e->getMessage());
         }
     }
 }

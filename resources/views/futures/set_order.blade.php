@@ -210,12 +210,10 @@
             $initialCountdownText = $days > 0
                 ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
                 : sprintf('%02d : %02d', $hrs, $mins);
-            $banRemainingFa = ($days > 0 ? ($days . ' روز') . ' و ' : '') . ($hrs . ' ساعت') . ' و ' . ($mins . ' دقیقه');
         @endphp
         <div class="alert alert-warning" id="ban-alert">
-            مدیریت ریسک فعال است. لطفاً تا
+            {{ $banMessage ?? 'مدیریت ریسک فعال است.' }}
             <span id="ban-countdown">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
-            دیگر (حدود {{ $banRemainingFa }}) برای ثبت سفارش صبر کنید.
         </div>
     @endif
 
