@@ -860,126 +860,193 @@ class FuturesController extends Controller
             $validated['entry2'] = $validated['entry1'];
         }
 
-        // Strict mode: keep symbol unchanged; only validate if user's selected market conflicts
-        if ($user->future_strict_mode && $user->selected_market) {
-            // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
-        }
+        // Lock the order to prevent race conditions with enforcer
+        $order->is_locked = true;
+        $order->save();
 
-        // Ensure leverage is optimized before updating order
-        $exchangeService = null;
         try {
-            $exchangeService = $this->getExchangeService();
-            $symbol = $order->symbol;
-            $isDemo = (bool)$order->is_demo;
-            
-            $userExchange = $order->userExchange;
-            if ($userExchange) {
-                $leverageKey = "leverage_{$symbol}_{$userExchange->id}";
+            // Strict mode: keep symbol unchanged; only validate if user's selected market conflicts
+            if ($user->future_strict_mode && $user->selected_market) {
+                // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
+            }
+
+            // Ensure leverage is optimized before updating order
+            $exchangeService = null;
+            try {
+                $exchangeService = $this->getExchangeService();
+                $symbol = $order->symbol;
+                $isDemo = (bool)$order->is_demo;
                 
-                // Check cache with expiration (3 days)
+                $userExchange = $order->userExchange;
+                if ($userExchange) {
+                    $leverageKey = "leverage_{$symbol}_{$userExchange->id}";
+                    
+                    // Check cache with expiration (3 days)
+                    $setting = \App\Models\UserAccountSetting::where('user_id', $user->id)
+                        ->where('key', $leverageKey)
+                        ->where('is_demo', $isDemo)
+                        ->first();
+                        
+                    $leverageNeedsUpdate = false;
+                    if (!$setting || $setting->updated_at < now()->subDays(3)) {
+                        $leverageNeedsUpdate = true;
+                    }
+
+                    if ($leverageNeedsUpdate) {
+                        // Fetch max leverage and set it on exchange
+                        $maxLeverage = $exchangeService->getMaxLeverage($symbol);
+                        
+                        try {
+                            $exchangeService->setLeverage($symbol, $maxLeverage);
+                            // Update cache
+                            \App\Models\UserAccountSetting::setUserSetting($user->id, $leverageKey, $maxLeverage, 'decimal', $isDemo);
+                        } catch (\Exception $e) {
+                            // Ignore leverage setting errors, continue with edit
+                            Log::warning("Could not set leverage during order update for {$symbol}: " . $e->getMessage());
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore leverage optimization errors, continue with edit
+                Log::warning("Leverage optimization failed during order update: " . $e->getMessage());
+            }
+
+            if (!$exchangeService) {
+                $exchangeService = $this->getExchangeService();
+            }
+
+            // Get Instrument Info for precision and quantity steps
+            $instruments = $exchangeService->getInstrumentsInfo($symbol);
+            $inst = null;
+            if (isset($instruments['list'])) {
+                foreach ($instruments['list'] as $i) {
+                    if ($i['symbol'] === $symbol) {
+                        $inst = $i;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$inst) {
+                 throw new \Exception("اطلاعات نماد {$symbol} یافت نشد.");
+            }
+
+            $pricePrec = (int) $inst['priceScale'];
+            $qtyStep = (float) $inst['lotSizeFilter']['qtyStep'];
+            $minQty = (float) $inst['lotSizeFilter']['minOrderQty'];
+            
+            $qtyStepStr = (string) $qtyStep;
+            $amountPrec = (strpos($qtyStepStr, '.') !== false) ? strlen(substr($qtyStepStr, strpos($qtyStepStr, '.') + 1)) : 0;
+
+            $newEntryPrice = round((float)$validated['entry1'], $pricePrec);
+            $newSl = round((float)$validated['sl'], $pricePrec);
+            $newTp = round((float)$validated['tp'], $pricePrec);
+
+            // Recalculate Volume
+            $riskPercentage = isset($validated['risk_percentage']) ? (float)$validated['risk_percentage'] : (float)$order->initial_risk_percent;
+            $capitalUSD = (float)$order->balance_at_creation;
+            if ($capitalUSD <= 0) {
+                $capitalUSD = $this->resolveCapitalUSD($exchangeService);
+            }
+
+            $maxLossUSD = $capitalUSD * ($riskPercentage / 100.0);
+            $avgEntry = $newEntryPrice; // For single order edit, entry is entry1
+            $slDistance = abs($avgEntry - $newSl);
+            
+            if ($slDistance <= 0) {
+                throw new \Exception('حد ضرر نمی‌تواند برابر با قیمت ورود باشد.');
+            }
+
+            $originalAmount = $maxLossUSD / $slDistance;
+            
+            // Resolve leverage for downsizing check
+            $leverage = null;
+            try {
+                $leverageKey = "leverage_{$symbol}_{$order->user_exchange_id}";
                 $setting = \App\Models\UserAccountSetting::where('user_id', $user->id)
                     ->where('key', $leverageKey)
                     ->where('is_demo', $isDemo)
                     ->first();
-                    
-                $leverageNeedsUpdate = false;
-                if (!$setting || $setting->updated_at < now()->subDays(3)) {
-                    $leverageNeedsUpdate = true;
+                if ($setting) {
+                    $leverage = (float)$setting->value;
                 }
+            } catch (\Exception $e) {}
 
-                if ($leverageNeedsUpdate) {
-                    // Fetch max leverage and set it on exchange
-                    $maxLeverage = $exchangeService->getMaxLeverage($symbol);
+            // Downsize if needed
+            $maxAffordableQtyTotal = $originalAmount;
+            if ($leverage && $avgEntry > 0) {
+                $maxAffordableQtyTotal = ($capitalUSD * $leverage) / $avgEntry;
+            }
+            
+            $amount = ($leverage && $originalAmount > $maxAffordableQtyTotal) ? $maxAffordableQtyTotal : $originalAmount;
+            
+            $finalQty = $this->calculateOrderQuantity($amount, $qtyStep, $amountPrec);
+            
+            if ($finalQty < $minQty) {
+                 throw new \Exception("مقدار سفارش ({$finalQty}) کمتر از حداقل مجاز ({$minQty}) است.");
+            }
+
+            $params = [
+                'symbol' => $symbol,
+                'orderId' => $order->order_id,
+                'qty' => (string)$finalQty,
+            ];
+
+            if ($newEntryPrice != $order->entry_price) {
+                $params['price'] = (string)$newEntryPrice;
+            }
+            if ($newSl != $order->sl) {
+                $params['stopLoss'] = (string)$newSl;
+            }
+            if ($newTp != $order->tp) {
+                $params['takeProfit'] = (string)$newTp;
+            }
+
+            try {
+                DB::beginTransaction();
+
+                if (count($params) > 2) {
+                    $result = $exchangeService->amendOrder($params);
                     
-                    try {
-                        $exchangeService->setLeverage($symbol, $maxLeverage);
-                        // Update cache
-                        \App\Models\UserAccountSetting::setUserSetting($user->id, $leverageKey, $maxLeverage, 'decimal', $isDemo);
-                    } catch (\Exception $e) {
-                        // Ignore leverage setting errors, continue with edit
-                        Log::warning("Could not set leverage during order update for {$symbol}: " . $e->getMessage());
+                    // Check if orderId changed (BingX Cancel-Replace)
+                    if (isset($result['orderId']) && $result['orderId'] != $order->order_id) {
+                        $order->order_id = $result['orderId'];
                     }
                 }
-            }
-        } catch (\Exception $e) {
-            // Ignore leverage optimization errors, continue with edit
-            Log::warning("Leverage optimization failed during order update: " . $e->getMessage());
-        }
 
-        $pricePrec = 2;
-        try {
-            if (!$exchangeService) {
-                $exchangeService = $this->getExchangeService();
-            }
-            $instruments = $exchangeService->getInstrumentsInfo($symbol);
-            $inst = $instruments['list'][0] ?? null;
-            if ($inst) {
-                // Logic to determine precision from instrument info can be added here
-            }
-        } catch (\Exception $e) {
-            // ignore
-        }
-
-        $newEntryPrice = round((float)$validated['entry1'], $pricePrec);
-        $newSl = round((float)$validated['sl'], $pricePrec);
-        $newTp = round((float)$validated['tp'], $pricePrec);
-
-        $params = [
-            'symbol' => $symbol,
-            'orderId' => $order->order_id,
-        ];
-
-        if ($newEntryPrice != $order->entry_price) {
-            $params['price'] = (string)$newEntryPrice;
-        }
-        if ($newSl != $order->sl) {
-            $params['stopLoss'] = (string)$newSl;
-        }
-        if ($newTp != $order->tp) {
-            $params['takeProfit'] = (string)$newTp;
-        }
-
-        try {
-            DB::beginTransaction();
-
-            if (count($params) > 2) {
-                $exchangeService = $this->getExchangeService();
-                $result = $exchangeService->amendOrder($params);
+                // If successful (or no API call needed), update DB
+                $order->entry_price = $newEntryPrice;
+                $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
+                $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
+                $order->sl          = $newSl;
+                $order->tp          = $newTp;
+                $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
+                $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
+                $order->amount         = $finalQty;
+                $order->initial_risk_percent = $riskPercentage;
+                $order->is_locked      = false; // Unlock
                 
-                // Check if orderId changed (BingX Cancel-Replace)
-                if (isset($result['orderId']) && $result['orderId'] != $order->order_id) {
-                    $order->order_id = $result['orderId'];
-                }
+                $order->save();
+                
+                DB::commit();
+
+                return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e; // Re-throw to be caught by outer catch
             }
 
-            // If successful (or no API call needed), update DB
-            $order->entry_price = $newEntryPrice;
-            $order->entry_low   = min((float)$validated['entry1'], (float)$validated['entry2']);
-            $order->entry_high  = max((float)$validated['entry1'], (float)$validated['entry2']);
-            $order->sl          = $newSl;
-            $order->tp          = $newTp;
-            $order->expire_minutes = isset($validated['expire']) ? (int)$validated['expire'] : $order->expire_minutes;
-            $order->cancel_price   = isset($validated['cancel_price']) ? (float)$validated['cancel_price'] : null;
-            
-            $order->save();
-            
-            DB::commit();
-
-            return redirect()->route('futures.orders')->with('success', 'سفارش با موفقیت ویرایش شد.');
-
         } catch (\Exception $e) {
-            DB::rollBack();
+            // Unlock on error
+            $order->is_locked = false;
+            $order->save();
+
             $msg = $e->getMessage();
             // Handle Cancel-Replace failure (BingX)
             if (str_contains($msg, 'REPLACE_FAILED')) {
                 // The original order was canceled, but new one failed.
                 // We must delete the local order to stay in sync.
-                // Note: We are in a transaction that rolled back. 
-                // So the local order is still in its original state in DB (not deleted).
-                // But the exchange order is canceled!
-                // We should probably delete it now.
-                // Since we rolled back, we need to start a new transaction or just delete it.
-                // But wait, if we rolled back, the $order object is still valid.
                 try {
                     $order->delete();
                 } catch (\Throwable $t) {}

@@ -176,6 +176,7 @@ class FuturesOrderEnforcer extends Command
         $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
             ->where('status', 'pending')
+            ->where('is_locked', false)
             ->get();
 
         // Create map of exchange orders for quick lookup
@@ -574,6 +575,7 @@ class FuturesOrderEnforcer extends Command
         $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', false)
             ->where('status', 'pending')
+            ->where('is_locked', false)
             ->get();
 
         $exchangeOrdersMap = [];

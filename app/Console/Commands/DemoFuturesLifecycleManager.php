@@ -195,6 +195,10 @@ class DemoFuturesLifecycleManager extends Command
             ->whereNotIn('status', ['expired'])
             ->first();
 
+        if ($order && $order->is_locked) {
+            return;
+        }
+
         if ($order) {
             $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
             if ($order->status !== $newStatus) {

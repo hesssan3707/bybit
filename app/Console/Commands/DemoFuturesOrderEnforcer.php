@@ -175,6 +175,7 @@ class DemoFuturesOrderEnforcer extends Command
         $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->where('status', 'pending')
+            ->where('is_locked', false)
             ->get();
 
         // ساخت نقشه سفارشات صرافی برای جستجوی سریع
@@ -559,6 +560,7 @@ class DemoFuturesOrderEnforcer extends Command
         $pendingOrders = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->where('status', 'pending')
+            ->where('is_locked', false)
             ->get();
 
         $exchangeOrdersMap = [];
