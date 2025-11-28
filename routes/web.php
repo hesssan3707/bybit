@@ -347,6 +347,16 @@ Route::get('/process-queue', function () {
     return '';
 })->middleware('throttle:10');
 
+Route::get('/cleanup-sessions', function () {
+    echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #6f42c1;border-radius:5px;white-space:pre-wrap;}</style></head><body>';
+    
+    Artisan::call('sessions:cleanup-database');
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div style="text-align:center;color:#6f42c1;font-weight:bold;font-size:18px;margin-top:20px;">SESSION CLEANUP DONE</div>';
+    echo '</body></html>';
+    return '';
+})->middleware('throttle:2');
+
 
 // Non-protected utility routes if needed, but it's better to protect them.
 // For simplicity, we can leave these out for now or protect them as well.
