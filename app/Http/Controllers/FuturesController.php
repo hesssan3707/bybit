@@ -275,7 +275,7 @@ class FuturesController extends Controller
                 $activeBan = UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 
@@ -297,7 +297,7 @@ class FuturesController extends Controller
                         $activeBan = UserBan::active()
                             ->forUser($user->id)
                             ->accountType($isDemo)
-                            ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                            ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
                             ->orderBy('ends_at', 'desc')
                             ->first();
                     }
@@ -421,7 +421,7 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
@@ -477,7 +477,7 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
@@ -624,7 +624,12 @@ class FuturesController extends Controller
                         // Fetch max leverage from exchange
                         // We use max leverage to ensure user can use their full balance if they want
                         $maxLeverage = $exchangeService->getMaxLeverage($symbol);
-                        
+
+                        // If exchange is Bybit, cap leverage at 55x
+                        if ($currentExchange->exchange_name === 'bybit') {
+                            $maxLeverage = min($maxLeverage, 55);
+                        }
+
                         // Set leverage on exchange to max
                         // This ensures that if user manually reduced it, we bump it back up
                         try {

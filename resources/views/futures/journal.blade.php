@@ -78,7 +78,7 @@
     .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; margin-inline-start:8px; }
     .badge-active { background: #ffffff; color:#111; border: 1px solid rgba(0,0,0,0.25); }
     .badge-ended { background: #000000; color:#ffffff; border: 1px solid rgba(255,255,255,0.25); }
-    .badge-default { background: rgba(0,123,255,0.15); color:#0d6efd; border:1px solid rgba(0,123,255,0.35); }
+    .badge-default { background: rgba(0,123,255,0.8); color:#0d6efd; border:1px solid rgba(0,123,255,0.35); }
     /* Modern CTA button for starting period */
     .btn-start-period {
         background: linear-gradient(135deg, #007bff, #0056b3);
@@ -201,53 +201,139 @@
         'resetUrl' => route('futures.journal')
     ])
 
-    <div class="glass-card" style="margin-bottom:20px;padding:15px;border-radius:10px;background: rgba(255, 255, 255, 0.05);">
-        <div style="display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;">
-            <button type="button" class="btn btn-start-period" onclick="openStartPeriodModal()">
-                <i class="fas fa-hourglass-start" style="margin-inline-end:8px;"></i>
-                شروع دوره جدید
-            </button>
-            <form method="POST" action="{{ route('futures.periods.recompute_all') }}" style="display:inline;" id="recomputeAllForm">
-                @csrf
-                <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" style="padding:10px 18px;">
-                    <i class="fas fa-sync" style="margin-inline-end:8px;"></i>
-                    بروزرسانی همه دوره‌ها
+    <!-- Periods Management Section -->
+    <!-- Periods Management Section -->
+    <div style="margin-bottom: 25px; padding: 20px; border-radius: 16px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.05);">
+        
+        <!-- Header: Title & Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-history" style=" font-size: 1.2em;"></i>
+                </div>
+                <h3 style="margin: 0; font-size: 1.2em; font-weight: 600;">دوره‌های معاملاتی</h3>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-start-period" onclick="openStartPeriodModal()" title="شروع دوره جدید" 
+                    style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--primary-color, #ffc107); color: #000; border: none; transition: transform 0.2s;">
+                    <i class="fas fa-plus" style="font-size: 16px;"></i>
                 </button>
-            </form>
-        </div>
-        <div style="margin-top:15px;">
-            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
-                @foreach($recentPeriods->take(5) as $per)
-                    <div class="glass-card period-chip {{ ($selectedPeriod && $selectedPeriod->id === $per->id) ? 'selected' : '' }}" style="padding:10px 15px;border-radius:8px;background: rgba(255, 255, 255, 0.06); display:flex; align-items:center; gap:12px;" onclick="if(event.target.closest('form')){ return; } selectPeriod({{ $per->id }})">
-                        <span>
-                            {{ $per->name }} — {{ optional($per->started_at)->format('Y-m-d') }} تا {{ $per->ended_at ? $per->ended_at->format('Y-m-d') : 'جاری' }}
-                            @if($per->is_default)
-                                <span class="badge badge-default">پیش‌فرض</span>
-                            @endif
-                            @if($per->is_active)
-                                <span class="badge badge-active">فعال</span>
-                            @else
-                                <span class="badge badge-ended">پایان‌یافته</span>
-                            @endif
-                        </span>
-                        @if($per->is_default)
-                            <small style="color:#adb5bd;">دوره پیش‌فرض قابل پایان نیست</small>
-                        @elseif($per->is_active)
-                            <form method="POST" action="{{ route('futures.periods.end', ['period' => $per->id]) }}" style="display:inline;">
-                                @csrf
-                                <button type="submit" class="btn btn-end-period" style="padding:6px 12px;">پایان دوره</button>
-                            </form>
-                        @endif
-                    </div>
-                @endforeach
+                
+                <form method="POST" action="{{ route('futures.periods.recompute_all') }}" id="recomputeAllForm" style="margin: 0;">
+                    @csrf
+                    <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" title="بروزرسانی همه دوره‌ها" 
+                        style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;">
+                        <i class="fas fa-sync" style="font-size: 16px;"></i>
+                    </button>
+                </form>
             </div>
         </div>
+
+        <!-- Messages -->
         @if(session('success'))
-            <div class="alert alert-success" style="margin-top:10px;">{!! session('success') !!}</div>
+            <div class="alert alert-success" style="margin-bottom: 20px; border-radius: 10px; padding: 10px 15px; font-size: 0.9em;">
+                <i class="fas fa-check-circle"></i> {!! session('success') !!}
+            </div>
         @endif
         @if(session('error'))
-            <div class="alert alert-danger" style="margin-top:10px;">{{ session('error') }}</div>
+            <div class="alert alert-danger" style="margin-bottom: 20px; border-radius: 10px; padding: 10px 15px; font-size: 0.9em;">
+                <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+            </div>
         @endif
+
+        <!-- Periods Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+            @foreach($recentPeriods->take(6) as $per)
+                <div class="period-card {{ ($selectedPeriod && $selectedPeriod->id === $per->id) ? 'selected' : '' }}" 
+                     onclick="if(event.target.closest('form') || event.target.closest('button')) return; selectPeriod({{ $per->id }})"
+                     style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div style="font-weight: 600; color: #fff; font-size: 1.05em;">{{ $per->name }}</div>
+                        <div>
+                            @if($per->is_active)
+                                <span class="badge-status-active">فعال</span>
+                            @else
+                                <span class="badge-status-ended">پایان‌یافته</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div style="font-size: 0.85em; color: #aaa; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                        <i class="far fa-calendar"></i>
+                        <span>{{ optional($per->started_at)->format('Y-m-d') }}</span>
+                        <i class="fas fa-arrow-left" style="font-size: 0.8em; opacity: 0.5;"></i>
+                        <span>{{ $per->ended_at ? $per->ended_at->format('Y-m-d') : 'اکنون' }}</span>
+                    </div>
+
+                    @if($per->is_active && !$per->is_default)
+                        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; display: flex; justify-content: flex-end;">
+                            <form method="POST" action="{{ route('futures.periods.end', ['period' => $per->id]) }}">
+                                @csrf
+                                <button type="submit" class="btn-end-period-action">
+                                    <i class="fas fa-stop-circle"></i> پایان دوره
+                                </button>
+                            </form>
+                        </div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+        
+        <style>
+            /* Badges */
+            .badge-status-active {
+                background: rgba(255, 255, 255, 0.8);
+                color: #28a745;
+                border: 1px solid rgba(40, 167, 69, 0.3);
+                padding: 4px 10px;
+                border-radius: 8px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+            .badge-status-ended {
+                background: rgba(0, 0, 0, 0.8);
+                color: #dc3545;
+                border: 1px solid rgba(220, 53, 69, 0.3);
+                padding: 4px 10px;
+                border-radius: 8px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+
+            /* End Period Button */
+            .btn-end-period-action {
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(220, 53, 69, 0.3);
+                color: #dc3545;
+                font-size: 0.85em;
+                cursor: pointer;
+                padding: 8px 14px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s;
+            }
+            .btn-end-period-action:hover {
+                background: rgba(220, 53, 69, 0.8);
+                color: #fff;
+                border-color: rgba(220, 53, 69, 0.8);
+            }
+
+            /* Period Card */
+            .period-card:hover {
+                background: rgba(255, 255, 255, 0.08) !important;
+                transform: translateY(-2px);
+            }
+            .period-card.selected {
+                background: rgba(255, 255, 255, 0.12) !important;
+                border: 1px solid rgba(255, 255, 255, 0.4) !important;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                transform: scale(1.02);
+            }
+        </style>
     </div>
 
     <!-- Start Period Modal - using modern alert modal styles -->
@@ -382,11 +468,10 @@
             }
             function updateBtnState() {
                 if (isCooldownActive()) {
-                    btn.disabled = true;
-                    btn.textContent = 'منتظر بمانید...';
+                    btn.style.display = 'none'; // Hide completely
                 } else {
+                    btn.style.display = 'flex'; // Show as flex
                     btn.disabled = false;
-                    btn.textContent = 'بروزرسانی همه دوره‌ها';
                 }
             }
             updateBtnState();
@@ -399,7 +484,8 @@
                 }
                 const tenMinutesMs = 10 * 60 * 1000;
                 localStorage.setItem(key, String(Date.now() + tenMinutesMs));
-                updateBtnState();
+                btn.style.display = 'none'; // Hide immediately on submit
+                setTimeout(updateBtnState, 1000); // Check again after a second
             });
         })();
 

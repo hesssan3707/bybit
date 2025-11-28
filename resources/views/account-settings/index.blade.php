@@ -688,6 +688,657 @@
                             <br><strong>حداقل نسبت سود به ضرر: {{ $minRrRatio }}</strong>
                         @endif
                     </div>
+
+                    <!-- Strict Mode Profit/Loss Targets Form -->
+                    <div class="setting-item" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 20px;">
+                        <h3 class="setting-title">اهداف سود و ضرر هفتگی و ماهانه</h3>
+                        <div class="setting-description">
+                            در این بخش می‌توانید اهداف هفتگی و ماهانه برای سود و ضرر خود تعیین کنید.
+                            <br>
+                            <strong style="color: #ffc107;">توجه مهم:</strong> پس از تنظیم، این اهداف غیرقابل تغییر و غیرقابل حذف هستند و برای همیشه ثبت می‌شوند.
+                        </div>
+
+                        <style>
+                            /* Toggle Switch */
+                            .switch {
+                                position: relative;
+                                display: inline-block;
+                                width: 46px;
+                                height: 24px;
+                                vertical-align: middle;
+                            }
+                            .switch input {
+                                opacity: 0;
+                                width: 0;
+                                height: 0;
+                            }
+                            .switch-slider {
+                                position: absolute;
+                                cursor: pointer;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background-color: #444;
+                                transition: .3s;
+                                border-radius: 24px;
+                            }
+                            .switch-slider:before {
+                                position: absolute;
+                                content: "";
+                                height: 18px;
+                                width: 18px;
+                                left: 3px;
+                                bottom: 3px;
+                                background-color: white;
+                                transition: .3s;
+                                border-radius: 50%;
+                            }
+                            .switch input:checked + .switch-slider {
+                                background-color: var(--primary-color, #ffc107);
+                            }
+                            .switch input:checked + .switch-slider:before {
+                                transform: translateX(22px);
+                            }
+                            .switch input:disabled + .switch-slider {
+                                opacity: 0.5;
+                                cursor: not-allowed;
+                            }
+
+                            /* Slider CSS */
+                            .dual-range-slider {
+                                position: relative;
+                                width: 100%;
+                                height: 80px; /* Increased height */
+                                margin-top: 15px;
+                                margin-bottom: 20px;
+                                padding: 0 15px; /* Side padding for thumbs */
+                                box-sizing: border-box;
+                            }
+                            .slider-wrapper {
+                                max-height: 0;
+                                overflow: hidden;
+                                opacity: 0;
+                                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                                transform: translateY(-10px);
+                            }
+                            .slider-wrapper.expanded {
+                                max-height: 120px;
+                                opacity: 1;
+                                transform: translateY(0);
+                                margin-top: 15px;
+                                margin-bottom: 20px;
+                                overflow: visible; /* Allow thumbs to extend */
+                            }
+                            .slider-track-container {
+                                position: absolute;
+                                top: 35px;
+                                left: 15px;
+                                right: 15px;
+                                height: 8px;
+                                background: #333;
+                                border-radius: 4px;
+                                z-index: 1;
+                            }
+                            /* Zero Zone Marker */
+                            .zero-zone-marker {
+                                position: absolute;
+                                top: 0;
+                                bottom: 0;
+                                width: 10%; /* 10% width for zero zone */
+                                left: 45%; /* Starts at 45% */
+                                background: #1e1e1e; /* Match page background */
+                                z-index: 5; /* On top of bar */
+                                border-left: 1px solid #333;
+                                border-right: 1px solid #333;
+                            }
+                            .zero-zone-label {
+                                position: absolute;
+                                top: -25px;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                color: #666;
+                                font-size: 12px;
+                                font-weight: bold;
+                            }
+                            .slider-range-bar {
+                                position: absolute;
+                                top: 0;
+                                bottom: 0;
+                                background: var(--primary-color, #ffc107);
+                                z-index: 3;
+                                opacity: 0.8;
+                                border-radius: 4px;
+                            }
+                            .slider-thumb {
+                                position: absolute;
+                                top: 26px; /* Centered relative to track top:35, height:8 -> center:39. Thumb height:26 -> top: 39-13=26 */
+                                width: 26px;
+                                height: 26px;
+                                background: #fff;
+                                border: 2px solid var(--primary-color, #ffc107);
+                                border-radius: 6px; /* Square with rounded corners */
+                                cursor: pointer;
+                                z-index: 10; /* Highest */
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+                                transition: transform 0.1s, box-shadow 0.1s;
+                                margin-left: -13px; /* Center the thumb on the point */
+                            }
+                            .slider-thumb:hover {
+                                transform: scale(1.1);
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+                            }
+                            .slider-thumb.dragging {
+                                transform: scale(1.2);
+                                cursor: grabbing;
+                                z-index: 11;
+                            }
+                            .slider-value {
+                                position: absolute;
+                                top: -32px;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                background: #444;
+                                color: #fff;
+                                padding: 4px 8px;
+                                border-radius: 6px;
+                                font-size: 13px;
+                                font-weight: bold;
+                                white-space: nowrap;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                            }
+                            .slider-value:after {
+                                content: '';
+                                position: absolute;
+                                bottom: -4px;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                border-width: 4px 4px 0;
+                                border-style: solid;
+                                border-color: #444 transparent transparent transparent;
+                            }
+                            .slider-labels {
+                                position: absolute;
+                                top: 55px;
+                                width: 100%;
+                                padding: 0 15px;
+                                display: flex;
+                                justify-content: space-between;
+                                color: #888;
+                                font-size: 12px;
+                                pointer-events: none;
+                            }
+                            
+                            /* Header with Switch */
+                            .target-header {
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                                margin-bottom: 10px;
+                                background: rgba(255,255,255,0.05);
+                                padding: 10px 15px;
+                                border-radius: 8px;
+                            }
+                            .target-title {
+                                font-weight: 600;
+                                font-size: 1.1em;
+                                color: #eee;
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                            }
+
+                            /* Saved Range Display */
+                            .saved-range-display {
+                                background: rgba(40, 167, 69, 0.15);
+                                border: 1px solid #28a745;
+                                border-radius: 12px;
+                                padding: 15px;
+                                margin-top: 10px;
+                                color: #fff;
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                                flex-wrap: wrap;
+                                gap: 15px;
+                            }
+                            .saved-info {
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                            }
+                            .saved-values {
+                                display: flex;
+                                gap: 15px;
+                            }
+                            .saved-value-box {
+                                background: rgba(0,0,0,0.2);
+                                padding: 5px 12px;
+                                border-radius: 6px;
+                                text-align: center;
+                            }
+                            .saved-value-box span {
+                                display: block;
+                                font-size: 0.8em;
+                                color: #aaa;
+                            }
+                            .saved-value-box strong {
+                                color: #ffc107;
+                                font-size: 1.1em;
+                            }
+
+
+                            #targetsConfirmationModal .modal-content {
+                                background: #2a2a2a;
+                                border: 1px solid #444;
+                                border-radius: 12px;
+                                width: 90%;
+                                max-width: 500px;
+                                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                                animation: modalFadeIn 0.3s ease;
+                                margin: auto; /* Override default margin */
+                                margin-top:200px;
+                            }
+                            @keyframes modalFadeIn {
+                                from { opacity: 0; transform: translateY(-20px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                        </style>
+
+                        <form action="{{ route('account-settings.update-strict-limits') }}" method="POST" id="strictTargetsForm">
+                            @csrf
+
+                            @if($errors->any())
+                                <div class="alert alert-danger" style="border-radius: 8px; margin-bottom: 20px;">
+                                    <ul style="margin: 0; padding-right: 20px;">
+                                        @foreach($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            
+                            <!-- Weekly Targets -->
+                            <div class="form-group">
+                                <div class="target-header">
+                                    <div class="target-title">
+                                        <i class="fas fa-calendar-week"></i> اهداف هفتگی
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #aaa; margin-top: 5px; width: 100%;">
+                                        با رسیدن به هر یک از اهداف، معاملات تا پایان هفته قفل خواهد شد.
+                                    </div>
+                                    @if($weeklyProfitLimit === null || $weeklyLossLimit === null)
+                                        <div class="switch-wrapper">
+                                            <label class="switch">
+                                                <input type="checkbox" id="weekly_limit_enabled" name="weekly_limit_enabled" value="1" 
+                                                    {{ $weeklyLimitEnabled ? 'checked' : '' }}>
+                                                <span class="switch-slider"></span>
+                                            </label>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if($weeklyProfitLimit !== null && $weeklyLossLimit !== null)
+                                    <div class="saved-range-display">
+                                        <div class="saved-info">
+                                            <i class="fas fa-lock" style="color: #28a745; font-size: 1.2em;"></i>
+                                            <div>
+                                                <div style="font-weight: bold; color: #28a745;">ثبت شده</div>
+                                                <div style="font-size: 0.85em; opacity: 0.8;">غیرقابل تغییر</div>
+                                            </div>
+                                        </div>
+                                        <div class="saved-values">
+                                            <div class="saved-value-box">
+                                                <span>هدف سود</span>
+                                                <strong>+{{ number_format($weeklyProfitLimit, 0) }}%</strong>
+                                            </div>
+                                            <div class="saved-value-box">
+                                                <span>هدف ضرر</span>
+                                                <strong>-{{ number_format($weeklyLossLimit, 0) }}%</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- No hidden inputs for existing values needed, as they are immutable -->
+                                @else
+                                    <div class="slider-wrapper" id="weekly-slider-wrapper">
+                                        <div class="dual-range-slider" id="weekly-slider">
+                                            <div class="slider-track-container">
+                                                <div class="zero-zone-marker">
+                                                    <span class="zero-zone-label">0%</span>
+                                                </div>
+                                                <div class="slider-range-bar"></div>
+                                            </div>
+                                            
+                                            <div class="slider-thumb left" data-type="max">
+                                                <div class="slider-value">0%</div>
+                                            </div>
+                                            <div class="slider-thumb right" data-type="min">
+                                                <div class="slider-value">0%</div>
+                                            </div>
+
+                                            <div class="slider-labels">
+                                                <span>-30%</span>
+                                                <span>+25%</span>
+                                            </div>
+
+                                            <input type="hidden" name="weekly_loss_limit" id="weekly_loss_input" value="">
+                                            <input type="hidden" name="weekly_profit_limit" id="weekly_profit_input" value="">
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Monthly Targets -->
+                            <div class="form-group" style="margin-top: 25px;">
+                                <div class="target-header">
+                                    <div class="target-title">
+                                        <i class="fas fa-calendar-alt"></i> اهداف ماهانه
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #aaa; margin-top: 5px; width: 100%;">
+                                        با رسیدن به هر یک از اهداف، معاملات تا پایان ماه قفل خواهد شد.
+                                    </div>
+                                    @if($monthlyProfitLimit === null || $monthlyLossLimit === null)
+                                        <div class="switch-wrapper">
+                                            <label class="switch">
+                                                <input type="checkbox" id="monthly_limit_enabled" name="monthly_limit_enabled" value="1" 
+                                                    {{ $monthlyLimitEnabled ? 'checked' : '' }}>
+                                                <span class="switch-slider"></span>
+                                            </label>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if($monthlyProfitLimit !== null && $monthlyLossLimit !== null)
+                                    <div class="saved-range-display">
+                                        <div class="saved-info">
+                                            <i class="fas fa-lock" style="color: #28a745; font-size: 1.2em;"></i>
+                                            <div>
+                                                <div style="font-weight: bold; color: #28a745;">ثبت شده</div>
+                                                <div style="font-size: 0.85em; opacity: 0.8;">غیرقابل تغییر</div>
+                                            </div>
+                                        </div>
+                                        <div class="saved-values">
+                                            <div class="saved-value-box">
+                                                <span>هدف سود</span>
+                                                <strong>+{{ number_format($monthlyProfitLimit, 0) }}%</strong>
+                                            </div>
+                                            <div class="saved-value-box">
+                                                <span>هدف ضرر</span>
+                                                <strong>-{{ number_format($monthlyLossLimit, 0) }}%</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="slider-wrapper" id="monthly-slider-wrapper">
+                                        <div class="dual-range-slider" id="monthly-slider">
+                                            <div class="slider-track-container">
+                                                <div class="zero-zone-marker">
+                                                    <span class="zero-zone-label">0%</span>
+                                                </div>
+                                                <div class="slider-range-bar"></div>
+                                            </div>
+                                            
+                                            <div class="slider-thumb left" data-type="max">
+                                                <div class="slider-value">0%</div>
+                                            </div>
+                                            <div class="slider-thumb right" data-type="min">
+                                                <div class="slider-value">0%</div>
+                                            </div>
+
+                                            <div class="slider-labels">
+                                                <span>-50%</span>
+                                                <span>+60%</span>
+                                            </div>
+
+                                            <input type="hidden" name="monthly_loss_limit" id="monthly_loss_input" value="">
+                                            <input type="hidden" name="monthly_profit_limit" id="monthly_profit_input" value="">
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            @if(($weeklyProfitLimit === null || $weeklyLossLimit === null) || ($monthlyProfitLimit === null || $monthlyLossLimit === null))
+                                <div class="button-group" style="margin-top: 30px;">
+                                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1.1em;">
+                                        <i class="fas fa-check-circle"></i> ثبت نهایی اهداف
+                                    </button>
+                                </div>
+                            @endif
+                        </form>
+
+                        <!-- Targets Confirmation Modal -->
+
+
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const form = document.getElementById('strictTargetsForm');
+
+                                // Toggle Animation Logic
+                                function setupToggle(toggleId, wrapperId) {
+                                    const toggle = document.getElementById(toggleId);
+                                    const wrapper = document.getElementById(wrapperId);
+                                    if (!toggle || !wrapper) return;
+
+                                    function updateState() {
+                                        if (toggle.checked) {
+                                            wrapper.classList.add('expanded');
+                                        } else {
+                                            wrapper.classList.remove('expanded');
+                                        }
+                                    }
+
+                                    toggle.addEventListener('change', updateState);
+                                    updateState(); // Initial state
+                                }
+
+                                setupToggle('weekly_limit_enabled', 'weekly-slider-wrapper');
+                                setupToggle('monthly_limit_enabled', 'monthly-slider-wrapper');
+
+                                // Slider Logic with Zero Zone (Reversed: Profit Left, Loss Right)
+                                function initSlider(sliderId, minVal, maxVal, minLimit, maxLimit, inputMinId, inputMaxId) {
+                                    const slider = document.getElementById(sliderId);
+                                    if (!slider) return;
+                                    
+                                    const thumbLeft = slider.querySelector('.slider-thumb.left'); // Profit (Positive)
+                                    const thumbRight = slider.querySelector('.slider-thumb.right'); // Loss (Negative)
+                                    const rangeBar = slider.querySelector('.slider-range-bar');
+                                    const inputMin = document.getElementById(inputMinId); // Loss Input
+                                    const inputMax = document.getElementById(inputMaxId); // Profit Input
+                                    
+                                    // Configuration
+                                    const ABS_MIN = minVal; // e.g. -30
+                                    const ABS_MAX = maxVal; // e.g. 25
+                                    
+                                    // Visual Split: 45% Profit | 10% Zero | 45% Loss
+                                    const ZERO_START = 45;
+                                    const ZERO_END = 55;
+                                    
+                                    // Initial values
+                                    let currentLoss = minLimit; // e.g. -1
+                                    let currentProfit = maxLimit; // e.g. 1
+
+                                    // Helper: Value to Percent
+                                    function valueToPercent(val) {
+                                        if (val > 0) {
+                                            // Profit Zone (0% to 45%)
+                                            // val=MAX -> 0%, val=1 -> 45%
+                                            // Formula: (MAX - val) / (MAX - 1) * 45
+                                            // Wait, if val=MAX -> 0%. If val=1 -> 45%.
+                                            // Correct: Left side is MAX.
+                                            return ((ABS_MAX - val) / (ABS_MAX - 1)) * 45;
+                                        } else {
+                                            // Loss Zone (55% to 100%)
+                                            // val=-1 -> 55%, val=MIN -> 100%
+                                            // Formula: 55 + ((-1 - val) / (-1 - ABS_MIN)) * 45
+                                            return 55 + ((-1 - val) / (-1 - ABS_MIN)) * 45;
+                                        }
+                                    }
+
+                                    // Helper: Percent to Value
+                                    function percentToValue(pct) {
+                                        if (pct <= 45) {
+                                            // Profit Zone
+                                            // pct = ((MAX - val) / (MAX - 1)) * 45
+                                            // val = MAX - (pct / 45) * (MAX - 1)
+                                            let val = ABS_MAX - (pct / 45) * (ABS_MAX - 1);
+                                            return Math.max(1, Math.min(ABS_MAX, Math.round(val)));
+                                        } else if (pct >= 55) {
+                                            // Loss Zone
+                                            // pct = 55 + ((-1 - val) / (-1 - MIN)) * 45
+                                            // (pct - 55) / 45 = (-1 - val) / (-1 - MIN)
+                                            // val = -1 - ((pct - 55) / 45) * (-1 - ABS_MIN)
+                                            let val = -1 - ((pct - 55) / 45) * (-1 - ABS_MIN);
+                                            return Math.min(-1, Math.max(ABS_MIN, Math.round(val)));
+                                        }
+                                        return 0; // Should not happen due to dead zone logic
+                                    }
+
+                                    function updateUI() {
+                                        const leftPos = valueToPercent(currentProfit);
+                                        const rightPos = valueToPercent(currentLoss);
+
+                                        // Update Thumbs
+                                        // Use leftPos for left thumb, rightPos for right thumb
+                                        thumbLeft.style.left = `${leftPos}%`;
+                                        thumbRight.style.left = `${rightPos}%`;
+                                        
+                                        // Update Range Bar
+                                        // From Left Thumb to Right Thumb
+                                        rangeBar.style.left = `${leftPos}%`;
+                                        rangeBar.style.width = `${rightPos - leftPos}%`;
+
+                                        // Update Labels
+                                        thumbLeft.querySelector('.slider-value').textContent = '+' + currentProfit + '%';
+                                        thumbRight.querySelector('.slider-value').textContent = '-' + Math.abs(currentLoss) + '%';
+
+                                        // Update Inputs
+                                        inputMin.value = Math.abs(currentLoss);
+                                        inputMax.value = currentProfit;
+                                    }
+
+                                    function handleDrag(thumb, isProfitThumb) {
+                                        let isDragging = false;
+
+                                        thumb.addEventListener('mousedown', startDrag);
+                                        thumb.addEventListener('touchstart', startDrag, {passive: false});
+
+                                        function startDrag(e) {
+                                            isDragging = true;
+                                            thumb.classList.add('dragging');
+                                            document.addEventListener('mousemove', onDrag);
+                                            document.addEventListener('touchmove', onDrag, {passive: false});
+                                            document.addEventListener('mouseup', stopDrag);
+                                            document.addEventListener('touchend', stopDrag);
+                                            e.preventDefault();
+                                        }
+
+                                        function onDrag(e) {
+                                            if (!isDragging) return;
+                                            
+                                            const rect = slider.querySelector('.slider-track-container').getBoundingClientRect();
+                                            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                                            
+                                            // Calculate percentage from LEFT of track
+                                            let percent = (clientX - rect.left) / rect.width * 100;
+                                            percent = Math.max(0, Math.min(100, percent));
+                                            
+                                            // Dead Zone Logic
+                                            if (percent > 45 && percent < 55) {
+                                                // Snap to closest edge
+                                                if (percent < 50) percent = 45;
+                                                else percent = 55;
+                                            }
+
+                                            // Determine Value
+                                            let val = percentToValue(percent);
+
+                                            if (isProfitThumb) {
+                                                // Profit Thumb (Left side, Positive)
+                                                // Must stay in Profit Zone (<= 45%)
+                                                if (percent > 45) val = 1;
+                                                currentProfit = val;
+                                            } else {
+                                                // Loss Thumb (Right side, Negative)
+                                                // Must stay in Loss Zone (>= 55%)
+                                                if (percent < 55) val = -1;
+                                                currentLoss = val;
+                                            }
+
+                                            updateUI();
+                                        }
+
+                                        function stopDrag() {
+                                            isDragging = false;
+                                            thumb.classList.remove('dragging');
+                                            document.removeEventListener('mousemove', onDrag);
+                                            document.removeEventListener('touchmove', onDrag);
+                                            document.removeEventListener('mouseup', stopDrag);
+                                            document.removeEventListener('touchend', stopDrag);
+                                        }
+                                    }
+
+                                    handleDrag(thumbLeft, true);  // Left thumb controls Profit
+                                    handleDrag(thumbRight, false); // Right thumb controls Loss
+                                    
+                                    updateUI();
+                                }
+
+                                // Initialize Sliders
+                                // Weekly: -30 to +25
+                                initSlider('weekly-slider', -30, 25, -1, 1, 'weekly_loss_input', 'weekly_profit_input');
+                                // Monthly: -50 to +60
+                                initSlider('monthly-slider', -50, 60, -3, 3, 'monthly_loss_input', 'monthly_profit_input');
+                                
+                                // Save Button State Logic
+                                const weeklyToggle = document.getElementById('weekly_limit_enabled');
+                                const monthlyToggle = document.getElementById('monthly_limit_enabled');
+                                const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+
+                                function updateSubmitButtonState() {
+                                    if (!submitBtn) return;
+                                    
+                                    const isWeeklyChecked = weeklyToggle ? weeklyToggle.checked : false;
+                                    const isMonthlyChecked = monthlyToggle ? monthlyToggle.checked : false;
+
+                                    if (!isWeeklyChecked && !isMonthlyChecked) {
+                                        submitBtn.disabled = true;
+                                        submitBtn.style.opacity = '0.5';
+                                        submitBtn.style.cursor = 'not-allowed';
+                                    } else {
+                                        submitBtn.disabled = false;
+                                        submitBtn.style.opacity = '1';
+                                        submitBtn.style.cursor = 'pointer';
+                                    }
+                                }
+
+                                if (weeklyToggle) weeklyToggle.addEventListener('change', updateSubmitButtonState);
+                                if (monthlyToggle) monthlyToggle.addEventListener('change', updateSubmitButtonState);
+                                updateSubmitButtonState(); // Initial check
+
+                                // Form Submission Interception
+                                if (form) {
+                                    form.addEventListener('submit', function(e) {
+                                        e.preventDefault();
+                                        showTargetsConfirmationModal();
+                                    });
+                                }
+                            });
+
+                            // Modal Functions
+                            function showTargetsConfirmationModal() {
+                                const modal = document.getElementById('targetsConfirmationModal');
+                                modal.style.display = 'block'; // Use block to match other modals
+                            }
+
+                            function closeTargetsModal() {
+                                document.getElementById('targetsConfirmationModal').style.display = 'none';
+                            }
+
+                            function submitTargetsForm() {
+                                document.getElementById('strictTargetsForm').submit();
+                            }
+                        </script>
+                    </div>
                 @else
                     <div class="warning-box">
                         <h4>⚠️ هشدار مهم:</h4>
@@ -767,6 +1418,31 @@
                 <div class="modal-buttons">
                     <button type="button" class="btn btn-secondary" onclick="closeModal()">انصراف</button>
                     <button type="button" class="btn btn-danger" onclick="activateFutureStrictMode()">تأیید و فعال‌سازی</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Targets Confirmation Modal -->
+    <div id="targetsConfirmationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>تأیید اهداف سود و ضرر</h3>
+                <span class="close" onclick="closeTargetsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>هشدار:</strong> این اهداف پس از ثبت غیرقابل تغییر هستند!
+                </div>
+                <p>آیا از مقادیر تعیین شده برای اهداف هفتگی و ماهانه اطمینان دارید؟</p>
+                <ul style="margin-top: 10px;">
+                    <li>این مقادیر برای همیشه ثبت می‌شوند.</li>
+                    <li>پس از ثبت، امکان ویرایش یا حذف وجود ندارد.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeTargetsModal()">بازگشت و اصلاح</button>
+                    <button type="button" class="btn btn-success" onclick="submitTargetsForm()">تأیید و ثبت نهایی</button>
                 </div>
             </div>
         </div>

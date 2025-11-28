@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [AccountSettingsController::class, 'index'])->name('index');
         Route::post('/update', [AccountSettingsController::class, 'update'])->name('update');
         Route::get('/settings', [AccountSettingsController::class, 'getSettings'])->name('settings');
+        Route::post('/update-strict-limits', [AccountSettingsController::class, 'updateStrictLimits'])->name('update-strict-limits');
     });
 
     // Exchange Management Routes (requires authentication)

@@ -23,8 +23,20 @@ class AccountSettingsController extends Controller
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
         $minRrRatio = UserAccountSetting::getMinRrRatio($user->id, $isDemo);
+        
+        // Fetch strict limits
+        $strictSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
+        $weeklyLimitEnabled = $strictSettings['weekly_limit_enabled'] ?? false;
+        $monthlyLimitEnabled = $strictSettings['monthly_limit_enabled'] ?? false;
+        $weeklyProfitLimit = $strictSettings['weekly_profit_limit'] ?? null;
+        $weeklyLossLimit = $strictSettings['weekly_loss_limit'] ?? null;
+        $monthlyProfitLimit = $strictSettings['monthly_profit_limit'] ?? null;
+        $monthlyLossLimit = $strictSettings['monthly_loss_limit'] ?? null;
 
-        return view('account-settings.index', compact('user', 'defaultRisk', 'defaultExpirationTime' , 'defaultFutureOrderSteps', 'minRrRatio', 'isDemo'));
+        return view('account-settings.index', compact(
+            'user', 'defaultRisk', 'defaultExpirationTime', 'defaultFutureOrderSteps', 'minRrRatio', 'isDemo',
+            'weeklyLimitEnabled', 'monthlyLimitEnabled', 'weeklyProfitLimit', 'weeklyLossLimit', 'monthlyProfitLimit', 'monthlyLossLimit'
+        ));
     }
 
     /**
@@ -104,5 +116,116 @@ class AccountSettingsController extends Controller
             'default_expiration_time' => UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo),
             'strict_mode' => $user->future_strict_mode,
         ]);
+    }
+    /**
+     * Update strict mode trading limits
+     */
+    public function updateStrictLimits(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->future_strict_mode) {
+            return redirect()->back()->withErrors(['msg' => 'حالت سخت‌گیرانه فعال نیست.']);
+        }
+
+        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+
+        $fields = [
+            'weekly_profit_limit' => 'حد سود هفتگی',
+            'weekly_loss_limit' => 'حد ضرر هفتگی',
+            'monthly_profit_limit' => 'حد سود ماهانه',
+            'monthly_loss_limit' => 'حد ضرر ماهانه',
+            'weekly_limit_enabled' => 'فعال‌سازی محدودیت هفتگی',
+            'monthly_limit_enabled' => 'فعال‌سازی محدودیت ماهانه',
+        ];
+
+        $validated = $request->validate([
+            'weekly_profit_limit' => 'nullable|numeric|min:1|max:25',
+            'weekly_loss_limit' => 'nullable|numeric|min:1|max:30',
+            'monthly_profit_limit' => 'nullable|numeric|min:3|max:60',
+            'monthly_loss_limit' => 'nullable|numeric|min:3|max:50',
+            'weekly_limit_enabled' => 'nullable|boolean',
+            'monthly_limit_enabled' => 'nullable|boolean',
+        ], [], $fields);
+
+        // Check for existing settings (Immutability)
+        $existingSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
+        $isSet = fn($key) => isset($existingSettings[$key]) && $existingSettings[$key] !== null;
+
+        // Check enabled flags immutability (cannot disable once enabled)
+        if (($isSet('weekly_limit_enabled') && $existingSettings['weekly_limit_enabled']) && 
+            (isset($request->weekly_limit_enabled) && !$request->boolean('weekly_limit_enabled'))) {
+            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت هفتگی امکان‌پذیر نیست.']);
+        }
+        
+        if (($isSet('monthly_limit_enabled') && $existingSettings['monthly_limit_enabled']) && 
+            (isset($request->monthly_limit_enabled) && !$request->boolean('monthly_limit_enabled'))) {
+            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت ماهانه امکان‌پذیر نیست.']);
+        }
+
+        // Check values immutability
+        // $fields is already defined above
+
+        foreach ($fields as $key => $label) {
+            if ($isSet($key) && isset($validated[$key])) {
+                if (abs((float)$validated[$key] - (float)$existingSettings[$key]) > 0.001) {
+                    return redirect()->back()->withErrors(['msg' => "تغییر مقدار {$label} امکان‌پذیر نیست."]);
+                }
+            }
+        }
+
+        // Validate relationships (Weekly <= Monthly)
+        // Only check if Monthly is enabled (either in DB or in Request)
+        $monthlyEnabled = ($existingSettings['monthly_limit_enabled'] ?? false) || $request->boolean('monthly_limit_enabled');
+        $weeklyEnabled = ($existingSettings['weekly_limit_enabled'] ?? false) || $request->boolean('weekly_limit_enabled');
+
+        if ($weeklyEnabled && $monthlyEnabled) {
+            // Determine effective values
+            $wp = isset($existingSettings['weekly_profit_limit']) ? (float)$existingSettings['weekly_profit_limit'] : (float)$validated['weekly_profit_limit'];
+            $mp = isset($existingSettings['monthly_profit_limit']) ? (float)$existingSettings['monthly_profit_limit'] : (float)$validated['monthly_profit_limit'];
+            
+            if ($wp > $mp) {
+                 return redirect()->back()->withErrors(['msg' => 'حد سود هفتگی نمی‌تواند بیشتر از حد سود ماهانه باشد.']);
+            }
+
+            $wl = isset($existingSettings['weekly_loss_limit']) ? (float)$existingSettings['weekly_loss_limit'] : (float)$validated['weekly_loss_limit'];
+            $ml = isset($existingSettings['monthly_loss_limit']) ? (float)$existingSettings['monthly_loss_limit'] : (float)$validated['monthly_loss_limit'];
+
+            if ($wl > $ml) {
+                 return redirect()->back()->withErrors(['msg' => 'حد ضرر هفتگی نمی‌تواند بیشتر از حد ضرر ماهانه باشد.']);
+            }
+        }
+
+        try {
+            // Save settings
+            // Save Weekly Settings
+            if ($request->has('weekly_limit_enabled') && $request->boolean('weekly_limit_enabled')) {
+                UserAccountSetting::setUserSetting($user->id, 'weekly_limit_enabled', true, 'boolean', $isDemo);
+                
+                if (isset($validated['weekly_profit_limit']) && !$isSet('weekly_profit_limit')) {
+                    UserAccountSetting::setUserSetting($user->id, 'weekly_profit_limit', $validated['weekly_profit_limit'], 'decimal', $isDemo);
+                }
+                if (isset($validated['weekly_loss_limit']) && !$isSet('weekly_loss_limit')) {
+                    UserAccountSetting::setUserSetting($user->id, 'weekly_loss_limit', $validated['weekly_loss_limit'], 'decimal', $isDemo);
+                }
+            }
+
+            // Save Monthly Settings
+            if ($request->has('monthly_limit_enabled') && $request->boolean('monthly_limit_enabled')) {
+                UserAccountSetting::setUserSetting($user->id, 'monthly_limit_enabled', true, 'boolean', $isDemo);
+                
+                if (isset($validated['monthly_profit_limit']) && !$isSet('monthly_profit_limit')) {
+                    UserAccountSetting::setUserSetting($user->id, 'monthly_profit_limit', $validated['monthly_profit_limit'], 'decimal', $isDemo);
+                }
+                if (isset($validated['monthly_loss_limit']) && !$isSet('monthly_loss_limit')) {
+                    UserAccountSetting::setUserSetting($user->id, 'monthly_loss_limit', $validated['monthly_loss_limit'], 'decimal', $isDemo);
+                }
+            }
+
+            return redirect()->back()->with('success', 'محدودیت‌های جدید با موفقیت اعمال شدند.');
+
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['msg' => 'خطا در ذخیره تنظیمات: ' . $e->getMessage()]);
+        }
     }
 }

@@ -216,6 +216,103 @@ class BanService
     }
 
     /**
+     * Check strict mode limits (weekly/monthly profit/loss)
+     */
+    public function checkStrictLimits(\App\Models\User $user, bool $isDemo): void
+    {
+        if (!$user->future_strict_mode) {
+            return;
+        }
+
+        $settings = \App\Models\UserAccountSetting::getUserSettings($user->id, $isDemo);
+        
+        $weeklyEnabled = $settings['weekly_limit_enabled'] ?? false;
+        $monthlyEnabled = $settings['monthly_limit_enabled'] ?? false;
+
+        if (!$weeklyEnabled && !$monthlyEnabled) {
+            return;
+        }
+
+        // Calculate Weekly PnL %
+        if ($weeklyEnabled) {
+            $startOfWeek = now()->startOfWeek();
+            $endOfWeek = now()->endOfWeek();
+            $weeklyPnlPercent = $this->calculatePeriodPnlPercent($user->id, $isDemo, $startOfWeek, $endOfWeek);
+            
+            $profitLimit = isset($settings['weekly_profit_limit']) ? (float)$settings['weekly_profit_limit'] : null;
+            $lossLimit = isset($settings['weekly_loss_limit']) ? (float)$settings['weekly_loss_limit'] : null;
+
+            if ($profitLimit !== null && $weeklyPnlPercent >= $profitLimit) {
+                $this->createLimitBan($user->id, $isDemo, 'weekly_profit_limit', $endOfWeek);
+            }
+            
+            if ($lossLimit !== null && $weeklyPnlPercent <= -$lossLimit) {
+                $this->createLimitBan($user->id, $isDemo, 'weekly_loss_limit', $endOfWeek);
+            }
+        }
+
+        // Calculate Monthly PnL %
+        if ($monthlyEnabled) {
+            $startOfMonth = now()->startOfMonth();
+            $endOfMonth = now()->endOfMonth();
+            $monthlyPnlPercent = $this->calculatePeriodPnlPercent($user->id, $isDemo, $startOfMonth, $endOfMonth);
+
+            $profitLimit = isset($settings['monthly_profit_limit']) ? (float)$settings['monthly_profit_limit'] : null;
+            $lossLimit = isset($settings['monthly_loss_limit']) ? (float)$settings['monthly_loss_limit'] : null;
+
+            if ($profitLimit !== null && $monthlyPnlPercent >= $profitLimit) {
+                $this->createLimitBan($user->id, $isDemo, 'monthly_profit_limit', $endOfMonth);
+            }
+
+            if ($lossLimit !== null && $monthlyPnlPercent <= -$lossLimit) {
+                $this->createLimitBan($user->id, $isDemo, 'monthly_loss_limit', $endOfMonth);
+            }
+        }
+    }
+
+    private function calculatePeriodPnlPercent($userId, $isDemo, $startDate, $endDate)
+    {
+        $trades = Trade::whereHas('userExchange', function($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->join('orders', 'trades.order_id', '=', 'orders.order_id')
+            ->where('trades.is_demo', $isDemo)
+            ->whereNotNull('trades.closed_at')
+            ->whereBetween('trades.closed_at', [$startDate, $endDate])
+            ->select('trades.pnl', 'orders.balance_at_creation')
+            ->get();
+
+        $totalPercent = 0;
+        foreach ($trades as $trade) {
+            $capital = (float)$trade->balance_at_creation;
+            if ($capital > 0) {
+                $totalPercent += ((float)$trade->pnl / $capital) * 100.0;
+            }
+        }
+        return $totalPercent;
+    }
+
+    private function createLimitBan($userId, $isDemo, $type, $endsAt)
+    {
+        // Check if active ban of this type exists
+        $exists = UserBan::active()
+            ->forUser($userId)
+            ->accountType($isDemo)
+            ->where('ban_type', $type)
+            ->exists();
+
+        if (!$exists) {
+            UserBan::create([
+                'user_id' => $userId,
+                'is_demo' => $isDemo,
+                'ban_type' => $type,
+                'starts_at' => now(),
+                'ends_at' => $endsAt,
+            ]);
+        }
+    }
+
+    /**
      * Get Persian ban message with remaining time
      * 
      * @param \App\Models\UserBan $ban
@@ -227,6 +324,10 @@ class BanService
             'single_loss' => 'ضرر در یک معامله',
             'double_loss' => 'دو ضرر متوالی',
             'exchange_force_close' => 'بستن اجباری سفارش توسط صرافی',
+            'weekly_profit_limit' => 'رسیدن به حد سود هفتگی',
+            'weekly_loss_limit' => 'رسیدن به حد ضرر هفتگی',
+            'monthly_profit_limit' => 'رسیدن به حد سود ماهانه',
+            'monthly_loss_limit' => 'رسیدن به حد ضرر ماهانه',
         ];
 
         $reason = $reasonMap[$ban->ban_type] ?? 'دلیل نامشخص';

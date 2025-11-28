@@ -195,12 +195,17 @@ class DemoFuturesLifecycleManager extends Command
             ->whereNotIn('status', ['expired'])
             ->first();
 
+        // Determine new status first to see if we should override lock
+        $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
+
         if ($order && $order->is_locked) {
-            return;
+            // Only allow update if the new status is terminal (filled, canceled, expired)
+            if (!in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
+                return;
+            }
         }
 
         if ($order) {
-            $newStatus = $this->mapExchangeStatus($this->extractOrderStatus($exchangeOrder, $userExchange->exchange_name));
             if ($order->status !== $newStatus) {
                 DB::transaction(function () use ($order, $newStatus, $exchangeOrder, $userExchange, $orderId) {
                     $order->status = $newStatus;
@@ -806,6 +811,12 @@ class DemoFuturesLifecycleManager extends Command
             $banService = new \App\Services\BanService();
             foreach ($recentlyClosedTrades as $trade) {
                 $banService->processTradeBans($trade);
+            }
+
+            // Check strict limits (Weekly/Monthly PnL)
+            $user = User::find($userExchange->user_id);
+            if ($user) {
+                $banService->checkStrictLimits($user, true);
             }
 
         } catch (\Exception $e) {
