@@ -267,7 +267,7 @@
                 @endforeach
             </div>
         @endif
-        
+
         <!-- هشدار اختصاصی برای تب اتصال با کلیدهای خود -->
         <div id="own-warning" class="warning-box" style="display:block;">
             <h4>⚠️ نکات مهم:</h4>
@@ -330,7 +330,7 @@
                     <div class="form-group">
                         <label for="api_secret">کلید محرمانه (API Secret):</label>
                         <div class="password-field">
-                            <input id="api_secret" type="password" autocomplete="off" name="api_secret" 
+                            <input id="api_secret" type="password" autocomplete="off" name="api_secret"
                                    placeholder="کلید محرمانه صرافی خود را وارد کنید">
                             <span class="password-toggle" onclick="togglePassword('api_secret')">
                                 <i id="api_secret-icon" class="fas fa-eye"></i>
@@ -379,7 +379,7 @@
                         <button type="button" onclick="testRealConnectionCreate()" class="btn btn-glass btn-glass-info is-active" id="test-real-btn-create" style="margin-left: 10px;">
                             <i class="fas fa-plug"></i> تست اتصال حساب واقعی
                         </button>
-                        
+
                         <button type="button" onclick="testDemoConnectionCreate()" class="btn btn-glass btn-glass-success is-active" id="test-demo-btn-create" style="display: none;">
                             <i class="fas fa-vial"></i> تست اتصال حساب دمو
                         </button>
@@ -455,10 +455,10 @@
                 <div id="company-pending-info" style="color:#6b7280; margin-top:8px; display:none; font-size:13px;"></div>
             </div>
 
-            
+
 
             <button type="submit" class="btn btn-glass btn-glass-primary is-active">
-                ارسال درخواست دسترسی صرافی شرکت
+                ارسال درخواست ایجاد صرافی
             </button>
         </form>
     </div>
@@ -544,7 +544,7 @@ function checkDemoInputs() {
     const demoApiKey = document.getElementById('demo_api_key').value.trim();
     const demoApiSecret = document.getElementById('demo_api_secret').value.trim();
     const demoTestBtn = document.getElementById('test-demo-btn-create');
-    
+
     if (demoApiKey && demoApiSecret) {
         demoTestBtn.style.display = 'inline-block';
     } else {
@@ -555,7 +555,7 @@ function checkDemoInputs() {
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
     const icon = document.getElementById(fieldId + '-icon');
-    
+
     if (field.type === 'password') {
         field.type = 'text';
         icon.classList.remove('fa-eye');
@@ -835,7 +835,7 @@ function applyCompanyTypeLocks(exchangeName) {
 
     if (messages.length > 0 && infoEl) {
         infoEl.style.display = 'block';
-        infoEl.textContent = 'برای این صرافی درخواست در انتظار بررسی دارید؛ نوع ' + messages.join(' و ') + ' غیرفعال شد.';
+        infoEl.textContent = 'برای '+ messages.join(' و ') +' این صرافی درخواست در انتظار بررسی دارید؛ ' ;
     }
 }
 </script>

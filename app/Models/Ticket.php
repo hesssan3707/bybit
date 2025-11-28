@@ -14,6 +14,7 @@ class Ticket extends Model
         'title',
         'description',
         'status',
+        'category',
         'reply',
         'replied_by',
     ];

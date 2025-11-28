@@ -33,6 +33,7 @@ class TicketController extends Controller
             'title' => $title,
             'description' => $description,
             'status' => 'open',
+            'category' => 'issue',
         ]);
 
         return response()->json([
@@ -40,5 +41,29 @@ class TicketController extends Controller
             'message' => 'گزارش شما با موفقیت ثبت شد. تیم پشتیبانی به‌زودی بررسی می‌کند.',
             'ticket_id' => $ticket->id,
         ], 200);
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'category' => 'required|in:issue,suggestion',
+        ]);
+
+        $user = $request->user();
+
+        Ticket::create([
+            'user_id' => $user->id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'status' => 'open',
+            'category' => $request->category,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تیکت شما با موفقیت ثبت شد. نتیجه به ایمیل شما ارسال خواهد شد.',
+        ]);
     }
 }

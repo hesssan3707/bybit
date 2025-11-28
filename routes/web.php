@@ -85,6 +85,8 @@ Route::middleware('auth')->group(function () {
 
     // User Tickets
     Route::post('/tickets/report-journal', [TicketController::class, 'reportJournalIssue'])->name('tickets.report_journal');
+    Route::post('/tickets/store', [TicketController::class, 'store'])->name('tickets.store');
+    
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
 

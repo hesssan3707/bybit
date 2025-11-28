@@ -968,6 +968,10 @@
                         <span>پنل مدیریت</span>
                     </a>
                 @endif
+                <a href="#" onclick="event.preventDefault(); openTicketModal();" class="profile-action-btn">
+                    <i class="fas fa-headset"></i>
+                    <span>پشتیبانی</span>
+                </a>
                 <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="profile-action-btn danger">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>خروج از حساب</span>
@@ -1096,6 +1100,8 @@
             </div>
         @endif
     </div>
+
+    @include('partials.ticket-modal')
 
     @include('partials.alert-modal')
 
