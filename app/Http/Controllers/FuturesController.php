@@ -184,7 +184,31 @@ class FuturesController extends Controller
             });
         }
 
-        $orders = $ordersQuery->latest('updated_at')->paginate(20);
+        $perPage = 20;
+        $page = max(1, (int)($request->input('page', 1)));
+
+        $highlightOid = $request->input('highlight_oid');
+        if ($highlightOid) {
+            try {
+                $target = (clone $ordersQuery)->where('order_id', $highlightOid)->first();
+                if ($target) {
+                    $beforeCount = (clone $ordersQuery)
+                        ->where(function ($q) use ($target) {
+                            $q->where('updated_at', '>', $target->updated_at)
+                              ->orWhere(function ($q2) use ($target) {
+                                  $q2->where('updated_at', $target->updated_at)
+                                     ->where('id', '>', $target->id);
+                              });
+                        })
+                        ->count();
+                    $page = intdiv($beforeCount, $perPage) + 1;
+                }
+            } catch (\Throwable $e) {
+                // Ignore positioning failures; fall back to default page
+            }
+        }
+
+        $orders = $ordersQuery->latest('updated_at')->paginate($perPage, ['*'], 'page', $page);
 
         // Build symbol options for filter dropdown (distinct for user + account type)
         $symbolOptions = Order::forUser(auth()->id())
@@ -203,6 +227,7 @@ class FuturesController extends Controller
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
             'exchangeMessage' => $exchangeStatus['message'],
             'filterSymbols' => $symbolOptions,
+            'initialHighlightOid' => $highlightOid,
         ]);
     }
 
@@ -232,6 +257,9 @@ class FuturesController extends Controller
             ->exists();
 
         if ($exists) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'شما قبلاً برای این سفارش پاسخ داده‌اید.'], 200);
+            }
             return back()->withErrors(['msg' => 'شما قبلاً برای این سفارش پاسخ داده‌اید.']);
         }
 
@@ -240,7 +268,9 @@ class FuturesController extends Controller
             'user_id' => $user->id,
             'answer' => $validated['answer'],
         ]);
-
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'پاسخ شما ثبت شد.']);
+        }
         return back()->with('success', 'پاسخ شما ثبت شد.');
     }
 
@@ -1640,7 +1670,31 @@ class FuturesController extends Controller
                 $closedTradesQuery->where('closed_at', '<=', $toDate);
             } catch (\Throwable $e) {}
         }
-        $closedTrades = $closedTradesQuery->latest('closed_at')->paginate(20);
+        $perPage = 20;
+        $page = max(1, (int)($request->input('page', 1)));
+
+        $highlightOid = $request->input('highlight_oid');
+        if ($highlightOid) {
+            try {
+                $target = (clone $closedTradesQuery)->where('order_id', $highlightOid)->first();
+                if ($target) {
+                    $beforeCount = (clone $closedTradesQuery)
+                        ->where(function ($q) use ($target) {
+                            $q->where('closed_at', '>', $target->closed_at)
+                              ->orWhere(function ($q2) use ($target) {
+                                  $q2->where('closed_at', $target->closed_at)
+                                     ->where('id', '>', $target->id);
+                              });
+                        })
+                        ->count();
+                    $page = intdiv($beforeCount, $perPage) + 1;
+                }
+            } catch (\Throwable $e) {
+                // ignore positioning failure
+            }
+        }
+
+        $closedTrades = $closedTradesQuery->latest('closed_at')->paginate($perPage, ['*'], 'page', $page);
 
         // Open trades (closed_at is null)
         $openTradesQuery = Trade::forUser(auth()->id());
@@ -1711,6 +1765,7 @@ class FuturesController extends Controller
             'manualCloseBanEndsAt' => $manualCloseBanEndsAt,
             'manualCloseBanRemainingFa' => $manualCloseBanRemainingFa,
             'filterSymbols' => $symbolOptions,
+            'initialHighlightOid' => $highlightOid,
         ]);
     }
 

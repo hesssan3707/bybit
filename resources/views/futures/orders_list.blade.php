@@ -276,14 +276,13 @@
                                     </svg>
                                 </button>
                                 @if(!$answered)
-                                    <form action="{{ route('futures.orders.strategy_feedback', $order) }}" method="POST" style="display:inline;margin-right:8px">
-                                        @csrf
-                                        <span style="margin-left:6px">آیا این معامله با استراتژی شما همسو بود؟</span>
-                                        <button name="answer" value="yes" type="submit" class="edit-btn" style="margin-left:6px">بله</button>
-                                        <button name="answer" value="no" type="submit" class="delete-btn" style="margin-left:6px">خیر</button>
-                                        <button name="answer" value="chart_no_load" type="submit" class="edit-btn" style="margin-left:6px">نمودار بارگذاری نشد</button>
-                                        <button name="answer" value="no_strategy" type="submit" class="edit-btn" style="margin-left:6px">استراتژی ندارم</button>
-                                    </form>
+                                    <button type="button" class="icon-btn open-strategy-modal-btn" data-order-id="{{ $order->id }}" onclick="window.openStrategyModal({{ $order->id }})" title="ارزیابی استراتژی" aria-label="ارزیابی استراتژی" style="margin-left:8px">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+                                            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.7"/>
+                                            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                                        </svg>
+                                    </button>
                                 @endif
                             @elseif($order->status === 'expired')
                                 @php
@@ -298,7 +297,13 @@
                                 <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="delete-btn">حذف</button>
+                                    <button type="submit" class="icon-btn" title="حذف" aria-label="حذف">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                            <path d="M6 7h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                            <path d="M9 7V5h6v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                            <path d="M7 7l1 12c.1 1 1 2 2 2h4c1 0 1.9-1 2-2l1-12" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
                                 </form>
                             @else
                                 -
@@ -370,14 +375,103 @@ document.addEventListener('DOMContentLoaded', function() {
             row.classList.add('row-highlight');
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
-            window.location.href = '{{ route('futures.pnl_history') }}' + '?order_not_found=1';
+            showToast('سفارش مرتبط یافت نشد.', 'error', 5000);
         }
+        params.delete('highlight_oid');
+        params.delete('from');
+        if (params.has('pnl_not_found')) params.delete('pnl_not_found');
+        var q = params.toString();
+        history.replaceState(null, '', window.location.pathname + (q ? ('?' + q) : ''));
     }
+
+    if (params.get('pnl_not_found')) { showToast('رکورد سود و زیان مرتبط یافت نشد.', 'error'); }
 
     document.querySelectorAll('.highlight-pnl-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var oid = this.getAttribute('data-exchange-order-id');
             window.location.href = '{{ route('futures.pnl_history') }}' + '?highlight_oid=' + encodeURIComponent(oid) + '&from=orders';
+        });
+    });
+
+    var strategyBackdrop = document.getElementById('strategyFeedbackModal');
+    var closeStrategyBtn = document.getElementById('closeStrategyModalBtn');
+    var strategySuccess = document.getElementById('strategy-feedback-success');
+    var strategyContent = document.getElementById('strategy-feedback-content');
+    var currentStrategyOrderId = null;
+
+    window.openStrategyModal = function(orderId) {
+        currentStrategyOrderId = orderId;
+        // Ensure elements exist (robust against partial loads)
+        strategyBackdrop = document.getElementById('strategyFeedbackModal');
+        strategySuccess = document.getElementById('strategy-feedback-success');
+        strategyContent = document.getElementById('strategy-feedback-content');
+        closeStrategyBtn = document.getElementById('closeStrategyModalBtn');
+        if (!strategyBackdrop || !strategyContent || !strategySuccess) {
+            showToast('امکان نمایش پرسش وجود ندارد.', 'error', 5000);
+            return;
+        }
+        strategySuccess.style.display = 'none';
+        strategyContent.style.display = 'block';
+        strategyBackdrop.style.display = 'flex';
+        setTimeout(function(){ strategyBackdrop.classList.add('show'); }, 10);
+    }
+    window.closeStrategyModal = function() {
+        strategyBackdrop.classList.remove('show');
+        setTimeout(function(){ strategyBackdrop.style.display = 'none'; }, 300);
+        currentStrategyOrderId = null;
+    }
+    document.addEventListener('click', function(e){
+        var btn = e.target.closest('#closeStrategyModalBtn');
+        if (btn) { window.closeStrategyModal(); }
+    });
+    if (strategyBackdrop) {
+        strategyBackdrop.addEventListener('click', function(e) {
+            if (e.target === strategyBackdrop) { window.closeStrategyModal(); }
+        });
+    }
+
+    document.querySelectorAll('.open-strategy-modal-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var id = this.getAttribute('data-order-id');
+            window.openStrategyModal(id);
+        });
+    });
+
+    var openFromChartBtn = document.getElementById('openStrategyFromChartBtn');
+    var currentChartOrderId = null;
+
+    document.querySelectorAll('.strategy-answer-btn').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            var answer = this.getAttribute('data-answer');
+            if (!currentStrategyOrderId) return;
+            try {
+                const resp = await fetch('/futures/orders/' + encodeURIComponent(currentStrategyOrderId) + '/strategy-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ answer: answer })
+                });
+                const json = await resp.json();
+                if (json && json.success) {
+                    strategyContent.style.display = 'none';
+                    strategySuccess.style.display = 'block';
+                    var btnOpen = document.querySelector('.open-strategy-modal-btn[data-order-id="' + currentStrategyOrderId + '"]');
+                    if (btnOpen) { btnOpen.style.display = 'none'; }
+                } else {
+                    strategySuccess.style.display = 'block';
+                    strategySuccess.classList.remove('alert-success');
+                    strategySuccess.classList.add('alert-danger');
+                    strategySuccess.textContent = (json && json.message) ? json.message : 'خطا در ذخیره پاسخ';
+                }
+            } catch (e) {
+                strategySuccess.style.display = 'block';
+                strategySuccess.classList.remove('alert-success');
+                strategySuccess.classList.add('alert-danger');
+                strategySuccess.textContent = 'خطا در ارتباط با سرور';
+            }
         });
     });
 });
@@ -549,6 +643,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.view-order-btn').forEach(btn => {
             btn.addEventListener('click', async function() {
                 const id = this.dataset.orderId;
+                currentChartOrderId = id;
+                window.currentChartOrderId = id;
                 openBackdrop();
                 try {
                     setLoading(true);
@@ -576,6 +672,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+
+        if (openFromChartBtn) {
+            openFromChartBtn.addEventListener('click', function() {
+                var id = currentChartOrderId;
+                if (id) { window.openStrategyModal(id); }
+            });
+        }
     });
     </script>
 @endpush
@@ -583,10 +686,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Chart Modal Backdrop -->
 <div id="orderChartBackdrop" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1050;">
     <div style="background: #fff; color:#222; border-radius: 12px; width: 95%; max-width: 960px; padding: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.25);">
-        <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 8px;">
-            <div style="font-weight:600;">نمایش سفارش</div>
-            <button id="closeChartModalBtn" class="delete-btn" style="height:auto; padding:6px 10px;">بستن</button>
-        </div>
+            <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="font-weight:600;">نمایش سفارش</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button id="openStrategyFromChartBtn" class="icon-btn" title="ارزیابی استراتژی" aria-label="ارزیابی استراتژی">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+                            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.7"/>
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <button id="closeChartModalBtn" class="icon-btn" title="بستن" aria-label="بستن">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         <div id="order-chart-wrapper" style="position:relative; height: 420px; width: 100%; overflow:hidden;">
             <div id="order-chart-container" style="height: 100%; width: 100%;"></div>
             <div id="order-chart-loading" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255,255,255,0.85); z-index: 2;">
@@ -594,10 +712,32 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div id="order-chart-tf" class="tf-switch" aria-label="انتخاب تایم‌فریم"></div>
         </div>
+</div>
+</div>
+
+<!-- Strategy Feedback Modal -->
+<div id="strategyFeedbackModal" class="alert-modal-overlay" style="display:none;">
+    <div class="alert-modal-container">
+        <div class="alert-modal-content">
+            <button id="closeStrategyModalBtn" class="alert-modal-close" aria-label="بستن">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="alert-modal-body">
+                <div id="strategy-feedback-content">
+                    <div style="margin-bottom:12px; font-weight:600;">آیا این معامله با استراتژی شما همسو بود؟</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center;">
+                        <button class="edit-btn strategy-answer-btn" data-answer="yes">بله</button>
+                        <button class="delete-btn strategy-answer-btn" data-answer="no">خیر</button>
+                        <button class="edit-btn strategy-answer-btn" data-answer="chart_no_load">نمودار بارگذاری نشد</button>
+                        <button class="edit-btn strategy-answer-btn" data-answer="no_strategy">استراتژی ندارم</button>
+                    </div>
+                </div>
+                <div id="strategy-feedback-success" class="alert alert-success" style="display:none; margin-top:12px;">پاسخ با موفقیت ذخیره شد.</div>
+            </div>
+        </div>
     </div>
 </div>
 
 @include('partials.alert-modal')
-    @if(request('pnl_not_found'))
-        <div class="alert alert-danger">رکورد سود و زیان مرتبط یافت نشد.</div>
-    @endif

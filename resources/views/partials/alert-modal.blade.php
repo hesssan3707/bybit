@@ -29,6 +29,10 @@
     </div>
 </div>
 
+<div id="toastOverlay" class="toast-overlay" style="display: none;">
+    <div class="toast-container"><div id="toastMessage"></div></div>
+</div>
+
 <style>
 .alert-modal-overlay {
     position: fixed;
@@ -407,4 +411,51 @@ function modernConfirm(title, message, onConfirm) {
         onConfirm: onConfirm
     });
 }
+
+function showToast(message, type = 'info', duration = 3000) {
+    var overlay = document.getElementById('toastOverlay');
+    var msgEl = document.getElementById('toastMessage');
+    var container = overlay ? overlay.querySelector('.toast-container') : null;
+    if (!overlay || !msgEl) return;
+    msgEl.textContent = message || '';
+    msgEl.className = '';
+    msgEl.classList.add('toast-' + (type || 'info'));
+    overlay.style.display = 'flex';
+    setTimeout(function(){ overlay.classList.add('show'); }, 10);
+    if (container) {
+        container.style.animation = 'toastFlipIn 280ms ease-out forwards';
+        container.onclick = function(){ hide(true); };
+    }
+    var hide = function(immediate){
+        if (container && !immediate) {
+            container.style.animation = 'toastFlipOut 260ms ease-in forwards';
+            setTimeout(function(){ overlay.classList.remove('show'); setTimeout(function(){ overlay.style.display = 'none'; }, 180); }, 240);
+        } else {
+            overlay.classList.remove('show'); setTimeout(function(){ overlay.style.display = 'none'; }, 180);
+        }
+    };
+    setTimeout(function(){ hide(false); }, Math.max(3500, duration || 3500));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var style = document.createElement('style');
+    style.textContent = `
+    .toast-overlay { position: fixed; inset: 0; display: none; align-items: flex-start; justify-content: flex-start; z-index: 10000; opacity: 0; transition: opacity .2s ease; pointer-events: none; perspective: 900px; }
+    .toast-overlay.show { opacity: 1; }
+    .toast-container { background: rgba(0,0,0,0.96); color: #fff; border-radius: 6px; padding: 16px 24px; min-width: 300px; max-width: 60vw; text-align: center; box-shadow: 0 12px 32px rgba(0,0,0,0.45); margin: 18px; pointer-events: all; cursor: pointer; transform-origin: top left; will-change: transform, opacity; }
+    #toastMessage { font-weight: 800; letter-spacing: .3px; font-size: 16px; }
+
+    @keyframes toastFlipIn {
+        0% { transform: rotateX(90deg) translateY(-6px); opacity: 0; }
+        50% { transform: rotateX(20deg) translateY(-2px); opacity: 0.6; }
+        100% { transform: rotateX(0deg) translateY(0); opacity: 1; }
+    }
+    @keyframes toastFlipOut {
+        0% { transform: rotateX(0deg) translateY(0); opacity: 1; }
+        50% { transform: rotateX(20deg) translateY(-2px); opacity: 0.5; }
+        100% { transform: rotateX(90deg) translateY(-6px); opacity: 0; }
+    }
+    `;
+    document.head.appendChild(style);
+});
 </script>

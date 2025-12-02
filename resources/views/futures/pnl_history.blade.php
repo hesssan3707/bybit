@@ -394,10 +394,13 @@ document.addEventListener('DOMContentLoaded', function() {
             row.classList.add('row-highlight');
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
-            if (params.get('from') === 'orders') {
-                window.location.href = '{{ route('futures.orders') }}' + '?pnl_not_found=1';
-            }
+            showToast('رکورد سود و زیان مرتبط یافت نشد.', 'error', 5000);
         }
+        params.delete('highlight_oid');
+        params.delete('from');
+        if (params.has('order_not_found')) params.delete('order_not_found');
+        var q = params.toString();
+        history.replaceState(null, '', window.location.pathname + (q ? ('?' + q) : ''));
     }
 
     document.querySelectorAll('tr.pnl-row').forEach(function(tr) {
@@ -411,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
 @endpush
 
 @include('partials.alert-modal')
-    @if(request('order_not_found'))
-        <div class="alert alert-danger">سفارش مرتبط یافت نشد.</div>
+    @php $orderNotFound = request('order_not_found'); @endphp
+    @if($orderNotFound)
+        <script>document.addEventListener('DOMContentLoaded', function(){ showToast('سفارش مرتبط یافت نشد.', 'error'); });</script>
     @endif
