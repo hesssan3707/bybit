@@ -759,28 +759,30 @@
         var cumulativePnlChart = new ApexCharts(document.querySelector("#cumulativePnlChart"), cumulativePnlOptions);
         cumulativePnlChart.render();
 
-        // Prepare cumulative percent series as datetime
-        var cumulativePnlPercentRaw = {!! json_encode($cumulativePnlPercent) !!};
-        // Build compounded cumulative percent with per-day dedup (keep last trade of day)
+        // Prepare cumulative percent series as datetime (client-side compounding from per-trade percent)
+        var perTradePercentRaw = {!! json_encode($perTradePercentSeries) !!};
         var cumulativePnlPercentData = (function(){
-            var items = (cumulativePnlPercentRaw || []).filter(function(i){ return i && i.date; });
-            // Deduplicate by day: last item per YYYY-MM-DD wins
-            var lastByDay = {};
+            var items = (perTradePercentRaw || []).filter(function(i){ return i && i.date; });
+            var byDay = {};
             for (var k = 0; k < items.length; k++) {
                 var it = items[k];
-                lastByDay[it.date] = it;
+                var d = it.date;
+                if (!byDay[d]) byDay[d] = [];
+                byDay[d].push(it);
             }
-            var days = Object.keys(lastByDay).sort();
-            var dailyItems = days.map(function(d){ return lastByDay[d]; });
+            var days = Object.keys(byDay).sort();
             var compound = 1.0;
             var out = [];
-            for (var i = 0; i < dailyItems.length; i++) {
-                var cur = dailyItems[i];
-                var prevY = i > 0 ? (dailyItems[i-1].y || 0) : 0;
-                var perTradePercent = i === 0 ? (cur.y || 0) : ((cur.y || 0) - prevY);
-                var factor = 1 + (perTradePercent / 100.0);
-                compound = compound * factor;
-                out.push({ x: new Date(cur.date).getTime(), y: (compound - 1) * 100.0 });
+            for (var i = 0; i < days.length; i++) {
+                var day = days[i];
+                var dayItems = byDay[day];
+                var dayFactor = 1.0;
+                for (var j = 0; j < dayItems.length; j++) {
+                    var perTradePercent = parseFloat(dayItems[j].y || 0);
+                    dayFactor = dayFactor * (1.0 + (perTradePercent / 100.0));
+                }
+                compound = compound * dayFactor;
+                out.push({ x: new Date(day).getTime(), y: (compound - 1.0) * 100.0 });
             }
             return out;
         })();

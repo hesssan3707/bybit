@@ -10,9 +10,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Traits\ParsesExchangeErrors;
 
 class ExchangeController extends Controller
 {
+    use ParsesExchangeErrors;
     public function __construct()
     {
         $this->middleware('auth');
@@ -409,24 +411,12 @@ class ExchangeController extends Controller
 
         } catch (\Exception $e) {
             Log::error('API connection test failed: ' . $e->getMessage());
-            
-            // Extract meaningful error message from exchange API
-            $errorMessage = $e->getMessage();
-            if (strpos($errorMessage, 'API key is invalid') !== false) {
-                $errorMessage = 'کلید API نامعتبر است';
-            } elseif (strpos($errorMessage, 'Invalid signature') !== false) {
-                $errorMessage = 'امضای API نامعتبر است';
-            } elseif (strpos($errorMessage, 'IP not allowed') !== false) {
-                $errorMessage = 'IP شما مجاز نیست';
-            } elseif (strpos($errorMessage, 'Permission denied') !== false) {
-                $errorMessage = 'دسترسی مجاز نیست';
-            } else {
-                $errorMessage = $isDemo ? 'خطا در تست اتصال حساب دمو: ' . $errorMessage : 'خطا در تست اتصال حساب واقعی: ' . $errorMessage;
-            }
-            
+            $raw = $e->getMessage();
+            $shouldParse = str_contains($raw, 'API Error');
+            $message = $shouldParse ? $this->parseExchangeError($raw) : $raw;
             return response()->json([
                 'success' => false,
-                'message' => $errorMessage
+                'message' => $message
             ]);
         }
     }

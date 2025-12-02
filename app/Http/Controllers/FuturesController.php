@@ -1787,24 +1787,38 @@ class FuturesController extends Controller
 
         $pnlChartData = $metrics['pnl_per_trade'] ?? [];
         $cumulativePnl = $metrics['cum_pnl'] ?? [];
-        $cumulativePnlPercent = $metrics['cum_pnl_percent'] ?? [];
+        
 
-        // Percent aggregates from series
+        // Percent aggregates from series (compounded)
         $perTradePercent = collect($metrics['per_trade_percent'] ?? []);
         $pnlPerTrade = collect($metrics['pnl_per_trade'] ?? []);
-        $totalPnlPercent = (float) $perTradePercent->sum('y');
-        $totalProfitPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+        $totalPnlPercentCompound = (float) $perTradePercent->reduce(function ($carry, $percentItem) {
+            $percentVal = is_array($percentItem) ? ((float)($percentItem['y'] ?? 0)) : 0.0;
+            return $carry * (1.0 + ($percentVal / 100.0));
+        }, 1.0);
+        $totalPnlPercent = ($totalPnlPercentCompound - 1.0) * 100.0;
+
+        $totalProfitCompound = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
             [$pnlItem, $percentItem] = $pair;
-            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
-            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
-            return $carry + ($pnlVal > 0 ? $percentVal : 0);
-        }, 0.0);
-        $totalLossPercent = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
+            $pnlVal = is_array($pnlItem) ? ((float)($pnlItem['y'] ?? 0)) : 0.0;
+            $percentVal = is_array($percentItem) ? ((float)($percentItem['y'] ?? 0)) : 0.0;
+            if ($pnlVal > 0) {
+                return $carry * (1.0 + ($percentVal / 100.0));
+            }
+            return $carry;
+        }, 1.0);
+        $totalProfitPercent = ($totalProfitCompound - 1.0) * 100.0;
+
+        $totalLossCompound = (float) $pnlPerTrade->zip($perTradePercent)->reduce(function ($carry, $pair) {
             [$pnlItem, $percentItem] = $pair;
-            $pnlVal = is_array($pnlItem) ? ($pnlItem['y'] ?? 0) : 0;
-            $percentVal = is_array($percentItem) ? ($percentItem['y'] ?? 0) : 0;
-            return $carry + ($pnlVal < 0 ? $percentVal : 0);
-        }, 0.0);
+            $pnlVal = is_array($pnlItem) ? ((float)($pnlItem['y'] ?? 0)) : 0.0;
+            $percentVal = is_array($percentItem) ? ((float)($percentItem['y'] ?? 0)) : 0.0;
+            if ($pnlVal < 0) {
+                return $carry * (1.0 + ($percentVal / 100.0));
+            }
+            return $carry;
+        }, 1.0);
+        $totalLossPercent = ($totalLossCompound - 1.0) * 100.0;
 
         // Rankings within the selected period window and filters
         $pnlRank = null;
@@ -1858,17 +1872,19 @@ class FuturesController extends Controller
                 $percentQuery->where('trades.user_exchange_id', $userExchangeId);
             }
 
-            $allTrades = $percentQuery->get();
+            $allTrades = $percentQuery->orderBy('trades.closed_at', 'asc')->get();
             $userStats = $allTrades->groupBy('user_id')->map(function ($userTrades) {
-                $sumPercent = $userTrades->reduce(function ($carry, $t) {
-                    $capital = (float) $t->balance_at_creation;
-                    $percent = $capital > 0 ? ((float)$t->pnl / $capital) * 100.0 : 0.0;
-                    return $carry + $percent;
-                }, 0.0);
-                $firstTrade = $userTrades->sortBy('closed_at')->first();
+                $compound = 1.0;
+                foreach ($userTrades as $t) {
+                    $capital = (float) ($t->balance_at_creation ?? 0.0);
+                    if ($capital <= 0.0) { continue; }
+                    $percent = ((float)$t->pnl / $capital) * 100.0;
+                    $compound = $compound * (1.0 + ($percent / 100.0));
+                }
+                $firstTrade = collect($userTrades)->first();
                 return [
                     'user_id' => $firstTrade->user_id,
-                    'pnl_percent' => $sumPercent,
+                    'pnl_percent' => ($compound - 1.0) * 100.0,
                 ];
             });
 
@@ -1924,7 +1940,7 @@ class FuturesController extends Controller
             'totalLossPercent' => $totalLossPercent,
             'pnlRank' => $pnlRank,
             'pnlPercentRank' => $pnlPercentRank,
-            'cumulativePnlPercent' => $cumulativePnlPercent,
+            'perTradePercentSeries' => $metrics['per_trade_percent'] ?? [],
         ]);
     }
 

@@ -94,11 +94,9 @@ class BinanceApiService implements ExchangeApiServiceInterface
         if ($response->failed() || (isset($responseData['code']) && $responseData['code'] != 200)) {
             $errorCode = $responseData['code'] ?? 'N/A';
             $errorMsg = $responseData['msg'] ?? 'Unknown error';
-            $requestBody = json_encode($params);
-            $fullResponse = $response->body();
-            throw new \Exception(
-                "Binance API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}, Request: {$requestBody}, Full Response: {$fullResponse}"
-            );
+            $isDemoMode = strpos($this->baseUrl, 'testnet') !== false;
+            $userFriendlyMessage = $this->getUserFriendlyErrorMessage($errorCode, $errorMsg, $isDemoMode);
+            throw new \Exception($userFriendlyMessage);
         }
 
         return $responseData;
@@ -553,38 +551,41 @@ class BinanceApiService implements ExchangeApiServiceInterface
      */
     private function getUserFriendlyErrorMessage(string $errorCode, string $errorMsg, bool $isDemoMode): string
     {
-        // Common Binance error codes and their meanings
         $errorMappings = [
             '-1022' => 'امضای API نامعتبر است',
             '-2014' => 'کلید API نامعتبر است',
             '-2015' => 'کلید API نامعتبر، آدرس IP یا مجوزها',
             '-1021' => 'زمان درخواست منقضی شده است',
-            '-2010' => 'حساب کاربری محدود شده است',
-            '-1003' => 'تعداد درخواست‌ها بیش از حد مجاز است'
+            '-2010' => 'سفارش رد شد. لطفاً پارامترهای سفارش را بررسی کنید',
+            '-1003' => 'تعداد درخواست‌ها بیش از حد مجاز است',
+            '-2019' => 'مارجین کافی نیست. لطفاً موجودی خود را افزایش دهید',
+            '-4028' => 'خطا در حالت معاملاتی. لطفاً حالت hedge را بررسی کنید',
+            '-1013' => 'مقدار سفارش نامعتبر است. لطفاً مقدار صحیح وارد کنید',
+            '-1111' => 'دقت اعشار بیش از حد مجاز است. لطفاً دقت کمتری وارد کنید',
+            '-1015' => 'تعداد سفارش‌های جدید بیش از حد مجاز است. لطفاً کمی صبر کنید',
+            '-1102' => 'پارامترهای ضروری ناقص هستند. لطفاً همه فیلدها را پر کنید',
+            '-1104' => 'پارامترهای اضافی ارسال شده است. لطفاً پارامترهای صحیح را ارسال کنید',
+            '-1106' => 'یکی از پارامترها خالی است. لطفاً همه فیلدها را پر کنید',
+            '-1112' => 'هیچ سفارشی برای این جفت ارز وجود ندارد'
         ];
 
-        // Check for specific demo account issues
         if ($isDemoMode) {
             if (in_array($errorCode, ['-1022', '-2014', '-2015'])) {
                 return 'اطلاعات حساب دمو نامعتبر است. لطفاً از کلیدهای API تست‌نت Binance استفاده کنید که از https://testnet.binance.vision ایجاد شده‌اند.';
             }
-            
             if ($errorMsg === 'Unknown error' || empty($errorMsg)) {
                 return 'خطا در اتصال به حساب دمو. لطفاً اطمینان حاصل کنید که از کلیدهای API تست‌نت Binance استفاده می‌کنید، نه کلیدهای حساب واقعی.';
             }
         }
 
-        // Return mapped error or original message
         if (isset($errorMappings[$errorCode])) {
             return $errorMappings[$errorCode];
         }
 
-        // For unmapped errors, provide context
         if ($isDemoMode) {
             return "خطا در حساب دمو: {$errorMsg} (کد: {$errorCode})";
-        } else {
-            return "خطا در API Binance: {$errorMsg} (کد: {$errorCode})";
         }
+        return "خطا در API Binance: {$errorMsg} (کد: {$errorCode})";
     }
 
     /**

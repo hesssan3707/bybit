@@ -279,17 +279,18 @@ class BanService
             ->where('trades.is_demo', $isDemo)
             ->whereNotNull('trades.closed_at')
             ->whereBetween('trades.closed_at', [$startDate, $endDate])
-            ->select('trades.pnl', 'orders.balance_at_creation')
+            ->orderBy('trades.closed_at', 'asc')
+            ->select('trades.pnl', 'trades.closed_at', 'orders.balance_at_creation')
             ->get();
 
-        $totalPercent = 0;
+        $compound = 1.0;
         foreach ($trades as $trade) {
-            $capital = (float)$trade->balance_at_creation;
-            if ($capital > 0) {
-                $totalPercent += ((float)$trade->pnl / $capital) * 100.0;
-            }
+            $capital = (float)($trade->balance_at_creation ?? 0.0);
+            if ($capital <= 0.0) { continue; }
+            $percent = ((float)$trade->pnl / $capital) * 100.0;
+            $compound = $compound * (1.0 + ($percent / 100.0));
         }
-        return $totalPercent;
+        return ($compound - 1.0) * 100.0;
     }
 
     private function createLimitBan($userId, $isDemo, $type, $endsAt)

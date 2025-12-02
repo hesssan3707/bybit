@@ -80,9 +80,9 @@ class BingXApiService implements ExchangeApiServiceInterface
         if ($response->failed() || ($responseData['code'] ?? 0) !== 0) {
             $errorCode = $responseData['code'] ?? 'N/A';
             $errorMsg = $responseData['msg'] ?? 'Unknown error';
-            throw new \Exception(
-                "BingX API Error on {$endpoint}. Code: {$errorCode}, Msg: {$errorMsg}"
-            );
+            $isDemoMode = strpos($this->baseUrl, 'vst') !== false;
+            $userFriendlyMessage = $this->getUserFriendlyErrorMessage($errorCode, $errorMsg, $isDemoMode);
+            throw new \Exception($userFriendlyMessage);
         }
 
         return $responseData['data'];

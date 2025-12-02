@@ -200,7 +200,6 @@ class JournalPeriodService
         $pnlSeries = [];
         $percentSeries = [];
         $cumPnlSeries = [];
-        $cumPnlPercentSeries = [];
 
         $cum = 0.0;
         $initialCapital = 0.0;
@@ -230,11 +229,6 @@ class JournalPeriodService
                 'y' => $percent,
                 'date' => optional($t->closed_at)->format('Y-m-d'),
             ];
-            $cumPnlPercentSeries[] = [
-                'x' => 'ترید ' . ($idx + 1),
-                'y' => $capital > 0 ? ($cum / $capital) * 100.0 : 0.0,
-                'date' => optional($t->closed_at)->format('Y-m-d'),
-            ];
         }
 
         return [
@@ -251,7 +245,7 @@ class JournalPeriodService
             'pnl_per_trade' => $pnlSeries,
             'per_trade_percent' => $percentSeries,
             'cum_pnl' => $cumPnlSeries,
-            'cum_pnl_percent' => $cumPnlPercentSeries,
+            
         ];
     }
 }
