@@ -206,6 +206,44 @@ class FuturesController extends Controller
         ]);
     }
 
+    public function storeStrategyFeedback(Request $request, \App\Models\Order $order)
+    {
+        $exchangeStatus = $this->checkActiveExchange();
+        if (!$exchangeStatus['hasActiveExchange']) {
+            return back()->withErrors(['msg' => $exchangeStatus['message']])->withInput();
+        }
+
+        $user = auth()->user();
+        $userExchangeIds = $user->activeExchanges()->pluck('id')->toArray();
+        if (!in_array($order->user_exchange_id, $userExchangeIds)) {
+            return back()->withErrors(['msg' => 'شما مجاز به ثبت پاسخ برای این سفارش نیستید.']);
+        }
+
+        if ($order->status !== 'filled') {
+            return back()->withErrors(['msg' => 'تنها سفارش‌های تکمیل‌شده قابل ثبت پاسخ هستند.']);
+        }
+
+        $validated = $request->validate([
+            'answer' => 'required|string|in:yes,no,chart_no_load,no_strategy',
+        ]);
+
+        $exists = \App\Models\OrderStrategyFeedback::where('order_id', $order->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['msg' => 'شما قبلاً برای این سفارش پاسخ داده‌اید.']);
+        }
+
+        \App\Models\OrderStrategyFeedback::create([
+            'order_id' => $order->id,
+            'user_id' => $user->id,
+            'answer' => $validated['answer'],
+        ]);
+
+        return back()->with('success', 'پاسخ شما ثبت شد.');
+    }
+
     public function create()
     {
         // Check if user has active exchange

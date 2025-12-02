@@ -102,6 +102,9 @@
         box-shadow: 0 6px 16px rgba(111,66,193,0.35);
     }
     .icon-btn svg { width: 18px; height: 18px; }
+    .order-row { transition: background-color 0.2s ease; cursor: pointer; }
+    .order-row:hover { background-color: rgba(0, 123, 255, 0.08); }
+    .row-highlight { background-color: rgba(0, 123, 255, 0.18) !important; box-shadow: inset 0 0 0 2px rgba(0,123,255,0.35); }
 
     /* Timeframe switcher styles */
     .tf-switch {
@@ -238,7 +241,8 @@
             </thead>
             <tbody>
                 @forelse ($orders as $order)
-                    <tr>
+                    @php $answered = \App\Models\OrderStrategyFeedback::where('order_id', $order->id)->where('user_id', auth()->id())->exists(); @endphp
+                    <tr class="order-row" data-exchange-order-id="{{ $order->order_id }}">
                         <td data-label="جهت">{{ $order->side }}</td>
                         <td data-label="قیمت ورود">{{ number_format($order->entry_price, 2) }}</td>
                         <td data-label="مقدار">{{ number_format($order->amount, 2) }}</td>
@@ -253,9 +257,7 @@
                                     <button type="submit" class="delete-btn">لغو کردن</button>
                                 </form>
                             @elseif($order->status === 'filled')
-                                {{-- دکمه بستن به بخش سود و زیان منتقل شد --}}
                                 <button type="button" class="icon-btn view-order-btn" data-order-id="{{ $order->id }}" title="نمایش نمودار سفارش" aria-label="نمایش نمودار سفارش" style="margin-left:8px">
-                                    <!-- trend line chart icon -->
                                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                         <path d="M4 19V5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
                                         <path d="M20 19H4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
@@ -266,6 +268,23 @@
                                         <circle cx="19" cy="8" r="1.5" fill="currentColor"/>
                                     </svg>
                                 </button>
+                                <button type="button" class="icon-btn highlight-pnl-btn" data-exchange-order-id="{{ $order->order_id }}" title="نمایش در سود و زیان" aria-label="نمایش در سود و زیان" style="margin-left:8px">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.7"/>
+                                        <path d="M7 9h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                        <path d="M7 13h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                                @if(!$answered)
+                                    <form action="{{ route('futures.orders.strategy_feedback', $order) }}" method="POST" style="display:inline;margin-right:8px">
+                                        @csrf
+                                        <span style="margin-left:6px">آیا این معامله با استراتژی شما همسو بود؟</span>
+                                        <button name="answer" value="yes" type="submit" class="edit-btn" style="margin-left:6px">بله</button>
+                                        <button name="answer" value="no" type="submit" class="delete-btn" style="margin-left:6px">خیر</button>
+                                        <button name="answer" value="chart_no_load" type="submit" class="edit-btn" style="margin-left:6px">نمودار بارگذاری نشد</button>
+                                        <button name="answer" value="no_strategy" type="submit" class="edit-btn" style="margin-left:6px">استراتژی ندارم</button>
+                                    </form>
+                                @endif
                             @elseif($order->status === 'expired')
                                 @php
                                     $canResend = $order->closed_at && now()->diffInMinutes($order->closed_at) <= 30;
@@ -340,6 +359,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const title = form.getAttribute('data-title') || 'تایید اقدام';
             const message = form.getAttribute('data-message') || 'آیا از انجام این عملیات مطمئن هستید؟';
             modernConfirm(title, message, function() { form.submit(); });
+        });
+    });
+
+    var params = new URLSearchParams(window.location.search);
+    var highlightOid = params.get('highlight_oid');
+    if (highlightOid) {
+        var row = document.querySelector('tr.order-row[data-exchange-order-id="' + highlightOid + '"]');
+        if (row) {
+            row.classList.add('row-highlight');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            window.location.href = '{{ route('futures.pnl_history') }}' + '?order_not_found=1';
+        }
+    }
+
+    document.querySelectorAll('.highlight-pnl-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var oid = this.getAttribute('data-exchange-order-id');
+            window.location.href = '{{ route('futures.pnl_history') }}' + '?highlight_oid=' + encodeURIComponent(oid) + '&from=orders';
         });
     });
 });
@@ -560,3 +598,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 @include('partials.alert-modal')
+    @if(request('pnl_not_found'))
+        <div class="alert alert-danger">رکورد سود و زیان مرتبط یافت نشد.</div>
+    @endif

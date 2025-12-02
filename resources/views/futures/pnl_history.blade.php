@@ -35,6 +35,9 @@
     tbody tr:nth-of-type(odd) {
         background-color: rgba(249, 249, 249, 0.2);
     }
+    .pnl-row { transition: background-color 0.2s ease; cursor: pointer; }
+    .pnl-row:hover { background-color: rgba(0, 123, 255, 0.08); }
+    .row-highlight { background-color: rgba(0, 123, 255, 0.18) !important; box-shadow: inset 0 0 0 2px rgba(0,123,255,0.35); }
     .pagination {
         margin-top: 20px;
         display: flex;
@@ -136,7 +139,47 @@
         }
 
         /* Open positions: show cards, hide table */
-        .position-card { font-size: 0.95rem; }
+    .position-card { font-size: 0.95rem; }
+    }
+    .week-separator td {
+        padding: 0 !important;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        cursor: help;
+        border: none !important;
+        transition: all 0.3s ease;
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+    }
+    .week-separator:hover td {
+        background: var(--primary-color, #007bff);
+    }
+    .week-separator.active td {
+        height: auto;
+        padding: 8px 12px !important;
+        background: rgba(0, 123, 255, 0.15);
+        color: #fff;
+        font-size: 0.9em;
+        text-align: center;
+        cursor: pointer;
+    }
+    .week-separator-content {
+        display: none;
+    }
+    .week-separator.active .week-separator-content {
+        display: block;
+    }
+    @media screen and (max-width: 768px) {
+        tr.week-separator {
+            box-shadow: none !important;
+            background: transparent !important;
+            margin: 8px 0 !important;
+        }
+        tr.week-separator td {
+            display: block !important;
+            width: 100% !important;
+        }
     }
 </style>
 @endpush
@@ -223,8 +266,40 @@
                 @if(isset($openTrades[0]))
                     <tr><td colspan="7" class="section-separator"></td></tr>
                 @endif
+                @php
+                    $closedItems = ($closedTrades instanceof \Illuminate\Pagination\LengthAwarePaginator) ? $closedTrades->items() : (is_array($closedTrades) ? $closedTrades : collect($closedTrades)->all());
+                    $weekCounts = [];
+                    $weekRanges = [];
+                    foreach ($closedItems as $ct) {
+                        $wStart = \Carbon\Carbon::parse($ct->closed_at)->setTimezone(config('app.timezone'))->startOfWeek(\Carbon\Carbon::MONDAY);
+                        $wkKey = $wStart->format('o-W');
+                        $weekCounts[$wkKey] = ($weekCounts[$wkKey] ?? 0) + 1;
+                        $weekRanges[$wkKey] = [$wStart->copy(), $wStart->copy()->endOfWeek(\Carbon\Carbon::SUNDAY)];
+                    }
+                    $currentWeekKey = null;
+                @endphp
                 @forelse ($closedTrades as $trade)
-                    <tr>
+                    @php
+                        $dt = \Carbon\Carbon::parse($trade->closed_at)->setTimezone(config('app.timezone'));
+                        $wStart = $dt->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
+                        $wkKey = $wStart->format('o-W');
+                        if ($currentWeekKey !== $wkKey) {
+                            $currentWeekKey = $wkKey;
+                            $range = $weekRanges[$wkKey] ?? [$wStart->copy(), $wStart->copy()->endOfWeek(\Carbon\Carbon::SUNDAY)];
+                            $count = $weekCounts[$wkKey] ?? 0;
+                        }
+                    @endphp
+                    @if ($loop->first || $wkKey !== (\Carbon\Carbon::parse(($closedItems[$loop->index - 1]->closed_at ?? null))->setTimezone(config('app.timezone'))->startOfWeek(\Carbon\Carbon::MONDAY)->format('o-W') ?? null))
+                        @php $range = $weekRanges[$wkKey]; @endphp
+                        <tr class="week-separator" onclick="this.classList.toggle('active')" title="برای مشاهده جزئیات کلیک کنید">
+                            <td colspan="7">
+                                <div class="week-separator-content">
+                                    هفته: {{ $range[0]->format('Y/m/d') }} تا {{ $range[1]->format('Y/m/d') }} | تعداد معاملات: {{ $weekCounts[$wkKey] ?? 0 }}
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
+                    <tr class="pnl-row" data-exchange-order-id="{{ $trade->order_id }}">
                         <td data-label="نماد">{{ $trade->symbol }}</td>
                         <td data-label="جهت">{{ $trade->side }}</td>
                         <td data-label="مقدار">{{ rtrim(rtrim(number_format($trade->qty, 8), '0'), '.') }}</td>
@@ -238,7 +313,14 @@
                                 {{ rtrim(rtrim(number_format($trade->pnl, 2), '0'), '.') }}
                             </span>
                         </td>
-                        <td data-label="زمان بسته شدن">{{ \Carbon\Carbon::parse($trade->closed_at)->format('Y-m-d H:i:s') }}</td>
+                        <td data-label="زمان بسته شدن">
+                            @php
+                                $dt = \Carbon\Carbon::parse($trade->closed_at)->setTimezone(config('app.timezone'));
+                                $daysAgo = \Carbon\Carbon::now(config('app.timezone'))->startOfDay()->diffInDays($dt->copy()->startOfDay());
+                                $label = ($daysAgo === 0) ? 'امروز' : (($daysAgo === 1) ? 'دیروز' : (($daysAgo <= 4) ? ($daysAgo . ' روز پیش') : $dt->format('Y-m-d')));
+                            @endphp
+                            {{ $label }} — {{ $dt->format('H:i') }}
+                        </td>
                     </tr>
                 @empty
                     <tr>
@@ -303,8 +385,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    var params = new URLSearchParams(window.location.search);
+    var highlightOid = params.get('highlight_oid');
+    if (highlightOid) {
+        var row = document.querySelector('tr.pnl-row[data-exchange-order-id="' + highlightOid + '"]');
+        if (row) {
+            row.classList.add('row-highlight');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            if (params.get('from') === 'orders') {
+                window.location.href = '{{ route('futures.orders') }}' + '?pnl_not_found=1';
+            }
+        }
+    }
+
+    document.querySelectorAll('tr.pnl-row').forEach(function(tr) {
+        tr.addEventListener('click', function() {
+            var oid = this.getAttribute('data-exchange-order-id');
+            window.location.href = '{{ route('futures.orders') }}' + '?highlight_oid=' + encodeURIComponent(oid) + '&from=pnl';
+        });
+    });
 });
 </script>
 @endpush
 
 @include('partials.alert-modal')
+    @if(request('order_not_found'))
+        <div class="alert alert-danger">سفارش مرتبط یافت نشد.</div>
+    @endif

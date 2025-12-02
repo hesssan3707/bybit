@@ -235,8 +235,8 @@ class BanService
 
         // Calculate Weekly PnL %
         if ($weeklyEnabled) {
-            $startOfWeek = now()->startOfWeek();
-            $endOfWeek = now()->endOfWeek();
+            $startOfWeek = \Carbon\Carbon::now(config('app.timezone'))->startOfWeek(\Carbon\Carbon::MONDAY);
+            $endOfWeek = $startOfWeek->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
             $weeklyPnlPercent = $this->calculatePeriodPnlPercent($user->id, $isDemo, $startOfWeek, $endOfWeek);
             
             $profitLimit = isset($settings['weekly_profit_limit']) ? (float)$settings['weekly_profit_limit'] : null;
