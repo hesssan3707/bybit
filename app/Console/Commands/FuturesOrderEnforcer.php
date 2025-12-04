@@ -135,6 +135,13 @@ class FuturesOrderEnforcer extends Command
             // Get user's selected market
             $symbol = $user->selected_market;
 
+            // Independent PnL stop block: runs even if other parts fail
+            try {
+                $this->checkPnlStopsIndependent($exchangeService, $user, $userExchange, $symbol);
+            } catch (Exception $e) {
+                $this->warn("  خطا در اجرای بلوک مستقل توقف سود/زیان: " . $e->getMessage());
+            }
+
             // Get all open orders from exchange (all symbols)
             $openOrdersResult = $exchangeService->getOpenOrders(null);
             $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
@@ -245,9 +252,9 @@ class FuturesOrderEnforcer extends Command
                 continue;
             }
 
-            // ابتدا بررسی سود/زیان: اگر بزرگ‌تر از ±10% باشد، موقعیت بسته شود
+            // ابتدا بررسی زیان: اگر بزرگ‌تر از 10% زیان باشد، موقعیت بسته شود
             $pnlRatio = $this->getPositionPnlRatio($matchingPosition);
-            if ($pnlRatio !== null && abs($pnlRatio) >= 0.10) {
+            if ($pnlRatio !== null && $pnlRatio <= -0.10) {
                 try {
                     DB::transaction(function () use ($exchangeService, $dbTrade, $matchingPosition) {
                         $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
@@ -256,10 +263,10 @@ class FuturesOrderEnforcer extends Command
                         $dbTrade->closed_at = now();
                         $dbTrade->save();
                     });
-                    $this->info("    بستن موقعیت به دلیل سود/زیان بزرگ: {$dbTrade->symbol} (PnL=" . round($pnlRatio*100,2) . "%)");
+                    $this->info("    بستن موقعیت به دلیل زیان بزرگ: {$dbTrade->symbol} (PnL=" . round($pnlRatio*100,2) . "%)");
                     continue;
                 } catch (Exception $e) {
-                    $this->warn("    خطا در بستن موقعیت به دلیل PnL {$dbTrade->symbol}: " . $e->getMessage());
+                    $this->warn("    خطا در بستن موقعیت به دلیل زیان {$dbTrade->symbol}: " . $e->getMessage());
                 }
             }
 
@@ -477,6 +484,97 @@ class FuturesOrderEnforcer extends Command
         }
 
         return false;
+    }
+
+    private function checkPnlStopsIndependent($exchangeService, User $user, UserExchange $userExchange, string $symbol)
+    {
+        if (!$user->future_strict_mode) { return; }
+
+        $openTrades = Trade::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', false)
+            ->whereNull('closed_at')
+            ->where('symbol', $symbol)
+            ->get();
+
+        if ($openTrades->isEmpty()) { return; }
+
+        $positionsResult = $exchangeService->getPositions(null);
+        $exchangePositions = $positionsResult['list'] ?? [];
+
+        foreach ($openTrades as $dbTrade) {
+            $matchingPosition = null;
+            foreach ($exchangePositions as $position) {
+                if (($position['symbol'] ?? null) === $dbTrade->symbol &&
+                    strtolower($position['side'] ?? $position['positionSide'] ?? '') === strtolower($dbTrade->side) &&
+                    (float)($position['size'] ?? 0) > 0) {
+                    $matchingPosition = $position;
+                    break;
+                }
+            }
+
+            if (!$matchingPosition) { continue; }
+
+            $pnlRatio = $this->getPositionPnlRatio($matchingPosition);
+            if ($pnlRatio === null) { continue; }
+
+            if ($pnlRatio <= -0.10) {
+                try {
+                    DB::transaction(function () use ($exchangeService, $dbTrade, $matchingPosition) {
+                        $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                        $exchangeSizeForClose = (float)($matchingPosition['size'] ?? 0);
+                        $exchangeService->closePosition($dbTrade->symbol, $closeSide, $exchangeSizeForClose);
+                        $dbTrade->closed_at = now();
+                        $dbTrade->save();
+                    });
+                    $this->info("    بستن موقعیت به دلیل زیان بزرگ: {$dbTrade->symbol} (PnL=" . round($pnlRatio*100,2) . "%)");
+                } catch (Exception $e) {
+                    $this->warn("    خطا در بستن موقعیت به دلیل زیان {$dbTrade->symbol}: " . $e->getMessage());
+                }
+                continue;
+            }
+
+            if ($pnlRatio >= 0.10) {
+                $openOrdersResult = $exchangeService->getOpenOrders($dbTrade->symbol);
+                $exchangeOpenOrders = $openOrdersResult['list'] ?? [];
+
+                $avgEntry = (float)($matchingPosition['avgPrice'] ?? $matchingPosition['entryPrice'] ?? $matchingPosition['avgCostPrice'] ?? 0);
+                $isLong = (strtolower($dbTrade->side) === 'buy');
+                $expectedOppositeSide = $isLong ? 'sell' : 'buy';
+
+                $hasReduceOnlyTp = false;
+                foreach ($exchangeOpenOrders as $eo) {
+                    $reduceRaw = $eo['reduceOnly'] ?? false;
+                    $isReduce = ($reduceRaw === true || $reduceRaw === 'true' || $reduceRaw === 1 || $reduceRaw === '1');
+                    $side = strtolower($eo['side'] ?? '');
+                    $otype = strtoupper((string)($eo['orderType'] ?? ($eo['type'] ?? '')));
+                    $price = (float)($eo['price'] ?? $eo['triggerPrice'] ?? $eo['stopPrice'] ?? $eo['stopPx'] ?? 0);
+                    if (!$isReduce) { continue; }
+                    if ($side !== $expectedOppositeSide) { continue; }
+                    if (!in_array($otype, ['LIMIT','TAKE_PROFIT','TAKE_PROFIT_MARKET'])) { continue; }
+                    if ($avgEntry > 0) {
+                        if ($isLong && $price <= $avgEntry) { continue; }
+                        if (!$isLong && $price >= $avgEntry) { continue; }
+                    }
+                    $hasReduceOnlyTp = true;
+                    break;
+                }
+
+                if (!$hasReduceOnlyTp) {
+                    try {
+                        DB::transaction(function () use ($exchangeService, $dbTrade, $matchingPosition) {
+                            $closeSide = (strtolower($dbTrade->side) === 'buy') ? 'Buy' : 'Sell';
+                            $exchangeSizeForClose = (float)($matchingPosition['size'] ?? 0);
+                            $exchangeService->closePosition($dbTrade->symbol, $closeSide, $exchangeSizeForClose);
+                            $dbTrade->closed_at = now();
+                            $dbTrade->save();
+                        });
+                        $this->info("    بستن موقعیت به دلیل سود ≥10% بدون سفارش برداشت سود: {$dbTrade->symbol}");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در بستن موقعیت به دلیل سود بدون TP {$dbTrade->symbol}: " . $e->getMessage());
+                    }
+                }
+            }
+        }
     }
 
     /**

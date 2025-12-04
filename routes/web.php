@@ -190,59 +190,27 @@ Route::middleware('auth')->group(function () {
 Route::get('/schedule', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}.separator{color:#007cba;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#e7f3ff;border-radius:5px;}</style></head><body>';
 
-    Artisan::call('futures:lifecycle');
+    Artisan::call('futures:orchestrate');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-
-    Artisan::call('futures:enforce');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-
-    Artisan::call('futures:sync-sltp');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    echo '<div class="separator">------------------------------------------ orchestrate done --------------------------------------------------</div>';
 
     sleep(10);
 
-    Artisan::call('futures:lifecycle');
+    Artisan::call('futures:orchestrate');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-
-    Artisan::call('futures:enforce');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-
-    Artisan::call('futures:sync-sltp');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    echo '<div class="separator">------------------------------------------ orchestrate done --------------------------------------------------</div>';
 
     sleep(10);
 
-    Artisan::call('futures:lifecycle');
+    Artisan::call('futures:orchestrate');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-
-    Artisan::call('futures:enforce');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-
-    Artisan::call('futures:sync-sltp');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    echo '<div class="separator">------------------------------------------ orchestrate done --------------------------------------------------</div>';
 
     sleep(10);
 
-    Artisan::call('futures:lifecycle');
+    Artisan::call('futures:orchestrate');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------------------ lifecycle done -----------------------------------------</div>';
-
-    Artisan::call('futures:enforce');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">-------------------------------------- enforce done -------------------------------------------------</div>';
-
-    Artisan::call('futures:sync-sltp');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------ sync sl tp done --------------------------------------------------</div>';
+    echo '<div class="separator">------------------------------------------ orchestrate done --------------------------------------------------</div>';
 
     echo '<div style="text-align:center;color:#28a745;font-weight:bold;font-size:18px;margin-top:20px;">************************************************************DONE*******************************************************</div>';
     echo '</body></html>';
@@ -252,17 +220,9 @@ Route::get('/schedule', function () {
 Route::get('/demo-schedule', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #ff6b35;border-radius:5px;white-space:pre-wrap;}.separator{color:#ff6b35;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#fff3e0;border-radius:5px;}</style></head><body>';
 
-    Artisan::call('demo:futures:lifecycle');
+    Artisan::call('demo:futures:orchestrate');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------------------ demo lifecycle done -----------------------------------------</div>';
-
-    Artisan::call('demo:futures:enforce');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">-------------------------------------- demo enforce done -------------------------------------------------</div>';
-
-    Artisan::call('demo:futures:sync-sltp');
-    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
-    echo '<div class="separator">------------------------------------------ demo sync sl tp done --------------------------------------------------</div>';
+    echo '<div class="separator">------------------------------------------ demo orchestrate done --------------------------------------------------</div>';
 
     Artisan::call('demo:spot:lifecycle');
     echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
