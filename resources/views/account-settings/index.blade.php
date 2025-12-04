@@ -579,12 +579,12 @@
                                    class="form-control"
                                    value="{{ $defaultRisk }}"
                                    min="1"
-                                   max="{{ $user->future_strict_mode ? '10' : '80' }}"
+                                   max="{{ (isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode) ? '10' : '80' }}"
                                    step="0.01"
                                    placeholder="مثال: 2.5">
                             <span class="input-suffix">%</span>
                         </div>
-                        @if($user->future_strict_mode)
+                        @if(isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode)
                             <small style="color: #aaa;">در حالت سخت‌گیرانه حداکثر 10 درصد مجاز است</small>
                         @endif
                     </div>
@@ -642,6 +642,7 @@
                 </div>
             </form>
         </div>
+        @if(isset($user) && $user->email === 'hesssan3506@gmail.com')
         <div class="settings-card">
             <h2>حالت سخت‌گیرانه آتی (Future Strict Mode) </h2>
 
@@ -1447,6 +1448,7 @@
             </div>
         </div>
     </div>
+    @endif
 @endsection
 
 @push('scripts')
@@ -1454,7 +1456,7 @@
         // Update max risk value when strict mode changes
         document.addEventListener('DOMContentLoaded', function() {
             const riskInput = document.getElementById('default_risk');
-            const strictMode = {{ $user->future_strict_mode ? 'true' : 'false' }};
+            const strictMode = {{ (isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode) ? 'true' : 'false' }};
 
             if (strictMode) {
                 riskInput.max = '10';
