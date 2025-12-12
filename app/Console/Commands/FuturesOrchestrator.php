@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Trade;
 use App\Services\Exchanges\ExchangeFactory;
 use Illuminate\Support\Facades\DB;
+use App\Services\BanService;
 use Exception;
 
 class FuturesOrchestrator extends Command
@@ -89,10 +90,18 @@ class FuturesOrchestrator extends Command
             };
 
             $this->syncLifecycleForExchange($exchangeService, $user, $ue);
+            
+            // Checks capable of running for all users (Expiration/Cancel Price)
+            // We pass strict mode flag to decide if we want full enforcement or just basic (cancel/expire)
+            $this->checkPendingOrders($exchangeService, $ue, $symbol, $openOrdersAll, $user->future_strict_mode);
 
             if ($user->future_strict_mode) {
+                // Strict-only enforcements
                 $this->enforceIndependentPnlStops($exchangeService, $user, $ue, $symbol, $openOrdersAll, $positionsAll);
-                $this->checkPendingOrders($exchangeService, $ue, $symbol, $openOrdersAll);
+                // checkPendingOrders already called above with Strict=true (or false), no need to call again if logic is merged
+                // But wait, checkPendingOrders in Enforcer did distinct things. 
+                // Let's refine: checkPendingOrders handles BOTH strict logic (size match) AND universal logic (expire).
+                
                 $this->checkFilledOrders($exchangeService, $ue, $symbol, $positionsAll);
                 $this->checkForeignOrders($exchangeService, $ue, $symbol, $openOrdersAll);
                 $this->purgeOtherSymbolsPositions($exchangeService, $ue, $symbol, $positionsAll);
@@ -182,7 +191,7 @@ class FuturesOrchestrator extends Command
         }
     }
 
-    private function checkPendingOrders($exchangeService, UserExchange $ue, string $symbol, array $openOrdersAll)
+    private function checkPendingOrders($exchangeService, UserExchange $ue, string $symbol, array $openOrdersAll, bool $isStrict)
     {
         $this->info("  بررسی سفارشات در انتظار...");
         $pendingOrders = Order::where('user_exchange_id', $ue->id)
@@ -195,25 +204,93 @@ class FuturesOrchestrator extends Command
         foreach ($openOrdersAll as $o) { $map[$o['orderId']] = $o; }
 
         foreach ($pendingOrders as $dbOrder) {
-            $exchangeOrder = $map[$dbOrder->order_id] ?? null;
-            if (!$exchangeOrder) { continue; }
-
-            $exchangePrice = (float)($exchangeOrder['price'] ?? 0);
-            $dbPrice = (float)$dbOrder->entry_price;
-            $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
-            $dbQty = (float)$dbOrder->amount;
-
-            if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
-                try {
-                    DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
-                        $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
-                        $dbOrder->delete();
-                    });
-                    $this->info("    حذف سفارش تغییر یافته: {$dbOrder->order_id}");
-                } catch (Exception $e) {
-                    $this->warn("    خطا در حذف سفارش {$dbOrder->order_id}: " . $e->getMessage());
+            // 1. Check Expiration (Universal)
+            if ($dbOrder->expire_minutes !== null) {
+                $expireAt = $dbOrder->created_at->timestamp + ($dbOrder->expire_minutes * 60);
+                if (time() >= $expireAt) {
+                    try {
+                        DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                            $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                            $dbOrder->status = 'expired';
+                            $dbOrder->closed_at = now();
+                            $dbOrder->save();
+                        });
+                        $this->info("    لغو سفارش منقضی شده: {$dbOrder->order_id}");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در لغو سفارش منقضی {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                    continue; // Order expired, move to next
                 }
-                continue;
+            }
+
+            // 2. Check Cancel Price (Universal)
+            if ($dbOrder->cancel_price) {
+                try {
+                    // Optimization: Fetch klines only if needed. For now, fetch per order as it's rare.
+                    // Ideally we could cache this if multiple orders share the same symbol.
+                    $klinesRaw = $exchangeService->getKlines($symbol, '1m', 2);
+                    $list = $klinesRaw['list'] ?? $klinesRaw['data'] ?? $klinesRaw['result']['list'] ?? $klinesRaw;
+                    if (!is_array($list)) { $list = []; }
+                    $candles = array_slice($list, -2);
+                    $extractHL = function($col) {
+                         if (is_array($col)) {
+                            // Bybit/Binance array format: [time, open, high, low, close...]
+                            if (array_keys($col) === range(0, count($col)-1)) {
+                                $high = isset($col[2]) ? (float)$col[2] : (isset($col[1]) ? (float)$col[1] : 0.0);
+                                $low = isset($col[3]) ? (float)$col[3] : (isset($col[2]) ? (float)$col[2] : 0.0);
+                                return [$high, $low];
+                            }
+                            // Obj format
+                            $high = (float)($col['high'] ?? $col['highPrice'] ?? $col['h'] ?? 0);
+                            $low  = (float)($col['low']  ?? $col['lowPrice']  ?? $col['l'] ?? 0);
+                            return [$high, $low];
+                         }
+                         return [0.0, 0.0];
+                    };
+                    [$h1,$l1] = isset($candles[0]) ? $extractHL($candles[0]) : [0.0,0.0];
+                    [$h2,$l2] = isset($candles[1]) ? $extractHL($candles[1]) : [0.0,0.0];
+
+                    $shouldCancel = ($dbOrder->side === 'buy' && max($h1, $h2) >= (float)$dbOrder->cancel_price) ||
+                                   ($dbOrder->side === 'sell' && min($l1, $l2) <= (float)$dbOrder->cancel_price);
+
+                    if ($shouldCancel) {
+                        try {
+                            DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                                $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                                $dbOrder->status = 'canceled';
+                                $dbOrder->closed_at = now();
+                                $dbOrder->save();
+                            });
+                            $this->info("    لغو سفارش به دلیل رسیدن به قیمت بسته شدن: {$dbOrder->order_id}");
+                        } catch (Exception $e) { $this->warn("    خطا در لغو سفارش (قیمت بسته شدن) {$dbOrder->order_id}: " . $e->getMessage()); }
+                        continue;
+                    }
+                } catch (Exception $e) {
+                    $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش {$dbOrder->order_id}: " . $e->getMessage());
+                }
+            }
+
+            // 3. Check Strict Consistency (Strict Only)
+            if ($isStrict) {
+                $exchangeOrder = $map[$dbOrder->order_id] ?? null;
+                if (!$exchangeOrder) { continue; } // Order not on exchange, maybe already filled/moved
+
+                $exchangePrice = (float)($exchangeOrder['price'] ?? 0);
+                $dbPrice = (float)$dbOrder->entry_price;
+                $exchangeQty = (float)($exchangeOrder['qty'] ?? 0);
+                $dbQty = (float)$dbOrder->amount;
+
+                if (abs($exchangePrice - $dbPrice) > 0.0001 || abs($exchangeQty - $dbQty) > 0.000001) {
+                    try {
+                        DB::transaction(function () use ($exchangeService, $dbOrder, $symbol) {
+                            $exchangeService->cancelOrderWithSymbol($dbOrder->order_id, $symbol);
+                            $dbOrder->delete();
+                        });
+                        $this->info("    حذف سفارش تغییر یافته: {$dbOrder->order_id}");
+                    } catch (Exception $e) {
+                        $this->warn("    خطا در حذف سفارش {$dbOrder->order_id}: " . $e->getMessage());
+                    }
+                }
             }
         }
     }
@@ -702,20 +779,110 @@ class FuturesOrchestrator extends Command
     private function verifyClosedTradesSynchronization($exchangeService, UserExchange $ue)
     {
         try {
-            $closedTrades = Trade::where('user_exchange_id', $ue->id)
+            $trades = Trade::where('user_exchange_id', $ue->id)
                 ->where('is_demo', false)
                 ->whereNotNull('closed_at')
+                ->where('synchronized', 0)
+                ->orderBy('created_at', 'asc')
                 ->get();
-            foreach ($closedTrades as $trade) {
-                $trade->synchronized = $trade->synchronized ?? 1;
-                $trade->save();
+
+            if ($trades->isEmpty()) { return; }
+
+            $oldestCreatedAt = $trades->first()->created_at;
+            $startTime = $oldestCreatedAt ? $oldestCreatedAt->timestamp * 1000 : null;
+
+            // Group by symbol for optimization
+            $bySymbol = $trades->groupBy('symbol');
+
+            foreach ($bySymbol as $symbol => $symbolTrades) {
+                $closedRaw = $exchangeService->getClosedPnl($symbol, 200, $startTime);
+                $closedList = $this->normalizeClosedPnl($ue->exchange_name, $closedRaw);
+
+                $records = array_values(array_filter($closedList, function($c) use ($symbol) {
+                    return isset($c['symbol']) && $c['symbol'] === $symbol;
+                }));
+
+                foreach ($symbolTrades as $trade) {
+                    $matched = null;
+                    $epsilonQty = 1e-8;
+                    $epsilonPrice = 1e-6;
+
+                    if (!$trade->order || !$trade->avg_entry_price || !$trade->qty) {
+                        $trade->synchronized = 2; // Unverified
+                        $trade->save();
+                        continue;
+                    }
+
+                    // 1. Direct match
+                    foreach ($records as $c) {
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $fieldsMatch = isset($c['qty'], $c['avgEntryPrice'])
+                            && abs((float)$c['qty'] - (float)$trade->qty) <= $epsilonQty
+                            && abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        if ($idMatch || $fieldsMatch) { $matched = [$c]; break; }
+                    }
+
+                    // 2. Multi-record match (split closures)
+                    if (!$matched) {
+                         $cands = array_values(array_filter($records, function($c) use ($trade, $epsilonPrice) {
+                            if (!isset($c['avgEntryPrice'], $c['qty'])) { return false; }
+                            return abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                        }));
+
+                        // Sum candidates
+                        $sumQty = 0.0; $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                        foreach ($cands as $c) {
+                            $q = (float)($c['qty'] ?? 0.0); $sumQty += $q;
+                            if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
+                            if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                        }
+                        if (abs($sumQty - (float)$trade->qty) <= $epsilonQty && $sumQty > 0) {
+                            $matched = $cands;
+                            $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
+                            $trade->pnl = $sumPnl;
+                        }
+                    }
+
+                    if ($matched) {
+                        if (count($matched) === 1) {
+                            $m = $matched[0];
+                            if (isset($m['avgExitPrice'])) { $trade->avg_exit_price = (float)$m['avgExitPrice']; }
+                            if (isset($m['realizedPnl'])) { $trade->pnl = (float)$m['realizedPnl']; }
+                        }
+                        $trade->synchronized = 1;
+                    } else {
+                        $trade->synchronized = 2;
+                    }
+                    $trade->save();
+                }
             }
         } catch (Exception $e) { $this->warn("خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage()); }
     }
 
     private function checkRecentTradesForBans(UserExchange $ue)
     {
-        try { $this->info("بررسی بن‌ها بر اساس معاملات اخیراً بسته شده برای صرافی {$ue->exchange_name}"); } catch (Exception $e) {}
+        try {
+            $this->info("بررسی بن‌ها بر اساس معاملات اخیراً بسته شده برای صرافی {$ue->exchange_name}");
+            $recentlyClosedTrades = Trade::where('user_exchange_id', $ue->id)
+                ->where('is_demo', false)
+                ->whereNotNull('closed_at')
+                ->where('closed_at', '>=', now()->subMinutes(5))
+                ->get();
+
+            if ($recentlyClosedTrades->isEmpty()) { return; }
+
+            $banService = new BanService();
+            foreach ($recentlyClosedTrades as $trade) {
+                $banService->processTradeBans($trade);
+            }
+
+            $user = User::find($ue->user_id);
+            if ($user) {
+                $banService->checkStrictLimits($user, false); // Real mode = false
+            }
+        } catch (Exception $e) {
+            $this->warn("[Real] خطا در بررسی بن‌های اخیر: " . $e->getMessage());
+        }
     }
 
     private function extractOrderId($exchangeOrder, string $exchangeName): ?string
