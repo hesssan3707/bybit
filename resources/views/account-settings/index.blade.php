@@ -911,6 +911,10 @@
                             .saved-values {
                                 display: flex;
                                 gap: 15px;
+                                width: 100%;
+                            }
+                            .saved-values .saved-value-box {
+                                flex: 1 1 0;
                             }
                             .saved-value-box {
                                 background: rgba(0,0,0,0.2);
@@ -936,9 +940,12 @@
                                 border-radius: 999px;
                                 overflow: hidden;
                                 margin-top: 8px;
+                                direction: ltr;
+                                text-align: left;
                             }
 
                             .target-progress-fill {
+                                display: block;
                                 height: 100%;
                                 width: 0;
                                 background: linear-gradient(90deg, #28a745, #20c997);
@@ -1036,11 +1043,9 @@
                                                 <div class="target-progress-bar">
                                                     <div class="target-progress-fill" style="width: {{ $weeklyProfitFill }}%;"></div>
                                                 </div>
-                                                @if($weeklyProfitAmount > 0)
-                                                    <div class="target-progress-label">
-                                                        سود فعلی: {{ number_format($weeklyProfitAmount, 1) }}%
-                                                    </div>
-                                                @endif
+                                                <div class="target-progress-label">
+                                                    سود فعلی: {{ number_format($weeklyProfitAmount, 1) }}%
+                                                </div>
                                             </div>
                                             <div class="saved-value-box">
                                                 <span>حد ضرر</span>
@@ -1048,11 +1053,9 @@
                                                 <div class="target-progress-bar">
                                                     <div class="target-progress-fill loss" style="width: {{ $weeklyLossFill }}%;"></div>
                                                 </div>
-                                                @if($weeklyLossAmount > 0)
-                                                    <div class="target-progress-label">
-                                                        ضرر فعلی: -{{ number_format($weeklyLossAmount, 1) }}%
-                                                    </div>
-                                                @endif
+                                                <div class="target-progress-label">
+                                                    ضرر فعلی: -{{ number_format($weeklyLossAmount, 1) }}%
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1136,11 +1139,9 @@
                                                 <div class="target-progress-bar">
                                                     <div class="target-progress-fill" style="width: {{ $monthlyProfitFill }}%;"></div>
                                                 </div>
-                                                @if($monthlyProfitAmount > 0)
-                                                    <div class="target-progress-label">
-                                                        سود فعلی: {{ number_format($monthlyProfitAmount, 1) }}%
-                                                    </div>
-                                                @endif
+                                                <div class="target-progress-label">
+                                                    سود فعلی: {{ number_format($monthlyProfitAmount, 1) }}%
+                                                </div>
                                             </div>
                                             <div class="saved-value-box">
                                                 <span>حد ضرر</span>
@@ -1148,11 +1149,9 @@
                                                 <div class="target-progress-bar">
                                                     <div class="target-progress-fill loss" style="width: {{ $monthlyLossFill }}%;"></div>
                                                 </div>
-                                                @if($monthlyLossAmount > 0)
-                                                    <div class="target-progress-label">
-                                                        ضرر فعلی: -{{ number_format($monthlyLossAmount, 1) }}%
-                                                    </div>
-                                                @endif
+                                                <div class="target-progress-label">
+                                                    ضرر فعلی: -{{ number_format($monthlyLossAmount, 1) }}%
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
