@@ -928,6 +928,33 @@
                                 font-size: 1.1em;
                             }
 
+                            .target-progress-bar {
+                                position: relative;
+                                width: 100%;
+                                height: 10px;
+                                background: rgba(255,255,255,0.15);
+                                border-radius: 999px;
+                                overflow: hidden;
+                                margin-top: 8px;
+                            }
+
+                            .target-progress-fill {
+                                height: 100%;
+                                width: 0;
+                                background: linear-gradient(90deg, #28a745, #20c997);
+                                transition: width 0.3s ease;
+                            }
+
+                            .target-progress-fill.loss {
+                                background: linear-gradient(90deg, #dc3545, #ff6b6b);
+                            }
+
+                            .target-progress-label {
+                                font-size: 0.8em;
+                                color: #e0e0e0;
+                                margin-top: 6px;
+                            }
+
 
                             #targetsConfirmationModal .modal-content {
                                 background: #2a2a2a;
@@ -980,6 +1007,20 @@
                                 </div>
 
                                 @if($weeklyProfitLimit !== null && $weeklyLossLimit !== null)
+                                    @php
+                                        $weeklyPnl = isset($weeklyPnlPercent) ? (float)$weeklyPnlPercent : 0.0;
+                                        $weeklyProfitFill = 0.0;
+                                        $weeklyLossFill = 0.0;
+                                        $weeklyProfitAmount = 0.0;
+                                        $weeklyLossAmount = 0.0;
+                                        if ($weeklyPnl > 0 && $weeklyProfitLimit > 0) {
+                                            $weeklyProfitAmount = $weeklyPnl;
+                                            $weeklyProfitFill = max(0, min(100, ($weeklyPnl / $weeklyProfitLimit) * 100));
+                                        } elseif ($weeklyPnl < 0 && $weeklyLossLimit > 0) {
+                                            $weeklyLossAmount = abs($weeklyPnl);
+                                            $weeklyLossFill = max(0, min(100, (abs($weeklyPnl) / $weeklyLossLimit) * 100));
+                                        }
+                                    @endphp
                                     <div class="saved-range-display">
                                         <div class="saved-info">
                                             <i class="fas fa-lock" style="color: #28a745; font-size: 1.2em;"></i>
@@ -992,10 +1033,26 @@
                                             <div class="saved-value-box">
                                                 <span>هدف سود</span>
                                                 <strong>+{{ number_format($weeklyProfitLimit, 0) }}%</strong>
+                                                <div class="target-progress-bar">
+                                                    <div class="target-progress-fill" style="width: {{ $weeklyProfitFill }}%;"></div>
+                                                </div>
+                                                @if($weeklyProfitAmount > 0)
+                                                    <div class="target-progress-label">
+                                                        سود فعلی: {{ number_format($weeklyProfitAmount, 1) }}%
+                                                    </div>
+                                                @endif
                                             </div>
                                             <div class="saved-value-box">
-                                                <span>هدف ضرر</span>
+                                                <span>حد ضرر</span>
                                                 <strong>-{{ number_format($weeklyLossLimit, 0) }}%</strong>
+                                                <div class="target-progress-bar">
+                                                    <div class="target-progress-fill loss" style="width: {{ $weeklyLossFill }}%;"></div>
+                                                </div>
+                                                @if($weeklyLossAmount > 0)
+                                                    <div class="target-progress-label">
+                                                        ضرر فعلی: -{{ number_format($weeklyLossAmount, 1) }}%
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -1050,6 +1107,20 @@
                                 </div>
 
                                 @if($monthlyProfitLimit !== null && $monthlyLossLimit !== null)
+                                    @php
+                                        $monthlyPnl = isset($monthlyPnlPercent) ? (float)$monthlyPnlPercent : 0.0;
+                                        $monthlyProfitFill = 0.0;
+                                        $monthlyLossFill = 0.0;
+                                        $monthlyProfitAmount = 0.0;
+                                        $monthlyLossAmount = 0.0;
+                                        if ($monthlyPnl > 0 && $monthlyProfitLimit > 0) {
+                                            $monthlyProfitAmount = $monthlyPnl;
+                                            $monthlyProfitFill = max(0, min(100, ($monthlyPnl / $monthlyProfitLimit) * 100));
+                                        } elseif ($monthlyPnl < 0 && $monthlyLossLimit > 0) {
+                                            $monthlyLossAmount = abs($monthlyPnl);
+                                            $monthlyLossFill = max(0, min(100, (abs($monthlyPnl) / $monthlyLossLimit) * 100));
+                                        }
+                                    @endphp
                                     <div class="saved-range-display">
                                         <div class="saved-info">
                                             <i class="fas fa-lock" style="color: #28a745; font-size: 1.2em;"></i>
@@ -1062,10 +1133,26 @@
                                             <div class="saved-value-box">
                                                 <span>هدف سود</span>
                                                 <strong>+{{ number_format($monthlyProfitLimit, 0) }}%</strong>
+                                                <div class="target-progress-bar">
+                                                    <div class="target-progress-fill" style="width: {{ $monthlyProfitFill }}%;"></div>
+                                                </div>
+                                                @if($monthlyProfitAmount > 0)
+                                                    <div class="target-progress-label">
+                                                        سود فعلی: {{ number_format($monthlyProfitAmount, 1) }}%
+                                                    </div>
+                                                @endif
                                             </div>
                                             <div class="saved-value-box">
-                                                <span>هدف ضرر</span>
+                                                <span>حد ضرر</span>
                                                 <strong>-{{ number_format($monthlyLossLimit, 0) }}%</strong>
+                                                <div class="target-progress-bar">
+                                                    <div class="target-progress-fill loss" style="width: {{ $monthlyLossFill }}%;"></div>
+                                                </div>
+                                                @if($monthlyLossAmount > 0)
+                                                    <div class="target-progress-label">
+                                                        ضرر فعلی: -{{ number_format($monthlyLossAmount, 1) }}%
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>

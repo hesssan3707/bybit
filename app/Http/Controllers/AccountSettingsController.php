@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\UserAccountSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use App\Services\BanService;
+use Carbon\Carbon;
 
 class AccountSettingsController extends Controller
 {
@@ -33,9 +35,25 @@ class AccountSettingsController extends Controller
         $monthlyProfitLimit = $strictSettings['monthly_profit_limit'] ?? null;
         $monthlyLossLimit = $strictSettings['monthly_loss_limit'] ?? null;
 
+        $weeklyPnlPercent = null;
+        $monthlyPnlPercent = null;
+
+        if ($user->future_strict_mode) {
+            $banService = app(BanService::class);
+
+            $startOfWeek = Carbon::now(config('app.timezone'))->startOfWeek(Carbon::MONDAY);
+            $endOfWeek = $startOfWeek->copy()->endOfWeek(Carbon::SUNDAY);
+            $weeklyPnlPercent = $banService->getPeriodPnlPercent($user->id, $isDemo, $startOfWeek, $endOfWeek);
+
+            $startOfMonth = now()->startOfMonth();
+            $endOfMonth = now()->endOfMonth();
+            $monthlyPnlPercent = $banService->getPeriodPnlPercent($user->id, $isDemo, $startOfMonth, $endOfMonth);
+        }
+
         return view('account-settings.index', compact(
             'user', 'defaultRisk', 'defaultExpirationTime', 'defaultFutureOrderSteps', 'minRrRatio', 'isDemo',
-            'weeklyLimitEnabled', 'monthlyLimitEnabled', 'weeklyProfitLimit', 'weeklyLossLimit', 'monthlyProfitLimit', 'monthlyLossLimit'
+            'weeklyLimitEnabled', 'monthlyLimitEnabled', 'weeklyProfitLimit', 'weeklyLossLimit', 'monthlyProfitLimit', 'monthlyLossLimit',
+            'weeklyPnlPercent', 'monthlyPnlPercent'
         ));
     }
 

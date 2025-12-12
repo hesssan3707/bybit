@@ -270,6 +270,11 @@ class BanService
         }
     }
 
+    public function getPeriodPnlPercent(int $userId, bool $isDemo, $startDate, $endDate)
+    {
+        return $this->calculatePeriodPnlPercent($userId, $isDemo, $startDate, $endDate);
+    }
+
     private function calculatePeriodPnlPercent($userId, $isDemo, $startDate, $endDate)
     {
         $trades = Trade::whereHas('userExchange', function($q) use ($userId) {
@@ -351,6 +356,25 @@ class BanService
         }
 
         $timeRemaining = implode(' و ', $timeParts);
+
+        if (in_array($ban->ban_type, ['weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'], true)) {
+            $isWeekly = strpos($ban->ban_type, 'weekly_') === 0;
+            $isProfit = strpos($ban->ban_type, '_profit_') !== false;
+
+            if ($isProfit && $isWeekly) {
+                $baseMessage = 'تبریک! شما به هدف سود هفتگی خود رسیده‌اید. امکان ثبت معاملات جدید تا پایان هفته برای شما غیرفعال شده است. می‌توانید استراحت کنید و برای هفته بعد برنامه‌ریزی کنید.';
+            } elseif ($isProfit && !$isWeekly) {
+                $baseMessage = 'تبریک! شما به هدف سود ماهانه خود رسیده‌اید. امکان ثبت معاملات جدید تا پایان ماه برای شما غیرفعال شده است. می‌توانید استراحت کنید و برای ماه بعد برنامه‌ریزی کنید.';
+            } elseif (!$isProfit && $isWeekly) {
+                $baseMessage = 'این هفته مطابق برنامه پیش نرفته است و برای محافظت از سرمایه شما، امکان ثبت معاملات جدید تا پایان هفته غیرفعال شده است. از این فرصت برای بررسی عملکرد خود و برنامه‌ریزی برای هفته‌های بعد استفاده کنید.';
+            } else {
+                $baseMessage = 'این ماه مطابق برنامه پیش نرفته است و برای محافظت از سرمایه شما، امکان ثبت معاملات جدید تا پایان ماه غیرفعال شده است. از این فرصت برای بررسی عملکرد خود و برنامه‌ریزی برای ماه‌های بعد استفاده کنید.';
+            }
+
+            $periodLabel = $isWeekly ? 'پایان هفته' : 'پایان ماه';
+
+            return $baseMessage . " زمان باقی‌مانده تا {$periodLabel}: {$timeRemaining}.";
+        }
 
         return "به دلیل {$reason}، شما تا {$timeRemaining} دیگر امکان ثبت سفارش جدید را ندارید.";
     }
