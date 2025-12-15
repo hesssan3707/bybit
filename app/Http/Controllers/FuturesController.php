@@ -321,6 +321,7 @@ class FuturesController extends Controller
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id, $isDemo);
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
+        $tvDefaultInterval = UserAccountSetting::getTradingViewDefaultInterval($user->id, $isDemo);
 
         // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
@@ -394,6 +395,7 @@ class FuturesController extends Controller
             'activeBan' => $activeBan,
             'banRemainingSeconds' => $banRemainingSeconds,
             'banMessage' => $banMessage,
+            'tvDefaultInterval' => $tvDefaultInterval,
         ]);
     }
 
@@ -478,6 +480,7 @@ class FuturesController extends Controller
         // Get user defaults (to mirror create page behavior in UI)
         $defaultFutureOrderSteps = \App\Models\UserAccountSetting::getDefaultFutureOrderSteps($user->id, (bool)$order->is_demo);
         $defaultExpirationMinutes = \App\Models\UserAccountSetting::getDefaultExpirationTime($user->id, (bool)$order->is_demo);
+        $tvDefaultInterval = \App\Models\UserAccountSetting::getTradingViewDefaultInterval($user->id, (bool)$order->is_demo);
 
         // Compute active opening-ban for UI when strict mode is active
         $activeBan = null;
@@ -525,6 +528,7 @@ class FuturesController extends Controller
             'defaultRisk' => $defaultRisk,
             'activeBan' => $activeBan,
             'banRemainingSeconds' => $banRemainingSeconds,
+            'tvDefaultInterval' => $tvDefaultInterval,
         ]);
     }
 

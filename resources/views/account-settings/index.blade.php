@@ -624,13 +624,13 @@
                     <div class="form-group">
                         <label for="tv_default_interval">بازه زمانی پیش‌فرض نمودار (TradingView)</label>
                         <div class="input-group">
-                            <select id="tv_default_interval" class="form-control">
-                                <option value="1">۱ دقیقه</option>
-                                <option value="5">۵ دقیقه</option>
-                                <option value="15">۱۵ دقیقه</option>
-                                <option value="60">۱ ساعت</option>
-                                <option value="240">۴ ساعت</option>
-                                <option value="D">۱ روز</option>
+                            <select id="tv_default_interval" name="tv_default_interval" class="form-control">
+                                <option value="1" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '1') ? 'selected' : '' }}>۱ دقیقه</option>
+                                <option value="5" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '5') ? 'selected' : '' }}>۵ دقیقه</option>
+                                <option value="15" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '15') ? 'selected' : '' }}>۱۵ دقیقه</option>
+                                <option value="60" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '60') ? 'selected' : '' }}>۱ ساعت</option>
+                                <option value="240" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '240') ? 'selected' : '' }}>۴ ساعت</option>
+                                <option value="D" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === 'D') ? 'selected' : '' }}>۱ روز</option>
                             </select>
                         </div>
                         <small style="color: #aaa;">این تنظیم فقط نمایش نمودار را تغییر می‌دهد و در منطق سفارش اثری ندارد</small>
@@ -1558,20 +1558,6 @@
                 }
             });
 
-            // Initialize TradingView default interval select from localStorage
-            const tvIntervalSelect = document.getElementById('tv_default_interval');
-            if (tvIntervalSelect) {
-                const allowed = ['1','5','15','60','240','D'];
-                const stored = localStorage.getItem('tv_default_interval');
-                const initial = allowed.includes(stored) ? stored : '5';
-                tvIntervalSelect.value = initial;
-                tvIntervalSelect.addEventListener('change', function() {
-                    const val = this.value;
-                    if (allowed.includes(val)) {
-                        localStorage.setItem('tv_default_interval', val);
-                    }
-                });
-            }
         });
 
         function showConfirmationModal() {

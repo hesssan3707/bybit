@@ -155,11 +155,7 @@
                     if (!symbol) return;
                     // Append ".P" for perpetual futures contracts
                     const tradingViewSymbol = `${exchangeName}:${symbol}.P`;
-                    const defaultInterval = (function(){
-                        const v = localStorage.getItem('tv_default_interval');
-                        const allowed = ['1','5','15','60','240','D'];
-                        return allowed.includes(v) ? v : '5';
-                    })();
+                    const defaultInterval = "{{ isset($tvDefaultInterval) ? $tvDefaultInterval : '5' }}";
                     new TradingView.widget({
                         "width": "100%",
                         "height": 400,

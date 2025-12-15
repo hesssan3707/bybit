@@ -25,6 +25,7 @@ class AccountSettingsController extends Controller
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
         $minRrRatio = UserAccountSetting::getMinRrRatio($user->id, $isDemo);
+        $tvDefaultInterval = UserAccountSetting::getTradingViewDefaultInterval($user->id, $isDemo);
         
         // Fetch strict limits
         $strictSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
@@ -51,9 +52,21 @@ class AccountSettingsController extends Controller
         }
 
         return view('account-settings.index', compact(
-            'user', 'defaultRisk', 'defaultExpirationTime', 'defaultFutureOrderSteps', 'minRrRatio', 'isDemo',
-            'weeklyLimitEnabled', 'monthlyLimitEnabled', 'weeklyProfitLimit', 'weeklyLossLimit', 'monthlyProfitLimit', 'monthlyLossLimit',
-            'weeklyPnlPercent', 'monthlyPnlPercent'
+            'user',
+            'defaultRisk',
+            'defaultExpirationTime',
+            'defaultFutureOrderSteps',
+            'minRrRatio',
+            'isDemo',
+            'weeklyLimitEnabled',
+            'monthlyLimitEnabled',
+            'weeklyProfitLimit',
+            'weeklyLossLimit',
+            'monthlyProfitLimit',
+            'monthlyLossLimit',
+            'weeklyPnlPercent',
+            'monthlyPnlPercent',
+            'tvDefaultInterval'
         ));
     }
 
@@ -71,6 +84,7 @@ class AccountSettingsController extends Controller
             'default_risk' => 'nullable|numeric|min:1|max:80',
             'default_future_order_steps' => 'nullable|integer|min:1|max:8',
             'default_expiration_time' => 'nullable|integer|min:1|max:1000',
+            'tv_default_interval' => 'nullable|string',
         ]);
 
         try {
@@ -107,6 +121,15 @@ class AccountSettingsController extends Controller
                     UserAccountSetting::setDefaultExpirationTime($user->id, null, $isDemo);
                 } else {
                     UserAccountSetting::setDefaultExpirationTime($user->id, $validatedData['default_expiration_time'], $isDemo);
+                }
+            }
+
+            if ($request->has('tv_default_interval')) {
+                $interval = $request->tv_default_interval;
+                if ($interval === '' || $interval === null) {
+                    UserAccountSetting::setTradingViewDefaultInterval($user->id, null, $isDemo);
+                } else {
+                    UserAccountSetting::setTradingViewDefaultInterval($user->id, $interval, $isDemo);
                 }
             }
 

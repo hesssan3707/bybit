@@ -126,6 +126,22 @@ class UserAccountSetting extends Model
         return static::getUserSetting($userId, 'default_expiration_time', null, $isDemo);
     }
 
+    /**
+     * Get TradingView default interval for user
+     */
+    public static function getTradingViewDefaultInterval($userId, $isDemo = false)
+    {
+        return static::getUserSetting($userId, 'tv_default_interval', '5', $isDemo);
+    }
+
+    /**
+     * Set TradingView default interval for user
+     */
+    public static function setTradingViewDefaultInterval($userId, $interval, $isDemo = false)
+    {
+        return static::setUserSetting($userId, 'tv_default_interval', $interval, 'string', $isDemo);
+    }
+
 
     /**
      * Set default risk with strict mode validation
