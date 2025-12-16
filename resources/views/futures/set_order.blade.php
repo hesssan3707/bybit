@@ -140,7 +140,6 @@
     @else
         <h2>ثبت سفارش جدید</h2>
     @endif
-
     <div class="tradingview-container">
         <!-- TradingView Widget BEGIN -->
         <div class="tradingview-widget-container">
@@ -195,6 +194,12 @@
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+
+    @if(isset($marketRiskLevel) && in_array($marketRiskLevel, ['elevated','critical']) && $marketRiskMessage)
+        <div class="alert alert-warning">
+            {{ $marketRiskMessage }}
+        </div>
     @endif
 
     @if(isset($activeBan) && $activeBan)
@@ -458,6 +463,8 @@
                 entry1Input.value = '';
                 entry2Input.value = '';
             });
+
+            updateChainIcon();
         }
 
         // Initial state

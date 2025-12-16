@@ -88,6 +88,12 @@ Route::middleware(['api.auth'])->group(function () {
     });
 });
 
+Route::get('/funding-snapshots-sync', function () {
+    Artisan::call('futures:sync-funding-snapshots');
+    echo '<div class="output">' . htmlspecialchars(Artisan::output()) . '</div>';
+    echo '<div class="separator">------------------------------------------ sync funding snapshots done --------------------------------------------------</div>';
+})->middleware('throttle:4');
+
 // Public maintenance / cron-style routes (no session, api middleware group)
 Route::middleware('throttle:4')->get('/schedule', function () {
     echo '<html><head><meta charset="UTF-8"><style>body{direction:rtl;text-align:right;font-family:Arial,sans-serif;background:#f5f5f5;margin:20px;}.output{background:#fff;padding:15px;margin:10px 0;border-right:4px solid #007cba;border-radius:5px;white-space:pre-wrap;}.separator{color:#007cba;font-weight:bold;text-align:center;margin:15px 0;padding:10px;background:#e7f3ff;border-radius:5px;}</style></head><body>';

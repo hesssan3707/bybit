@@ -3,6 +3,7 @@
 use App\Http\Controllers\FuturesController;
 use App\Http\Controllers\PeriodController;
 use App\Http\Controllers\MACDStrategyController;
+use App\Http\Controllers\StrategiesFundingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AccountSettingsController;
@@ -84,6 +85,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/periods/recompute-all', [PeriodController::class, 'recomputeAll'])->name('periods.recompute_all');
     });
 
+    Route::get('/api/market-price/{symbol}', [FuturesController::class, 'getMarketPrice'])
+        ->name('futures.market-price');
+
     // User Tickets
     Route::post('/tickets/report-journal', [TicketController::class, 'reportJournalIssue'])->name('tickets.report_journal');
     Route::post('/tickets/store', [TicketController::class, 'store'])->name('tickets.store');
@@ -93,6 +97,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('strategies')->name('strategies.')->group(function () {
         Route::get('/macd', [MACDStrategyController::class, 'index'])->name('macd');
+        Route::get('/funding', [StrategiesFundingController::class, 'index'])->name('funding');
     });
 
     // Password Change Routes (requires authentication)

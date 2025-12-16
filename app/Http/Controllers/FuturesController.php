@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Trade;
 use App\Models\UserBan;
 use App\Models\UserAccountSetting;
+use App\Models\FuturesFundingSnapshot;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use App\Traits\HandlesExchangeAccess;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class FuturesController extends Controller
@@ -294,6 +296,9 @@ class FuturesController extends Controller
             $symbol = $availableMarkets[0]; // Use BTCUSDT as default instead of ETHUSDT
         }
 
+        $marketRiskLevel = 'normal';
+        $marketRiskMessage = null;
+
         if ($exchangeStatus['hasActiveExchange']) {
             try {
                 $exchangeService = $this->getExchangeService();
@@ -381,6 +386,15 @@ class FuturesController extends Controller
             // silent failure
         }
 
+        try {
+            $riskStatus = Cache::get('market:risk');
+            if ($riskStatus === 'risky') {
+                $marketRiskLevel = 'critical';
+                $marketRiskMessage = 'هشدار: بر اساس وضعیت کلی بازار آتی (تجمیع فاندینگ و اوپن اینترست در صرافی‌های جهانی)، شرایط فعلی پرریسک است. لطفاً با احتیاط و اندازه ریسک محافظه‌کارانه ادامه دهید.';
+            }
+        } catch (\Throwable $e) {
+        }
+
         return view('futures.set_order', [
             'marketPrice' => $marketPrice,
             'hasActiveExchange' => $exchangeStatus['hasActiveExchange'],
@@ -396,6 +410,8 @@ class FuturesController extends Controller
             'banRemainingSeconds' => $banRemainingSeconds,
             'banMessage' => $banMessage,
             'tvDefaultInterval' => $tvDefaultInterval,
+            'marketRiskLevel' => $marketRiskLevel,
+            'marketRiskMessage' => $marketRiskMessage,
         ]);
     }
 
@@ -1591,7 +1607,6 @@ class FuturesController extends Controller
      */
     public function getMarketPrice($symbol)
     {
-        // Check if user is authenticated
         if (!auth()->check()) {
             return response()->json([
                 'success' => false,
@@ -1599,7 +1614,6 @@ class FuturesController extends Controller
             ], 401);
         }
 
-        // Validate symbol is in supported markets
         $supportedMarkets = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'TRXUSDT', 'DOGEUSDT', 'LTCUSDT'];
 
         if (!in_array($symbol, $supportedMarkets)) {
@@ -1610,7 +1624,10 @@ class FuturesController extends Controller
         }
 
         try {
-            // Get user's exchange service (requires active exchange)
+            $user = auth()->user();
+            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $exchangeName = $currentExchange ? strtolower($currentExchange->exchange_name) : null;
+
             $exchangeService = $this->getExchangeService();
             $tickerInfo = $exchangeService->getTickerInfo($symbol);
             $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
