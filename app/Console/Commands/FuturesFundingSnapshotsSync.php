@@ -30,7 +30,7 @@ class FuturesFundingSnapshotsSync extends Command
             return 1;
         }
 
-        $allExchanges = ['bybit', 'binance', 'bingx'];
+        $allExchanges = ['bybit', 'binance', 'bingx', 'okx', 'bitget', 'gate'];
 
         if ($exchangeOption) {
             $exchangeOption = strtolower(trim($exchangeOption));
@@ -123,6 +123,15 @@ class FuturesFundingSnapshotsSync extends Command
         }
         if ($exchange === 'bingx') {
             return $this->fetchBingxMetrics($symbol);
+        }
+        if ($exchange === 'okx') {
+            return $this->fetchOkxMetrics($symbol);
+        }
+        if ($exchange === 'bitget') {
+            return $this->fetchBitgetMetrics($symbol);
+        }
+        if ($exchange === 'gate') {
+            return $this->fetchGateMetrics($symbol);
         }
         return [null, null, null];
     }
@@ -233,7 +242,7 @@ class FuturesFundingSnapshotsSync extends Command
 
         try {
             $resp = Http::get('https://open-api.bingx.com/openApi/swap/v2/quote/fundingRate', [
-                'symbol' => $symbol,
+                'symbol' => $this->mapBingxSymbol($symbol),
             ]);
             if ($resp->ok()) {
                 $json = $resp->json();
@@ -250,5 +259,131 @@ class FuturesFundingSnapshotsSync extends Command
         }
 
         return [$fundingRate, $openInterest, $metricTime];
+    }
+
+    private function fetchOkxMetrics(string $symbol): array
+    {
+        $fundingRate = null;
+        $openInterest = null;
+        $metricTime = null;
+
+        $instId = $this->mapOkxSymbol($symbol);
+        try {
+            $resp = Http::get('https://www.okx.com/api/v5/public/funding-rate', [
+                'instId' => $instId,
+            ]);
+            if ($resp->ok()) {
+                $json = $resp->json();
+                $data = $json['data'][0] ?? null;
+                if ($data) {
+                    $rate = $data['fundingRate'] ?? null;
+                    $ts = $data['fundingTime'] ?? ($data['nextFundingRateTime'] ?? null);
+                    if ($rate !== null) {
+                        $fundingRate = (float) $rate;
+                    }
+                    if ($ts !== null) {
+                        $metricTime = Carbon::createFromTimestampMs((int) $ts);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $resp2 = Http::get('https://www.okx.com/api/v5/public/open-interest', [
+                'instId' => $instId,
+            ]);
+            if ($resp2->ok()) {
+                $json2 = $resp2->json();
+                $data2 = $json2['data'][0] ?? null;
+                if ($data2) {
+                    $oi = $data2['oi'] ?? null;
+                    $ts2 = $data2['ts'] ?? null;
+                    if ($oi !== null) {
+                        $openInterest = (float) $oi;
+                    }
+                    if ($metricTime === null && $ts2 !== null) {
+                        $metricTime = Carbon::createFromTimestampMs((int) $ts2);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return [$fundingRate, $openInterest, $metricTime];
+    }
+
+    private function fetchBitgetMetrics(string $symbol): array
+    {
+        $fundingRate = null;
+        $openInterest = null;
+        $metricTime = null;
+
+        try {
+            $resp = Http::get('https://api.bitget.com/api/v2/mix/market/current-fund-rate', [
+                'symbol' => $symbol,
+                'productType' => 'usdt-futures',
+            ]);
+            if ($resp->ok()) {
+                $json = $resp->json();
+                $data = $json['data'][0] ?? null;
+                if ($data) {
+                    $rate = $data['fundingRate'] ?? null;
+                    $ts = $data['nextUpdate'] ?? null;
+                    if ($rate !== null) {
+                        $fundingRate = (float) $rate;
+                    }
+                    if ($ts !== null) {
+                        $metricTime = Carbon::createFromTimestampMs((int) $ts);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return [$fundingRate, $openInterest, $metricTime];
+    }
+
+    private function fetchGateMetrics(string $symbol): array
+    {
+        $fundingRate = null;
+        $openInterest = null;
+        $metricTime = null;
+
+        $contract = $this->mapGateSymbol($symbol);
+        try {
+            $resp = Http::get('https://fx-api.gateio.ws/api/v4/futures/usdt/contracts/' . $contract);
+            if ($resp->ok()) {
+                $json = $resp->json();
+                $rate = $json['funding_rate'] ?? null;
+                $ts = $json['funding_next_apply'] ?? null;
+                if ($rate !== null) {
+                    $fundingRate = (float) $rate;
+                }
+                if ($ts !== null) {
+                    $metricTime = Carbon::createFromTimestamp((int) $ts);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return [$fundingRate, $openInterest, $metricTime];
+    }
+
+    private function mapBingxSymbol(string $symbol): string
+    {
+        if (strtoupper($symbol) === 'BTCUSDT') return 'BTC-USDT';
+        if (strtoupper($symbol) === 'ETHUSDT') return 'ETH-USDT';
+        return $symbol;
+    }
+
+    private function mapOkxSymbol(string $symbol): string
+    {
+        if (strtoupper($symbol) === 'BTCUSDT') return 'BTC-USDT-SWAP';
+        if (strtoupper($symbol) === 'ETHUSDT') return 'ETH-USDT-SWAP';
+        return $symbol;
+    }
+
+    private function mapGateSymbol(string $symbol): string
+    {
+        if (strtoupper($symbol) === 'BTCUSDT') return 'BTC_USDT';
+        if (strtoupper($symbol) === 'ETHUSDT') return 'ETH_USDT';
+        return $symbol;
     }
 }

@@ -10,7 +10,7 @@ class StrategiesFundingController extends Controller
 {
     public function index(Request $request)
     {
-        $exchanges = ['bybit', 'binance', 'bingx'];
+        $exchanges = ['bybit', 'binance', 'bingx', 'okx', 'bitget', 'gate'];
         $symbols = ['BTCUSDT', 'ETHUSDT'];
 
         $now = Carbon::now();
@@ -39,7 +39,7 @@ class StrategiesFundingController extends Controller
             ->orderBy('id')
             ->get();
 
-        $analysis = $this->analyzeMarket($latest);
+        $analysis = $this->analyzeMarket($latest, $symbols, $exchanges);
 
         return view('strategies.funding_overview', [
             'latest' => $latest,
@@ -50,12 +50,13 @@ class StrategiesFundingController extends Controller
         ]);
     }
 
-    private function analyzeMarket(array $latest): array
+    private function analyzeMarket(array $latest, array $symbols, array $exchanges): array
     {
         $levels = [];
+        $aggregates = [];
 
-        foreach ($latest as $exchange => $symbols) {
-            foreach ($symbols as $symbol => $snapshot) {
+        foreach ($latest as $exchange => $exchangeSymbols) {
+            foreach ($exchangeSymbols as $symbol => $snapshot) {
                 $funding = $snapshot->funding_rate;
                 $oi = $snapshot->open_interest;
                 $absFunding = $funding !== null ? abs((float) $funding) : null;
@@ -84,6 +85,27 @@ class StrategiesFundingController extends Controller
             }
         }
 
+        foreach ($symbols as $sym) {
+            $rates = [];
+            $ois = [];
+            foreach ($exchanges as $ex) {
+                if (isset($latest[$ex][$sym])) {
+                    $r = $latest[$ex][$sym]->funding_rate;
+                    $o = $latest[$ex][$sym]->open_interest;
+                    if ($r !== null) { $rates[] = (float) $r; }
+                    if ($o !== null) { $ois[] = (float) $o; }
+                }
+            }
+            $avgFunding = !empty($rates) ? array_sum($rates) / count($rates) : null;
+            $sumOi = !empty($ois) ? array_sum($ois) : null;
+            $aggregates[$sym] = [
+                'avg_funding_rate' => $avgFunding,
+                'sum_open_interest' => $sumOi,
+                'funding_count' => count($rates),
+                'oi_count' => count($ois),
+            ];
+        }
+
         $worstLevel = 'normal';
 
         foreach ($levels as $exchangeLevels) {
@@ -110,7 +132,7 @@ class StrategiesFundingController extends Controller
             'levels' => $levels,
             'worst_level' => $worstLevel,
             'message' => $message,
+            'aggregates' => $aggregates,
         ];
     }
 }
-

@@ -201,6 +201,7 @@
             <a href="#" onclick="toggleStrategiesMenu(event)">استراتژی‌ها ▼</a>
             <div id="strategiesMenu" class="dropdown-list">
                 <a href="{{ route('strategies.macd') }}">MACD Strategy</a>
+                <a href="{{ route('strategies.funding') }}">تحلیل فاندینگ و اوپن اینترست</a>
             </div>
         </div>
 
@@ -242,8 +243,10 @@
 <!-- Mobile Sticky Footer -->
 <div id="dropup-menu" class="dropup-menu">
     <a href="{{ route('futures.orders') }}">سفارش‌ها</a>
+    <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
     <a href="{{ route('futures.journal') }}">ژورنال</a>
-    <a href="{{ route('strategies.macd') }}">استراتژی‌ها</a>
+    <a href="{{ route('strategies.macd') }}">استراتژی MACD</a>
+    <a href="{{ route('strategies.funding') }}">تحلیل فاندینگ و اوپن اینترست</a>
     <a href="{{ route('api.documentation') }}">مستندات</a>
 </div>
 <nav class="mobile-footer-nav">
@@ -309,7 +312,7 @@
         });
 
         // Only highlight dropdown menu items that match current path
-        const dropdownLinks = document.querySelectorAll('#futuresMenu a, #spotMenu a, #adminMenu a');
+        const dropdownLinks = document.querySelectorAll('#futuresMenu a, #spotMenu a, #adminMenu a, #strategiesMenu a');
         let hasActiveDropdownItem = false;
         dropdownLinks.forEach(link => {
             const href = link.getAttribute('href');

@@ -37,7 +37,7 @@ class MACDStrategyController extends Controller
             $comparisonData[$timeframe] = $this->calculateTrend($altcoinMacd, $baseMarketMacd);
         }
 
-        return view('macd.index', compact('comparisonData', 'altcoins', 'selectedAltcoin', 'baseMarket', 'timeframes'));
+        return view('strategies.macd', compact('comparisonData', 'altcoins', 'selectedAltcoin', 'baseMarket', 'timeframes'));
     }
 
     private function getPricesForSymbol(string $market, string $timeframe): array
