@@ -49,6 +49,20 @@
     .badge-critical { background: #3b0000; color: #fff; border: 1px solid rgba(220,53,69,0.35); }
     .badge-elevated { background: #1f1a00; color: #ffd66b; border: 1px solid rgba(255, 214, 107, 0.35); }
     .badge-normal { background: rgba(108,117,125,0.15); color: #6c757d; border: 1px solid rgba(108,117,125,0.35); }
+    .risk-legend {
+        margin: 10px 0 20px 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.05);
+        line-height: 1.8;
+    }
+    .risk-legend strong { display: block; margin-bottom: 6px; }
+    .chart-wrap { width: 100%; }
+    .chart-box { width: 100%; height: 360px; }
+    .latest-table .exchange-group-row { display: none; }
+    @media screen and (max-width: 768px) {
+        .chart-box { height: 320px; }
+    }
     @media screen and (max-width: 768px) {
         label { display: none; }
         table thead { display: none; }
@@ -73,6 +87,18 @@
             padding-left: 10px;
             text-align: left;
         }
+
+        .latest-table td.exchange-cell { display: none; }
+        .latest-table .exchange-group-row { display: block; }
+        .latest-table .exchange-group-row td {
+            display: block;
+            padding: 12px 15px;
+            font-weight: 800;
+            text-align: center;
+            background: rgba(255,255,255,0.06);
+            border-bottom: 0;
+        }
+        .latest-table .exchange-group-row td::before { content: ''; display: none; }
     }
 </style>
 @endpush
@@ -91,6 +117,22 @@
             <p style="margin: 0; line-height: 1.7;">
                 {{ $analysis['message'] }}
             </p>
+        </div>
+
+        <div class="risk-legend">
+            <strong>سطوح ریسک دقیقاً چه هستند؟</strong>
+            <div>
+                <span class="risk-badge badge-normal">نرمال</span>
+                زمانی که فاندینگ در محدوده طبیعی باشد و اوپن اینترست نسبت به میانگین ۳ روز اخیر جهش غیرعادی نداشته باشد.
+            </div>
+            <div>
+                <span class="risk-badge badge-elevated">بالا</span>
+                زمانی که فاندینگ از محدوده طبیعی عبور کند یا اوپن اینترست نسبت به میانگین ۳ روز اخیر افزایش قابل توجه داشته باشد.
+            </div>
+            <div>
+                <span class="risk-badge badge-critical">خیلی بالا</span>
+                زمانی که فاندینگ بسیار بزرگ باشد یا اوپن اینترست نسبت به میانگین ۳ روز اخیر جهش شدید داشته باشد.
+            </div>
         </div>
 
         <div class="table-responsive" style="margin-bottom: 20px;">
@@ -125,35 +167,36 @@
         </div>
 
         <div class="table-responsive" style="margin-bottom: 20px;">
-            <table>
+            <table class="latest-table">
                 <thead>
                     <tr>
                         <th>صرافی</th>
                         <th>نماد</th>
                         <th>فاندینگ</th>
                         <th>اوپن اینترست</th>
-                        <th>زمان داده</th>
                         <th>سطح ریسک</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($exchanges as $exchange)
-                        @foreach ($symbols as $symbol)
+                        <tr class="exchange-group-row">
+                            <td colspan="5">{{ strtoupper($exchange) }}</td>
+                        </tr>
+                        @foreach ($symbols as $idx => $symbol)
                             @php
                                 $snapshot = $latest[$exchange][$symbol] ?? null;
                                 $entry = $analysis['levels'][$exchange][$symbol] ?? null;
                             @endphp
                             <tr>
-                                <td data-label="صرافی">{{ strtoupper($exchange) }}</td>
+                                @if ($idx === 0)
+                                    <td data-label="صرافی" class="exchange-cell" rowspan="{{ count($symbols) }}">{{ strtoupper($exchange) }}</td>
+                                @endif
                                 <td data-label="نماد">{{ $symbol }}</td>
                                 <td data-label="فاندینگ" dir="ltr">
                                     {{ $snapshot && $snapshot->funding_rate !== null ? number_format($snapshot->funding_rate * 100, 4) . ' %' : 'نامشخص' }}
                                 </td>
                                 <td data-label="اوپن اینترست" dir="ltr">
                                     {{ $snapshot && $snapshot->open_interest !== null ? number_format($snapshot->open_interest, 2) : 'نامشخص' }}
-                                </td>
-                                <td data-label="زمان داده" dir="ltr">
-                                    {{ $snapshot && optional($snapshot->metric_time)->format('Y-m-d H:i') ?? 'نامشخص' }}
                                 </td>
                                 <td data-label="سطح ریسک">
                                     @if ($entry)
@@ -173,42 +216,89 @@
             </table>
         </div>
 
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>زمان</th>
-                        <th>صرافی</th>
-                        <th>نماد</th>
-                        <th>فاندینگ</th>
-                        <th>اوپن اینترست</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($history as $row)
-                        <tr>
-                            <td data-label="زمان" dir="ltr">
-                                {{ optional($row->metric_time)->format('Y-m-d H:i') ?? 'نامشخص' }}
-                            </td>
-                            <td data-label="صرافی">{{ strtoupper($row->exchange) }}</td>
-                            <td data-label="نماد">{{ $row->symbol ?? '-' }}</td>
-                            <td data-label="فاندینگ" dir="ltr">
-                                {{ $row->funding_rate !== null ? number_format($row->funding_rate * 100, 4) . ' %' : 'نامشخص' }}
-                            </td>
-                            <td data-label="اوپن اینترست" dir="ltr">
-                                {{ $row->open_interest !== null ? number_format($row->open_interest, 2) : 'نامشخص' }}
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" style="padding: 10px; text-align: center; color: #777;">
-                                هنوز داده‌ای برای نمایش ثبت نشده است. ابتدا همگام‌سازی را از طریق API یا دستور کنسول اجرا کنید.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+        <div class="chart-wrap" style="margin-top: 10px;">
+            <h3 style="margin: 0 0 10px 0;">تاریخچه فاندینگ</h3>
+            <div id="fundingHistoryChart" class="chart-box"></div>
+        </div>
+
+        <div class="chart-wrap" style="margin-top: 25px;">
+            <h3 style="margin: 0 0 10px 0;">تاریخچه اوپن اینترست</h3>
+            <div id="openInterestHistoryChart" class="chart-box"></div>
         </div>
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var fundingSeries = {!! json_encode($fundingSeries ?? []) !!};
+        var oiSeries = {!! json_encode($oiSeries ?? []) !!};
+
+        var common = {
+            chart: {
+                type: 'line',
+                height: 360,
+                toolbar: { show: true },
+                zoom: { enabled: true }
+            },
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 2 },
+            xaxis: {
+                type: 'datetime'
+            },
+            grid: {
+                borderColor: 'rgba(0, 0, 0, 0.08)'
+            },
+            legend: { show: true }
+        };
+
+        if (fundingSeries.length) {
+            var fundingOptions = Object.assign({}, common, {
+                series: fundingSeries,
+                yaxis: {
+                    labels: {
+                        formatter: function(val){ return (val || 0).toFixed(4) + '%'; }
+                    }
+                },
+                tooltip: {
+                    x: { format: 'yyyy-MM-dd HH:mm' },
+                    y: {
+                        formatter: function(val){ return (val || 0).toFixed(6) + '%'; }
+                    }
+                }
+            });
+            new ApexCharts(document.querySelector('#fundingHistoryChart'), fundingOptions).render();
+        } else {
+            document.querySelector('#fundingHistoryChart').innerHTML = '<div style="padding:10px; text-align:center; color:#777;">داده‌ای برای نمایش وجود ندارد.</div>';
+        }
+
+        if (oiSeries.length) {
+            var oiOptions = Object.assign({}, common, {
+                series: oiSeries,
+                yaxis: {
+                    labels: {
+                        formatter: function(val){
+                            if (val === null || val === undefined) return '-';
+                            return Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        }
+                    }
+                },
+                tooltip: {
+                    x: { format: 'yyyy-MM-dd HH:mm' },
+                    y: {
+                        formatter: function(val){
+                            if (val === null || val === undefined) return '-';
+                            return Number(val).toLocaleString(undefined, { maximumFractionDigits: 6 });
+                        }
+                    }
+                }
+            });
+            new ApexCharts(document.querySelector('#openInterestHistoryChart'), oiOptions).render();
+        } else {
+            document.querySelector('#openInterestHistoryChart').innerHTML = '<div style="padding:10px; text-align:center; color:#777;">داده‌ای برای نمایش وجود ندارد.</div>';
+        }
+    });
+</script>
+@endpush

@@ -19,5 +19,8 @@ class FuturesFundingSnapshot extends Model
         'total_market_value',
         'metric_time',
     ];
-}
 
+    protected $casts = [
+        'metric_time' => 'datetime',
+    ];
+}

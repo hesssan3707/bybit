@@ -387,10 +387,22 @@ class FuturesController extends Controller
         }
 
         try {
-            $riskStatus = Cache::get('market:risk');
-            if ($riskStatus === 'risky') {
+            $riskLevel = Cache::get('market:risk_level');
+            $riskMessage = Cache::get('market:risk_message');
+
+            if ($riskLevel === 'critical') {
                 $marketRiskLevel = 'critical';
-                $marketRiskMessage = 'هشدار: بر اساس وضعیت کلی بازار آتی (تجمیع فاندینگ و اوپن اینترست در صرافی‌های جهانی)، شرایط فعلی پرریسک است. لطفاً با احتیاط و اندازه ریسک محافظه‌کارانه ادامه دهید.';
+                if (is_string($riskMessage) && $riskMessage !== '') {
+                    $marketRiskMessage = $riskMessage;
+                } else {
+                    $marketRiskMessage = 'هشدار: بر اساس وضعیت کلی بازار آتی (تجمیع فاندینگ و اوپن اینترست در صرافی‌های جهانی)، شرایط فعلی پرریسک است. لطفاً با احتیاط و اندازه ریسک محافظه‌کارانه ادامه دهید.';
+                }
+            } else {
+                $riskStatus = Cache::get('market:risk');
+                if ($riskStatus === 'risky') {
+                    $marketRiskLevel = 'critical';
+                    $marketRiskMessage = 'هشدار: بر اساس وضعیت کلی بازار آتی (تجمیع فاندینگ و اوپن اینترست در صرافی‌های جهانی)، شرایط فعلی پرریسک است. لطفاً با احتیاط و اندازه ریسک محافظه‌کارانه ادامه دهید.';
+                }
             }
         } catch (\Throwable $e) {
         }

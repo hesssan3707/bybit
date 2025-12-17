@@ -196,7 +196,7 @@
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    @if(isset($marketRiskLevel) && in_array($marketRiskLevel, ['elevated','critical']) && $marketRiskMessage)
+    @if(isset($marketRiskLevel) && $marketRiskLevel === 'critical' && $marketRiskMessage)
         <div class="alert alert-warning">
             {{ $marketRiskMessage }}
         </div>
