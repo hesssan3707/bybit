@@ -52,6 +52,7 @@
 
         .profile-info {
             flex: 1;
+            text-align: right;
         }
 
         .profile-name {
@@ -71,6 +72,9 @@
             color: #bbb;
             font-size: 1.1em;
             font-weight: 400;
+            text-align: right;
+            direction: ltr;
+            unicode-bidi: embed;
         }
 
         .profile-actions {
@@ -551,6 +555,54 @@
             font-size: 0.85em;
         }
 
+        .name-edit-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.2s ease;
+        }
+        .name-edit-btn:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.22);
+        }
+        .name-inline-editor {
+            display: none;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .name-inline-editor input {
+            max-width: 320px;
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            outline: none;
+        }
+        .name-inline-editor .mini-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .name-inline-editor .mini-btn.save { background: linear-gradient(135deg, #28a745, #1e7e34); color: #fff; }
+        .name-inline-editor .mini-btn.cancel { background: linear-gradient(135deg, #6c757d, #495057); color: #fff; }
+
         .form-row {
             display: flex;
             gap: 15px;
@@ -600,6 +652,25 @@
             border: none;
             cursor: pointer;
             padding: 5px;
+        }
+
+        .watcher-edit-btn {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.35);
+            color: #c7d2fe;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+        .watcher-edit-btn:hover {
+            transform: translateY(-1px);
+            background: rgba(102, 126, 234, 0.28);
+            border-color: rgba(102, 126, 234, 0.55);
         }
 
         @media (max-width: 768px) {
@@ -991,8 +1062,11 @@
 
             .profile-header {
                 flex-direction: column;
-                text-align: center;
+                text-align: right;
                 gap: 15px;
+            }
+            .profile-info {
+                width: 100%;
             }
 
             .profile-avatar {
@@ -1056,7 +1130,21 @@
                     <i class="fas fa-user-circle"></i>
                 </div>
                 <div class="profile-info">
-                    <h2 class="profile-name">{{ $user->name ?? 'کاربر' }}</h2>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; text-align:right;margin-bottom:10px">
+                        <h2 class="profile-name" id="profileNameText" style="margin:0;">{{ $user->name ?? 'کاربر' }}</h2>
+                        <button type="button" class="name-edit-btn" id="profileNameEditBtn" aria-label="ویرایش نام" title="ویرایش نام">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </div>
+                    <div class="name-inline-editor" id="profileNameEditor">
+                        <input type="text" id="profileNameInput" value="{{ $user->name ?? '' }}" maxlength="255" />
+                        <button type="button" class="mini-btn save" id="profileNameSaveBtn" aria-label="ذخیره" title="ذخیره">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button type="button" class="mini-btn cancel" id="profileNameCancelBtn" aria-label="انصراف" title="انصراف">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                     <p class="profile-email">{{ $user->email }}</p>
                 </div>
             </div>
@@ -1066,24 +1154,28 @@
                     <i class="fas fa-key"></i>
                     <span>تغییر رمز عبور</span>
                 </a>
-                <a href="{{ route('account-settings.index') }}" class="profile-action-btn">
-                    <i class="fas fa-cog"></i>
-                    <span>تنظیمات</span>
-                </a>
-                <a href="{{ route('exchanges.index') }}" class="profile-action-btn">
-                    <i class="fas fa-exchange-alt"></i>
-                    <span>مدیریت صرافی‌ها</span>
-                </a>
+                @if(!$user->isWatcher())
+                    <a href="{{ route('account-settings.index') }}" class="profile-action-btn">
+                        <i class="fas fa-cog"></i>
+                        <span>تنظیمات</span>
+                    </a>
+                    <a href="{{ route('exchanges.index') }}" class="profile-action-btn">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>مدیریت صرافی‌ها</span>
+                    </a>
+                @endif
                 @if(auth()->user()->isAdmin())
                     <a href="{{ route('admin.all-users') }}" class="profile-action-btn admin">
                         <i class="fas fa-user-shield"></i>
                         <span>پنل مدیریت</span>
                     </a>
                 @endif
-                <a href="#" onclick="event.preventDefault(); openTicketModal();" class="profile-action-btn">
-                    <i class="fas fa-headset"></i>
-                    <span>پشتیبانی</span>
-                </a>
+                @if(!$user->isWatcher())
+                    <a href="#" onclick="event.preventDefault(); openTicketModal();" class="profile-action-btn">
+                        <i class="fas fa-headset"></i>
+                        <span>پشتیبانی</span>
+                    </a>
+                @endif
                 <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="profile-action-btn danger">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>خروج از حساب</span>
@@ -1112,27 +1204,13 @@
             @endif
 
             @if($watchers->count() < 3)
-            <div class="watcher-form">
-                <h4><i class="fas fa-plus-circle"></i> افزودن ناظر جدید</h4>
-                <form action="{{ route('profile.watchers.store') }}" method="POST">
-                    @csrf
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>نام ناظر</label>
-                            <input type="text" name="name" class="form-control" placeholder="مثلاً: علی رضایی" required>
-                        </div>
-                        <div class="form-group">
-                            <label>ایمیل ناظر</label>
-                            <input type="email" name="email" class="form-control" placeholder="example@gmail.com" required>
-                        </div>
-                        <div class="form-group">
-                            <label>رمز عبور</label>
-                            <input type="password" name="password" class="form-control" placeholder="********" required>
-                        </div>
+                <div class="watcher-form" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                    <div style="color:#fff; font-weight:600;">
+                        <i class="fas fa-plus-circle"></i>
+                        افزودن ناظر جدید
                     </div>
-                    <button type="submit" class="submit-btn">ثبت ناظر</button>
-                </form>
-            </div>
+                    <button type="button" class="submit-btn" onclick="openWatcherCreateModal()">ایجاد ناظر</button>
+                </div>
             @endif
 
             <div class="watcher-grid">
@@ -1142,17 +1220,100 @@
                             <span class="watcher-name">{{ $watcher->name }}</span>
                             <span class="watcher-email">{{ $watcher->real_email }}</span>
                         </div>
-                        <form action="{{ route('profile.watchers.destroy', $watcher->id) }}" method="POST" onsubmit="return confirm('آیا از حذف این ناظر اطمینان دارید؟');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="delete-btn">
-                                <i class="fas fa-trash-alt"></i>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button type="button" class="watcher-edit-btn" onclick="openWatcherEditModal({{ $watcher->id }}, @js($watcher->name), @js($watcher->real_email))" title="ویرایش" aria-label="ویرایش">
+                                <i class="fas fa-user-pen"></i>
                             </button>
-                        </form>
+                            <form action="{{ route('profile.watchers.destroy', $watcher->id) }}" method="POST" class="modern-confirm-form" data-title="حذف ناظر" data-message="آیا از حذف این ناظر اطمینان دارید؟">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="delete-btn" title="حذف" aria-label="حذف">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 @empty
                     <p style="color: #888; text-align: center; grid-column: 1/-1;">هنوز هیچ ناظری اضافه نشده است.</p>
                 @endforelse
+            </div>
+
+            <div id="watcherCreateModal" class="ticket-modal-overlay" style="display:none;">
+                <div class="ticket-modal-container">
+                    <div class="ticket-modal-content">
+                        <div class="ticket-modal-header">
+                            <div class="ticket-modal-title">
+                                <i class="fas fa-users-viewfinder"></i>
+                                <h3>ایجاد ناظر</h3>
+                            </div>
+                            <button type="button" class="ticket-modal-close" onclick="closeWatcherCreateModal()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="ticket-modal-body">
+                            <form action="{{ route('profile.watchers.store') }}" method="POST" id="watcherCreateForm">
+                                @csrf
+                                <div class="form-group">
+                                    <label class="form-label">نام ناظر</label>
+                                    <input type="text" name="name" class="form-control" placeholder="مثلاً: علی رضایی" required maxlength="255">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">ایمیل ناظر</label>
+                                    <input type="email" name="email" class="form-control" placeholder="example@gmail.com" required maxlength="255">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">رمز عبور</label>
+                                    <input type="password" name="password" class="form-control" placeholder="********" required minlength="8">
+                                </div>
+                                <button type="submit" class="btn-submit">
+                                    <span class="btn-text">
+                                        <i class="fas fa-check"></i>
+                                        ثبت ناظر
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="watcherEditModal" class="ticket-modal-overlay" style="display:none;">
+                <div class="ticket-modal-container">
+                    <div class="ticket-modal-content">
+                        <div class="ticket-modal-header">
+                            <div class="ticket-modal-title">
+                                <i class="fas fa-user-pen"></i>
+                                <h3>ویرایش ناظر</h3>
+                            </div>
+                            <button type="button" class="ticket-modal-close" onclick="closeWatcherEditModal()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="ticket-modal-body">
+                            <form method="POST" id="watcherEditForm">
+                                @csrf
+                                <div class="form-group">
+                                    <label class="form-label">نام ناظر</label>
+                                    <input type="text" name="name" class="form-control" id="watcherEditName" required maxlength="255">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">ایمیل ناظر</label>
+                                    <input type="email" name="email" class="form-control" id="watcherEditEmail" required maxlength="255">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">رمز عبور جدید (اختیاری)</label>
+                                    <input type="password" name="password" class="form-control" placeholder="********" minlength="8">
+                                </div>
+                                <button type="submit" class="btn-submit">
+                                    <span class="btn-text">
+                                        <i class="fas fa-save"></i>
+                                        ذخیره تغییرات
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         @endif
@@ -1203,11 +1364,15 @@
                 </div>
                 <div class="no-exchange-content">
                     <h3>صرافی فعالی ندارید</h3>
-                    <p>برای شروع معاملات، ابتدا یک صرافی اضافه کنید</p>
-                    <a href="{{ route('exchanges.create') }}" class="add-exchange-btn">
-                        <i class="fas fa-plus"></i>
-                        افزودن صرافی
-                    </a>
+                    @if($user->isWatcher())
+                        <p>برای نمایش اطلاعات، ابتدا باید برای حساب اصلی یک صرافی فعال باشد</p>
+                    @else
+                        <p>برای شروع معاملات، ابتدا یک صرافی اضافه کنید</p>
+                        <a href="{{ route('exchanges.create') }}" class="add-exchange-btn">
+                            <i class="fas fa-plus"></i>
+                            افزودن صرافی
+                        </a>
+                    @endif
                 </div>
             </div>
         @endif
@@ -1360,5 +1525,153 @@
                 }
             );
         }
+
+        function openWatcherCreateModal() {
+            const modal = document.getElementById('watcherCreateModal');
+            if (!modal) return;
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+            modal.style.zIndex = '20000';
+            modal.style.display = 'flex';
+            setTimeout(function() { modal.classList.add('show'); }, 10);
+        }
+
+        function closeWatcherCreateModal() {
+            const modal = document.getElementById('watcherCreateModal');
+            if (!modal) return;
+            modal.classList.remove('show');
+            setTimeout(function() { modal.style.display = 'none'; }, 300);
+        }
+
+        function openWatcherEditModal(id, name, email) {
+            const modal = document.getElementById('watcherEditModal');
+            const form = document.getElementById('watcherEditForm');
+            const nameInput = document.getElementById('watcherEditName');
+            const emailInput = document.getElementById('watcherEditEmail');
+            if (!modal || !form || !nameInput || !emailInput) return;
+
+            nameInput.value = name || '';
+            emailInput.value = email || '';
+            form.action = `{{ url('/profile/watchers') }}/${id}`;
+
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+            modal.style.zIndex = '20000';
+            modal.style.display = 'flex';
+            setTimeout(function() { modal.classList.add('show'); }, 10);
+        }
+
+        function closeWatcherEditModal() {
+            const modal = document.getElementById('watcherEditModal');
+            if (!modal) return;
+            modal.classList.remove('show');
+            setTimeout(function() { modal.style.display = 'none'; }, 300);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashSuccess = @js(session('success'));
+            const flashError = @js(session('error'));
+            if (typeof showToast === 'function') {
+                if (flashSuccess) showToast(flashSuccess, 'success', 4000);
+                if (flashError) showToast(flashError, 'error', 5500);
+            }
+
+            document.querySelectorAll('.modern-confirm-form').forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const title = form.getAttribute('data-title') || 'تایید اقدام';
+                    const message = form.getAttribute('data-message') || 'آیا از انجام این عملیات مطمئن هستید؟';
+                    modernConfirm(title, message, function() { form.submit(); });
+                });
+            });
+
+            const nameText = document.getElementById('profileNameText');
+            const editBtn = document.getElementById('profileNameEditBtn');
+            const editor = document.getElementById('profileNameEditor');
+            const input = document.getElementById('profileNameInput');
+            const saveBtn = document.getElementById('profileNameSaveBtn');
+            const cancelBtn = document.getElementById('profileNameCancelBtn');
+
+            const showEditor = function() {
+                if (!editor || !input || !nameText) return;
+                editor.style.display = 'flex';
+                if (editBtn) editBtn.style.display = 'none';
+                input.focus();
+                input.select();
+            };
+
+            const hideEditor = function() {
+                if (!editor || !input) return;
+                editor.style.display = 'none';
+                if (editBtn) editBtn.style.display = 'inline-flex';
+                input.value = nameText ? (nameText.textContent || '').trim() : input.value;
+            };
+
+            const saveName = async function() {
+                if (!input) return;
+                const newName = (input.value || '').trim();
+                if (!newName) {
+                    modernAlert('نام الزامی است.', 'error');
+                    return;
+                }
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    const resp = await fetch(`{{ route('profile.update-name') }}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken || '',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ name: newName })
+                    });
+
+                    const json = await resp.json().catch(function() { return null; });
+                    if (!resp.ok || !json || !json.success) {
+                        modernAlert((json && json.message) ? json.message : 'خطا در ذخیره نام.', 'error');
+                        return;
+                    }
+
+                    if (nameText) nameText.textContent = json.name || newName;
+                    hideEditor();
+                    showToast('نام با موفقیت ذخیره شد.', 'success', 2500);
+                } catch (e) {
+                    modernAlert('خطا در ارتباط با سرور.', 'error');
+                }
+            };
+
+            if (editBtn) editBtn.addEventListener('click', function() { showEditor(); });
+            if (cancelBtn) cancelBtn.addEventListener('click', function() { hideEditor(); });
+            if (saveBtn) saveBtn.addEventListener('click', function() { saveName(); });
+
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveName();
+                    }
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        hideEditor();
+                    }
+                });
+            }
+
+            const createModal = document.getElementById('watcherCreateModal');
+            if (createModal) {
+                createModal.addEventListener('click', function(e) {
+                    if (e.target === createModal) closeWatcherCreateModal();
+                });
+            }
+            const editModal = document.getElementById('watcherEditModal');
+            if (editModal) {
+                editModal.addEventListener('click', function(e) {
+                    if (e.target === editModal) closeWatcherEditModal();
+                });
+            }
+        });
     </script>
 @endsection

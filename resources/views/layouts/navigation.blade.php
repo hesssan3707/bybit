@@ -192,7 +192,9 @@
                 <a href="{{ route('futures.orders') }}">تاریخچه سفارش‌ها</a>
                 <a href="{{ route('futures.pnl_history') }}">سود و زیان</a>
                 <a href="{{ route('futures.journal') }}">ژورنال</a>
-                <a href="{{ route('futures.order.create') }}">سفارش آتی جدید</a>
+                @if(!auth()->user()?->isWatcher())
+                    <a href="{{ route('futures.order.create') }}">سفارش آتی جدید</a>
+                @endif
             </div>
         </div>
 
@@ -210,7 +212,9 @@
             <a href="#" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
             <div id="spotMenu" class="dropdown-list">
                 <a href="{{ route('spot.orders.view') }}">سفارش‌های اسپات</a>
-                <a href="{{ route('spot.order.create.view') }}">سفارش اسپات جدید</a>
+                @if(!auth()->user()?->isWatcher())
+                    <a href="{{ route('spot.order.create.view') }}">سفارش اسپات جدید</a>
+                @endif
             </div>
         </div>
 
@@ -250,15 +254,17 @@
     <a href="{{ route('api.documentation') }}">مستندات</a>
 </div>
 <nav class="mobile-footer-nav">
-    <a href="{{ route('futures.order.create') }}">
-        <span class="icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 8v8M8 12h8"></path>
-            </svg>
-        </span>
-        <span>جدید</span>
-    </a>
+    @if(!auth()->user()?->isWatcher())
+        <a href="{{ route('futures.order.create') }}">
+            <span class="icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 8v8M8 12h8"></path>
+                </svg>
+            </span>
+            <span>جدید</span>
+        </a>
+    @endif
     <a href="{{ route('spot.orders.view') }}">
         <span class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">

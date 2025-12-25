@@ -45,10 +45,10 @@ class RestrictWatcher
                 return $next($request);
             }
 
-            // Allow order cancellation (Future feature, but keeping it for now if needed)
-            // For now, let's stick to "only view" as per current requirement
             $allowedRoutes = [
                 'exchanges.switch',
+                'password.change',
+                'profile.update-name',
             ];
 
             foreach ($allowedRoutes as $route) {

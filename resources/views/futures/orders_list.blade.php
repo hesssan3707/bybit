@@ -251,11 +251,13 @@
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
                                 <a href="{{ route('futures.order.edit', $order) }}" class="edit-btn" style="margin-left:8px">ویرایش</a>
-                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="delete-btn">لغو کردن</button>
-                                </form>
+                                @if(!auth()->user()?->isWatcher())
+                                    <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="delete-btn">لغو کردن</button>
+                                    </form>
+                                @endif
                             @elseif($order->status === 'filled')
                                 <button type="button" class="icon-btn view-order-btn" data-order-id="{{ $order->id }}" title="نمایش نمودار سفارش" aria-label="نمایش نمودار سفارش" style="margin-left:8px">
                                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -275,7 +277,7 @@
                                         <path d="M7 13h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
                                     </svg>
                                 </button>
-                                @if(!$answered)
+                                @if(!$answered && !auth()->user()?->isWatcher())
                                     <button type="button" class="icon-btn open-strategy-modal-btn" data-order-id="{{ $order->id }}" onclick="window.openStrategyModal({{ $order->id }})" title="ارزیابی استراتژی" aria-label="ارزیابی استراتژی" style="margin-left:8px">
                                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
@@ -294,17 +296,19 @@
                                         <button type="submit" class="edit-btn" style="margin-left:8px">ارسال مجدد</button>
                                     </form>
                                 @endif
-                                <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="icon-btn" title="حذف" aria-label="حذف">
-                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                            <path d="M6 7h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                                            <path d="M9 7V5h6v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                                            <path d="M7 7l1 12c.1 1 1 2 2 2h4c1 0 1.9-1 2-2l1-12" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                                @if(!auth()->user()?->isWatcher())
+                                    <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="icon-btn danger" title="حذف" aria-label="حذف">
+                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M6 7h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                                <path d="M9 7V5h6v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                                <path d="M7 7l1 12c.1 1 1 2 2 2h4c1 0 1.9-1 2-2l1-12" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                @endif
                             @else
                                 -
                             @endif

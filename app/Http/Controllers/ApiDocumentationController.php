@@ -12,6 +12,9 @@ class ApiDocumentationController extends Controller
      */
     public function index()
     {
+        if (auth()->check() && auth()->user() && auth()->user()->isWatcher()) {
+            return redirect()->route('futures.orders')->with('error', 'کاربر ناظر اجازه دسترسی به این بخش را ندارد.');
+        }
         return view('api-documentation.index');
     }
 }

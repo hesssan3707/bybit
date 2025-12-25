@@ -134,7 +134,7 @@ class User extends Authenticatable
     public function getRealEmailAttribute()
     {
         if ($this->isWatcher()) {
-            return str_replace('Watcher-', '', $this->email);
+            return preg_replace('/^watcher\s*-\s*/i', '', (string)$this->email);
         }
         return $this->email;
     }
@@ -271,12 +271,24 @@ class User extends Authenticatable
      */
     public static function findByEmail($email)
     {
-        $user = self::where('email', $email)->first();
-        if (!$user) {
-            // Check for watcher account if not found by direct email
-            $user = self::where('email', 'Watcher-' . $email)->first();
+        $input = trim((string)$email);
+        if ($input === '') {
+            return null;
         }
-        return $user;
+
+        if (preg_match('/^watcher\s*-\s*/i', $input)) {
+            $normalized = preg_replace('/^watcher\s*-\s*/i', 'watcher-', $input);
+            $normalized = strtolower($normalized);
+            $raw = preg_replace('/^watcher-/', '', $normalized);
+
+            return self::whereIn('email', [
+                $normalized,
+                'Watcher-' . $raw,
+                'Watcher - ' . $raw,
+            ])->first();
+        }
+
+        return self::where('email', $input)->first();
     }
 
     /**

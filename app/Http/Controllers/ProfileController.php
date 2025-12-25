@@ -134,14 +134,23 @@ class ProfileController extends Controller
             'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
         ]);
 
-        $watcherEmail = 'Watcher-' . $request->email;
+        $realEmail = strtolower(trim($request->email));
+        $realEmail = preg_replace('/^watcher\s*-\s*/i', '', $realEmail);
+        $watcherEmail = 'watcher-' . $realEmail;
 
-        if (User::where('email', $watcherEmail)->exists()) {
+        $legacyWatcherEmails = [
+            $watcherEmail,
+            'Watcher-' . $realEmail,
+            'Watcher - ' . $realEmail,
+        ];
+
+        if (User::whereIn('email', $legacyWatcherEmails)->exists()) {
             return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان ناظر ثبت شده است.');
         }
 
         User::create([
             'name' => $request->name,
+            'username' => $watcherEmail,
             'email' => $watcherEmail,
             'password' => Hash::make($request->password),
             'parent_id' => $user->id,
@@ -154,6 +163,52 @@ class ProfileController extends Controller
         return redirect()->back()->with('success', 'کاربر ناظر با موفقیت ایجاد شد.');
     }
 
+    public function updateWatcher(Request $request, $id)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'password' => 'nullable|string|min:8',
+        ], [
+            'name.required' => 'نام الزامی است.',
+            'email.required' => 'ایمیل الزامی است.',
+            'email.email' => 'ایمیل نامعتبر است.',
+            'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+        ]);
+
+        $watcher = $user->watchers()->findOrFail($id);
+
+        $realEmail = strtolower(trim($request->email));
+        $realEmail = preg_replace('/^watcher\s*-\s*/i', '', $realEmail);
+        $watcherEmail = 'watcher-' . $realEmail;
+
+        $legacyWatcherEmails = [
+            $watcherEmail,
+            'Watcher-' . $realEmail,
+            'Watcher - ' . $realEmail,
+        ];
+
+        if ($watcher->email !== $watcherEmail && User::whereIn('email', $legacyWatcherEmails)->exists()) {
+            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان ناظر ثبت شده است.');
+        }
+
+        $update = [
+            'name' => $request->name,
+            'email' => $watcherEmail,
+            'username' => $watcherEmail,
+        ];
+
+        if ($request->filled('password')) {
+            $update['password'] = Hash::make($request->password);
+        }
+
+        $watcher->update($update);
+
+        return redirect()->back()->with('success', 'اطلاعات ناظر با موفقیت به‌روزرسانی شد.');
+    }
+
     public function deleteWatcher($id)
     {
         $user = Auth::user();
@@ -162,5 +217,25 @@ class ProfileController extends Controller
         $watcher->delete();
 
         return redirect()->back()->with('success', 'کاربر ناظر با موفقیت حذف شد.');
+    }
+
+    public function updateName(Request $request)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ], [
+            'name.required' => 'نام الزامی است.',
+        ]);
+
+        $user->update([
+            'name' => $request->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'name' => $user->name,
+        ]);
     }
 }

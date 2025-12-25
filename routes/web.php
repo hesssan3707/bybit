@@ -95,7 +95,9 @@ Route::middleware(['auth', 'restrict.watcher'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
     Route::post('/profile/watchers', [ProfileController::class, 'storeWatcher'])->name('profile.watchers.store');
+    Route::post('/profile/watchers/{id}', [ProfileController::class, 'updateWatcher'])->name('profile.watchers.update');
     Route::delete('/profile/watchers/{id}', [ProfileController::class, 'deleteWatcher'])->name('profile.watchers.destroy');
+    Route::post('/profile/update-name', [ProfileController::class, 'updateName'])->name('profile.update-name');
 
     Route::prefix('strategies')->name('strategies.')->group(function () {
         Route::get('/macd', [MACDStrategyController::class, 'index'])->name('macd');

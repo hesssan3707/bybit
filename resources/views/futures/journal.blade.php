@@ -214,20 +214,22 @@
                 <h3 style="margin: 0; font-size: 1.2em; font-weight: 600;">دوره‌های معاملاتی</h3>
             </div>
             
-            <div style="display: flex; gap: 10px;">
-                <button type="button" class="btn btn-start-period" onclick="openStartPeriodModal()" title="شروع دوره جدید" 
-                    style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--primary-color, #ffc107); color: #000; border: none; transition: transform 0.2s;">
-                    <i class="fas fa-plus" style="font-size: 16px;"></i>
-                </button>
-                
-                <form method="POST" action="{{ route('futures.periods.recompute_all') }}" id="recomputeAllForm" style="margin: 0;">
-                    @csrf
-                    <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" title="بروزرسانی همه دوره‌ها" 
-                        style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;">
-                        <i class="fas fa-sync" style="font-size: 16px;"></i>
+            @if(!auth()->user()?->isWatcher())
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-start-period" onclick="openStartPeriodModal()" title="شروع دوره جدید" 
+                        style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--primary-color, #ffc107); color: #000; border: none; transition: transform 0.2s;">
+                        <i class="fas fa-plus" style="font-size: 16px;"></i>
                     </button>
-                </form>
-            </div>
+                    
+                    <form method="POST" action="{{ route('futures.periods.recompute_all') }}" id="recomputeAllForm" style="margin: 0;">
+                        @csrf
+                        <button type="submit" class="btn btn-start-period" id="recomputeAllBtn" title="بروزرسانی همه دوره‌ها" 
+                            style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;">
+                            <i class="fas fa-sync" style="font-size: 16px;"></i>
+                        </button>
+                    </form>
+                </div>
+            @endif
         </div>
 
         <!-- Messages -->
@@ -267,7 +269,7 @@
                         <span>{{ $per->ended_at ? $per->ended_at->format('Y-m-d') : 'اکنون' }}</span>
                     </div>
 
-                    @if($per->is_active && !$per->is_default)
+                    @if($per->is_active && !$per->is_default && !auth()->user()?->isWatcher())
                         <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; display: flex; justify-content: flex-end;">
                             <form method="POST" action="{{ route('futures.periods.end', ['period' => $per->id]) }}">
                                 @csrf
@@ -336,35 +338,37 @@
         </style>
     </div>
 
-    <!-- Start Period Modal - using modern alert modal styles -->
-    <div id="startPeriodModal" class="alert-modal-overlay" style="display: none;">
-        <div class="alert-modal-container">
-            <div class="alert-modal-content">
-                <div class="alert-modal-header">
-                    <div class="alert-modal-icon success">
-                        <i class="fas fa-hourglass-start"></i>
-                    </div>
-                    <h3>شروع دوره جدید</h3>
-                    <button class="alert-modal-close" type="button" aria-label="بستن" onclick="closeStartPeriodModal()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <form id="startPeriodForm" method="POST" action="{{ route('futures.periods.start') }}" onsubmit="return validateStartPeriodForm(this)">
-                    @csrf
-                    <div class="alert-modal-body">
-                        <div style="display:flex; flex-direction:column; gap:10px; text-align:start;">
-                            <label for="periodName" style="font-weight:600; color:#333;">نام دوره </label>
-                            <input id="periodName" type="text" name="name" class="form-control modern-input" placeholder="مثلاً: فصل پاییز یا کمپین Q3" required />
+    @if(!auth()->user()?->isWatcher())
+        <!-- Start Period Modal - using modern alert modal styles -->
+        <div id="startPeriodModal" class="alert-modal-overlay" style="display: none;">
+            <div class="alert-modal-container">
+                <div class="alert-modal-content">
+                    <div class="alert-modal-header">
+                        <div class="alert-modal-icon success">
+                            <i class="fas fa-hourglass-start"></i>
                         </div>
+                        <h3>شروع دوره جدید</h3>
+                        <button class="alert-modal-close" type="button" aria-label="بستن" onclick="closeStartPeriodModal()">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
-                    <div class="alert-modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="closeStartPeriodModal()">انصراف</button>
-                        <button type="submit" class="btn btn-primary">شروع</button>
-                    </div>
-                </form>
+                    <form id="startPeriodForm" method="POST" action="{{ route('futures.periods.start') }}" onsubmit="return validateStartPeriodForm(this)">
+                        @csrf
+                        <div class="alert-modal-body">
+                            <div style="display:flex; flex-direction:column; gap:10px; text-align:start;">
+                                <label for="periodName" style="font-weight:600; color:#333;">نام دوره </label>
+                                <input id="periodName" type="text" name="name" class="form-control modern-input" placeholder="مثلاً: فصل پاییز یا کمپین Q3" required />
+                            </div>
+                        </div>
+                        <div class="alert-modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeStartPeriodModal()">انصراف</button>
+                            <button type="submit" class="btn btn-primary">شروع</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
+    @endif
 
     <div class="stats-grid">
         <!-- Row 1: PNL -->
@@ -556,13 +560,16 @@
         };
         window.closeStartPeriodModal = function() {
             const modal = document.getElementById('startPeriodModal');
+            if (!modal) return;
             modal.classList.remove('show');
             setTimeout(() => { modal.style.display = 'none'; }, 300);
             document.body.classList.remove('modal-open');
         };
         // Close on overlay click
         const overlay = document.getElementById('startPeriodModal');
-        overlay.addEventListener('click', function(e){ if(e.target === overlay){ closeStartPeriodModal(); } });
+        if (overlay) {
+            overlay.addEventListener('click', function(e){ if(e.target === overlay){ closeStartPeriodModal(); } });
+        }
         // Close on escape
         document.addEventListener('keydown', function(e){
             if(e.key === 'Escape'){
@@ -601,7 +608,9 @@
         });
         // Initialize state when modal opens
         const modal = document.getElementById('startPeriodModal');
-        modal.addEventListener('transitionend', function(){ updateStartBtn(); });
+        if (modal) {
+            modal.addEventListener('transitionend', function(){ updateStartBtn(); });
+        }
         // Also initialize after DOM ready
         updateStartBtn();
         // PnL Per Trade Chart

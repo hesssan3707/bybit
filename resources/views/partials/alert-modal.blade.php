@@ -444,6 +444,10 @@ document.addEventListener('DOMContentLoaded', function() {
     .toast-overlay.show { opacity: 1; }
     .toast-container { background: rgba(0,0,0,0.96); color: #fff; border-radius: 6px; padding: 16px 24px; min-width: 300px; max-width: 60vw; text-align: center; box-shadow: 0 12px 32px rgba(0,0,0,0.45); margin: 18px; pointer-events: all; cursor: pointer; transform-origin: top left; will-change: transform, opacity; }
     #toastMessage { font-weight: 800; letter-spacing: .3px; font-size: 16px; }
+    @media (max-width: 768px) {
+        .toast-overlay { justify-content: center; }
+        .toast-container { min-width: auto; width: calc(100vw - 24px); max-width: calc(100vw - 24px); margin: 12px; transform-origin: top center; }
+    }
 
     @keyframes toastFlipIn {
         0% { transform: rotateX(90deg) translateY(-6px); opacity: 0; }
