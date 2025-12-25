@@ -1091,26 +1091,41 @@ class FuturesController extends Controller
                  throw new \Exception("مقدار سفارش ({$finalQty}) کمتر از حداقل مجاز ({$minQty}) است.");
             }
 
+            $oldEntryPrice = round((float)$order->entry_price, $pricePrec);
+            $oldQty = (float)$order->amount;
+
+            $priceTol = (pow(10, -$pricePrec) / 2);
+            $qtyTol = max($qtyStep / 2, 1e-12);
+
+            $corePriceChanged = abs($newEntryPrice - $oldEntryPrice) > $priceTol;
+            $coreQtyChanged = abs($finalQty - $oldQty) > $qtyTol;
+            $coreParamsToAmend = [];
+            if ($coreQtyChanged) {
+                $coreParamsToAmend['qty'] = (string)$finalQty;
+            }
+            if ($corePriceChanged) {
+                $coreParamsToAmend['price'] = (string)$newEntryPrice;
+            }
+
+            $shouldSendAmend = count($coreParamsToAmend) > 0;
             $params = [
                 'symbol' => $symbol,
                 'orderId' => $order->order_id,
-                'qty' => (string)$finalQty,
             ];
-
-            if ($newEntryPrice != $order->entry_price) {
-                $params['price'] = (string)$newEntryPrice;
-            }
-            if ($newSl != $order->sl) {
-                $params['stopLoss'] = (string)$newSl;
-            }
-            if ($newTp != $order->tp) {
-                $params['takeProfit'] = (string)$newTp;
+            if ($shouldSendAmend) {
+                $params = array_merge($params, $coreParamsToAmend);
+                if ($newSl != $order->sl) {
+                    $params['stopLoss'] = (string)$newSl;
+                }
+                if ($newTp != $order->tp) {
+                    $params['takeProfit'] = (string)$newTp;
+                }
             }
 
             try {
                 DB::beginTransaction();
 
-                if (count($params) > 2) {
+                if ($shouldSendAmend && count($params) > 2) {
                     $result = $exchangeService->amendOrder($params);
                     
                     // Check if orderId changed (BingX Cancel-Replace)
