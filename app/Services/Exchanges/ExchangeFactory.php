@@ -89,6 +89,19 @@ class ExchangeFactory
      */
     public static function createForUser(int $userId, ?string $exchangeName = null): ExchangeApiServiceInterface
     {
+        $user = \App\Models\User::find($userId);
+        
+        if ($user && $user->isWatcher()) {
+            // If watcher has a specific exchange they are currently viewing, and no specific exchangeName is requested
+            if (!$exchangeName && $user->current_exchange_id) {
+                $userExchange = UserExchange::find($user->current_exchange_id);
+                if ($userExchange && $userExchange->user_id == $user->parent_id && $userExchange->is_active) {
+                    return self::createForUserExchangeWithCredentialType($userExchange, 'auto');
+                }
+            }
+            $userId = $user->parent_id;
+        }
+
         $query = UserExchange::where('user_id', $userId)->active();
         
         if ($exchangeName) {

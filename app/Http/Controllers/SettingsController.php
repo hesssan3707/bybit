@@ -151,7 +151,7 @@ class SettingsController extends Controller
 
             // Persist minimum RR ratio selection (default to 3:1 if not provided)
             $selectedRr = $request->input('min_rr_ratio', '3:1');
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
             UserAccountSetting::setMinRrRatio($user->id, $selectedRr, $isDemo);
 

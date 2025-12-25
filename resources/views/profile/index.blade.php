@@ -499,6 +499,118 @@
             gap:10px;
         }
 
+        /* Watchers Section Styles */
+        .watchers-section {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.05));
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .watcher-form {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .watcher-form h4 {
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .watcher-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .watcher-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .watcher-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .watcher-name {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .watcher-email {
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #bbb;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            color: #fff;
+            outline: none;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .delete-btn {
+            color: #ff4757;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+            }
+            .form-group {
+                width: 100%;
+            }
+        }
+
         .exchange-logo {
             width: 50px;
             height: 50px;
@@ -978,6 +1090,72 @@
                 </a>
             </div>
         </div>
+
+        @if(!$user->isWatcher())
+        <!-- Watchers Management Section -->
+        <div class="watchers-section">
+            <div class="section-header">
+                <h3><i class="fas fa-users-viewfinder"></i> مدیریت ناظران</h3>
+                <span class="exchange-count">{{ $watchers->count() }} / ۳</span>
+            </div>
+
+            @if(session('success'))
+                <div class="alert alert-success">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="alert alert-danger" style="background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if($watchers->count() < 3)
+            <div class="watcher-form">
+                <h4><i class="fas fa-plus-circle"></i> افزودن ناظر جدید</h4>
+                <form action="{{ route('profile.watchers.store') }}" method="POST">
+                    @csrf
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>نام ناظر</label>
+                            <input type="text" name="name" class="form-control" placeholder="مثلاً: علی رضایی" required>
+                        </div>
+                        <div class="form-group">
+                            <label>ایمیل ناظر</label>
+                            <input type="email" name="email" class="form-control" placeholder="example@gmail.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>رمز عبور</label>
+                            <input type="password" name="password" class="form-control" placeholder="********" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="submit-btn">ثبت ناظر</button>
+                </form>
+            </div>
+            @endif
+
+            <div class="watcher-grid">
+                @forelse($watchers as $watcher)
+                    <div class="watcher-card">
+                        <div class="watcher-info">
+                            <span class="watcher-name">{{ $watcher->name }}</span>
+                            <span class="watcher-email">{{ $watcher->real_email }}</span>
+                        </div>
+                        <form action="{{ route('profile.watchers.destroy', $watcher->id) }}" method="POST" onsubmit="return confirm('آیا از حذف این ناظر اطمینان دارید؟');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="delete-btn">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+                    </div>
+                @empty
+                    <p style="color: #888; text-align: center; grid-column: 1/-1;">هنوز هیچ ناظری اضافه نشده است.</p>
+                @endforelse
+            </div>
+        </div>
+        @endif
 
         <!-- Balance Cards -->
         @if($currentExchange)

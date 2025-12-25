@@ -15,7 +15,7 @@ class PeriodController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         // Ensure default period exists
@@ -61,7 +61,7 @@ class PeriodController extends Controller
     public function store(Request $request)
     {
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         $activeCount = UserPeriod::forUser($user->id)

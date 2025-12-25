@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Models\UserExchange;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
@@ -98,6 +101,8 @@ class ProfileController extends Controller
         // Load all active exchanges for switching
         $activeExchanges = $user->activeExchanges()->get();
         
+        $watchers = $user->watchers;
+
         return view('profile.index', [
             'user' => $user,
             'totalEquity' => $totalEquity,
@@ -105,6 +110,57 @@ class ProfileController extends Controller
             'currentExchange' => $currentExchange,
             'activeExchanges' => $activeExchanges,
             'availableExchanges' => UserExchange::getAvailableExchanges(),
+            'watchers' => $watchers,
         ]);
+    }
+
+    public function storeWatcher(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user->watchers()->count() >= 3) {
+            return redirect()->back()->with('error', 'شما حداکثر می‌توانید ۳ کاربر ناظر داشته باشید.');
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'password' => 'required|string|min:8',
+        ], [
+            'name.required' => 'نام الزامی است.',
+            'email.required' => 'ایمیل الزامی است.',
+            'email.email' => 'ایمیل نامعتبر است.',
+            'password.required' => 'رمز عبور الزامی است.',
+            'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+        ]);
+
+        $watcherEmail = 'Watcher-' . $request->email;
+
+        if (User::where('email', $watcherEmail)->exists()) {
+            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان ناظر ثبت شده است.');
+        }
+
+        User::create([
+            'name' => $request->name,
+            'email' => $watcherEmail,
+            'password' => Hash::make($request->password),
+            'parent_id' => $user->id,
+            'role' => 'watcher',
+            'is_active' => true,
+            'activated_at' => now(),
+            'email_verified_at' => now(), // Watchers don't need verification
+        ]);
+
+        return redirect()->back()->with('success', 'کاربر ناظر با موفقیت ایجاد شد.');
+    }
+
+    public function deleteWatcher($id)
+    {
+        $user = Auth::user();
+        $watcher = $user->watchers()->findOrFail($id);
+
+        $watcher->delete();
+
+        return redirect()->back()->with('success', 'کاربر ناظر با موفقیت حذف شد.');
     }
 }

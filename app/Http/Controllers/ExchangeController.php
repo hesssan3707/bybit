@@ -165,12 +165,21 @@ class ExchangeController extends Controller
     public function switchTo(UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            $user = auth()->user();
+            $owner = $user->getAccountOwner();
+
+            if ($exchange->user_id !== $owner->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 
             if (!$exchange->is_active) {
                 return back()->withErrors(['msg' => 'این صرافی فعال نیست.']);
+            }
+
+            if ($user->isWatcher()) {
+                // For watchers, only change their current view, don't affect parent's default
+                $user->update(['current_exchange_id' => $exchange->id]);
+                return redirect()->route('profile.index');
             }
 
             DB::transaction(function () use ($exchange) {
@@ -210,7 +219,10 @@ class ExchangeController extends Controller
     public function testConnection(UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            $user = auth()->user();
+        $owner = $user->getAccountOwner();
+
+        if ($exchange->user_id !== $owner->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 
@@ -245,7 +257,7 @@ class ExchangeController extends Controller
     public function testRealConnection(Request $request, UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 
@@ -300,7 +312,7 @@ class ExchangeController extends Controller
     public function testDemoConnection(Request $request, UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 
@@ -426,7 +438,7 @@ class ExchangeController extends Controller
      */
     public function edit(UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             abort(403, 'دسترسی غیرمجاز');
         }
 
@@ -438,7 +450,7 @@ class ExchangeController extends Controller
      */
     public function update(Request $request, UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             abort(403, 'دسترسی غیرمجاز');
         }
 
@@ -526,7 +538,17 @@ class ExchangeController extends Controller
      */
     public function switchMode(Request $request, UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        $user = auth()->user();
+        if ($user->isWatcher()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'کاربر ناظر اجازه تغییر حالت دمو/واقعی را ندارد.',
+                'is_demo_mode' => $exchange->is_demo_active
+            ], 403);
+        }
+
+        $owner = $user->getAccountOwner();
+        if ($exchange->user_id !== $owner->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'دسترسی غیرمجاز',
@@ -574,7 +596,7 @@ class ExchangeController extends Controller
     public function enableHedgeMode(UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'دسترسی غیرمجاز'
@@ -621,7 +643,7 @@ class ExchangeController extends Controller
     public function cancelRequest(UserExchange $exchange)
     {
         try {
-            if ($exchange->user_id !== auth()->id()) {
+            if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 

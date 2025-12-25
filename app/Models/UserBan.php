@@ -43,6 +43,10 @@ class UserBan extends Model
 
     public function scopeForUser($query, int $userId)
     {
+        $user = User::find($userId);
+        if ($user && $user->isWatcher()) {
+            $userId = $user->parent_id;
+        }
         return $query->where('user_id', $userId);
     }
 

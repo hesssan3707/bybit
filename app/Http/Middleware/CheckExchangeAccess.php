@@ -20,9 +20,15 @@ class CheckExchangeAccess
         }
 
         $user = auth()->user();
-        $currentExchange = $user->currentExchange;
         
-        // If no current exchange, try default exchange
+        $currentExchange = $user->getCurrentExchange();
+        
+        // If still no current exchange, try user's default exchange (fallback already handled by getCurrentExchange but being explicit)
+        if (!$currentExchange && $user->isWatcher()) {
+            $currentExchange = $user->parent->defaultExchange;
+        }
+        
+        // If still no current exchange, try user's default exchange
         if (!$currentExchange) {
             $currentExchange = $user->defaultExchange;
         }

@@ -81,6 +81,11 @@ class Trade extends Model
      */
     public function scopeForUser($query, $userId)
     {
+        $user = User::find($userId);
+        if ($user && $user->isWatcher()) {
+            $userId = $user->parent_id;
+        }
+
         return $query->whereHas('userExchange', function($q) use ($userId) {
             $q->where('user_id', $userId);
         });

@@ -17,7 +17,7 @@ class AccountSettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         // Get current settings for current mode
@@ -76,7 +76,7 @@ class AccountSettingsController extends Controller
     public function update(Request $request)
     {
         $user = Auth::user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         // Validate input - allow empty strings to remove default values
@@ -149,7 +149,7 @@ class AccountSettingsController extends Controller
     public function getSettings()
     {
         $user = Auth::user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         return response()->json([
@@ -168,7 +168,7 @@ class AccountSettingsController extends Controller
             return redirect()->back()->withErrors(['msg' => 'حالت سخت‌گیرانه فعال نیست.']);
         }
 
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         $fields = [

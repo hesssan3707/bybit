@@ -121,7 +121,7 @@ class CompanyExchangeRequestController extends Controller
     public function withdraw(CompanyExchangeRequest $requestItem)
     {
         try {
-            if ($requestItem->user_id !== auth()->id()) {
+            if ($requestItem->user_id !== auth()->user()->getAccountOwner()->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 
@@ -153,7 +153,7 @@ class CompanyExchangeRequestController extends Controller
     public function destroy(CompanyExchangeRequest $requestItem)
     {
         try {
-            if ($requestItem->user_id !== auth()->id()) {
+            if ($requestItem->user_id !== auth()->user()->getAccountOwner()->id) {
                 abort(403, 'دسترسی غیرمجاز');
             }
 

@@ -142,7 +142,7 @@ class FuturesController extends Controller
 
         // Get current exchange to filter by account type
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
 
         $ordersQuery = Order::forUser(auth()->id());
 
@@ -307,7 +307,7 @@ class FuturesController extends Controller
                 $marketPrice = (string)$price;
             } catch (\Exception $e) {
                 // Check if this is an access permission error and update validation
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
 
                 if ($currentExchange) {
                     try {
@@ -321,7 +321,7 @@ class FuturesController extends Controller
         }
 
         // Get user's default settings
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
         $defaultRisk = UserAccountSetting::getDefaultRisk($user->id, $isDemo);
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
@@ -342,7 +342,7 @@ class FuturesController extends Controller
         $banMessage = null;
         try {
             if ($user && ($user->future_strict_mode ?? false)) {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
                 
                 // First, quick check for existing active ban
@@ -469,7 +469,7 @@ class FuturesController extends Controller
                 $price = (float)($tickerInfo['list'][0]['lastPrice'] ?? 0);
                 $marketPrice = (string)$price;
             } catch (\Exception $e) {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 if ($currentExchange) {
                     try {
                         $this->handleApiException($e, $currentExchange, 'futures');
@@ -515,7 +515,7 @@ class FuturesController extends Controller
         $banRemainingSeconds = null;
         try {
             if ($user && ($user->future_strict_mode ?? false)) {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
@@ -572,7 +572,7 @@ class FuturesController extends Controller
         try {
             $user = auth()->user();
             if ($user && ($user->future_strict_mode ?? false)) {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
@@ -665,7 +665,7 @@ class FuturesController extends Controller
 
             // Prevent placing multiple orders with the same direction if there's
             // an existing pending order or an open trade on the same side (for current exchange & symbol)
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             if ($currentExchange) {
                 $pendingQuery = Order::where('user_exchange_id', $currentExchange->id)
                     ->where('is_demo', $currentExchange->is_demo_active)
@@ -698,7 +698,7 @@ class FuturesController extends Controller
             // Cache expires after 3 days
             $leverage = null;
             try {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 if ($currentExchange) {
                     $isDemo = (bool)$currentExchange->is_demo_active;
                     $leverageKey = "leverage_{$symbol}_{$currentExchange->id}";
@@ -767,7 +767,7 @@ class FuturesController extends Controller
             }
             // Enforce configured minimum RR ratio when strict mode is active
             if ($user->future_strict_mode) {
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
                 $minRrStr = \App\Models\UserAccountSetting::getMinRrRatio($user->id, $isDemo);
                 if (!is_string($minRrStr) || !preg_match('/^\d+:\d+$/', $minRrStr)) {
@@ -868,7 +868,7 @@ class FuturesController extends Controller
 
                 // Get user's current active exchange
                 $user = auth()->user();
-                $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                $currentExchange = $user->getCurrentExchange();
                 if (!$currentExchange) {
                     throw new \Exception('لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.');
                 }
@@ -1413,7 +1413,7 @@ class FuturesController extends Controller
         // Strict-mode: block manual closes if an active close-only ban exists for current account type
         try {
             $user = auth()->user();
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             if ($user && $user->future_strict_mode) {
                 $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
                 $activeBan = \App\Models\UserBan::where('user_id', $user->id)
@@ -1461,7 +1461,7 @@ class FuturesController extends Controller
             $symbol = $order->symbol;
 
             // تشخیص صرافی فعال کاربر
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             if (!$currentExchange) {
                 throw new \Exception('No active exchange found');
             }
@@ -1529,7 +1529,7 @@ class FuturesController extends Controller
     public function closeAll(Request $request)
     {
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
 
         // Strict-mode: block if an active manual_close ban exists
@@ -1652,7 +1652,7 @@ class FuturesController extends Controller
 
         try {
             $user = auth()->user();
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             $exchangeName = $currentExchange ? strtolower($currentExchange->exchange_name) : null;
 
             $exchangeService = $this->getExchangeService();
@@ -1689,7 +1689,7 @@ class FuturesController extends Controller
 
         // Filter by current account type (demo/real)
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         if ($currentExchange) {
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }
@@ -1823,7 +1823,7 @@ class FuturesController extends Controller
     public function journal(Request $request)
     {
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         // Use current exchange account type (demo/real)
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
@@ -2253,7 +2253,7 @@ class FuturesController extends Controller
         try {
             // Determine timeframe: query param or user default, allowed list
             $allowedTfs = ['1m','5m','15m','1h','4h'];
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
             $userDefaultTf = \App\Models\UserAccountSetting::getUserSetting($user->id, 'default_timeframe', '15m', $isDemo);
             $tfRequested = strtolower((string)$request->query('tf', $userDefaultTf));

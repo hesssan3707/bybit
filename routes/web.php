@@ -60,7 +60,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'restrict.watcher'])->group(function () {
 
     Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
@@ -94,6 +94,8 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
+    Route::post('/profile/watchers', [ProfileController::class, 'storeWatcher'])->name('profile.watchers.store');
+    Route::delete('/profile/watchers/{id}', [ProfileController::class, 'deleteWatcher'])->name('profile.watchers.destroy');
 
     Route::prefix('strategies')->name('strategies.')->group(function () {
         Route::get('/macd', [MACDStrategyController::class, 'index'])->name('macd');

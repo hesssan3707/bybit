@@ -42,7 +42,7 @@ class SpotTradingController extends Controller
 
             // Filter by current account type (demo/real)
             $user = $request->user();
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             if ($currentExchange) {
                 $query->accountType($currentExchange->is_demo_active);
             }
@@ -68,7 +68,7 @@ class SpotTradingController extends Controller
         // Load the user_exchange relationship to avoid N+1 queries
         $spotOrder->load('userExchange');
         
-        if ($spotOrder->userExchange->user_id !== auth()->id()) {
+        if ($spotOrder->userExchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -127,7 +127,7 @@ class SpotTradingController extends Controller
             $quoteCoin = 'USDT';
 
             $user = $request->user();
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
 
             $spotOrder = SpotOrder::create([
                 'user_exchange_id' => $currentExchange->id,
@@ -164,7 +164,7 @@ class SpotTradingController extends Controller
         // Load the user_exchange relationship to avoid N+1 queries
         $spotOrder->load('userExchange');
         
-        if ($spotOrder->userExchange->user_id !== auth()->id()) {
+        if ($spotOrder->userExchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 

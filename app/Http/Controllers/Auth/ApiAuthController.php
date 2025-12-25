@@ -190,8 +190,8 @@ class ApiAuthController extends Controller
         try {
             $user = $request->user();
             
-            // Load current exchange relationship
-            $user->load('currentExchange');
+            // Get current exchange (handles watcher redirection)
+            $currentExchange = $user->getCurrentExchange();
 
             return response()->json([
                 'success' => true,
@@ -200,12 +200,12 @@ class ApiAuthController extends Controller
                     'email' => $user->email,
                     'created_at' => $user->created_at,
                     'token_expires_at' => $user->api_token_expires_at,
-                    'current_exchange' => $user->currentExchange ? [
-                        'id' => $user->currentExchange->id,
-                        'name' => $user->currentExchange->exchange_name,
-                        'display_name' => $user->currentExchange->exchange_display_name,
-                        'color' => $user->currentExchange->exchange_color,
-                        'is_default' => $user->currentExchange->is_default,
+                    'current_exchange' => $currentExchange ? [
+                        'id' => $currentExchange->id,
+                        'name' => $currentExchange->exchange_name,
+                        'display_name' => $currentExchange->exchange_display_name,
+                        'color' => $currentExchange->exchange_color,
+                        'is_default' => $currentExchange->is_default,
                     ] : null,
                     'available_exchanges' => $user->activeExchanges()->pluck('exchange_name')->toArray(),
                 ]

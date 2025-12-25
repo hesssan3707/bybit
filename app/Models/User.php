@@ -37,6 +37,7 @@ class User extends Authenticatable
         'future_strict_mode',
         'future_strict_mode_activated_at',
         'selected_market',
+        'parent_id',
     ];
 
     /**
@@ -73,7 +74,8 @@ class User extends Authenticatable
      */
     public function orders()
     {
-        return $this->hasManyThrough(Order::class, UserExchange::class, 'user_id', 'user_exchange_id');
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasManyThrough(Order::class, UserExchange::class, 'user_id', 'user_exchange_id', $localKey, 'id');
     }
 
     /**
@@ -81,7 +83,8 @@ class User extends Authenticatable
      */
     public function spotOrders()
     {
-        return $this->hasManyThrough(SpotOrder::class, UserExchange::class, 'user_id', 'user_exchange_id');
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasManyThrough(SpotOrder::class, UserExchange::class, 'user_id', 'user_exchange_id', $localKey, 'id');
     }
 
     /**
@@ -89,7 +92,69 @@ class User extends Authenticatable
      */
     public function trades()
     {
-        return $this->hasManyThrough(Trade::class, UserExchange::class, 'user_id', 'user_exchange_id');
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasManyThrough(Trade::class, UserExchange::class, 'user_id', 'user_exchange_id', $localKey, 'id');
+    }
+
+    /**
+     * Get the parent user (if this user is a watcher)
+     */
+    public function parent()
+    {
+        return $this->belongsTo(User::class, 'parent_id');
+    }
+
+    /**
+     * Get the watcher users for this account
+     */
+    public function watchers()
+    {
+        return $this->hasMany(User::class, 'parent_id');
+    }
+
+    /**
+     * Check if the user is a watcher
+     */
+    public function isWatcher()
+    {
+        return $this->role === 'watcher';
+    }
+
+    /**
+     * Get the account owner (returns self if not a watcher, otherwise returns parent)
+     */
+    public function getAccountOwner()
+    {
+        return $this->isWatcher() ? $this->parent : $this;
+    }
+
+    /**
+     * Get the real email address (strips the prefix if it's a watcher)
+     */
+    public function getRealEmailAttribute()
+    {
+        if ($this->isWatcher()) {
+            return str_replace('Watcher-', '', $this->email);
+        }
+        return $this->email;
+    }
+
+    /**
+     * Get the user's periods
+     */
+    public function periods()
+    {
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasMany(UserPeriod::class, 'user_id', $localKey);
+    }
+
+    /**
+     * Get the user's bans
+     */
+    public function bans()
+    {
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasMany(UserBan::class, 'user_id', $localKey);
     }
 
     /**
@@ -97,7 +162,8 @@ class User extends Authenticatable
      */
     public function exchanges()
     {
-        return $this->hasMany(UserExchange::class);
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasMany(UserExchange::class, 'user_id', $localKey);
     }
 
     /**
@@ -105,7 +171,9 @@ class User extends Authenticatable
      */
     public function activeExchanges()
     {
-        return $this->hasMany(UserExchange::class)->active();
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasMany(UserExchange::class, 'user_id', $localKey)
+            ->active();
     }
 
     /**
@@ -113,7 +181,8 @@ class User extends Authenticatable
      */
     public function accountSettings()
     {
-        return $this->hasOne(UserAccountSetting::class);
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasOne(UserAccountSetting::class, 'user_id', $localKey);
     }
 
     /**
@@ -121,7 +190,11 @@ class User extends Authenticatable
      */
     public function defaultExchange()
     {
-        return $this->hasOne(UserExchange::class)->where('is_default', true)->where('is_active', true)->where('status', 'approved');
+        $localKey = $this->isWatcher() ? 'parent_id' : 'id';
+        return $this->hasOne(UserExchange::class, 'user_id', $localKey)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->where('status', 'approved');
     }
 
     /**
@@ -198,7 +271,12 @@ class User extends Authenticatable
      */
     public static function findByEmail($email)
     {
-        return self::where('email', $email)->first();
+        $user = self::where('email', $email)->first();
+        if (!$user) {
+            // Check for watcher account if not found by direct email
+            $user = self::where('email', 'Watcher-' . $email)->first();
+        }
+        return $user;
     }
 
     /**
@@ -384,6 +462,9 @@ class User extends Authenticatable
      */
     public function getCurrentExchange()
     {
+        if ($this->isWatcher() && $this->current_exchange_id) {
+            return $this->currentExchange;
+        }
         return $this->defaultExchange;
     }
 

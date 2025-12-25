@@ -130,7 +130,7 @@ class SpotTradingController extends Controller
         
         // Get current exchange to filter by account type
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         
         $ordersQuery = SpotOrder::forUser(auth()->id());
         
@@ -396,7 +396,7 @@ class SpotTradingController extends Controller
 
             // Get user's current active exchange ID
             $user = auth()->user();
-            $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+            $currentExchange = $user->getCurrentExchange();
             if (!$currentExchange) {
                 return back()->withErrors(['msg' => 'لطفاً ابتدا در صفحه پروفایل، صرافی مورد نظر خود را فعال کنید.'])->withInput();
             }

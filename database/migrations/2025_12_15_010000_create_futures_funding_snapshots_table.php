@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('futures_funding_snapshots', function (Blueprint $table) {
             $table->id();
-            $table->string('exchange');
-            $table->string('symbol')->nullable();
+            $table->string('exchange', 50);
+            $table->string('symbol', 50)->nullable();
             $table->decimal('funding_rate', 20, 10)->nullable();
             $table->decimal('open_interest', 32, 10)->nullable();
             $table->decimal('total_market_value', 32, 10)->nullable();

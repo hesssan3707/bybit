@@ -85,7 +85,7 @@ class FuturesController extends Controller
             ], 401);
         }
 
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         if ($currentExchange) {
             $ordersQuery->accountType($currentExchange->is_demo_active);
         }
@@ -197,7 +197,7 @@ class FuturesController extends Controller
                     ];
 
                     $responseData = $exchangeService->createOrder($orderParams);
-                    $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+                    $currentExchange = $user->getCurrentExchange();
 
                     $order = Order::create([
                         'user_exchange_id' => $currentExchange->id,
@@ -237,7 +237,7 @@ class FuturesController extends Controller
 
     public function destroy(Order $order)
     {
-        if ($order->user_exchange->user_id !== auth()->id()) {
+        if ($order->user_exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -262,7 +262,7 @@ class FuturesController extends Controller
 
     public function close(Request $request, Order $order)
     {
-        if ($order->user_exchange->user_id !== auth()->id()) {
+        if ($order->user_exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -326,7 +326,7 @@ class FuturesController extends Controller
 
         // Filter by current account type (demo/real)
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         if ($currentExchange) {
             $tradesQuery->accountType($currentExchange->is_demo_active);
         }

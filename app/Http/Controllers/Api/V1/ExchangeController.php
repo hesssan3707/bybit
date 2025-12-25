@@ -39,7 +39,7 @@ class ExchangeController extends Controller
 
     public function update(Request $request, UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -124,7 +124,7 @@ class ExchangeController extends Controller
 
     public function destroy(UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -135,7 +135,7 @@ class ExchangeController extends Controller
 
     public function switchTo(UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -173,7 +173,7 @@ class ExchangeController extends Controller
 
     public function testConnection(Request $request, UserExchange $exchange)
     {
-        if ($exchange->user_id !== auth()->id()) {
+        if ($exchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 

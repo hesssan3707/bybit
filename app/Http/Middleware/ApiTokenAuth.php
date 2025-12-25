@@ -50,13 +50,13 @@ class ApiTokenAuth
         // Also set the user in the auth guard so auth()->user() works
         auth()->setUser($user);
 
-        // Load current exchange for API context
-        $user->load('currentExchange');
+        // Get current exchange for API context (handles watcher redirection)
+        $currentExchange = $user->getCurrentExchange();
 
         // Add user and current exchange to request for easy access
         $request->merge([
             'authenticated_user' => $user,
-            'current_exchange' => $user->currentExchange
+            'current_exchange' => $currentExchange
         ]);
 
         return $next($request);

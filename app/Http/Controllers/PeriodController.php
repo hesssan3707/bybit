@@ -15,7 +15,7 @@ class PeriodController extends Controller
     public function start(Request $request)
     {
         $user = auth()->user();
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
 
         // Enforce limit of 5 active non-default periods
@@ -101,7 +101,7 @@ class PeriodController extends Controller
         $user = auth()->user();
 
         // Determine account type from current or default exchange
-        $currentExchange = $user->currentExchange ?? $user->defaultExchange;
+        $currentExchange = $user->getCurrentExchange();
         $isDemo = $currentExchange ? (bool) $currentExchange->is_demo_active : false;
 
         // Cooldown key per user + account type
