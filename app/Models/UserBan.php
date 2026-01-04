@@ -16,12 +16,18 @@ class UserBan extends Model
         'is_demo',
         'trade_id',
         'ban_type',
+        'price_below',
+        'price_above',
+        'lifted_by_price',
         'starts_at',
         'ends_at',
     ];
 
     protected $casts = [
         'is_demo' => 'boolean',
+        'price_below' => 'decimal:8',
+        'price_above' => 'decimal:8',
+        'lifted_by_price' => 'boolean',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
     ];

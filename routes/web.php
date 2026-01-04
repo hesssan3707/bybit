@@ -121,6 +121,7 @@ Route::middleware(['auth', 'restrict.investor'])->group(function () {
         Route::post('/update', [AccountSettingsController::class, 'update'])->name('update');
         Route::get('/settings', [AccountSettingsController::class, 'getSettings'])->name('settings');
         Route::post('/update-strict-limits', [AccountSettingsController::class, 'updateStrictLimits'])->name('update-strict-limits');
+        Route::post('/self-ban', [AccountSettingsController::class, 'updateSelfBan'])->name('self-ban');
     });
 
     // Exchange Management Routes (requires authentication)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\UserAccountSetting;
 use App\Models\User;
+use App\Models\UserBan;
 use Illuminate\Support\Facades\Auth;
 use App\Services\BanService;
 use Carbon\Carbon;
@@ -51,6 +52,25 @@ class AccountSettingsController extends Controller
             $monthlyPnlPercent = $banService->getPeriodPnlPercent($user->id, $isDemo, $startOfMonth, $endOfMonth);
         }
 
+        $selfBanTime = null;
+        $selfBanPrice = null;
+        if ($user->future_strict_mode) {
+            $selfBanTime = UserBan::active()
+                ->forUser($user->id)
+                ->accountType($isDemo)
+                ->where('ban_type', 'self_ban_time')
+                ->orderByDesc('ends_at')
+                ->first();
+
+            $selfBanPrice = UserBan::active()
+                ->forUser($user->id)
+                ->accountType($isDemo)
+                ->where('ban_type', 'self_ban_price')
+                ->where('lifted_by_price', false)
+                ->orderByDesc('ends_at')
+                ->first();
+        }
+
         return view('account-settings.index', compact(
             'user',
             'defaultRisk',
@@ -66,7 +86,9 @@ class AccountSettingsController extends Controller
             'monthlyLossLimit',
             'weeklyPnlPercent',
             'monthlyPnlPercent',
-            'tvDefaultInterval'
+            'tvDefaultInterval',
+            'selfBanTime',
+            'selfBanPrice'
         ));
     }
 
@@ -268,5 +290,113 @@ class AccountSettingsController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['msg' => 'خطا در ذخیره تنظیمات: ' . $e->getMessage()]);
         }
+    }
+
+    public function updateSelfBan(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->future_strict_mode) {
+            return redirect()->back()->withErrors(['msg' => 'حالت سخت‌گیرانه فعال نیست.']);
+        }
+
+        $currentExchange = $user->getCurrentExchange();
+        if (!$currentExchange) {
+            return redirect()->back()->withErrors(['msg' => 'برای تنظیم مسدودسازی دستی، ابتدا صرافی فعال کنید.']);
+        }
+
+        $isDemo = (bool)$currentExchange->is_demo_active;
+        $effectiveUserId = ($user->isInvestor() ? (int)$user->parent_id : (int)$user->id);
+
+        $mode = (string)$request->input('self_ban_mode', '');
+        $timeOptions = ['30','60','120','240','720','1440','2880','4320','10080','43200'];
+
+        if ($mode === 'time') {
+            $validated = $request->validate([
+                'duration_minutes' => 'required|in:' . implode(',', $timeOptions),
+            ], [], [
+                'duration_minutes' => 'مدت زمان مسدودسازی',
+            ]);
+
+            $endsAt = now()->addMinutes((int)$validated['duration_minutes']);
+
+            $existing = UserBan::active()
+                ->where('user_id', $effectiveUserId)
+                ->where('is_demo', $isDemo)
+                ->where('ban_type', 'self_ban_time')
+                ->orderByDesc('ends_at')
+                ->first();
+
+            if ($existing) {
+                $existing->starts_at = now();
+                $existing->ends_at = $endsAt;
+                $existing->save();
+            } else {
+                UserBan::create([
+                    'user_id' => $effectiveUserId,
+                    'is_demo' => $isDemo,
+                    'ban_type' => 'self_ban_time',
+                    'starts_at' => now(),
+                    'ends_at' => $endsAt,
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'مسدودسازی دستی با موفقیت فعال شد.');
+        }
+
+        if ($mode === 'price') {
+            $validated = $request->validate([
+                'duration_minutes' => 'required|in:' . implode(',', $timeOptions),
+                'price_below' => 'nullable|numeric|min:0',
+                'price_above' => 'nullable|numeric|min:0',
+            ], [], [
+                'duration_minutes' => 'حداکثر مدت مسدودسازی',
+                'price_below' => 'قیمت پایین‌تر از',
+                'price_above' => 'قیمت بالاتر از',
+            ]);
+
+            $below = ($request->input('price_below') !== null && $request->input('price_below') !== '') ? (float)$validated['price_below'] : null;
+            $above = ($request->input('price_above') !== null && $request->input('price_above') !== '') ? (float)$validated['price_above'] : null;
+
+            if ($below === null && $above === null) {
+                return redirect()->back()->withErrors(['msg' => 'حداقل یکی از فیلدهای قیمت پایین‌تر یا قیمت بالاتر باید پر شود.']);
+            }
+
+            if ($below !== null && $above !== null && $below >= $above) {
+                return redirect()->back()->withErrors(['msg' => 'قیمت پایین‌تر باید از قیمت بالاتر کمتر باشد.']);
+            }
+
+            $endsAt = now()->addMinutes((int)$validated['duration_minutes']);
+
+            $existing = UserBan::active()
+                ->where('user_id', $effectiveUserId)
+                ->where('is_demo', $isDemo)
+                ->where('ban_type', 'self_ban_price')
+                ->orderByDesc('ends_at')
+                ->first();
+
+            if ($existing) {
+                $existing->price_below = $below;
+                $existing->price_above = $above;
+                $existing->lifted_by_price = false;
+                $existing->starts_at = now();
+                $existing->ends_at = $endsAt;
+                $existing->save();
+            } else {
+                UserBan::create([
+                    'user_id' => $effectiveUserId,
+                    'is_demo' => $isDemo,
+                    'ban_type' => 'self_ban_price',
+                    'price_below' => $below,
+                    'price_above' => $above,
+                    'lifted_by_price' => false,
+                    'starts_at' => now(),
+                    'ends_at' => $endsAt,
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'مسدودسازی دستی بر اساس قیمت با موفقیت فعال شد.');
+        }
+
+        return redirect()->back()->withErrors(['msg' => 'درخواست نامعتبر است.']);
     }
 }

@@ -565,6 +565,12 @@
         <div class="settings-card">
             <h2>تنظیمات حساب کاربری</h2>
 
+            @if(isset($user) && ($user->future_strict_mode ?? false))
+                <div class="button-group" style="justify-content: center; margin-bottom: 15px;">
+                    <a href="#self-ban" class="btn btn-secondary">مسدودسازی دستی</a>
+                </div>
+            @endif
+
             <!-- Default Settings Form -->
             <form action="{{ route('account-settings.update') }}" method="POST">
                 @csrf
@@ -642,6 +648,104 @@
                 </div>
             </form>
         </div>
+        @if(isset($user) && ($user->future_strict_mode ?? false))
+        <div class="settings-card" id="self-ban">
+            <h2>مسدودسازی دستی (Self-Ban)</h2>
+
+            @if($selfBanTime)
+                <div class="alert alert-danger" style="margin-bottom: 15px;">
+                    {{ \App\Services\BanService::getPersianBanMessage($selfBanTime) }}
+                    <br>
+                    <small>پایان: {{ $selfBanTime->ends_at->format('Y/m/d H:i') }}</small>
+                </div>
+            @endif
+
+            @if($selfBanPrice)
+                <div class="alert alert-danger" style="margin-bottom: 15px;">
+                    {{ \App\Services\BanService::getPersianBanMessage($selfBanPrice) }}
+                    <br>
+                    <small>پایان: {{ $selfBanPrice->ends_at->format('Y/m/d H:i') }}</small>
+                </div>
+            @endif
+
+            <div class="setting-item" style="border-top: 1px solid #444; padding-top: 20px;">
+                <h3 class="setting-title">مسدودسازی زمانی</h3>
+                <div class="setting-description">
+                    با انتخاب یکی از گزینه‌های زیر، امکان ثبت سفارش جدید تا پایان زمان انتخابی غیرفعال می‌شود.
+                </div>
+
+                <form method="POST" action="{{ route('account-settings.self-ban') }}">
+                    @csrf
+                    <input type="hidden" name="self_ban_mode" value="time">
+
+                    <div class="form-group">
+                        <label for="self_ban_time_duration">مدت زمان</label>
+                        <select id="self_ban_time_duration" name="duration_minutes" class="form-control" required>
+                            <option value="30">۳۰ دقیقه</option>
+                            <option value="60">۱ ساعت</option>
+                            <option value="120">۲ ساعت</option>
+                            <option value="240">۴ ساعت</option>
+                            <option value="720">۱۲ ساعت</option>
+                            <option value="1440">۱ روز</option>
+                            <option value="2880">۲ روز</option>
+                            <option value="4320">۳ روز</option>
+                            <option value="10080">۷ روز</option>
+                            <option value="43200">۳۰ روز</option>
+                        </select>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی زمانی</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="setting-item" style="border-top: 1px solid #444; padding-top: 20px;">
+                <h3 class="setting-title">مسدودسازی بر اساس قیمت</h3>
+                <div class="setting-description">
+                    در حالت سخت‌گیرانه، این مسدودسازی فقط روی بازار انتخابی شما اعمال می‌شود:
+                    <strong>{{ $user->selected_market ?? '-' }}</strong>
+                </div>
+
+                <form method="POST" action="{{ route('account-settings.self-ban') }}">
+                    @csrf
+                    <input type="hidden" name="self_ban_mode" value="price">
+
+                    <div class="form-group">
+                        <label for="self_ban_price_duration">حداکثر مدت مسدودسازی</label>
+                        <select id="self_ban_price_duration" name="duration_minutes" class="form-control" required>
+                            <option value="30">۳۰ دقیقه</option>
+                            <option value="60">۱ ساعت</option>
+                            <option value="120">۲ ساعت</option>
+                            <option value="240">۴ ساعت</option>
+                            <option value="720">۱۲ ساعت</option>
+                            <option value="1440">۱ روز</option>
+                            <option value="2880">۲ روز</option>
+                            <option value="4320">۳ روز</option>
+                            <option value="10080">۷ روز</option>
+                            <option value="43200">۳۰ روز</option>
+                        </select>
+                        <small style="color: #aaa;">اگر قیمت به شرط برسد، مسدودسازی زودتر غیرفعال می‌شود.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="self_ban_price_below">اگر قیمت کمتر یا مساویِ</label>
+                            <input id="self_ban_price_below" type="number" step="any" name="price_below" class="form-control" placeholder="اختیاری">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="self_ban_price_above">اگر قیمت بیشتر یا مساویِ</label>
+                            <input id="self_ban_price_above" type="number" step="any" name="price_above" class="form-control" placeholder="اختیاری">
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی قیمت</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @endif
         @if(isset($user) && $user->email === 'hesssan3506@gmail.com')
         <div class="settings-card">
             <h2>حالت سخت‌گیرانه آتی (Future Strict Mode) </h2>

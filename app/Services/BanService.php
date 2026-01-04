@@ -326,6 +326,51 @@ class BanService
      */
     public static function getPersianBanMessage(\App\Models\UserBan $ban): string
     {
+        if ($ban->ban_type === 'self_ban_time') {
+            $remainingSeconds = max(0, $ban->ends_at->diffInSeconds(now()));
+
+            $days = floor($remainingSeconds / 86400);
+            $hours = floor(($remainingSeconds % 86400) / 3600);
+            $minutes = floor(($remainingSeconds % 3600) / 60);
+
+            $timeParts = [];
+            if ($days > 0) { $timeParts[] = $days . ' روز'; }
+            if ($hours > 0) { $timeParts[] = $hours . ' ساعت'; }
+            if ($minutes > 0 || empty($timeParts)) { $timeParts[] = $minutes . ' دقیقه'; }
+            $timeRemaining = implode(' و ', $timeParts);
+
+            return "مسدودسازی دستی فعال است. شما تا {$timeRemaining} دیگر امکان ثبت سفارش جدید را ندارید.";
+        }
+
+        if ($ban->ban_type === 'self_ban_price') {
+            $remainingSeconds = max(0, $ban->ends_at->diffInSeconds(now()));
+
+            $days = floor($remainingSeconds / 86400);
+            $hours = floor(($remainingSeconds % 86400) / 3600);
+            $minutes = floor(($remainingSeconds % 3600) / 60);
+
+            $timeParts = [];
+            if ($days > 0) { $timeParts[] = $days . ' روز'; }
+            if ($hours > 0) { $timeParts[] = $hours . ' ساعت'; }
+            if ($minutes > 0 || empty($timeParts)) { $timeParts[] = $minutes . ' دقیقه'; }
+            $timeRemaining = implode(' و ', $timeParts);
+
+            $below = $ban->price_below !== null ? (float)$ban->price_below : null;
+            $above = $ban->price_above !== null ? (float)$ban->price_above : null;
+
+            if ($below !== null && $above !== null) {
+                $cond = 'تا زمانی که قیمت به کمتر از ' . number_format($below, 2) . ' یا بیشتر از ' . number_format($above, 2) . ' برسد';
+            } elseif ($below !== null) {
+                $cond = 'تا زمانی که قیمت به کمتر از ' . number_format($below, 2) . ' برسد';
+            } elseif ($above !== null) {
+                $cond = 'تا زمانی که قیمت به بیشتر از ' . number_format($above, 2) . ' برسد';
+            } else {
+                $cond = 'تا اطلاع ثانوی';
+            }
+
+            return "مسدودسازی دستی (شرط قیمتی) فعال است؛ {$cond}. در صورت فعال نشدن شرط، این محدودیت حداکثر تا {$timeRemaining} دیگر ادامه دارد.";
+        }
+
         $reasonMap = [
             'single_loss' => 'ضرر در یک معامله',
             'double_loss' => 'دو ضرر متوالی',

@@ -9,6 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('user', 'admin', 'watcher', 'investor') DEFAULT 'user'");
+
         DB::transaction(function () {
             $watchers = DB::table('users')
                 ->where('role', 'watcher')
@@ -85,7 +87,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('user', 'admin', 'watcher') DEFAULT 'user'");
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('user', 'admin', 'watcher', 'investor') DEFAULT 'user'");
 
         DB::transaction(function () {
             $investors = DB::table('users')
@@ -111,6 +113,8 @@ return new class extends Migration
                     ]);
             }
         });
+
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('user', 'admin', 'watcher') DEFAULT 'user'");
     }
 };
 

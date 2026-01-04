@@ -744,8 +744,44 @@ class FuturesOrderEnforcer extends Command
                         }
                     }
                 } catch (Exception $e) {
-                    $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش {$dbOrder->order_id}: " . $e->getMessage());
+                            $this->warn("    خطا در بررسی قیمت بسته شدن برای سفارش {$dbOrder->order_id}: " . $e->getMessage());
                 }
+            }
+
+            try {
+                $currentPrice = null;
+                if (isset($h1, $l1, $h2, $l2)) {
+                    $currentPrice = ($h2 + $l2) > 0 ? (($h2 + $l2) / 2.0) : (($h1 + $l1) / 2.0);
+                }
+                if ($currentPrice !== null && $currentPrice > 0) {
+                    $activePriceBans = \App\Models\UserBan::active()
+                        ->where('user_id', $userExchange->user_id)
+                        ->where('is_demo', false)
+                        ->where('ban_type', 'self_ban_price')
+                        ->where('lifted_by_price', false)
+                        ->get();
+
+                    foreach ($activePriceBans as $ban) {
+                        $below = $ban->price_below !== null ? (float)$ban->price_below : null;
+                        $above = $ban->price_above !== null ? (float)$ban->price_above : null;
+
+                        $lift = false;
+                        if ($below !== null && $currentPrice <= $below) {
+                            $lift = true;
+                        }
+                        if ($above !== null && $currentPrice >= $above) {
+                            $lift = true;
+                        }
+
+                        if ($lift) {
+                            $ban->lifted_by_price = true;
+                            $ban->ends_at = now();
+                            $ban->save();
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                $this->warn("    خطا در بررسی بن‌های خودکار قیمت برای کاربر {$userExchange->user_id}: " . $e->getMessage());
             }
         }
     }

@@ -328,6 +328,34 @@ class FuturesController extends Controller
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
         $tvDefaultInterval = UserAccountSetting::getTradingViewDefaultInterval($user->id, $isDemo);
 
+        $weeklyProfitLimit = null;
+        $weeklyLossLimit = null;
+        $monthlyProfitLimit = null;
+        $monthlyLossLimit = null;
+        $weeklyPnlPercent = null;
+        $monthlyPnlPercent = null;
+        if ($user->future_strict_mode) {
+            $settings = \App\Models\UserAccountSetting::getUserSettings($user->id, $isDemo);
+            $weeklyProfitLimit = isset($settings['weekly_profit_limit']) ? (float)$settings['weekly_profit_limit'] : null;
+            $weeklyLossLimit = isset($settings['weekly_loss_limit']) ? (float)$settings['weekly_loss_limit'] : null;
+            $monthlyProfitLimit = isset($settings['monthly_profit_limit']) ? (float)$settings['monthly_profit_limit'] : null;
+            $monthlyLossLimit = isset($settings['monthly_loss_limit']) ? (float)$settings['monthly_loss_limit'] : null;
+
+            if (($weeklyProfitLimit !== null && $weeklyProfitLimit > 0) || ($weeklyLossLimit !== null && $weeklyLossLimit > 0)) {
+                $banService = new \App\Services\BanService();
+                $startOfWeek = \Carbon\Carbon::now(config('app.timezone'))->startOfWeek(\Carbon\Carbon::MONDAY);
+                $endOfWeek = $startOfWeek->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
+                $weeklyPnlPercent = $banService->getPeriodPnlPercent($user->id, $isDemo, $startOfWeek, $endOfWeek);
+            }
+
+            if (($monthlyProfitLimit !== null && $monthlyProfitLimit > 0) || ($monthlyLossLimit !== null && $monthlyLossLimit > 0)) {
+                $banService = isset($banService) ? $banService : new \App\Services\BanService();
+                $startOfMonth = now()->startOfMonth();
+                $endOfMonth = now()->endOfMonth();
+                $monthlyPnlPercent = $banService->getPeriodPnlPercent($user->id, $isDemo, $startOfMonth, $endOfMonth);
+            }
+        }
+
         // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
             // In strict mode, limit risk to 10% if user's default is higher
@@ -349,7 +377,7 @@ class FuturesController extends Controller
                 $activeBan = UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit', 'self_ban_time', 'self_ban_price'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 
@@ -424,6 +452,12 @@ class FuturesController extends Controller
             'tvDefaultInterval' => $tvDefaultInterval,
             'marketRiskLevel' => $marketRiskLevel,
             'marketRiskMessage' => $marketRiskMessage,
+            'weeklyProfitLimit' => $weeklyProfitLimit,
+            'weeklyLossLimit' => $weeklyLossLimit,
+            'monthlyProfitLimit' => $monthlyProfitLimit,
+            'monthlyLossLimit' => $monthlyLossLimit,
+            'weeklyPnlPercent' => $weeklyPnlPercent,
+            'monthlyPnlPercent' => $monthlyPnlPercent,
         ]);
     }
 
@@ -520,7 +554,7 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit', 'self_ban_time', 'self_ban_price'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
@@ -577,14 +611,14 @@ class FuturesController extends Controller
                 $activeBan = \App\Models\UserBan::active()
                     ->forUser($user->id)
                     ->accountType($isDemo)
-                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit'])
+                    ->whereIn('ban_type', ['single_loss', 'double_loss', 'exchange_force_close', 'weekly_profit_limit', 'weekly_loss_limit', 'monthly_profit_limit', 'monthly_loss_limit', 'self_ban_time', 'self_ban_price'])
                     ->orderBy('ends_at', 'desc')
                     ->first();
                 if ($activeBan) {
                     $remainingSeconds = max(0, $activeBan->ends_at->diffInSeconds(now()));
                     $remainingFa = $this->formatFaDuration($remainingSeconds);
                     return back()
-                        ->withErrors(['msg' => 'ثبت سفارش جدید موقتاً محدود شده است. لطفاً ' . $remainingFa . ' صبر کنید.'])
+                        ->withErrors(['msg' => \App\Services\BanService::getPersianBanMessage($activeBan) . ' ' . 'زمان باقی‌مانده: ' . $remainingFa . '.'])
                         ->withInput();
                 }
             }

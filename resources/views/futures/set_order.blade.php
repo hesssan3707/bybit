@@ -128,6 +128,162 @@
             padding: 10px;
         }
     }
+    .goals-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+    .goals-logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, #facc15, #f97316);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transform: scale(1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 0 0 0 rgba(250,204,21,0.4);
+    }
+    .goals-logo:hover {
+        transform: scale(1.08);
+        box-shadow: 0 0 0 6px rgba(250,204,21,0.18);
+    }
+    .goals-logo-icon {
+        width: 16px;
+        height: 16px;
+        color: #0f172a;
+    }
+    .goals-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,0.72);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+        padding: 16px;
+    }
+    .goals-modal-backdrop.show {
+        display: flex;
+        animation: goalsFadeIn 0.2s ease-out;
+    }
+    .goals-modal {
+        width: 100%;
+        max-width: 420px;
+        background: radial-gradient(circle at top, rgba(59,130,246,0.16), rgba(15,23,42,0.96));
+        border-radius: 18px;
+        border: 1px solid rgba(148,163,184,0.35);
+        box-shadow:
+            0 22px 60px rgba(15,23,42,0.7),
+            0 0 0 1px rgba(15,23,42,0.8);
+        padding: 20px 18px 18px;
+        transform: scale(0.82);
+        opacity: 0;
+        transition: transform 0.22s ease-out, opacity 0.22s ease-out;
+    }
+    .goals-modal.show {
+        transform: scale(1);
+        opacity: 1;
+    }
+    .goals-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .goals-modal-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #e5e7eb;
+    }
+    .goals-modal-subtitle {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 2px;
+    }
+    .goals-modal-close {
+        border: none;
+        background: transparent;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 999px;
+        transition: background 0.18s ease, color 0.18s ease;
+    }
+    .goals-modal-close:hover {
+        background: rgba(55,65,81,0.6);
+        color: #e5e7eb;
+    }
+    .goals-progress-group {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-top: 4px;
+    }
+    .goals-progress-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(15,23,42,0.85);
+        border: 1px solid rgba(55,65,81,0.7);
+    }
+    .goals-progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+    }
+    .goals-progress-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #e5e7eb;
+    }
+    .goals-progress-value {
+        font-size: 12px;
+        color: #9ca3af;
+    }
+    .goals-progress-bar {
+        position: relative;
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(31,41,55,0.9);
+        overflow: hidden;
+    }
+    .goals-progress-fill {
+        position: absolute;
+        inset: 0;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22c55e, #a3e635);
+        transition: width 0.25s ease-out;
+    }
+    .goals-progress-fill.loss {
+        background: linear-gradient(90deg, #f97373, #fb7185);
+    }
+    .goals-progress-footer {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #6b7280;
+        display: flex;
+        justify-content: space-between;
+    }
+    .goals-progress-footer span:last-child {
+        text-align: left;
+    }
+    @media (max-width: 480px) {
+        .goals-modal {
+            max-width: 100%;
+            padding-inline: 16px;
+        }
+    }
+    @keyframes goalsFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
 </style>
 @endpush
 
@@ -135,11 +291,28 @@
 <div class="page-container">
     <div class="form-container">
         <div class="glass-card container">
-    @if(isset($user) && $user->future_strict_mode && $selectedMarket)
-        <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
-    @else
-        <h2>ثبت سفارش جدید</h2>
-    @endif
+    <div class="goals-header">
+        @if(isset($user) && $user->future_strict_mode && $selectedMarket)
+            <h2>ثبت سفارش جدید - {{ $selectedMarket }}</h2>
+        @else
+            <h2>ثبت سفارش جدید</h2>
+        @endif
+        @if(isset($user) && $user->future_strict_mode && (isset($weeklyProfitLimit, $weeklyLossLimit, $monthlyProfitLimit, $monthlyLossLimit)))
+            @php
+                $hasWeeklyTargets = ($weeklyProfitLimit !== null && $weeklyLossLimit !== null);
+                $hasMonthlyTargets = ($monthlyProfitLimit !== null && $monthlyLossLimit !== null);
+            @endphp
+            @if($hasWeeklyTargets || $hasMonthlyTargets)
+                <button type="button" class="goals-logo" id="openGoalsModalBtn" aria-label="اهداف هفتگی و ماهانه">
+                    <svg viewBox="0 0 24 24" class="goals-logo-icon" aria-hidden="true">
+                        <path d="M5 12h3v7H5z"></path>
+                        <path d="M10.5 9h3v10h-3z"></path>
+                        <path d="M16 5h3v14h-3z"></path>
+                    </svg>
+                </button>
+            @endif
+        @endif
+    </div>
     <div class="tradingview-container">
         <!-- TradingView Widget BEGIN -->
         <div class="tradingview-widget-container">
@@ -255,6 +428,89 @@
                     </button>
                 </div>
             @endif
+        </div>
+    @endif
+
+    @if(isset($user) && $user->future_strict_mode)
+        @php
+            $hasWeeklyTargets = isset($weeklyProfitLimit, $weeklyLossLimit) && $weeklyProfitLimit !== null && $weeklyLossLimit !== null;
+            $hasMonthlyTargets = isset($monthlyProfitLimit, $monthlyLossLimit) && $monthlyProfitLimit !== null && $monthlyLossLimit !== null;
+            $weeklyPnl = isset($weeklyPnlPercent) ? (float)$weeklyPnlPercent : 0.0;
+            $monthlyPnl = isset($monthlyPnlPercent) ? (float)$monthlyPnlPercent : 0.0;
+            $weeklyProfitFill = 0.0;
+            $weeklyLossFill = 0.0;
+            if ($weeklyPnl > 0 && $hasWeeklyTargets && $weeklyProfitLimit > 0) {
+                $weeklyProfitFill = max(0, min(100, ($weeklyPnl / $weeklyProfitLimit) * 100));
+            } elseif ($weeklyPnl < 0 && $hasWeeklyTargets && $weeklyLossLimit > 0) {
+                $weeklyLossFill = max(0, min(100, (abs($weeklyPnl) / $weeklyLossLimit) * 100));
+            }
+            $monthlyProfitFill = 0.0;
+            $monthlyLossFill = 0.0;
+            if ($monthlyPnl > 0 && $hasMonthlyTargets && $monthlyProfitLimit > 0) {
+                $monthlyProfitFill = max(0, min(100, ($monthlyPnl / $monthlyProfitLimit) * 100));
+            } elseif ($monthlyPnl < 0 && $hasMonthlyTargets && $monthlyLossLimit > 0) {
+                $monthlyLossFill = max(0, min(100, (abs($monthlyPnl) / $monthlyLossLimit) * 100));
+            }
+        @endphp
+
+        <div id="goalsModalBackdrop" class="goals-modal-backdrop" style="display:none;">
+            <div class="goals-modal" id="goalsModalBox">
+                <div class="goals-modal-header">
+                    <div>
+                        <div class="goals-modal-title">اهداف سود و ضرر</div>
+                        <div class="goals-modal-subtitle">پیشرفت هفتگی و ماهانه شما در حالت سخت‌گیرانه</div>
+                    </div>
+                    <button type="button" class="goals-modal-close" id="closeGoalsModalBtn" aria-label="بستن">
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="goals-progress-group">
+                    @if($hasWeeklyTargets)
+                        <div class="goals-progress-item">
+                            <div class="goals-progress-header">
+                                <div class="goals-progress-label">اهداف هفتگی</div>
+                                <div class="goals-progress-value">
+                                    {{ number_format($weeklyPnl, 1) }}%
+                                </div>
+                            </div>
+                            <div class="goals-progress-bar">
+                                @if($weeklyPnl >= 0)
+                                    <div class="goals-progress-fill" style="width: {{ $weeklyProfitFill }}%;"></div>
+                                @else
+                                    <div class="goals-progress-fill loss" style="width: {{ $weeklyLossFill }}%;"></div>
+                                @endif
+                            </div>
+                            <div class="goals-progress-footer">
+                                <span>سود هدف: +{{ number_format($weeklyProfitLimit, 0) }}%</span>
+                                <span>حد ضرر: -{{ number_format($weeklyLossLimit, 0) }}%</span>
+                            </div>
+                        </div>
+                    @endif
+                    @if($hasMonthlyTargets)
+                        <div class="goals-progress-item">
+                            <div class="goals-progress-header">
+                                <div class="goals-progress-label">اهداف ماهانه</div>
+                                <div class="goals-progress-value">
+                                    {{ number_format($monthlyPnl, 1) }}%
+                                </div>
+                            </div>
+                            <div class="goals-progress-bar">
+                                @if($monthlyPnl >= 0)
+                                    <div class="goals-progress-fill" style="width: {{ $monthlyProfitFill }}%;"></div>
+                                @else
+                                    <div class="goals-progress-fill loss" style="width: {{ $monthlyLossFill }}%;"></div>
+                                @endif
+                            </div>
+                            <div class="goals-progress-footer">
+                                <span>سود هدف: +{{ number_format($monthlyProfitLimit, 0) }}%</span>
+                                <span>حد ضرر: -{{ number_format($monthlyLossLimit, 0) }}%</span>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
     @endif
 
