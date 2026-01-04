@@ -60,7 +60,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-Route::middleware(['auth', 'restrict.watcher'])->group(function () {
+Route::middleware(['auth', 'restrict.investor'])->group(function () {
 
     Route::prefix('futures')->name('futures.')->middleware('exchange.access:futures')->group(function () {
         Route::get('/orders', [FuturesController::class, 'index'])->name('orders');
@@ -94,6 +94,9 @@ Route::middleware(['auth', 'restrict.watcher'])->group(function () {
     
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/show', [ProfileController::class, 'index'])->name('profile.show');
+    Route::post('/profile/investors', [ProfileController::class, 'storeInvestor'])->name('profile.investors.store');
+    Route::post('/profile/investors/{id}', [ProfileController::class, 'updateInvestor'])->name('profile.investors.update');
+    Route::delete('/profile/investors/{id}', [ProfileController::class, 'deleteInvestor'])->name('profile.investors.destroy');
     Route::post('/profile/watchers', [ProfileController::class, 'storeWatcher'])->name('profile.watchers.store');
     Route::post('/profile/watchers/{id}', [ProfileController::class, 'updateWatcher'])->name('profile.watchers.update');
     Route::delete('/profile/watchers/{id}', [ProfileController::class, 'deleteWatcher'])->name('profile.watchers.destroy');

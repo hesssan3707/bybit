@@ -39,6 +39,7 @@ class CollectMissingCandleDataCommand extends Command
 
         if ($trades->isEmpty()) {
             $this->info('هیچ معامله‌ای برای جمع‌آوری کندل پیدا نشد.');
+
             return 0;
         }
 
@@ -49,8 +50,9 @@ class CollectMissingCandleDataCommand extends Command
             try {
                 // Check if order exists
                 $order = $trade->order;
-                if (!$order) {
+                if (! $order) {
                     $this->warn("معامله {$trade->id} فاقد سفارش مرتبط است");
+
                     continue;
                 }
 
@@ -64,18 +66,19 @@ class CollectMissingCandleDataCommand extends Command
                 $job = new CollectOrderCandlesJob($trade->id);
                 $job->handle();
                 $dispatched++;
-                
+
                 $this->info("  ✓ پردازش کندل برای معامله {$trade->id} (سفارش {$order->order_id}) انجام شد");
             } catch (\Throwable $e) {
-                $this->error("  ✗ خطا در پردازش برای معامله {$trade->id}: " . $e->getMessage());
+                $this->error("  ✗ خطا در پردازش برای معامله {$trade->id}: ".$e->getMessage());
                 Log::error('Failed to dispatch CollectOrderCandlesJob', [
                     'trade_id' => $trade->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
 
         $this->info("✓ تعداد {$dispatched} job به صف اضافه شد");
+
         return 0;
     }
 }

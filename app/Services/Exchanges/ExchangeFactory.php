@@ -91,7 +91,7 @@ class ExchangeFactory
     {
         $user = \App\Models\User::find($userId);
         
-        if ($user && $user->isWatcher()) {
+        if ($user && $user->isInvestor()) {
             // If watcher has a specific exchange they are currently viewing, and no specific exchangeName is requested
             if (!$exchangeName && $user->current_exchange_id) {
                 $userExchange = UserExchange::find($user->current_exchange_id);

@@ -26,11 +26,22 @@ class ProfileController extends Controller
         $totalBalance = 'N/A';
         $currentExchange = null;
         $activeExchanges = [];
+        $investorBalance = 0.0;
         
         // Load user's default/active exchange
         $defaultExchange = $user->defaultExchange;
         
-        if ($defaultExchange) {
+        if ($user->isInvestor()) {
+            $investorBalance = (float) (DB::table('investor_wallets')
+                ->where('investor_user_id', $user->id)
+                ->where('currency', 'USDT')
+                ->value('balance') ?? 0);
+
+            $totalEquity = number_format($investorBalance, 2);
+            $totalBalance = number_format($investorBalance, 2);
+
+            $currentExchange = $user->getCurrentExchange();
+        } elseif ($defaultExchange) {
             $currentExchange = $defaultExchange;
             
             try {
@@ -38,6 +49,8 @@ class ProfileController extends Controller
 
 
                 $name = $defaultExchange->exchange_name;
+                $equityNumeric = null;
+                $walletNumeric = null;
 
                 if ($name === 'bybit') {
                         // BYBIT (UNIFIED, USDT):
@@ -49,8 +62,8 @@ class ProfileController extends Controller
                             $equity = (float)($usdt['totalEquity'] ?? ($usdt['equity'] ?? ((($usdt['totalWalletBalance'] ?? ($usdt['walletBalance'] ?? 0))) + ($usdt['unrealizedPnl'] ?? 0))));
                             $unrealized = (float)($usdt['unrealizedPnl'] ?? 0);
                             $wallet = (float)($usdt['totalWalletBalance'] ?? ($usdt['walletBalance'] ?? ($equity - $unrealized)));
-                            $totalEquity = number_format($equity, 2);
-                            $totalBalance = number_format($wallet, 2);
+                            $equityNumeric = $equity;
+                            $walletNumeric = $wallet;
                         }
                     } elseif ($name === 'binance') {
                         // BINANCE (FUTURES, USDT from /fapi/v2/balance):
@@ -63,8 +76,8 @@ class ProfileController extends Controller
                             $unpnl = (float)($usdtRow['crossUnPnl'] ?? 0);
                             $equity = $walletBase + $unpnl;
                             $wallet = (float)($usdtRow['crossWalletBalance'] ?? ($usdtRow['balance'] ?? ($usdtRow['availableBalance'] ?? ($usdtRow['maxWithdrawAmount'] ?? 0))));
-                            $totalEquity = number_format($equity, 2);
-                            $totalBalance = number_format($wallet, 2);
+                            $equityNumeric = $equity;
+                            $walletNumeric = $wallet;
                         }
                     } elseif ($name === 'bingx') {
                         // BINGX (FUTURES, single object):
@@ -76,21 +89,44 @@ class ProfileController extends Controller
                             $equity = (float)($obj['equity'] ?? ((($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? 0))) + ($obj['unrealizedPnl'] ?? 0)));
                             $unrealized = (float)($obj['unrealizedPnl'] ?? 0);
                             $wallet = (float)($obj['totalWalletBalance'] ?? ($obj['walletBalance'] ?? ($obj['availableBalance'] ?? ($equity - $unrealized))));
-                            $totalEquity = number_format($equity, 2);
-                            $totalBalance = number_format($wallet, 2);
+                            $equityNumeric = $equity;
+                            $walletNumeric = $wallet;
                         }
                     } else {
                         // Fallback to generic if available
                         $account = $exchangeService->getAccountBalance();
                         if ($account && isset($account['success']) && $account['success']) {
                             if (isset($account['total'])) {
-                                $totalEquity = number_format((float)$account['total'], 2);
+                                $equityNumeric = (float) $account['total'];
                             }
                             if (isset($account['available'])) {
-                                $totalBalance = number_format((float)$account['available'], 2);
+                                $walletNumeric = (float) $account['available'];
                             }
                         }
                     }
+
+                if ($equityNumeric !== null || $walletNumeric !== null) {
+                    $investorTotal = (float) (DB::table('users')
+                        ->join('investor_wallets', 'users.id', '=', 'investor_wallets.investor_user_id')
+                        ->where('users.parent_id', $user->id)
+                        ->where('users.role', 'investor')
+                        ->where('investor_wallets.currency', 'USDT')
+                        ->sum('investor_wallets.balance') ?? 0);
+
+                    if ($equityNumeric !== null) {
+                        $equityNumeric = max(0.0, $equityNumeric - $investorTotal);
+                    }
+                    if ($walletNumeric !== null) {
+                        $walletNumeric = max(0.0, $walletNumeric - $investorTotal);
+                    }
+
+                    if ($equityNumeric !== null) {
+                        $totalEquity = number_format($equityNumeric, 2);
+                    }
+                    if ($walletNumeric !== null) {
+                        $totalBalance = number_format($walletNumeric, 2);
+                    }
+                }
 
                 // }
             } catch (\Exception $e) {
@@ -101,7 +137,7 @@ class ProfileController extends Controller
         // Load all active exchanges for switching
         $activeExchanges = $user->activeExchanges()->get();
         
-        $watchers = $user->watchers;
+        $investors = $user->investors;
 
         return view('profile.index', [
             'user' => $user,
@@ -110,16 +146,16 @@ class ProfileController extends Controller
             'currentExchange' => $currentExchange,
             'activeExchanges' => $activeExchanges,
             'availableExchanges' => UserExchange::getAvailableExchanges(),
-            'watchers' => $watchers,
+            'investors' => $investors,
         ]);
     }
 
-    public function storeWatcher(Request $request)
+    public function storeInvestor(Request $request)
     {
         $user = Auth::user();
 
-        if ($user->watchers()->count() >= 3) {
-            return redirect()->back()->with('error', 'شما حداکثر می‌توانید ۳ کاربر ناظر داشته باشید.');
+        if ($user->investors()->count() >= 3) {
+            return redirect()->back()->with('error', 'شما حداکثر می‌توانید ۳ کاربر سرمایه‌گذار داشته باشید.');
         }
 
         $request->validate([
@@ -135,35 +171,51 @@ class ProfileController extends Controller
         ]);
 
         $realEmail = strtolower(trim($request->email));
+        $realEmail = preg_replace('/^investor\s*-\s*/i', '', $realEmail);
         $realEmail = preg_replace('/^watcher\s*-\s*/i', '', $realEmail);
-        $watcherEmail = 'watcher-' . $realEmail;
+        $investorEmail = 'investor-' . $realEmail;
 
-        $legacyWatcherEmails = [
-            $watcherEmail,
+        $legacyInvestorEmails = [
+            $investorEmail,
+            'Investor-' . $realEmail,
+            'Investor - ' . $realEmail,
+            'watcher-' . $realEmail,
             'Watcher-' . $realEmail,
             'Watcher - ' . $realEmail,
         ];
 
-        if (User::whereIn('email', $legacyWatcherEmails)->exists()) {
-            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان ناظر ثبت شده است.');
+        if (User::whereIn('email', $legacyInvestorEmails)->exists()) {
+            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان سرمایه‌گذار ثبت شده است.');
         }
 
-        User::create([
+        $investor = User::create([
             'name' => $request->name,
-            'username' => $watcherEmail,
-            'email' => $watcherEmail,
+            'username' => $investorEmail,
+            'email' => $investorEmail,
             'password' => Hash::make($request->password),
             'parent_id' => $user->id,
-            'role' => 'watcher',
+            'role' => 'investor',
             'is_active' => true,
             'activated_at' => now(),
-            'email_verified_at' => now(), // Watchers don't need verification
+            'email_verified_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', 'کاربر ناظر با موفقیت ایجاد شد.');
+        DB::table('investor_wallets')->updateOrInsert(
+            [
+                'investor_user_id' => $investor->id,
+                'currency' => 'USDT',
+            ],
+            [
+                'balance' => 0,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'کاربر سرمایه‌گذار با موفقیت ایجاد شد.');
     }
 
-    public function updateWatcher(Request $request, $id)
+    public function updateInvestor(Request $request, $id)
     {
         $user = Auth::user();
 
@@ -178,45 +230,64 @@ class ProfileController extends Controller
             'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
         ]);
 
-        $watcher = $user->watchers()->findOrFail($id);
+        $investor = $user->investors()->findOrFail($id);
 
         $realEmail = strtolower(trim($request->email));
+        $realEmail = preg_replace('/^investor\s*-\s*/i', '', $realEmail);
         $realEmail = preg_replace('/^watcher\s*-\s*/i', '', $realEmail);
-        $watcherEmail = 'watcher-' . $realEmail;
+        $investorEmail = 'investor-' . $realEmail;
 
-        $legacyWatcherEmails = [
-            $watcherEmail,
+        $legacyInvestorEmails = [
+            $investorEmail,
+            'Investor-' . $realEmail,
+            'Investor - ' . $realEmail,
+            'watcher-' . $realEmail,
             'Watcher-' . $realEmail,
             'Watcher - ' . $realEmail,
         ];
 
-        if ($watcher->email !== $watcherEmail && User::whereIn('email', $legacyWatcherEmails)->exists()) {
-            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان ناظر ثبت شده است.');
+        if ($investor->email !== $investorEmail && User::whereIn('email', $legacyInvestorEmails)->exists()) {
+            return redirect()->back()->with('error', 'این ایمیل قبلاً به عنوان سرمایه‌گذار ثبت شده است.');
         }
 
         $update = [
             'name' => $request->name,
-            'email' => $watcherEmail,
-            'username' => $watcherEmail,
+            'email' => $investorEmail,
+            'username' => $investorEmail,
         ];
 
         if ($request->filled('password')) {
             $update['password'] = Hash::make($request->password);
         }
 
-        $watcher->update($update);
+        $investor->update($update);
 
-        return redirect()->back()->with('success', 'اطلاعات ناظر با موفقیت به‌روزرسانی شد.');
+        return redirect()->back()->with('success', 'اطلاعات سرمایه‌گذار با موفقیت به‌روزرسانی شد.');
+    }
+
+    public function deleteInvestor($id)
+    {
+        $user = Auth::user();
+        $investor = $user->investors()->findOrFail($id);
+
+        $investor->delete();
+
+        return redirect()->back()->with('success', 'کاربر سرمایه‌گذار با موفقیت حذف شد.');
+    }
+
+    public function storeWatcher(Request $request)
+    {
+        return $this->storeInvestor($request);
+    }
+
+    public function updateWatcher(Request $request, $id)
+    {
+        return $this->updateInvestor($request, $id);
     }
 
     public function deleteWatcher($id)
     {
-        $user = Auth::user();
-        $watcher = $user->watchers()->findOrFail($id);
-
-        $watcher->delete();
-
-        return redirect()->back()->with('success', 'کاربر ناظر با موفقیت حذف شد.');
+        return $this->deleteInvestor($id);
     }
 
     public function updateName(Request $request)

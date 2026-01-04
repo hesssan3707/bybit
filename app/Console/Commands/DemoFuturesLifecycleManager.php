@@ -2,17 +2,14 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\User;
-use App\Models\UserExchange;
 use App\Models\Order;
 use App\Models\Trade;
-use App\Models\UserBan;
-use App\Services\BanService;
+use App\Models\User;
+use App\Models\UserExchange;
 use App\Services\Exchanges\ExchangeFactory;
-use Illuminate\Support\Facades\DB;
-use App\Jobs\CollectOrderCandlesJob;
 use Exception;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class DemoFuturesLifecycleManager extends Command
 {
@@ -41,8 +38,9 @@ class DemoFuturesLifecycleManager extends Command
 
         if ($userOption) {
             $user = User::find($userOption);
-            if (!$user) {
+            if (! $user) {
                 $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+
                 return 1;
             }
             $this->syncForUser($user);
@@ -51,6 +49,7 @@ class DemoFuturesLifecycleManager extends Command
         }
 
         $this->info('مدیریت چرخه حیات سفارشات آتی دمو با موفقیت تکمیل شد.');
+
         return 0;
     }
 
@@ -60,7 +59,7 @@ class DemoFuturesLifecycleManager extends Command
     private function syncForAllUsers()
     {
         $users = User::whereNotNull('email_verified_at')->get();
-        
+
         $this->info("پردازش {$users->count()} کاربر تایید شده...");
 
         foreach ($users as $user) {
@@ -98,6 +97,7 @@ class DemoFuturesLifecycleManager extends Command
             // If dry-run, skip any external API/network calls
             if ($this->option('dry-run')) {
                 $this->info("[Dry-run] فراخوانی‌های شبکه‌ای برای صرافی {$userExchange->exchange_name} (دمو) نادیده گرفته شد.");
+
                 return;
             }
 
@@ -113,7 +113,8 @@ class DemoFuturesLifecycleManager extends Command
             try {
                 $exchangeService->getAccountInfo();
             } catch (Exception $e) {
-                $this->warn("صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email} در دسترس نیست: " . $e->getMessage());
+                $this->warn("صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email} در دسترس نیست: ".$e->getMessage());
+
                 return;
             }
 
@@ -121,7 +122,7 @@ class DemoFuturesLifecycleManager extends Command
             $this->syncLifecycleForExchange($exchangeService, $user, $userExchange);
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: ".$e->getMessage());
         }
     }
 
@@ -135,11 +136,11 @@ class DemoFuturesLifecycleManager extends Command
         $oldestOrder = Order::where('user_exchange_id', $userExchange->id)
             ->where('is_demo', true)
             ->whereIn('status', ['pending', 'filled'])
-            ->where(function($q) {
-                $q->whereHas('trade', function($t) {
+            ->where(function ($q) {
+                $q->whereHas('trade', function ($t) {
                     $t->whereNull('closed_at');
                 })
-                ->orWhereDoesntHave('trade');
+                    ->orWhereDoesntHave('trade');
             })
             ->orderBy('created_at', 'asc')
             ->first();
@@ -149,27 +150,27 @@ class DemoFuturesLifecycleManager extends Command
         if ($oldestOrder) {
             $startTime = $oldestOrder->created_at->subMinutes(5)->timestamp * 1000; // Convert to milliseconds
             try {
-            // Get orders from exchange with time filtering
-            $exchangeOrders = $exchangeService->getOrderHistory(null, 100, $startTime);
-            $orders = $exchangeOrders['list'] ?? [];
+                // Get orders from exchange with time filtering
+                $exchangeOrders = $exchangeService->getOrderHistory(null, 100, $startTime);
+                $orders = $exchangeOrders['list'] ?? [];
 
-            $this->info("دریافت " . count($orders) . " سفارش از صرافی {$userExchange->exchange_name} (دمو)");
+                $this->info('دریافت '.count($orders)." سفارش از صرافی {$userExchange->exchange_name} (دمو)");
 
-            foreach ($orders as $exchangeOrder) {
-                $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
-            }
-            // پس از همگام‌سازی سفارش‌ها، موقعیت‌های باز را نیز همگام‌سازی می‌کنیم (دمو)
-            $this->syncPnlRecords($exchangeService, $userExchange);
+                foreach ($orders as $exchangeOrder) {
+                    $this->syncExchangeOrderToDatabase($exchangeOrder, $userExchange);
+                }
+                // پس از همگام‌سازی سفارش‌ها، موقعیت‌های باز را نیز همگام‌سازی می‌کنیم (دمو)
+                $this->syncPnlRecords($exchangeService, $userExchange);
 
             } catch (Exception $e) {
-                $this->error("خطا در همگام‌سازی سفارشات از صرافی (دمو): " . $e->getMessage());
+                $this->error('خطا در همگام‌سازی سفارشات از صرافی (دمو): '.$e->getMessage());
             }
         } else {
-            $this->info("سفارشی یافت نشد");
+            $this->info('سفارشی یافت نشد');
         }
         // تأیید همگام‌سازی معاملات بسته و علامت‌گذاری موارد ناموفق
         $this->verifyClosedTradesSynchronization($exchangeService, $userExchange);
-        
+
         // بررسی بن‌ها بر اساس معاملات اخیراً بسته شده (مستقل از همگام‌سازی)
         $this->checkRecentTradesForBans($userExchange);
     }
@@ -180,7 +181,7 @@ class DemoFuturesLifecycleManager extends Command
     private function syncExchangeOrderToDatabase($exchangeOrder, UserExchange $userExchange)
     {
         $orderId = $this->extractOrderId($exchangeOrder, $userExchange->exchange_name);
-        if (!$orderId) {
+        if (! $orderId) {
             return;
         }
 
@@ -200,7 +201,7 @@ class DemoFuturesLifecycleManager extends Command
 
         if ($order && $order->is_locked) {
             // Only allow update if the new status is terminal (filled, canceled, expired)
-            if (!in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
+            if (! in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
                 return;
             }
         }
@@ -219,7 +220,7 @@ class DemoFuturesLifecycleManager extends Command
                         $order->average_price = $avgPrice;
                     }
 
-                    if (in_array($newStatus, ['filled','canceled', 'expired', 'closed'])) {
+                    if (in_array($newStatus, ['filled', 'canceled', 'expired', 'closed'])) {
                         $order->closed_at = now();
                     }
                     if ($newStatus === 'filled') {
@@ -243,8 +244,8 @@ class DemoFuturesLifecycleManager extends Command
                                 ->first();
 
                             if ($existingOpen) {
-                                $existingOpen->qty = (float)$qty;
-                                $existingOpen->avg_entry_price = (float)$avgPrice;
+                                $existingOpen->qty = (float) $qty;
+                                $existingOpen->avg_entry_price = (float) $avgPrice;
                                 $existingOpen->save();
                                 $this->info("[Demo] معامله باز برای سفارش {$orderId} به‌روزرسانی شد");
                             } else {
@@ -255,8 +256,8 @@ class DemoFuturesLifecycleManager extends Command
                                     'side' => $side,
                                     'order_type' => 'Market',
                                     'leverage' => 1.0,
-                                    'qty' => (float)$qty,
-                                    'avg_entry_price' => (float)$avgPrice,
+                                    'qty' => (float) $qty,
+                                    'avg_entry_price' => (float) $avgPrice,
                                     'avg_exit_price' => 0,
                                     'pnl' => 0,
                                     'order_id' => $order->order_id,
@@ -283,10 +284,16 @@ class DemoFuturesLifecycleManager extends Command
 
             $normalized = [];
             foreach ($positions as $rawPosition) {
-                if (!is_array($rawPosition)) { continue; }
+                if (! is_array($rawPosition)) {
+                    continue;
+                }
                 $p = $this->mapRawPositionToCommon($userExchange->exchange_name, $rawPosition);
-                if (!$p) { continue; }
-                if (empty($p['size']) || (float)$p['size'] == 0.0) { continue; }
+                if (! $p) {
+                    continue;
+                }
+                if (empty($p['size']) || (float) $p['size'] == 0.0) {
+                    continue;
+                }
                 $normalized[] = $p;
             }
 
@@ -302,8 +309,8 @@ class DemoFuturesLifecycleManager extends Command
                     $matchedPosition = null;
                     foreach ($normalized as $p) {
                         if (($p['symbol'] ?? null) === $trade->symbol
-                            && isset($p['entryPrice']) && (float)$p['entryPrice'] == (float)$trade->avg_entry_price
-                            && isset($p['size']) && (float)$p['size'] == (float)$trade->qty) {
+                            && isset($p['entryPrice']) && (float) $p['entryPrice'] == (float) $trade->avg_entry_price
+                            && isset($p['size']) && (float) $p['size'] == (float) $trade->qty) {
                             $matchedPosition = $p;
                             break;
                         }
@@ -318,6 +325,7 @@ class DemoFuturesLifecycleManager extends Command
                         }
                         $trade->updated_at = now();
                         $trade->save();
+
                         return; // continue outer loop
                     }
 
@@ -328,17 +336,17 @@ class DemoFuturesLifecycleManager extends Command
 
                     $matchedClosed = null;
                     foreach ($closedList as $c) {
-                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string) $c['orderId'] === (string) $trade->order_id;
                         $fieldsMatch = (($c['symbol'] ?? null) === $symbol)
-                            && isset($c['qty']) && (float)$c['qty'] == (float)$trade->qty
-                            && isset($c['avgEntryPrice']) && (float)$c['avgEntryPrice'] == (float)$trade->avg_entry_price;
+                            && isset($c['qty']) && (float) $c['qty'] == (float) $trade->qty
+                            && isset($c['avgEntryPrice']) && (float) $c['avgEntryPrice'] == (float) $trade->avg_entry_price;
                         if ($idMatch || $fieldsMatch) {
                             $matchedClosed = $c;
                             break;
                         }
                     }
 
-                   if ($matchedClosed) {
+                    if ($matchedClosed) {
                         if (array_key_exists('avgExitPrice', $matchedClosed) && $matchedClosed['avgExitPrice'] !== null) {
                             $trade->avg_exit_price = $matchedClosed['avgExitPrice'];
                         }
@@ -349,11 +357,11 @@ class DemoFuturesLifecycleManager extends Command
                         $trade->synchronized = 1; // verified sync with exchange
                         $trade->updated_at = now();
                         $trade->save();
-                   }
+                    }
                 });
             }
         } catch (Exception $e) {
-            $this->warn("[Demo] خطا در همگام‌سازی سوابق PnL: " . $e->getMessage());
+            $this->warn('[Demo] خطا در همگام‌سازی سوابق PnL: '.$e->getMessage());
         }
     }
 
@@ -381,40 +389,50 @@ class DemoFuturesLifecycleManager extends Command
         } else {
             $list = $positionsRaw;
         }
-        if (!is_array($list)) {
+        if (! is_array($list)) {
             $this->warn("[Demo] شکل لیست موقعیت‌ها نامعتبر برای صرافی {$exchangeName}");
+
             return [];
         }
         if (is_array($list) && empty($list)) {
             $this->info("[Demo] لیست موقعیت‌ها خالی برای صرافی {$exchangeName}");
         }
+
         return $list;
     }
 
     private function mapRawPositionToCommon(string $exchangeName, array $raw): ?array
     {
         $symbol = $raw['symbol'] ?? null;
-        if (!$symbol) {
+        if (! $symbol) {
             $this->warn("[Demo] نماد نامشخص در موقعیت خام صرافی {$exchangeName}");
+
             return null;
         }
 
         // Determine side across exchanges
         $side = $raw['side'] ?? null;
-        if (!$side && isset($raw['positionSide'])) {
-            $ps = strtoupper((string)$raw['positionSide']);
+        if (! $side && isset($raw['positionSide'])) {
+            $ps = strtoupper((string) $raw['positionSide']);
             $side = ($ps === 'LONG') ? 'Buy' : (($ps === 'SHORT') ? 'Sell' : null);
         }
-        if (!$side && isset($raw['positionAmt'])) {
-            $amt = (float)$raw['positionAmt'];
-            if ($amt > 0) { $side = 'Buy'; }
-            elseif ($amt < 0) { $side = 'Sell'; }
+        if (! $side && isset($raw['positionAmt'])) {
+            $amt = (float) $raw['positionAmt'];
+            if ($amt > 0) {
+                $side = 'Buy';
+            } elseif ($amt < 0) {
+                $side = 'Sell';
+            }
         }
         if ($side) {
-            $s = strtoupper((string)$side);
-            if (in_array($s, ['LONG','BUY'])) { $side = 'Buy'; }
-            elseif (in_array($s, ['SHORT','SELL'])) { $side = 'Sell'; }
-            else { $side = null; }
+            $s = strtoupper((string) $side);
+            if (in_array($s, ['LONG', 'BUY'])) {
+                $side = 'Buy';
+            } elseif (in_array($s, ['SHORT', 'SELL'])) {
+                $side = 'Sell';
+            } else {
+                $side = null;
+            }
         }
         if ($side === null) {
             $this->warn("[Demo] جهت پوزیشن نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
@@ -423,9 +441,9 @@ class DemoFuturesLifecycleManager extends Command
         // Size/qty across exchanges
         $size = null;
         if (isset($raw['size'])) {
-            $size = (float)$raw['size'];
+            $size = (float) $raw['size'];
         } elseif (isset($raw['positionAmt'])) {
-            $size = abs((float)$raw['positionAmt']);
+            $size = abs((float) $raw['positionAmt']);
         }
         if (($size === null || $size == 0.0)) {
             $this->info("[Demo] حجم/سایز موقعیت نامشخص یا صفر برای نماد {$symbol} در صرافی {$exchangeName}");
@@ -433,7 +451,9 @@ class DemoFuturesLifecycleManager extends Command
 
         // Entry price
         $entryPrice = $raw['entryPrice'] ?? ($raw['avgPrice'] ?? ($raw['avg_entry_price'] ?? null));
-        if ($entryPrice !== null) { $entryPrice = (float)$entryPrice; }
+        if ($entryPrice !== null) {
+            $entryPrice = (float) $entryPrice;
+        }
         if ($entryPrice === null) {
             $this->info("[Demo] قیمت ورود نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
         }
@@ -441,16 +461,18 @@ class DemoFuturesLifecycleManager extends Command
         // Unrealized PnL
         $unrealizedPnl = null;
         if (isset($raw['unrealizedPnl'])) {
-            $unrealizedPnl = (float)$raw['unrealizedPnl'];
+            $unrealizedPnl = (float) $raw['unrealizedPnl'];
         } elseif (isset($raw['unrealisedPnl'])) {
-            $unrealizedPnl = (float)$raw['unrealisedPnl'];
+            $unrealizedPnl = (float) $raw['unrealisedPnl'];
         } elseif (isset($raw['unRealizedProfit'])) { // Binance
-            $unrealizedPnl = (float)$raw['unRealizedProfit'];
+            $unrealizedPnl = (float) $raw['unRealizedProfit'];
         }
 
         // Leverage
         $leverage = null;
-        if (isset($raw['leverage'])) { $leverage = (float)$raw['leverage']; }
+        if (isset($raw['leverage'])) {
+            $leverage = (float) $raw['leverage'];
+        }
         if ($leverage === null) {
             $this->info("[Demo] لورج نامشخص برای نماد {$symbol} در صرافی {$exchangeName}");
         }
@@ -506,11 +528,11 @@ class DemoFuturesLifecycleManager extends Command
     {
         switch ($exchangeName) {
             case 'binance':
-                return isset($exchangeOrder['executedQty']) ? (float)$exchangeOrder['executedQty'] : null;
+                return isset($exchangeOrder['executedQty']) ? (float) $exchangeOrder['executedQty'] : null;
             case 'bybit':
-                return isset($exchangeOrder['cumExecQty']) ? (float)$exchangeOrder['cumExecQty'] : null;
+                return isset($exchangeOrder['cumExecQty']) ? (float) $exchangeOrder['cumExecQty'] : null;
             case 'bingx':
-                return isset($exchangeOrder['executedQty']) ? (float)$exchangeOrder['executedQty'] : null;
+                return isset($exchangeOrder['executedQty']) ? (float) $exchangeOrder['executedQty'] : null;
             default:
                 return null;
         }
@@ -523,11 +545,11 @@ class DemoFuturesLifecycleManager extends Command
     {
         switch ($exchangeName) {
             case 'binance':
-                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+                return isset($exchangeOrder['avgPrice']) ? (float) $exchangeOrder['avgPrice'] : null;
             case 'bybit':
-                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+                return isset($exchangeOrder['avgPrice']) ? (float) $exchangeOrder['avgPrice'] : null;
             case 'bingx':
-                return isset($exchangeOrder['avgPrice']) ? (float)$exchangeOrder['avgPrice'] : null;
+                return isset($exchangeOrder['avgPrice']) ? (float) $exchangeOrder['avgPrice'] : null;
             default:
                 return null;
         }
@@ -567,10 +589,10 @@ class DemoFuturesLifecycleManager extends Command
         $closeOnTrigger = ($exchangeOrder['closeOnTrigger'] ?? false) === true;
         $hasTrigger = isset($exchangeOrder['triggerPrice']) || isset($exchangeOrder['stopPrice']);
 
-        $stopOrderType = strtolower((string)($exchangeOrder['stopOrderType'] ?? ''));
+        $stopOrderType = strtolower((string) ($exchangeOrder['stopOrderType'] ?? ''));
         $isStopOrderType = in_array($stopOrderType, ['stop', 'stoploss', 'sl', 'takeprofit', 'tp', 'trailing_stop']);
 
-        $orderType = strtoupper((string)($exchangeOrder['orderType'] ?? ($exchangeOrder['type'] ?? '')));
+        $orderType = strtoupper((string) ($exchangeOrder['orderType'] ?? ($exchangeOrder['type'] ?? '')));
         $isStopType = in_array($orderType, ['STOP', 'STOP_MARKET', 'TAKE_PROFIT', 'TAKE_PROFIT_MARKET']);
 
         // Only treat explicit reduce-only or close-on-trigger as closing
@@ -591,7 +613,7 @@ class DemoFuturesLifecycleManager extends Command
      */
     private function mapExchangeStatus($exchangeStatus)
     {
-        $status = strtoupper((string)$exchangeStatus);
+        $status = strtoupper((string) $exchangeStatus);
         switch ($status) {
             case 'NEW':
             case 'ACTIVE':
@@ -620,18 +642,22 @@ class DemoFuturesLifecycleManager extends Command
             }
         }
         $list = (is_array($raw) && isset($raw['list'])) ? $raw['list'] : $raw;
-        if (!is_array($list)) {
+        if (! is_array($list)) {
             $this->warn("[Demo] شکل لیست PnL بسته نامعتبر برای {$exchangeName}");
+
             return [];
         }
         if (empty($list)) {
             $this->info("[Demo] لیست PnL بسته خالی برای {$exchangeName}");
+
             return [];
         }
 
         $out = [];
         foreach ($list as $item) {
-            if (!is_array($item)) { continue; }
+            if (! is_array($item)) {
+                continue;
+            }
             $orderId = $item['orderId'] ?? ($item['order_id'] ?? null);
             $symbol = $item['symbol'] ?? null;
             $sideRaw = $item['side'] ?? null;
@@ -644,14 +670,19 @@ class DemoFuturesLifecycleManager extends Command
             // Normalize side to Buy/Sell where possible
             $side = null;
             if ($sideRaw !== null) {
-                $s = strtolower((string)$sideRaw);
-                if (in_array($s, ['buy','long'])) { $side = 'Buy'; }
-                elseif (in_array($s, ['sell','short'])) { $side = 'Sell'; }
-                else { $side = $sideRaw; }
+                $s = strtolower((string) $sideRaw);
+                if (in_array($s, ['buy', 'long'])) {
+                    $side = 'Buy';
+                } elseif (in_array($s, ['sell', 'short'])) {
+                    $side = 'Sell';
+                } else {
+                    $side = $sideRaw;
+                }
             }
 
-            if (!$orderId || !$symbol) {
-                $this->warn("[Demo] رویداد PnL بسته فاقد شناسه سفارش یا نماد؛ نادیده گرفته شد");
+            if (! $orderId || ! $symbol) {
+                $this->warn('[Demo] رویداد PnL بسته فاقد شناسه سفارش یا نماد؛ نادیده گرفته شد');
+
                 continue;
             }
             if ($avgEntry === null || $avgExit === null) {
@@ -662,15 +693,17 @@ class DemoFuturesLifecycleManager extends Command
                 'orderId' => $orderId,
                 'symbol' => $symbol,
                 'side' => $side,
-                'qty' => $qty !== null ? (float)$qty : null,
-                'avgEntryPrice' => $avgEntry !== null ? (float)$avgEntry : null,
-                'avgExitPrice' => $avgExit !== null ? (float)$avgExit : null,
-                'realizedPnl' => (float)$pnl,
-                'closedAt' => $closedAt ? (int)$closedAt : null,
+                'qty' => $qty !== null ? (float) $qty : null,
+                'avgEntryPrice' => $avgEntry !== null ? (float) $avgEntry : null,
+                'avgExitPrice' => $avgExit !== null ? (float) $avgExit : null,
+                'realizedPnl' => (float) $pnl,
+                'closedAt' => $closedAt ? (int) $closedAt : null,
             ];
         }
+
         return $out;
     }
+
     /**
      * Verify closed trades against exchange PnL history and mark synchronization status.
      * synchronized: 1 = verified, 2 = not found (unverified)
@@ -686,7 +719,9 @@ class DemoFuturesLifecycleManager extends Command
                 ->orderBy('created_at', 'asc')
                 ->get();
 
-            if ($trades->isEmpty()) { return; }
+            if ($trades->isEmpty()) {
+                return;
+            }
 
             $oldestCreatedAt = $trades->first()->created_at;
             $startTime = $oldestCreatedAt ? $oldestCreatedAt->timestamp * 1000 : null;
@@ -699,7 +734,7 @@ class DemoFuturesLifecycleManager extends Command
                 $closedList = $this->normalizeClosedPnl($userExchange->exchange_name, $closedRaw);
 
                 // Build quick lookup sets per symbol
-                $records = array_values(array_filter($closedList, function($c) use ($symbol) {
+                $records = array_values(array_filter($closedList, function ($c) use ($symbol) {
                     return isset($c['symbol']) && $c['symbol'] === $symbol;
                 }));
 
@@ -708,56 +743,85 @@ class DemoFuturesLifecycleManager extends Command
                     $epsilonQty = 1e-8;
                     $epsilonPrice = 1e-6;
 
-                    if (!$trade->order || !$trade->avg_entry_price || !$trade->qty) {
+                    if (! $trade->order || ! $trade->avg_entry_price || ! $trade->qty) {
                         $trade->synchronized = 2;
                         $trade->save();
+
                         continue;
                     }
 
                     // 1) Direct match by orderId or exact fields (ORIGINAL - KEEP THIS)
                     foreach ($records as $c) {
-                        $idMatch = isset($c['orderId']) && $trade->order_id && (string)$c['orderId'] === (string)$trade->order_id;
+                        $idMatch = isset($c['orderId']) && $trade->order_id && (string) $c['orderId'] === (string) $trade->order_id;
                         $fieldsMatch = isset($c['qty'], $c['avgEntryPrice'])
-                            && abs((float)$c['qty'] - (float)$trade->qty) <= $epsilonQty
-                            && abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
-                        if ($idMatch || $fieldsMatch) { $matched = [$c]; break; }
+                            && abs((float) $c['qty'] - (float) $trade->qty) <= $epsilonQty
+                            && abs((float) $c['avgEntryPrice'] - (float) $trade->avg_entry_price) <= $epsilonPrice;
+                        if ($idMatch || $fieldsMatch) {
+                            $matched = [$c];
+                            break;
+                        }
                     }
 
                     // 2) If not matched, try multi-record match for split closures (IMPROVED)
-                    if (!$matched) {
-                        $cands = array_values(array_filter($records, function($c) use ($trade, $epsilonPrice) {
-                            if (!isset($c['avgEntryPrice'], $c['qty'])) { return false; }
-                            return abs((float)$c['avgEntryPrice'] - (float)$trade->avg_entry_price) <= $epsilonPrice;
+                    if (! $matched) {
+                        $cands = array_values(array_filter($records, function ($c) use ($trade, $epsilonPrice) {
+                            if (! isset($c['avgEntryPrice'], $c['qty'])) {
+                                return false;
+                            }
+
+                            return abs((float) $c['avgEntryPrice'] - (float) $trade->avg_entry_price) <= $epsilonPrice;
                         }));
 
                         // Sum all candidates first
-                        $sumQty = 0.0; $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                        $sumQty = 0.0;
+                        $sumPnl = 0.0;
+                        $weightedExit = 0.0;
+                        $exitWeight = 0.0;
                         foreach ($cands as $c) {
-                            $q = (float)($c['qty'] ?? 0.0); $sumQty += $q;
-                            if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
-                            if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                            $q = (float) ($c['qty'] ?? 0.0);
+                            $sumQty += $q;
+                            if (isset($c['realizedPnl'])) {
+                                $sumPnl += (float) $c['realizedPnl'];
+                            }
+                            if (isset($c['avgExitPrice'])) {
+                                $weightedExit += $q * (float) $c['avgExitPrice'];
+                                $exitWeight += $q;
+                            }
                         }
-                        if (abs($sumQty - (float)$trade->qty) <= $epsilonQty && $sumQty > 0) {
+                        if (abs($sumQty - (float) $trade->qty) <= $epsilonQty && $sumQty > 0) {
                             $matched = $cands;
                             $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
                             $trade->pnl = $sumPnl;
                         } else {
                             // Try pair combinations
-                            $n = count($cands); $foundPair = null;
+                            $n = count($cands);
+                            $foundPair = null;
                             for ($i = 0; $i < $n; $i++) {
                                 for ($j = $i + 1; $j < $n; $j++) {
-                                    $q = (float)($cands[$i]['qty'] ?? 0.0) + (float)($cands[$j]['qty'] ?? 0.0);
-                                    if (abs($q - (float)$trade->qty) <= $epsilonQty) { $foundPair = [$cands[$i], $cands[$j]]; break; }
+                                    $q = (float) ($cands[$i]['qty'] ?? 0.0) + (float) ($cands[$j]['qty'] ?? 0.0);
+                                    if (abs($q - (float) $trade->qty) <= $epsilonQty) {
+                                        $foundPair = [$cands[$i], $cands[$j]];
+                                        break;
+                                    }
                                 }
-                                if ($foundPair) { break; }
+                                if ($foundPair) {
+                                    break;
+                                }
                             }
                             if ($foundPair) {
                                 $matched = $foundPair;
-                                $sumPnl = 0.0; $weightedExit = 0.0; $exitWeight = 0.0;
+                                $sumPnl = 0.0;
+                                $weightedExit = 0.0;
+                                $exitWeight = 0.0;
                                 foreach ($foundPair as $c) {
-                                    $q = (float)($c['qty'] ?? 0.0);
-                                    if (isset($c['realizedPnl'])) { $sumPnl += (float)$c['realizedPnl']; }
-                                    if (isset($c['avgExitPrice'])) { $weightedExit += $q * (float)$c['avgExitPrice']; $exitWeight += $q; }
+                                    $q = (float) ($c['qty'] ?? 0.0);
+                                    if (isset($c['realizedPnl'])) {
+                                        $sumPnl += (float) $c['realizedPnl'];
+                                    }
+                                    if (isset($c['avgExitPrice'])) {
+                                        $weightedExit += $q * (float) $c['avgExitPrice'];
+                                        $exitWeight += $q;
+                                    }
                                 }
                                 $trade->avg_exit_price = $exitWeight > 0 ? ($weightedExit / $exitWeight) : $trade->avg_exit_price;
                                 $trade->pnl = $sumPnl;
@@ -771,10 +835,10 @@ class DemoFuturesLifecycleManager extends Command
                         if (count($matched) === 1) {
                             $m = $matched[0];
                             if (array_key_exists('avgExitPrice', $m) && $m['avgExitPrice'] !== null) {
-                                $trade->avg_exit_price = (float)$m['avgExitPrice'];
+                                $trade->avg_exit_price = (float) $m['avgExitPrice'];
                             }
                             if (array_key_exists('realizedPnl', $m) && $m['realizedPnl'] !== null) {
-                                $trade->pnl = (float)$m['realizedPnl'];
+                                $trade->pnl = (float) $m['realizedPnl'];
                             }
                         }
                         $trade->synchronized = 1;
@@ -785,7 +849,7 @@ class DemoFuturesLifecycleManager extends Command
                 }
             }
         } catch (\Exception $e) {
-            $this->warn("[Demo] خطا در تأیید همگام‌سازی معاملات بسته: " . $e->getMessage());
+            $this->warn('[Demo] خطا در تأیید همگام‌سازی معاملات بسته: '.$e->getMessage());
         }
     }
 
@@ -808,7 +872,7 @@ class DemoFuturesLifecycleManager extends Command
             }
 
             // Process each recently closed trade for ban detection
-            $banService = new \App\Services\BanService();
+            $banService = new \App\Services\BanService;
             foreach ($recentlyClosedTrades as $trade) {
                 $banService->processTradeBans($trade);
             }
@@ -820,7 +884,7 @@ class DemoFuturesLifecycleManager extends Command
             }
 
         } catch (\Exception $e) {
-            $this->warn("[Demo] خطا در بررسی بن‌های اخیر: " . $e->getMessage());
+            $this->warn('[Demo] خطا در بررسی بن‌های اخیر: '.$e->getMessage());
         }
     }
 }

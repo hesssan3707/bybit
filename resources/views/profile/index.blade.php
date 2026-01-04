@@ -503,8 +503,8 @@
             gap:10px;
         }
 
-        /* Watchers Section Styles */
-        .watchers-section {
+        /* Investors Section Styles */
+        .investors-section {
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.05));
             backdrop-filter: blur(15px);
             border-radius: 20px;
@@ -512,26 +512,26 @@
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         }
 
-        .watcher-form {
+        .investor-form {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 25px;
         }
 
-        .watcher-form h4 {
+        .investor-form h4 {
             color: #fff;
             margin-bottom: 15px;
             font-size: 1.1em;
         }
 
-        .watcher-grid {
+        .investor-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
         }
 
-        .watcher-card {
+        .investor-card {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             padding: 15px;
@@ -540,17 +540,17 @@
             align-items: center;
         }
 
-        .watcher-info {
+        .investor-info {
             display: flex;
             flex-direction: column;
         }
 
-        .watcher-name {
+        .investor-name {
             color: #fff;
             font-weight: 600;
         }
 
-        .watcher-email {
+        .investor-email {
             color: #888;
             font-size: 0.85em;
         }
@@ -654,7 +654,7 @@
             padding: 5px;
         }
 
-        .watcher-edit-btn {
+        .investor-edit-btn {
             background: rgba(102, 126, 234, 0.2);
             border: 1px solid rgba(102, 126, 234, 0.35);
             color: #c7d2fe;
@@ -667,7 +667,7 @@
             cursor: pointer;
             transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
         }
-        .watcher-edit-btn:hover {
+        .investor-edit-btn:hover {
             transform: translateY(-1px);
             background: rgba(102, 126, 234, 0.28);
             border-color: rgba(102, 126, 234, 0.55);
@@ -1154,7 +1154,7 @@
                     <i class="fas fa-key"></i>
                     <span>تغییر رمز عبور</span>
                 </a>
-                @if(!$user->isWatcher())
+                @if(!$user->isInvestor())
                     <a href="{{ route('account-settings.index') }}" class="profile-action-btn">
                         <i class="fas fa-cog"></i>
                         <span>تنظیمات</span>
@@ -1170,7 +1170,7 @@
                         <span>پنل مدیریت</span>
                     </a>
                 @endif
-                @if(!$user->isWatcher())
+                @if(!$user->isInvestor())
                     <a href="#" onclick="event.preventDefault(); openTicketModal();" class="profile-action-btn">
                         <i class="fas fa-headset"></i>
                         <span>پشتیبانی</span>
@@ -1183,12 +1183,12 @@
             </div>
         </div>
 
-        @if(!$user->isWatcher())
-        <!-- Watchers Management Section -->
-        <div class="watchers-section">
+        @if(!$user->isInvestor())
+        <!-- Investors Management Section -->
+        <div class="investors-section">
             <div class="section-header">
-                <h3><i class="fas fa-users-viewfinder"></i> مدیریت ناظران</h3>
-                <span class="exchange-count">{{ $watchers->count() }} / ۳</span>
+                <h3><i class="fas fa-users-viewfinder"></i> مدیریت سرمایه‌گذاران</h3>
+                <span class="exchange-count">{{ $investors->count() }} / ۳</span>
             </div>
 
             @if(session('success'))
@@ -1203,28 +1203,28 @@
                 </div>
             @endif
 
-            @if($watchers->count() < 3)
-                <div class="watcher-form" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            @if($investors->count() < 3)
+                <div class="investor-form" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
                     <div style="color:#fff; font-weight:600;">
                         <i class="fas fa-plus-circle"></i>
-                        افزودن ناظر جدید
+                        افزودن سرمایه‌گذار جدید
                     </div>
-                    <button type="button" class="submit-btn" onclick="openWatcherCreateModal()">ایجاد ناظر</button>
+                    <button type="button" class="submit-btn" onclick="openInvestorCreateModal()">ایجاد سرمایه‌گذار</button>
                 </div>
             @endif
 
-            <div class="watcher-grid">
-                @forelse($watchers as $watcher)
-                    <div class="watcher-card">
-                        <div class="watcher-info">
-                            <span class="watcher-name">{{ $watcher->name }}</span>
-                            <span class="watcher-email">{{ $watcher->real_email }}</span>
+            <div class="investor-grid">
+                @forelse($investors as $investor)
+                    <div class="investor-card">
+                        <div class="investor-info">
+                            <span class="investor-name">{{ $investor->name }}</span>
+                            <span class="investor-email">{{ $investor->real_email }}</span>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
-                            <button type="button" class="watcher-edit-btn" onclick="openWatcherEditModal({{ $watcher->id }}, @js($watcher->name), @js($watcher->real_email))" title="ویرایش" aria-label="ویرایش">
+                            <button type="button" class="investor-edit-btn" onclick="openInvestorEditModal({{ $investor->id }}, @js($investor->name), @js($investor->real_email))" title="ویرایش" aria-label="ویرایش">
                                 <i class="fas fa-user-pen"></i>
                             </button>
-                            <form action="{{ route('profile.watchers.destroy', $watcher->id) }}" method="POST" class="modern-confirm-form" data-title="حذف ناظر" data-message="آیا از حذف این ناظر اطمینان دارید؟">
+                            <form action="{{ route('profile.investors.destroy', $investor->id) }}" method="POST" class="modern-confirm-form" data-title="حذف سرمایه‌گذار" data-message="آیا از حذف این سرمایه‌گذار اطمینان دارید؟">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="delete-btn" title="حذف" aria-label="حذف">
@@ -1234,31 +1234,31 @@
                         </div>
                     </div>
                 @empty
-                    <p style="color: #888; text-align: center; grid-column: 1/-1;">هنوز هیچ ناظری اضافه نشده است.</p>
+                    <p style="color: #888; text-align: center; grid-column: 1/-1;">هنوز هیچ سرمایه‌گذاری اضافه نشده است.</p>
                 @endforelse
             </div>
 
-            <div id="watcherCreateModal" class="ticket-modal-overlay" style="display:none;">
+            <div id="investorCreateModal" class="ticket-modal-overlay" style="display:none;">
                 <div class="ticket-modal-container">
                     <div class="ticket-modal-content">
                         <div class="ticket-modal-header">
                             <div class="ticket-modal-title">
                                 <i class="fas fa-users-viewfinder"></i>
-                                <h3>ایجاد ناظر</h3>
+                                <h3>ایجاد سرمایه‌گذار</h3>
                             </div>
-                            <button type="button" class="ticket-modal-close" onclick="closeWatcherCreateModal()">
+                            <button type="button" class="ticket-modal-close" onclick="closeInvestorCreateModal()">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                         <div class="ticket-modal-body">
-                            <form action="{{ route('profile.watchers.store') }}" method="POST" id="watcherCreateForm">
+                            <form action="{{ route('profile.investors.store') }}" method="POST" id="investorCreateForm">
                                 @csrf
                                 <div class="form-group">
-                                    <label class="form-label">نام ناظر</label>
+                                    <label class="form-label">نام سرمایه‌گذار</label>
                                     <input type="text" name="name" class="form-control" placeholder="مثلاً: علی رضایی" required maxlength="255">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">ایمیل ناظر</label>
+                                    <label class="form-label">ایمیل سرمایه‌گذار</label>
                                     <input type="email" name="email" class="form-control" placeholder="example@gmail.com" required maxlength="255">
                                 </div>
                                 <div class="form-group">
@@ -1268,7 +1268,7 @@
                                 <button type="submit" class="btn-submit">
                                     <span class="btn-text">
                                         <i class="fas fa-check"></i>
-                                        ثبت ناظر
+                                        ثبت سرمایه‌گذار
                                     </span>
                                 </button>
                             </form>
@@ -1277,31 +1277,31 @@
                 </div>
             </div>
 
-            <div id="watcherEditModal" class="ticket-modal-overlay" style="display:none;">
+            <div id="investorEditModal" class="ticket-modal-overlay" style="display:none;">
                 <div class="ticket-modal-container">
                     <div class="ticket-modal-content">
                         <div class="ticket-modal-header">
                             <div class="ticket-modal-title">
                                 <i class="fas fa-user-pen"></i>
-                                <h3>ویرایش ناظر</h3>
+                                <h3>ویرایش سرمایه‌گذار</h3>
                             </div>
-                            <button type="button" class="ticket-modal-close" onclick="closeWatcherEditModal()">
+                            <button type="button" class="ticket-modal-close" onclick="closeInvestorEditModal()">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                         <div class="ticket-modal-body">
-                            <form method="POST" id="watcherEditForm">
+                            <form method="POST" id="investorEditForm">
                                 @csrf
                                 <div class="form-group">
-                                    <label class="form-label">نام ناظر</label>
-                                    <input type="text" name="name" class="form-control" id="watcherEditName" required maxlength="255">
+                                    <label class="form-label">نام سرمایه‌گذار</label>
+                                    <input type="text" name="name" class="form-control" id="investorEditName" required maxlength="255">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">ایمیل ناظر</label>
-                                    <input type="email" name="email" class="form-control" id="watcherEditEmail" required maxlength="255">
+                                    <label class="form-label">ایمیل سرمایه‌گذار</label>
+                                    <input type="email" name="email" class="form-control" id="investorEditEmail" required maxlength="255">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">رمز عبور جدید (اختیاری)</label>
+                                    <label class="form-label">رمز عبور سرمایه‌گذار جدید (اختیاری)</label>
                                     <input type="password" name="password" class="form-control" placeholder="********" minlength="8">
                                 </div>
                                 <button type="submit" class="btn-submit">
@@ -1364,7 +1364,7 @@
                 </div>
                 <div class="no-exchange-content">
                     <h3>صرافی فعالی ندارید</h3>
-                    @if($user->isWatcher())
+                    @if($user->isInvestor())
                         <p>برای نمایش اطلاعات، ابتدا باید برای حساب اصلی یک صرافی فعال باشد</p>
                     @else
                         <p>برای شروع معاملات، ابتدا یک صرافی اضافه کنید</p>
@@ -1526,8 +1526,8 @@
             );
         }
 
-        function openWatcherCreateModal() {
-            const modal = document.getElementById('watcherCreateModal');
+        function openInvestorCreateModal() {
+            const modal = document.getElementById('investorCreateModal');
             if (!modal) return;
             if (modal.parentElement !== document.body) {
                 document.body.appendChild(modal);
@@ -1537,23 +1537,23 @@
             setTimeout(function() { modal.classList.add('show'); }, 10);
         }
 
-        function closeWatcherCreateModal() {
-            const modal = document.getElementById('watcherCreateModal');
+        function closeInvestorCreateModal() {
+            const modal = document.getElementById('investorCreateModal');
             if (!modal) return;
             modal.classList.remove('show');
             setTimeout(function() { modal.style.display = 'none'; }, 300);
         }
 
-        function openWatcherEditModal(id, name, email) {
-            const modal = document.getElementById('watcherEditModal');
-            const form = document.getElementById('watcherEditForm');
-            const nameInput = document.getElementById('watcherEditName');
-            const emailInput = document.getElementById('watcherEditEmail');
+        function openInvestorEditModal(id, name, email) {
+            const modal = document.getElementById('investorEditModal');
+            const form = document.getElementById('investorEditForm');
+            const nameInput = document.getElementById('investorEditName');
+            const emailInput = document.getElementById('investorEditEmail');
             if (!modal || !form || !nameInput || !emailInput) return;
 
             nameInput.value = name || '';
             emailInput.value = email || '';
-            form.action = `{{ url('/profile/watchers') }}/${id}`;
+            form.action = `{{ url('/profile/investors') }}/${id}`;
 
             if (modal.parentElement !== document.body) {
                 document.body.appendChild(modal);
@@ -1563,8 +1563,8 @@
             setTimeout(function() { modal.classList.add('show'); }, 10);
         }
 
-        function closeWatcherEditModal() {
-            const modal = document.getElementById('watcherEditModal');
+        function closeInvestorEditModal() {
+            const modal = document.getElementById('investorEditModal');
             if (!modal) return;
             modal.classList.remove('show');
             setTimeout(function() { modal.style.display = 'none'; }, 300);
@@ -1660,13 +1660,13 @@
                 });
             }
 
-            const createModal = document.getElementById('watcherCreateModal');
+            const createModal = document.getElementById('investorCreateModal');
             if (createModal) {
                 createModal.addEventListener('click', function(e) {
                     if (e.target === createModal) closeWatcherCreateModal();
                 });
             }
-            const editModal = document.getElementById('watcherEditModal');
+            const editModal = document.getElementById('investorEditModal');
             if (editModal) {
                 editModal.addEventListener('click', function(e) {
                     if (e.target === editModal) closeWatcherEditModal();

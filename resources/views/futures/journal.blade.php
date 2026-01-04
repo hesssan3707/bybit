@@ -214,7 +214,7 @@
                 <h3 style="margin: 0; font-size: 1.2em; font-weight: 600;">دوره‌های معاملاتی</h3>
             </div>
             
-            @if(!auth()->user()?->isWatcher())
+            @if(!auth()->user()?->isInvestor())
                 <div style="display: flex; gap: 10px;">
                     <button type="button" class="btn btn-start-period" onclick="openStartPeriodModal()" title="شروع دوره جدید" 
                         style="width: 42px; height: 42px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--primary-color, #ffc107); color: #000; border: none; transition: transform 0.2s;">
@@ -269,7 +269,7 @@
                         <span>{{ $per->ended_at ? $per->ended_at->format('Y-m-d') : 'اکنون' }}</span>
                     </div>
 
-                    @if($per->is_active && !$per->is_default && !auth()->user()?->isWatcher())
+                    @if($per->is_active && !$per->is_default && !auth()->user()?->isInvestor())
                         <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; display: flex; justify-content: flex-end;">
                             <form method="POST" action="{{ route('futures.periods.end', ['period' => $per->id]) }}">
                                 @csrf
@@ -338,7 +338,7 @@
         </style>
     </div>
 
-    @if(!auth()->user()?->isWatcher())
+    @if(!auth()->user()?->isInvestor())
         <!-- Start Period Modal - using modern alert modal styles -->
         <div id="startPeriodModal" class="alert-modal-overlay" style="display: none;">
             <div class="alert-modal-container">

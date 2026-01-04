@@ -67,6 +67,6 @@ class Kernel extends HttpKernel
         'api.auth' => \App\Http\Middleware\ApiTokenAuth::class,
         'exchange.access' => \App\Http\Middleware\CheckExchangeAccess::class,
         'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        'restrict.watcher' => \App\Http\Middleware\RestrictWatcher::class,
+        'restrict.investor' => \App\Http\Middleware\RestrictWatcher::class,
     ];
 }

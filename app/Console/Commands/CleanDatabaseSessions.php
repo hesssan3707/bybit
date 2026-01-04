@@ -28,17 +28,17 @@ class CleanDatabaseSessions extends Command
     {
         // Get session lifetime in minutes from config
         $lifetime = config('session.lifetime', 120);
-        
+
         // Calculate the expiration timestamp
         $expiration = now()->subMinutes($lifetime)->timestamp;
-        
+
         // Delete expired sessions from database
         $deleted = DB::table(config('session.table', 'sessions'))
             ->where('last_activity', '<', $expiration)
             ->delete();
-        
+
         $this->info("Cleaned up {$deleted} expired session(s) from database.");
-        
+
         return 0;
     }
 }

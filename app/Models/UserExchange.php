@@ -305,7 +305,7 @@ class UserExchange extends Model
     public function scopeForUser($query, $userId)
     {
         $user = User::find($userId);
-        if ($user && $user->isWatcher()) {
+        if ($user && $user->isInvestor()) {
             $userId = $user->parent_id;
         }
         return $query->where('user_id', $userId);

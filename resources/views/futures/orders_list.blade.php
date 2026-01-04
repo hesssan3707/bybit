@@ -251,7 +251,7 @@
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
                                 <a href="{{ route('futures.order.edit', $order) }}" class="edit-btn" style="margin-left:8px">ویرایش</a>
-                                @if(!auth()->user()?->isWatcher())
+                                @if(!auth()->user()?->isInvestor())
                                     <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
                                         @csrf
                                         @method('DELETE')
@@ -277,7 +277,7 @@
                                         <path d="M7 13h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
                                     </svg>
                                 </button>
-                                @if(!$answered && !auth()->user()?->isWatcher())
+                                @if(!$answered && !auth()->user()?->isInvestor())
                                     <button type="button" class="icon-btn open-strategy-modal-btn" data-order-id="{{ $order->id }}" onclick="window.openStrategyModal({{ $order->id }})" title="ارزیابی استراتژی" aria-label="ارزیابی استراتژی" style="margin-left:8px">
                                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
@@ -296,7 +296,7 @@
                                         <button type="submit" class="edit-btn" style="margin-left:8px">ارسال مجدد</button>
                                     </form>
                                 @endif
-                                @if(!auth()->user()?->isWatcher())
+                                @if(!auth()->user()?->isInvestor())
                                     <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="حذف سفارش منقضی" data-message="آیا از حذف این سفارش منقضی شده مطمئن هستید؟">
                                         @csrf
                                         @method('DELETE')

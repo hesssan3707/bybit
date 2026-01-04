@@ -23,8 +23,8 @@ class CheckExchangeAccess
         
         $currentExchange = $user->getCurrentExchange();
         
-        // If still no current exchange, try user's default exchange (fallback already handled by getCurrentExchange but being explicit)
-        if (!$currentExchange && $user->isWatcher()) {
+        // If still no current exchange and user is an investor, try parent's default exchange
+        if (!$currentExchange && $user->isInvestor()) {
             $currentExchange = $user->parent->defaultExchange;
         }
         

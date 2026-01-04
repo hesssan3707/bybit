@@ -2,13 +2,13 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\User;
-use App\Models\UserExchange;
 use App\Models\Order;
 use App\Models\Trade;
+use App\Models\User;
+use App\Models\UserExchange;
 use App\Services\Exchanges\ExchangeFactory;
 use Exception;
+use Illuminate\Console\Command;
 
 class DemoFuturesSlTpSync extends Command
 {
@@ -37,8 +37,9 @@ class DemoFuturesSlTpSync extends Command
 
         if ($userOption) {
             $user = User::find($userOption);
-            if (!$user) {
+            if (! $user) {
                 $this->error("کاربر با شناسه {$userOption} یافت نشد.");
+
                 return 1;
             }
             $this->syncForUser($user);
@@ -47,6 +48,7 @@ class DemoFuturesSlTpSync extends Command
         }
 
         $this->info('همگام‌سازی Stop Loss و Take Profit (دمو) با موفقیت تکمیل شد.');
+
         return 0;
     }
 
@@ -57,7 +59,7 @@ class DemoFuturesSlTpSync extends Command
     {
         // Find all users who are in strict mode
         $users = User::where('future_strict_mode', true)->get();
-        
+
         $this->info("پردازش {$users->count()} کاربر در حالت سخت‌گیرانه (دمو)...");
 
         foreach ($users as $user) {
@@ -108,6 +110,7 @@ class DemoFuturesSlTpSync extends Command
 
             if ($openTrades->isEmpty()) {
                 $this->info("هیچ معامله بازی برای کاربر {$user->email} در صرافی {$userExchange->exchange_name} (دمو) یافت نشد");
+
                 return;
             }
 
@@ -118,14 +121,14 @@ class DemoFuturesSlTpSync extends Command
             foreach ($openTrades as $trade) {
                 // Find corresponding open position for this trade
                 $position = $this->findPositionForTrade($positions, $trade);
-                
-                if (!$position) {
+
+                if (! $position) {
                     continue; // No open position for this trade
                 }
 
                 // Get the originating order for SL/TP definitions
                 $order = $trade->order;
-                if (!$order) {
+                if (! $order) {
                     // Without the original order record, we cannot read SL/TP targets
                     continue;
                 }
@@ -138,7 +141,7 @@ class DemoFuturesSlTpSync extends Command
             }
 
         } catch (Exception $e) {
-            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: " . $e->getMessage());
+            $this->error("خطا در پردازش صرافی {$userExchange->exchange_name} (دمو) برای کاربر {$user->email}: ".$e->getMessage());
         }
     }
 
@@ -154,14 +157,14 @@ class DemoFuturesSlTpSync extends Command
             }
 
             // Check if position has size (is open)
-            if ((float)($position['size'] ?? 0) == 0.0) {
+            if ((float) ($position['size'] ?? 0) == 0.0) {
                 continue;
             }
 
             // Check if side matches
             $positionSide = strtolower($position['side'] ?? '');
             $tradeSide = strtolower($trade->side ?? '');
-            
+
             if ($positionSide === $tradeSide) {
                 return $position;
             }
@@ -182,16 +185,16 @@ class DemoFuturesSlTpSync extends Command
             case 'bybit':
                 $list = $positionsResponse['list'] ?? ($positionsResponse['result']['list'] ?? []);
                 foreach ($list as $p) {
-                    $size = isset($p['size']) ? (float)$p['size'] : 0.0;
+                    $size = isset($p['size']) ? (float) $p['size'] : 0.0;
                     $side = strtolower($p['side'] ?? '');
-                    if ($size == 0.0 || !in_array($side, ['buy', 'sell'])) {
+                    if ($size == 0.0 || ! in_array($side, ['buy', 'sell'])) {
                         continue;
                     }
                     $normalized[] = [
                         'symbol' => $p['symbol'] ?? '',
                         'side' => $side,
                         'size' => abs($size),
-                        'positionIdx' => isset($p['positionIdx']) ? (int)$p['positionIdx'] : null,
+                        'positionIdx' => isset($p['positionIdx']) ? (int) $p['positionIdx'] : null,
                     ];
                 }
                 break;
@@ -199,7 +202,7 @@ class DemoFuturesSlTpSync extends Command
             case 'binance':
                 $list = $positionsResponse['list'] ?? [];
                 foreach ($list as $p) {
-                    $amt = isset($p['positionAmt']) ? (float)$p['positionAmt'] : 0.0;
+                    $amt = isset($p['positionAmt']) ? (float) $p['positionAmt'] : 0.0;
                     $posSide = strtoupper($p['positionSide'] ?? 'BOTH');
                     $side = null;
                     if ($posSide === 'LONG') {
@@ -208,10 +211,13 @@ class DemoFuturesSlTpSync extends Command
                         $side = 'sell';
                     } else {
                         // One-way mode: infer from sign of amount
-                        if ($amt > 0) $side = 'buy';
-                        elseif ($amt < 0) $side = 'sell';
+                        if ($amt > 0) {
+                            $side = 'buy';
+                        } elseif ($amt < 0) {
+                            $side = 'sell';
+                        }
                     }
-                    if (!$side || abs($amt) == 0.0) {
+                    if (! $side || abs($amt) == 0.0) {
                         continue;
                     }
                     $normalized[] = [
@@ -227,7 +233,7 @@ class DemoFuturesSlTpSync extends Command
                 $list = $positionsResponse['list'] ?? [];
                 foreach ($list as $p) {
                     // BingX positions often include positionSide (LONG/SHORT/BOTH) and positionAmt
-                    $amt = isset($p['positionAmt']) ? (float)$p['positionAmt'] : (isset($p['size']) ? (float)$p['size'] : 0.0);
+                    $amt = isset($p['positionAmt']) ? (float) $p['positionAmt'] : (isset($p['size']) ? (float) $p['size'] : 0.0);
                     $posSide = strtoupper($p['positionSide'] ?? 'BOTH');
                     $side = null;
                     if ($posSide === 'LONG') {
@@ -236,10 +242,13 @@ class DemoFuturesSlTpSync extends Command
                         $side = 'sell';
                     } else {
                         // One-way mode: infer from sign or size
-                        if ($amt > 0) $side = 'buy';
-                        elseif ($amt < 0) $side = 'sell';
+                        if ($amt > 0) {
+                            $side = 'buy';
+                        } elseif ($amt < 0) {
+                            $side = 'sell';
+                        }
                     }
-                    if (!$side || abs($amt) == 0.0) {
+                    if (! $side || abs($amt) == 0.0) {
                         continue;
                     }
                     $normalized[] = [
@@ -255,17 +264,24 @@ class DemoFuturesSlTpSync extends Command
                 // Fallback: try common keys
                 $list = $positionsResponse['list'] ?? ($positionsResponse['data'] ?? []);
                 foreach ($list as $p) {
-                    $size = (float)($p['size'] ?? $p['positionAmt'] ?? 0.0);
+                    $size = (float) ($p['size'] ?? $p['positionAmt'] ?? 0.0);
                     $sideRaw = strtolower($p['side'] ?? '');
                     $posSide = strtoupper($p['positionSide'] ?? '');
                     $side = in_array($sideRaw, ['buy', 'sell']) ? $sideRaw : null;
-                    if (!$side) {
-                        if ($posSide === 'LONG') $side = 'buy';
-                        elseif ($posSide === 'SHORT') $side = 'sell';
-                        elseif ($size > 0) $side = 'buy';
-                        elseif ($size < 0) $side = 'sell';
+                    if (! $side) {
+                        if ($posSide === 'LONG') {
+                            $side = 'buy';
+                        } elseif ($posSide === 'SHORT') {
+                            $side = 'sell';
+                        } elseif ($size > 0) {
+                            $side = 'buy';
+                        } elseif ($size < 0) {
+                            $side = 'sell';
+                        }
                     }
-                    if (!$side || abs($size) == 0.0) continue;
+                    if (! $side || abs($size) == 0.0) {
+                        continue;
+                    }
                     $normalized[] = [
                         'symbol' => $p['symbol'] ?? '',
                         'side' => $side,
@@ -284,7 +300,7 @@ class DemoFuturesSlTpSync extends Command
     private function syncStopLoss($exchangeService, Order $order, $position)
     {
         // Check if SL is defined in database
-        if (!$order->sl) {
+        if (! $order->sl) {
             return; // No SL defined in database
         }
 
@@ -295,17 +311,17 @@ class DemoFuturesSlTpSync extends Command
 
             $positionSide = strtolower($position['side'] ?? '');
             $expectedSlSide = $positionSide === 'buy' ? 'Sell' : 'Buy';
-            $positionSize = abs((float)($position['size'] ?? 0));
-            $targetSl = (float)$order->sl;
+            $positionSize = abs((float) ($position['size'] ?? 0));
+            $targetSl = (float) $order->sl;
 
             // Detect if a matching SL conditional order already exists
             $hasValidSl = false;
             foreach ($conditionalOrders as $co) {
                 $isReduceOnly = ($co['reduceOnly'] ?? false) === true || ($co['reduceOnly'] ?? '') === 'true';
                 $side = ucfirst(strtolower($co['side'] ?? ''));
-                $triggerPrice = (float)($co['triggerPrice'] ?? $co['stopPrice'] ?? 0);
-                $orderType = strtoupper((string)($co['orderType'] ?? ($co['type'] ?? '')));
-                $stopOrderType = strtolower((string)($co['stopOrderType'] ?? ''));
+                $triggerPrice = (float) ($co['triggerPrice'] ?? $co['stopPrice'] ?? 0);
+                $orderType = strtoupper((string) ($co['orderType'] ?? ($co['type'] ?? '')));
+                $stopOrderType = strtolower((string) ($co['stopOrderType'] ?? ''));
 
                 $isStopLike = in_array($orderType, ['STOP', 'STOP_MARKET']) || in_array($stopOrderType, ['stop', 'stoploss', 'sl']);
 
@@ -315,12 +331,12 @@ class DemoFuturesSlTpSync extends Command
                 }
             }
 
-            if (!$hasValidSl) {
+            if (! $hasValidSl) {
                 // Cancel existing SL-style conditional orders for this symbol to avoid duplicates/mismatches
                 foreach ($conditionalOrders as $co) {
                     $isReduceOnly = ($co['reduceOnly'] ?? false) === true || ($co['reduceOnly'] ?? '') === 'true';
-                    $orderType = strtoupper((string)($co['orderType'] ?? ($co['type'] ?? '')));
-                    $stopOrderType = strtolower((string)($co['stopOrderType'] ?? ''));
+                    $orderType = strtoupper((string) ($co['orderType'] ?? ($co['type'] ?? '')));
+                    $stopOrderType = strtolower((string) ($co['stopOrderType'] ?? ''));
                     $side = ucfirst(strtolower($co['side'] ?? ''));
 
                     $isStopLike = in_array($orderType, ['STOP', 'STOP_MARKET']) || in_array($stopOrderType, ['stop', 'stoploss', 'sl']);
@@ -328,7 +344,7 @@ class DemoFuturesSlTpSync extends Command
                         try {
                             $exchangeService->cancelOrderWithSymbol($co['orderId'], $order->symbol);
                         } catch (\Exception $e) {
-                            $this->warn("لغو سفارش شرطی (دمو) {$co['orderId']} با خطا مواجه شد: " . $e->getMessage());
+                            $this->warn("لغو سفارش شرطی (دمو) {$co['orderId']} با خطا مواجه شد: ".$e->getMessage());
                         }
                     }
                 }
@@ -340,15 +356,15 @@ class DemoFuturesSlTpSync extends Command
                     'symbol' => $order->symbol,
                     'side' => $expectedSlSide,
                     'orderType' => 'Market',
-                    'qty' => (string)$positionSize,
-                    'triggerPrice' => (string)$targetSl,
+                    'qty' => (string) $positionSize,
+                    'triggerPrice' => (string) $targetSl,
                     'triggerBy' => 'LastPrice',
                     'triggerDirection' => $positionSide === 'buy' ? 2 : 1,
                     'reduceOnly' => true,
                     'closeOnTrigger' => true,
                     'positionIdx' => $positionIdx,
                     'timeInForce' => 'GTC',
-                    'orderLinkId' => 'sl_sync_demo_' . time() . '_' . rand(1000, 9999),
+                    'orderLinkId' => 'sl_sync_demo_'.time().'_'.rand(1000, 9999),
                 ];
 
                 $exchangeService->createOrder($payload);
@@ -356,7 +372,7 @@ class DemoFuturesSlTpSync extends Command
             }
 
         } catch (Exception $e) {
-            $this->warn("خطا در همگام‌سازی Stop Loss (دمو) برای سفارش {$order->order_id}: " . $e->getMessage());
+            $this->warn("خطا در همگام‌سازی Stop Loss (دمو) برای سفارش {$order->order_id}: ".$e->getMessage());
         }
     }
 
@@ -366,7 +382,7 @@ class DemoFuturesSlTpSync extends Command
     private function syncTakeProfit($exchangeService, Order $order, $position)
     {
         // Check if TP is defined in database
-        if (!$order->tp) {
+        if (! $order->tp) {
             return; // No TP defined in database
         }
 
@@ -377,15 +393,15 @@ class DemoFuturesSlTpSync extends Command
 
             $positionSide = strtolower($position['side'] ?? '');
             $expectedTpSide = $positionSide === 'buy' ? 'Sell' : 'Buy';
-            $positionSize = abs((float)($position['size'] ?? 0));
-            $targetTp = (float)$order->tp;
+            $positionSize = abs((float) ($position['size'] ?? 0));
+            $targetTp = (float) $order->tp;
 
             $hasValidTp = false;
             foreach ($openOrders as $oo) {
                 $isReduceOnly = ($oo['reduceOnly'] ?? false) === true || ($oo['reduceOnly'] ?? '') === 'true';
                 $side = ucfirst(strtolower($oo['side'] ?? ''));
-                $orderType = strtoupper((string)($oo['orderType'] ?? ($oo['type'] ?? '')));
-                $price = (float)($oo['price'] ?? 0);
+                $orderType = strtoupper((string) ($oo['orderType'] ?? ($oo['type'] ?? '')));
+                $price = (float) ($oo['price'] ?? 0);
 
                 if ($isReduceOnly && $side === $expectedTpSide && in_array($orderType, ['LIMIT']) && abs($price - $targetTp) < 0.0001) {
                     $hasValidTp = true;
@@ -393,17 +409,17 @@ class DemoFuturesSlTpSync extends Command
                 }
             }
 
-            if (!$hasValidTp) {
+            if (! $hasValidTp) {
                 // Cancel mismatching reduce-only TP orders
                 foreach ($openOrders as $oo) {
                     $isReduceOnly = ($oo['reduceOnly'] ?? false) === true || ($oo['reduceOnly'] ?? '') === 'true';
                     $side = ucfirst(strtolower($oo['side'] ?? ''));
-                    $orderType = strtoupper((string)($oo['orderType'] ?? ($oo['type'] ?? '')));
+                    $orderType = strtoupper((string) ($oo['orderType'] ?? ($oo['type'] ?? '')));
                     if ($isReduceOnly && $side === $expectedTpSide && in_array($orderType, ['LIMIT'])) {
                         try {
                             $exchangeService->cancelOrderWithSymbol($oo['orderId'], $order->symbol);
                         } catch (\Exception $e) {
-                            $this->warn("لغو سفارش TP (دمو) {$oo['orderId']} با خطا مواجه شد: " . $e->getMessage());
+                            $this->warn("لغو سفارش TP (دمو) {$oo['orderId']} با خطا مواجه شد: ".$e->getMessage());
                         }
                     }
                 }
@@ -415,12 +431,12 @@ class DemoFuturesSlTpSync extends Command
                     'symbol' => $order->symbol,
                     'side' => $expectedTpSide,
                     'orderType' => 'Limit',
-                    'qty' => (string)$positionSize,
-                    'price' => (string)$targetTp,
+                    'qty' => (string) $positionSize,
+                    'price' => (string) $targetTp,
                     'reduceOnly' => true,
                     'positionIdx' => $positionIdx,
                     'timeInForce' => 'GTC',
-                    'orderLinkId' => 'tp_sync_demo_' . time() . '_' . rand(1000, 9999),
+                    'orderLinkId' => 'tp_sync_demo_'.time().'_'.rand(1000, 9999),
                 ];
 
                 $exchangeService->createOrder($payload);
@@ -428,7 +444,7 @@ class DemoFuturesSlTpSync extends Command
             }
 
         } catch (Exception $e) {
-            $this->warn("خطا در همگام‌سازی Take Profit (دمو) برای سفارش {$order->order_id}: " . $e->getMessage());
+            $this->warn("خطا در همگام‌سازی Take Profit (دمو) برای سفارش {$order->order_id}: ".$e->getMessage());
         }
     }
 }

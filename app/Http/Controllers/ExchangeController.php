@@ -176,8 +176,8 @@ class ExchangeController extends Controller
                 return back()->withErrors(['msg' => 'این صرافی فعال نیست.']);
             }
 
-            if ($user->isWatcher()) {
-                // For watchers, only change their current view, don't affect parent's default
+            if ($user->isInvestor()) {
+                // For investors, only change their current view, don't affect parent's default
                 $user->update(['current_exchange_id' => $exchange->id]);
                 return redirect()->route('profile.index');
             }
@@ -539,10 +539,10 @@ class ExchangeController extends Controller
     public function switchMode(Request $request, UserExchange $exchange)
     {
         $user = auth()->user();
-        if ($user->isWatcher()) {
+        if ($user->isInvestor()) {
             return response()->json([
                 'success' => false,
-                'message' => 'کاربر ناظر اجازه تغییر حالت دمو/واقعی را ندارد.',
+                'message' => 'کاربر سرمایه‌گذار اجازه تغییر حالت دمو/واقعی را ندارد.',
                 'is_demo_mode' => $exchange->is_demo_active
             ], 403);
         }

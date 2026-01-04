@@ -17,8 +17,8 @@ class RestrictWatcher
     {
         $user = auth()->user();
 
-        if ($user && $user->isWatcher()) {
-            // Block sensitive GET routes for watchers (forms and management)
+        if ($user && $user->isInvestor()) {
+            // Block sensitive GET routes for investors
             $blockedGetRoutes = [
                 'exchanges.create',
                 'exchanges.edit',
@@ -31,7 +31,7 @@ class RestrictWatcher
 
             foreach ($blockedGetRoutes as $route) {
                 if ($request->routeIs($route)) {
-                    return redirect()->route('futures.orders')->with('error', 'کاربر ناظر اجازه دسترسی به این بخش را ندارد.');
+                    return redirect()->route('futures.orders')->with('error', 'کاربر سرمایه‌گذار اجازه دسترسی به این بخش را ندارد.');
                 }
             }
 
@@ -57,15 +57,15 @@ class RestrictWatcher
                 }
             }
 
-            // Block everything else for watchers
+            // Block everything else for investors
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'کاربر ناظر اجازه انجام این عملیات را ندارد.'
+                    'message' => 'کاربر سرمایه‌گذار اجازه انجام این عملیات را ندارد.'
                 ], 403);
             }
 
-            return redirect()->back()->with('error', 'کاربر ناظر اجازه انجام این عملیات را ندارد.');
+            return redirect()->back()->with('error', 'کاربر سرمایه‌گذار اجازه انجام این عملیات را ندارد.');
         }
 
         return $next($request);
