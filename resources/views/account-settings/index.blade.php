@@ -208,25 +208,6 @@
                 margin-top: 5px;
             }
         }
-        .modal-buttons {
-            flex-direction: column;
-        }
-        .btn {
-            width: 100%;
-            margin: 5px 0;
-        }
-
-        .back-to-profile {
-            margin-top: 20px;
-            padding: 0 10px;
-        }
-
-        .back-to-profile .btn {
-            width: calc(100% - 40px);
-            max-width: 300px;
-            margin: 0 auto;
-            display: block;
-        }
         .setting-header {
             display: flex;
             justify-content: space-between;
@@ -327,6 +308,63 @@
             border: 1px solid #dc3545;
             color: #dc3545;
         }
+
+        .settings-tabs {
+            width: 100%;
+        }
+        .tabs-bar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        .tab-btn {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.45);
+            color: #e5e7eb;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+        }
+        .tab-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(250, 204, 21, 0.45);
+        }
+        .tab-btn.active {
+            background: rgba(250, 204, 21, 0.18);
+            border-color: rgba(250, 204, 21, 0.7);
+            color: #fff;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .back-to-profile-fixed {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 12px;
+            z-index: 900;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            padding: 0 12px;
+        }
+        .back-to-profile-fixed .btn {
+            pointer-events: auto;
+            width: min(320px, calc(100% - 24px));
+            box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+        }
+        .container.glass-card {
+            padding-bottom: 90px;
+        }
+
         .warning-box {
             border-radius: 8px;
             padding: 15px;
@@ -503,6 +541,16 @@
 
         /* Mobile Responsive for Modal */
         @media (max-width: 768px) {
+            .tabs-bar {
+                justify-content: flex-start;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                padding-bottom: 6px;
+                -webkit-overflow-scrolling: touch;
+            }
+            .tab-btn {
+                flex: 0 0 auto;
+            }
             .modal-content {
                 margin: 10% auto;
                 width: 95%;
@@ -547,10 +595,10 @@
 @include('partials.alert-modal')
 
 @section('content')
-    <div class="container glass-card">
-        <!-- Success/Error Messages -->
-        @if(session('success'))
-            <div class="alert alert-success">
+        <div class="container glass-card">
+            <!-- Success/Error Messages -->
+            @if(session('success'))
+                <div class="alert alert-success">
                 {{ session('success') }}
             </div>
         @endif
@@ -559,194 +607,254 @@
             <div class="alert alert-danger">
                 {{ session('error') }}
             </div>
-        @endif
-
-        <!-- Account Settings Card -->
-        <div class="settings-card">
-            <h2>تنظیمات حساب کاربری</h2>
-
-            @if(isset($user) && ($user->future_strict_mode ?? false))
-                <div class="button-group" style="justify-content: center; margin-bottom: 15px;">
-                    <a href="#self-ban" class="btn btn-secondary">مسدودسازی دستی</a>
-                </div>
             @endif
 
-            <!-- Default Settings Form -->
-            <form action="{{ route('account-settings.update') }}" method="POST">
-                @csrf
+        <div class="settings-tabs" id="account-settings-tabs">
+            <div class="tabs-bar" role="tablist" aria-label="تنظیمات حساب کاربری">
+                <button type="button" class="tab-btn active" data-tab="tab-general" aria-selected="true">عمومی</button>
+                <button type="button" class="tab-btn" data-tab="tab-strict" aria-selected="false">حالت سخت‌گیرانه و اهداف</button>
+                <button type="button" class="tab-btn" data-tab="tab-block" aria-selected="false">مسدودسازی (زمان/قیمت)</button>
+            </div>
 
-                <div class="setting-item">
-                    <div class="form-group">
-                        <label for="default_risk">ریسک پیش‌فرض (درصد)</label>
-                        <div class="input-group">
-                            <input type="text"
-                                   id="default_risk"
-                                   name="default_risk"
-                                   class="form-control"
-                                   value="{{ $defaultRisk }}"
-                                   min="1"
-                                   max="{{ (isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode) ? '10' : '80' }}"
-                                   step="0.01"
-                                   placeholder="مثال: 2.5">
-                            <span class="input-suffix">%</span>
+            <div id="tab-general" class="tab-panel active" role="tabpanel">
+                <div class="settings-card">
+                    <h2>تنظیمات حساب کاربری</h2>
+
+                    @if(isset($user) && ($user->future_strict_mode ?? false))
+                        <div class="button-group" style="justify-content: center; margin-bottom: 15px;">
+                            <button type="button" class="btn btn-secondary" data-tab-jump="tab-block">مسدودسازی دستی</button>
                         </div>
-                        @if(isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode)
-                            <small style="color: #aaa;">در حالت سخت‌گیرانه حداکثر 10 درصد مجاز است</small>
+                    @endif
+
+                    <form action="{{ route('account-settings.update') }}" method="POST">
+                        @csrf
+
+                        <div class="setting-item">
+                            <div class="form-group">
+                                <label for="default_risk">ریسک پیش‌فرض (درصد)</label>
+                                <div class="input-group">
+                                    <input type="text"
+                                           id="default_risk"
+                                           name="default_risk"
+                                           class="form-control"
+                                           value="{{ $defaultRisk }}"
+                                           min="1"
+                                           max="{{ (isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode) ? '10' : '80' }}"
+                                           step="0.01"
+                                           placeholder="مثال: 2.5">
+                                    <span class="input-suffix">%</span>
+                                </div>
+                                @if(isset($user) && $user->email === 'hesssan3506@gmail.com' && $user->future_strict_mode)
+                                    <small style="color: #aaa;">در حالت سخت‌گیرانه حداکثر 10 درصد مجاز است</small>
+                                @endif
+                            </div>
+
+                            <div class="form-group">
+                                <label for="default_expiration_time">زمان انقضای پیش‌فرض (دقیقه)</label>
+                                <div class="input-group">
+                                    <input type="text"
+                                           id="default_expiration_time"
+                                           name="default_expiration_time"
+                                           class="form-control"
+                                           value="{{ $defaultExpirationTime }}"
+                                           min="1"
+                                           max="1000"
+                                           placeholder="خالی بگذارید برای عدم تنظیم">
+                                    <span class="input-suffix">دقیقه</span>
+                                </div>
+                                <small style="color: #aaa;">حداکثر 999 دقیقه - خالی بگذارید اگر نمی‌خواهید زمان انقضا تنظیم شود</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="default_expiration_time">تعداد پله پیش‌فرض (ثبت معامله اتی)</label>
+                                <div class="input-group">
+                                    <input type="text"
+                                           id="default_future_order_steps"
+                                           name="default_future_order_steps"
+                                           class="form-control"
+                                           value="{{ $defaultFutureOrderSteps }}"
+                                           min="1"
+                                           max="8"
+                                           placeholder="خالی بگذارید برای عدم تنظیم">
+                                    <span class="input-suffix">عدد</span>
+                                </div>
+                                <small style="color: #aaa;">حداکثر 8 پله - خالی بگذارید اگر نمی‌خواهید تنظیم شود</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="tv_default_interval">بازه زمانی پیش‌فرض نمودار (TradingView)</label>
+                                <div class="input-group">
+                                    <select id="tv_default_interval" name="tv_default_interval" class="form-control">
+                                        <option value="1" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '1') ? 'selected' : '' }}>۱ دقیقه</option>
+                                        <option value="5" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '5') ? 'selected' : '' }}>۵ دقیقه</option>
+                                        <option value="15" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '15') ? 'selected' : '' }}>۱۵ دقیقه</option>
+                                        <option value="60" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '60') ? 'selected' : '' }}>۱ ساعت</option>
+                                        <option value="240" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '240') ? 'selected' : '' }}>۴ ساعت</option>
+                                        <option value="D" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === 'D') ? 'selected' : '' }}>۱ روز</option>
+                                    </select>
+                                </div>
+                                <small style="color: #aaa;">این تنظیم فقط نمایش نمودار را تغییر می‌دهد و در منطق سفارش اثری ندارد</small>
+                            </div>
+
+                            <div class="button-group">
+                                <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="tab-strict" class="tab-panel" role="tabpanel">
+                @if(isset($user) && $user->email === 'hesssan3506@gmail.com')
+                    <div class="settings-card">
+                        <h2>حالت سخت‌گیرانه آتی (Future Strict Mode) </h2>
+
+                        <div id="alert-container"></div>
+
+                        @if(session('success'))
+                            <div class="alert alert-success">
+                                {{ session('success') }}
+                            </div>
                         @endif
-                    </div>
 
-                    <div class="form-group">
-                        <label for="default_expiration_time">زمان انقضای پیش‌فرض (دقیقه)</label>
-                        <div class="input-group">
-                            <input type="text"
-                                   id="default_expiration_time"
-                                   name="default_expiration_time"
-                                   class="form-control"
-                                   value="{{ $defaultExpirationTime }}"
-                                   min="1"
-                                   max="1000"
-                                   placeholder="خالی بگذارید برای عدم تنظیم">
-                            <span class="input-suffix">دقیقه</span>
-                        </div>
-                        <small style="color: #aaa;">حداکثر 999 دقیقه - خالی بگذارید اگر نمی‌خواهید زمان انقضا تنظیم شود</small>
-                    </div>
+                        @if(session('error'))
+                            <div class="alert alert-danger">
+                                {{ session('error') }}
+                            </div>
+                        @endif
 
-                    <div class="form-group">
-                        <label for="default_expiration_time">تعداد پله پیش‌فرض (ثبت معامله اتی)</label>
-                        <div class="input-group">
-                            <input type="text"
-                                   id="default_future_order_steps"
-                                   name="default_future_order_steps"
-                                   class="form-control"
-                                   value="{{ $defaultFutureOrderSteps }}"
-                                   min="1"
-                                   max="8"
-                                   placeholder="خالی بگذارید برای عدم تنظیم">
-                            <span class="input-suffix">عدد</span>
-                        </div>
-                        <small style="color: #aaa;">حداکثر 8 پله - خالی بگذارید اگر نمی‌خواهید تنظیم شود</small>
-                    </div>
+                        <div class="setting-item">
 
-                    <div class="form-group">
-                        <label for="tv_default_interval">بازه زمانی پیش‌فرض نمودار (TradingView)</label>
-                        <div class="input-group">
-                            <select id="tv_default_interval" name="tv_default_interval" class="form-control">
-                                <option value="1" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '1') ? 'selected' : '' }}>۱ دقیقه</option>
-                                <option value="5" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '5') ? 'selected' : '' }}>۵ دقیقه</option>
-                                <option value="15" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '15') ? 'selected' : '' }}>۱۵ دقیقه</option>
-                                <option value="60" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '60') ? 'selected' : '' }}>۱ ساعت</option>
-                                <option value="240" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === '240') ? 'selected' : '' }}>۴ ساعت</option>
-                                <option value="D" {{ (isset($tvDefaultInterval) && $tvDefaultInterval === 'D') ? 'selected' : '' }}>۱ روز</option>
-                            </select>
-                        </div>
-                        <small style="color: #aaa;">این تنظیم فقط نمایش نمودار را تغییر می‌دهد و در منطق سفارش اثری ندارد</small>
-                    </div>
-
-                    <div class="button-group">
-                        <button type="submit" class="btn btn-primary">ذخیره تنظیمات</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-        @if(isset($user) && ($user->future_strict_mode ?? false))
-        <div class="settings-card" id="self-ban">
-            <h2>مسدودسازی دستی (Self-Ban)</h2>
-
-            @if($selfBanTime)
-                <div class="alert alert-danger" style="margin-bottom: 15px;">
-                    {{ \App\Services\BanService::getPersianBanMessage($selfBanTime) }}
-                    <br>
-                    <small>پایان: {{ $selfBanTime->ends_at->format('Y/m/d H:i') }}</small>
-                </div>
-            @endif
-
-            @if($selfBanPrice)
-                <div class="alert alert-danger" style="margin-bottom: 15px;">
-                    {{ \App\Services\BanService::getPersianBanMessage($selfBanPrice) }}
-                    <br>
-                    <small>پایان: {{ $selfBanPrice->ends_at->format('Y/m/d H:i') }}</small>
-                </div>
-            @endif
-
-            <div class="setting-item" style="border-top: 1px solid #444; padding-top: 20px;">
-                <h3 class="setting-title">مسدودسازی زمانی</h3>
-                <div class="setting-description">
-                    با انتخاب یکی از گزینه‌های زیر، امکان ثبت سفارش جدید تا پایان زمان انتخابی غیرفعال می‌شود.
-                </div>
-
-                <form method="POST" action="{{ route('account-settings.self-ban') }}">
-                    @csrf
-                    <input type="hidden" name="self_ban_mode" value="time">
-
-                    <div class="form-group">
-                        <label for="self_ban_time_duration">مدت زمان</label>
-                        <select id="self_ban_time_duration" name="duration_minutes" class="form-control" required>
-                            <option value="30">۳۰ دقیقه</option>
-                            <option value="60">۱ ساعت</option>
-                            <option value="120">۲ ساعت</option>
-                            <option value="240">۴ ساعت</option>
-                            <option value="720">۱۲ ساعت</option>
-                            <option value="1440">۱ روز</option>
-                            <option value="2880">۲ روز</option>
-                            <option value="4320">۳ روز</option>
-                            <option value="10080">۷ روز</option>
-                            <option value="43200">۳۰ روز</option>
-                        </select>
-                    </div>
-
-                    <div class="button-group">
-                        <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی زمانی</button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="setting-item" style="border-top: 1px solid #444; padding-top: 20px;">
-                <h3 class="setting-title">مسدودسازی بر اساس قیمت</h3>
-                <div class="setting-description">
-                    در حالت سخت‌گیرانه، این مسدودسازی فقط روی بازار انتخابی شما اعمال می‌شود:
-                    <strong>{{ $user->selected_market ?? '-' }}</strong>
-                </div>
-
-                <form method="POST" action="{{ route('account-settings.self-ban') }}">
-                    @csrf
-                    <input type="hidden" name="self_ban_mode" value="price">
-
-                    <div class="form-group">
-                        <label for="self_ban_price_duration">حداکثر مدت مسدودسازی</label>
-                        <select id="self_ban_price_duration" name="duration_minutes" class="form-control" required>
-                            <option value="30">۳۰ دقیقه</option>
-                            <option value="60">۱ ساعت</option>
-                            <option value="120">۲ ساعت</option>
-                            <option value="240">۴ ساعت</option>
-                            <option value="720">۱۲ ساعت</option>
-                            <option value="1440">۱ روز</option>
-                            <option value="2880">۲ روز</option>
-                            <option value="4320">۳ روز</option>
-                            <option value="10080">۷ روز</option>
-                            <option value="43200">۳۰ روز</option>
-                        </select>
-                        <small style="color: #aaa;">اگر قیمت به شرط برسد، مسدودسازی زودتر غیرفعال می‌شود.</small>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group" style="flex: 1;">
-                            <label for="self_ban_price_below">اگر قیمت کمتر یا مساویِ</label>
-                            <input id="self_ban_price_below" type="number" step="any" name="price_below" class="form-control" placeholder="اختیاری">
-                        </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label for="self_ban_price_above">اگر قیمت بیشتر یا مساویِ</label>
-                            <input id="self_ban_price_above" type="number" step="any" name="price_above" class="form-control" placeholder="اختیاری">
-                        </div>
-                    </div>
-
-                    <div class="button-group">
-                        <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی قیمت</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        @endif
-        @if(isset($user) && $user->email === 'hesssan3506@gmail.com')
+                            <div class="setting-description">
+                                این حالت زمانی که فعال شود، موارد زیر را تحت تأثیر قرار می‌دهد(این محدودیت ها در جهت نظم دادن به معامله و جلو گیری از معامله های شتاب زده است):
+                                <ul style="margin-top: 10px; padding-right: 20px;">
+                                    <li>امکان حذف یا تغییر Stop Loss و Take Profit وجود نخواهد داشت</li>
+                                    <li>تنها از طریق این سیستم می‌توانید سفارش جدید ثبت کنید</li>
+                                    <li>در صورت بستن سفارش فعال از طریق صرافی(اگر در نقطه حدضرر یا حد سود نباشد) ،امکان ثبت سفارش تا 3 روز اینده نخواهید داشت</li>
+                                    <li>درصورت بستن سفارش فعال ،امکان بستن سفارش تا یک هفته اینده را نخواهید داشت</li>
+                                    <li>حداکثر ریسک هر پوزیشن 10 درصد خواهد بود</li>
+                                    <li>پس از ضرر، باید 1 ساعت صبر کنید تا بتوانید سفارش جدید ثبت کنید</li>
+                                    <li>اگر دوبار پشت سرهم ضرر کنید ، تا 24 ساعت اینده نمی توانید سفارش جدید ثبت کنید</li>
+                                    <li><strong>باید یک بازار انتخاب کنید و تنها در همان بازار قابلیت معامله خواهید داشت</strong></li>
+                                    <li>این حالت پس از فعال‌سازی قابل غیرفعال‌سازی نیست</li>
+                                </ul>
+                            </div>
+ 
+                            @if($user->future_strict_mode)
+                                <div class="alert alert-success">
+                                    <strong>حالت سخت‌گیرانه آتی فعال است</strong><br>
+                                    تاریخ فعال‌سازی: {{ $user->future_strict_mode_activated_at->format('Y/m/d H:i') }}<br>
+                                    @if($user->selected_market)
+                                        <strong>بازار انتخابی: {{ $user->selected_market }}</strong>
+                                    @endif
+                                    @if(isset($minRrRatio))
+                                        <br><strong>حداقل نسبت سود به ضرر: {{ $minRrRatio }}</strong>
+                                    @endif
+                                </div>
+ 
+                                <!-- Strict Mode Profit/Loss Targets Form -->
+                                <div class="setting-item" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 20px;">
+                                    <h3 class="setting-title">اهداف سود و ضرر هفتگی و ماهانه</h3>
+                                    <div class="setting-description">
+                                        در این بخش می‌توانید اهداف هفتگی و ماهانه برای سود و ضرر خود تعیین کنید.
+                                        <br>
+                                        <strong style="color: #ffc107;">توجه مهم:</strong> پس از تنظیم، این اهداف غیرقابل تغییر و غیرقابل حذف هستند و برای همیشه ثبت می‌شوند.
+                                    </div>
+ 
+                                    <style>
+                                        /* Toggle Switch */
+                                        .switch {
+                                            position: relative;
+                                            display: inline-block;
+                                            width: 46px;
+                                            height: 24px;
+                                            vertical-align: middle;
+                                        }
+                                        .switch input {
+                                            opacity: 0;
+                                            width: 0;
+                                            height: 0;
+                                        }
+                                        .switch-slider {
+                                            position: absolute;
+                                            cursor: pointer;
+                                            top: 0;
+                                            left: 0;
+                                            right: 0;
+                                            bottom: 0;
+                                            background-color: #444;
+                                            transition: .3s;
+                                            border-radius: 24px;
+                                        }
+                                        .switch-slider:before {
+                                            position: absolute;
+                                            content: "";
+                                            height: 18px;
+                                            width: 18px;
+                                            left: 3px;
+                                            bottom: 3px;
+                                            background-color: white;
+                                            transition: .3s;
+                                            border-radius: 50%;
+                                        }
+                                        .switch input:checked + .switch-slider {
+                                            background-color: var(--primary-color, #ffc107);
+                                        }
+                                        .switch input:checked + .switch-slider:before {
+                                            transform: translateX(22px);
+                                        }
+                                        .switch input:disabled + .switch-slider {
+                                            opacity: 0.5;
+                                            cursor: not-allowed;
+                                        }
+ 
+                                        /* Slider CSS */
+                                        .dual-range-slider {
+                                            position: relative;
+                                            width: 100%;
+                                            height: 80px; /* Increased height */
+                                            margin-top: 15px;
+                                            margin-bottom: 20px;
+                                            padding: 0 15px; /* Side padding for thumbs */
+                                            box-sizing: border-box;
+                                        }
+                                        .slider-wrapper {
+                                            max-height: 0;
+                                            overflow: hidden;
+                                            opacity: 0;
+                                            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                                            transform: translateY(-10px);
+                                        }
+                                        .slider-wrapper.expanded {
+                                            max-height: 120px;
+                                            opacity: 1;
+                                            transform: translateY(0);
+                                            margin-top: 15px;
+                                            margin-bottom: 20px;
+                                            overflow: visible; /* Allow thumbs to extend */
+                                        }
+                                        .slider-track-container {
+                                            position: absolute;
+                                            top: 35px;
+                                            left: 15px;
+                                            right: 15px;
+                                            height: 8px;
+                                            background: #333;
+                                            border-radius: 4px;
+                                            z-index: 1;
+                                        }
+                                        /* Zero Zone Marker */
+                                        .zero-zone-marker {
+                                            position: absolute;
+                                            top: 0;
+                                            bottom: 0;
+                                            width: 10%; /* 10% width for zero zone */
+                                            left: 45%; /* Starts at 45% */
+                                            background: #1e1e1e; /* Match page background */
+                                            z-index: 5; /* On top of bar */
+                                        }
+                                    </style>
+                                @endif
         <div class="settings-card">
             <h2>حالت سخت‌گیرانه آتی (Future Strict Mode) </h2>
 
@@ -1546,12 +1654,117 @@
                 @endif
             </div>
 
-            <!-- Back to Profile Button -->
-            <div class="back-to-profile">
-                <a href="{{ route('profile.index') }}" class="btn btn-primary">
-                    بازگشت به پروفایل
-                </a>
+            <div id="tab-block" class="tab-panel" role="tabpanel">
+                <div class="settings-card">
+                    <h2>مسدودسازی دستی</h2>
+
+                    @if(!(isset($user) && ($user->future_strict_mode ?? false)))
+                        <div class="warning-box">
+                            <h4>⚠️ توجه:</h4>
+                            <p>برای استفاده از مسدودسازی دستی، ابتدا باید حالت سخت‌گیرانه را فعال کنید.</p>
+                        </div>
+                    @else
+                        @php
+                            $selfBanTimeRemainingMinutes = (isset($selfBanTime) && $selfBanTime) ? max(0, $selfBanTime->ends_at->diffInMinutes(now())) : null;
+                            $selfBanPriceRemainingMinutes = (isset($selfBanPrice) && $selfBanPrice) ? max(0, $selfBanPrice->ends_at->diffInMinutes(now())) : null;
+                        @endphp
+
+                        @if(isset($selfBanTime) && $selfBanTime)
+                            <div class="alert alert-success">
+                                مسدودسازی زمانی فعال است تا: {{ $selfBanTime->ends_at->format('Y/m/d H:i') }}
+                                @if($selfBanTimeRemainingMinutes !== null)
+                                    <br>زمان باقی‌مانده: {{ $selfBanTimeRemainingMinutes }} دقیقه
+                                @endif
+                            </div>
+                        @endif
+
+                        @if(isset($selfBanPrice) && $selfBanPrice)
+                            <div class="alert alert-success">
+                                مسدودسازی بر اساس قیمت فعال است تا: {{ $selfBanPrice->ends_at->format('Y/m/d H:i') }}
+                                @if($selfBanPriceRemainingMinutes !== null)
+                                    <br>زمان باقی‌مانده: {{ $selfBanPriceRemainingMinutes }} دقیقه
+                                @endif
+                                @if($selfBanPrice->price_below !== null)
+                                    <br>قیمت پایین‌تر از: {{ $selfBanPrice->price_below }}
+                                @endif
+                                @if($selfBanPrice->price_above !== null)
+                                    <br>قیمت بالاتر از: {{ $selfBanPrice->price_above }}
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="setting-item">
+                            <div class="setting-description">
+                                این بخش برای زمانی است که می‌خواهید خودتان به‌صورت دستی جلوی ثبت سفارش را بگیرید.
+                            </div>
+
+                            <div class="setting-title" style="margin-bottom: 10px;">مسدودسازی زمانی</div>
+                            <form action="{{ route('account-settings.self-ban') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="self_ban_mode" value="time">
+                                <div class="form-group">
+                                    <label for="duration_minutes_time">مدت زمان</label>
+                                    <select id="duration_minutes_time" name="duration_minutes" class="form-control" required>
+                                        <option value="30">۳۰ دقیقه</option>
+                                        <option value="60">۱ ساعت</option>
+                                        <option value="120">۲ ساعت</option>
+                                        <option value="240">۴ ساعت</option>
+                                        <option value="720">۱۲ ساعت</option>
+                                        <option value="1440">۱ روز</option>
+                                        <option value="2880">۲ روز</option>
+                                        <option value="4320">۳ روز</option>
+                                        <option value="10080">۱ هفته</option>
+                                        <option value="43200">۱ ماه</option>
+                                    </select>
+                                </div>
+                                <div class="button-group">
+                                    <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی زمانی</button>
+                                </div>
+                            </form>
+
+                            <div style="height: 16px;"></div>
+
+                            <div class="setting-title" style="margin-bottom: 10px;">مسدودسازی بر اساس قیمت</div>
+                            <form action="{{ route('account-settings.self-ban') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="self_ban_mode" value="price">
+                                <div class="form-group">
+                                    <label for="duration_minutes_price">حداکثر مدت زمان</label>
+                                    <select id="duration_minutes_price" name="duration_minutes" class="form-control" required>
+                                        <option value="30">۳۰ دقیقه</option>
+                                        <option value="60">۱ ساعت</option>
+                                        <option value="120">۲ ساعت</option>
+                                        <option value="240">۴ ساعت</option>
+                                        <option value="720">۱۲ ساعت</option>
+                                        <option value="1440">۱ روز</option>
+                                        <option value="2880">۲ روز</option>
+                                        <option value="4320">۳ روز</option>
+                                        <option value="10080">۱ هفته</option>
+                                        <option value="43200">۱ ماه</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="price_below">قیمت پایین‌تر از</label>
+                                    <input type="text" id="price_below" name="price_below" class="form-control" inputmode="decimal" placeholder="مثال: 65000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="price_above">قیمت بالاتر از</label>
+                                    <input type="text" id="price_above" name="price_above" class="form-control" inputmode="decimal" placeholder="مثال: 72000">
+                                </div>
+                                <div class="button-group">
+                                    <button type="submit" class="btn btn-danger">فعال‌سازی مسدودسازی بر اساس قیمت</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
+                </div>
             </div>
+        </div>
+
+        <div class="back-to-profile-fixed">
+            <a href="{{ route('profile.index') }}" class="btn btn-primary">
+                بازگشت به پروفایل
+            </a>
         </div>
     </div>
 
@@ -1662,6 +1875,53 @@
                 }
             });
 
+            const tabsRoot = document.getElementById('account-settings-tabs');
+            if (tabsRoot) {
+                const tabButtons = Array.from(tabsRoot.querySelectorAll('.tab-btn[data-tab]'));
+                const tabPanels = Array.from(tabsRoot.querySelectorAll('.tab-panel'));
+                const jumpButtons = Array.from(tabsRoot.querySelectorAll('[data-tab-jump]'));
+
+                function activateTab(tabId) {
+                    if (!tabId) return;
+                    tabButtons.forEach(btn => {
+                        const isActive = btn.getAttribute('data-tab') === tabId;
+                        btn.classList.toggle('active', isActive);
+                        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
+                    tabPanels.forEach(panel => {
+                        panel.classList.toggle('active', panel.id === tabId);
+                    });
+                    try { localStorage.setItem('accountSettingsActiveTab', tabId); } catch (e) {}
+                    if (history && history.replaceState) {
+                        try { history.replaceState(null, '', '#' + tabId); } catch (e) {}
+                    }
+                }
+
+                tabButtons.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        activateTab(this.getAttribute('data-tab'));
+                    });
+                });
+
+                jumpButtons.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        activateTab(this.getAttribute('data-tab-jump'));
+                    });
+                });
+
+                const hashTab = (window.location.hash || '').replace('#', '');
+                let initialTab = hashTab || null;
+                if (!initialTab) {
+                    try { initialTab = localStorage.getItem('accountSettingsActiveTab'); } catch (e) {}
+                }
+                if (!initialTab) {
+                    const activeBtn = tabButtons.find(b => b.classList.contains('active'));
+                    initialTab = activeBtn ? activeBtn.getAttribute('data-tab') : (tabButtons[0] ? tabButtons[0].getAttribute('data-tab') : null);
+                }
+                if (initialTab && document.getElementById(initialTab)) {
+                    activateTab(initialTab);
+                }
+            }
         });
 
         function showConfirmationModal() {

@@ -133,6 +133,7 @@
         align-items: center;
         justify-content: center;
         gap: 12px;
+        flex-wrap: wrap;
     }
     .goals-logo {
         width: 28px;
@@ -143,9 +144,14 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        border: none;
         transform: scale(1);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         box-shadow: 0 0 0 0 rgba(250,204,21,0.4);
+    }
+    .goals-logo:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(250,204,21,0.25), 0 0 0 7px rgba(250,204,21,0.14);
     }
     .goals-logo:hover {
         transform: scale(1.08);
@@ -255,13 +261,17 @@
     }
     .goals-progress-fill {
         position: absolute;
-        inset: 0;
+        top: 0;
+        bottom: 0;
+        left: 0;
         width: 0;
         border-radius: inherit;
         background: linear-gradient(90deg, #22c55e, #a3e635);
         transition: width 0.25s ease-out;
     }
     .goals-progress-fill.loss {
+        left: auto;
+        right: 0;
         background: linear-gradient(90deg, #f97373, #fb7185);
     }
     .goals-progress-footer {
@@ -273,6 +283,11 @@
     }
     .goals-progress-footer span:last-child {
         text-align: left;
+    }
+    #ban-countdown {
+        direction: ltr;
+        unicode-bidi: embed;
+        display: inline-block;
     }
     @media (max-width: 480px) {
         .goals-modal {
@@ -305,9 +320,7 @@
             @if($hasWeeklyTargets || $hasMonthlyTargets)
                 <button type="button" class="goals-logo" id="openGoalsModalBtn" aria-label="اهداف هفتگی و ماهانه">
                     <svg viewBox="0 0 24 24" class="goals-logo-icon" aria-hidden="true">
-                        <path d="M5 12h3v7H5z"></path>
-                        <path d="M10.5 9h3v10h-3z"></path>
-                        <path d="M16 5h3v14h-3z"></path>
+                        <path d="M12 2c3.87 0 7 3.13 7 7 0 3.6-2.72 6.57-6.2 6.96V20h2.2c.55 0 1 .45 1 1s-.45 1-1 1H9c-.55 0-1-.45-1-1s.45-1 1-1h2.2v-4.04C7.72 15.57 5 12.6 5 9c0-3.87 3.13-7 7-7zm0 2c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"></path>
                     </svg>
                 </button>
             @endif
@@ -387,7 +400,7 @@
         @endphp
         <div class="alert alert-warning" id="ban-alert">
             {{ $banMessage ?? 'مدیریت ریسک فعال است.' }}
-            <span id="ban-countdown">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
+            <span id="ban-countdown" dir="ltr">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
         </div>
     @endif
 
@@ -458,7 +471,6 @@
                 <div class="goals-modal-header">
                     <div>
                         <div class="goals-modal-title">اهداف سود و ضرر</div>
-                        <div class="goals-modal-subtitle">پیشرفت هفتگی و ماهانه شما در حالت سخت‌گیرانه</div>
                     </div>
                     <button type="button" class="goals-modal-close" id="closeGoalsModalBtn" aria-label="بستن">
                         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -891,6 +903,53 @@
                 );
             });
         }
+
+        (function() {
+            var openBtn = document.getElementById('openGoalsModalBtn');
+            var closeBtn = document.getElementById('closeGoalsModalBtn');
+            var backdrop = document.getElementById('goalsModalBackdrop');
+            var modal = document.getElementById('goalsModalBox');
+
+            if (!openBtn || !backdrop || !modal) return;
+
+            function openModal() {
+                backdrop.style.display = 'flex';
+                requestAnimationFrame(function () {
+                    backdrop.classList.add('show');
+                    modal.classList.add('show');
+                });
+            }
+
+            function closeModal() {
+                modal.classList.remove('show');
+                backdrop.classList.remove('show');
+                setTimeout(function () {
+                    backdrop.style.display = 'none';
+                }, 220);
+            }
+
+            openBtn.addEventListener('click', function () {
+                openModal();
+            });
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    closeModal();
+                });
+            }
+
+            backdrop.addEventListener('click', function (e) {
+                if (e.target === backdrop) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && backdrop.style.display !== 'none') {
+                    closeModal();
+                }
+            });
+        })();
 
         // --- Strict mode: update TP placeholder based on SL & RR ---
         (function() {

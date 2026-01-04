@@ -3,12 +3,11 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\UserExchange;
 use App\Models\Order;
-use App\Services\Exchanges\ExchangeFactory;
+use App\Models\Trade;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Mockery;
 
@@ -31,6 +30,12 @@ class FuturesSlTpSyncTest extends TestCase
             'user_id' => $user->id,
             'exchange_name' => 'bybit',
             'is_active' => true
+            ,'is_default' => true
+            ,'status' => 'approved'
+            ,'ip_access' => true
+            ,'futures_access' => true
+            ,'api_key' => 'test_key'
+            ,'api_secret' => 'test_secret'
         ]);
 
         $order = Order::factory()->create([
@@ -40,41 +45,76 @@ class FuturesSlTpSyncTest extends TestCase
             'side' => 'buy',
             'sl' => 100.0, // Database SL
             'tp' => 150.0, // Database TP
+            'order_id' => 'order-1',
         ]);
 
-        // Mock the BybitApiService
-        $mockBybitService = Mockery::mock(BybitApiService::class);
+        Trade::factory()->create([
+            'user_exchange_id' => $userExchange->id,
+            'is_demo' => false,
+            'symbol' => 'BTCUSDT',
+            'side' => 'buy',
+            'qty' => 1,
+            'order_id' => 'order-1',
+            'closed_at' => null,
+        ]);
 
-        // Mock getPositions to return a position with different SL and TP
-        $mockBybitService->shouldReceive('getPositions')
-            ->with('BTCUSDT')
+        $mockExchangeService = Mockery::mock(ExchangeApiServiceInterface::class);
+        Mockery::mock('alias:App\Services\Exchanges\ExchangeFactory')
+            ->shouldReceive('create')
+            ->once()
+            ->withArgs(function ($exchangeName, $apiKey, $apiSecret, $isDemo) {
+                return strtolower((string)$exchangeName) === 'bybit' && $isDemo === false;
+            })
+            ->andReturn($mockExchangeService);
+
+        $mockExchangeService->shouldReceive('getPositions')
+            ->once()
             ->andReturn([
                 'list' => [
                     [
                         'symbol' => 'BTCUSDT',
                         'side' => 'Buy',
-                        'stopLoss' => '110.0', // Exchange SL (mismatched)
-                        'takeProfit' => '160.0', // Exchange TP (mismatched)
-                        'positionIdx' => 1
+                        'size' => '1',
+                        'positionIdx' => 1,
                     ]
                 ]
             ]);
 
-        // Mock setStopLossAdvanced to expect a call with the correct database SL and TP
-        $mockBybitService->shouldReceive('setStopLossAdvanced')
+        $mockExchangeService->shouldReceive('getPositionIdx')->andReturn(1);
+
+        $mockExchangeService->shouldReceive('getConditionalOrders')
+            ->once()
+            ->with('BTCUSDT')
+            ->andReturn(['list' => []]);
+
+        $mockExchangeService->shouldReceive('getOpenOrders')
+            ->once()
+            ->with('BTCUSDT')
+            ->andReturn(['list' => []]);
+
+        $mockExchangeService->shouldReceive('createOrder')
             ->once()
             ->with(Mockery::on(function ($params) use ($order) {
-                return $params['stopLoss'] == (string)$order->sl &&
-                       $params['takeProfit'] == (string)$order->tp;
+                $triggerPrice = $params['triggerPrice'] ?? null;
+                return ($params['symbol'] ?? null) === 'BTCUSDT'
+                    && $triggerPrice !== null
+                    && abs(((float)$triggerPrice) - ((float)$order->sl)) < 0.0001;
             }))
-            ->andReturn(['retCode' => 0]); // Simulate success
+            ->andReturn(['orderId' => 'sl-1']);
 
-        // Replace the service container binding with our mock
-        $this->app->instance(BybitApiService::class, $mockBybitService);
+        $mockExchangeService->shouldReceive('createOrder')
+            ->once()
+            ->with(Mockery::on(function ($params) use ($order) {
+                $price = $params['price'] ?? null;
+                return ($params['symbol'] ?? null) === 'BTCUSDT'
+                    && $price !== null
+                    && abs(((float)$price) - ((float)$order->tp)) < 0.0001;
+            }))
+            ->andReturn(['orderId' => 'tp-1']);
 
         // 2. Act
         $this->artisan('futures:sync-sltp', ['--user' => $user->id])
-            ->expectsOutputToContain('Successfully updated SL/TP for user')
+            ->expectsOutputToContain('شروع همگام‌سازی Stop Loss و Take Profit...')
             ->assertExitCode(0);
     }
 }

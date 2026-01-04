@@ -237,7 +237,8 @@ class FuturesController extends Controller
 
     public function destroy(Order $order)
     {
-        if ($order->user_exchange->user_id !== auth()->user()->getAccountOwner()->id) {
+        $order->loadMissing('userExchange');
+        if (!$order->userExchange || $order->userExchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -262,7 +263,8 @@ class FuturesController extends Controller
 
     public function close(Request $request, Order $order)
     {
-        if ($order->user_exchange->user_id !== auth()->user()->getAccountOwner()->id) {
+        $order->loadMissing('userExchange');
+        if (!$order->userExchange || $order->userExchange->user_id !== auth()->user()->getAccountOwner()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
