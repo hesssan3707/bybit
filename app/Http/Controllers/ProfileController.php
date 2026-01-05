@@ -137,7 +137,15 @@ class ProfileController extends Controller
         // Load all active exchanges for switching
         $activeExchanges = $user->activeExchanges()->get();
         
-        $investors = $user->investors;
+        $investors = $user->investors()->get();
+        $investorBalances = [];
+        if (!$user->isInvestor() && $investors->isNotEmpty()) {
+            $investorBalances = DB::table('investor_wallets')
+                ->whereIn('investor_user_id', $investors->pluck('id')->all())
+                ->where('currency', 'USDT')
+                ->pluck('balance', 'investor_user_id')
+                ->toArray();
+        }
 
         return view('profile.index', [
             'user' => $user,
@@ -147,6 +155,7 @@ class ProfileController extends Controller
             'activeExchanges' => $activeExchanges,
             'availableExchanges' => UserExchange::getAvailableExchanges(),
             'investors' => $investors,
+            'investorBalances' => $investorBalances,
         ]);
     }
 

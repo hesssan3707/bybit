@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\ExchangeApiTest" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" tests="6" assertions="13" errors="0" failures="0" skipped="0" time="16.875784">
+    <testcase name="test_can_get_exchanges" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="26" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="2" time="16.433401"/>
+    <testcase name="test_can_create_exchange" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="39" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="3" time="0.086955"/>
+    <testcase name="test_can_update_exchange" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="61" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="2" time="0.088805"/>
+    <testcase name="test_can_delete_exchange" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="81" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="2" time="0.074055"/>
+    <testcase name="test_can_switch_exchange" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="93" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="3" time="0.105358"/>
+    <testcase name="test_can_test_exchange_connection" file="C:\wamp64\www\bridge\tests\Feature\ExchangeApiTest.php" line="107" class="Tests\Feature\ExchangeApiTest" classname="Tests.Feature.ExchangeApiTest" assertions="1" time="0.087209"/>
+  </testsuite>
+</testsuites>

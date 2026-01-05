@@ -554,6 +554,28 @@
             color: #888;
             font-size: 0.85em;
         }
+        .investor-balance-pill {
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+        }
+        .investor-balance-label {
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(148, 163, 184, 0.9);
+        }
+        .investor-balance-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e5e7eb;
+        }
 
         .name-edit-btn {
             background: rgba(255, 255, 255, 0.15);
@@ -1188,7 +1210,7 @@
         <div class="investors-section">
             <div class="section-header">
                 <h3><i class="fas fa-users-viewfinder"></i> مدیریت سرمایه‌گذاران</h3>
-                <span class="exchange-count">{{ $investors->count() }} / ۳</span>
+                <span class="exchange-count" dir="ltr">{{ $investors->count() }} / 3</span>
             </div>
 
             @if(session('success'))
@@ -1219,6 +1241,10 @@
                         <div class="investor-info">
                             <span class="investor-name">{{ $investor->name }}</span>
                             <span class="investor-email">{{ $investor->real_email }}</span>
+                            <div class="investor-balance-pill" dir="ltr">
+                                <span class="investor-balance-label">Balance</span>
+                                <span class="investor-balance-value">{{ number_format((float)($investorBalances[$investor->id] ?? 0), 2) }} USDT</span>
+                            </div>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <button type="button" class="investor-edit-btn" onclick="openInvestorEditModal({{ $investor->id }}, @js($investor->name), @js($investor->real_email))" title="ویرایش" aria-label="ویرایش">

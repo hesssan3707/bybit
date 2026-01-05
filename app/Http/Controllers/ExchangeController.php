@@ -77,6 +77,7 @@ class ExchangeController extends Controller
      */
     public function store(Request $request)
     {
+        $user = auth()->user();
         $validator = Validator::make($request->all(), [
             'exchange_name' => 'required|string|in:' . implode(',', ExchangeFactory::getSupportedExchanges()),
             'api_key' => 'nullable|string|min:8',
