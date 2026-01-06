@@ -695,6 +695,7 @@
                 entry2Input.placeholder = '';
 
                 if (data.success && data.price) {
+                        entry1Input.dataset.lastMarketPrice = data.price;
                         entry1Input.value = data.price;
                         if (isChained) {
                             entry2Input.value = data.price;
@@ -818,6 +819,66 @@
         if (stepsInput) {
             updateStepsControls();
             stepsInput.addEventListener('input', updateStepsControls);
+        }
+
+        const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
+        const selectedMarket = '{{ $selectedMarket ?? '' }}';
+
+        if (isStrictMode && '{{ $marketPrice ?? '' }}' !== '') {
+            entry1Input.dataset.lastMarketPrice = '{{ $marketPrice }}';
+        }
+
+        // --- Frontend Validation Logic ---
+        const orderForm = document.getElementById('order-form');
+        
+        if (orderForm) {
+            orderForm.addEventListener('submit', function(e) {
+                const entry1 = parseFloat(entry1Input.value);
+                const entry2 = parseFloat(entry2Input.value) || entry1;
+                const sl = parseFloat(document.getElementById('sl').value);
+                const tp = parseFloat(document.getElementById('tp').value);
+                const avgEntry = (entry1 + entry2) / 2;
+
+                // 1. Unreasonable deviation from market price (e.g. > 15%)
+                // We use the last fetched market price or server-provided price
+                const currentPrice = parseFloat(entry1Input.dataset.lastMarketPrice || '{{ $marketPrice ?? 0 }}');
+                if (currentPrice > 0) {
+                    const deviation = Math.abs(avgEntry - currentPrice) / currentPrice;
+                    if (deviation > 0.15) { // 15% threshold
+                        e.preventDefault();
+                        modernAlert(`قیمت ورود انتخابی (${avgEntry.toLocaleString()}) تفاوت زیادی با قیمت فعلی بازار (${currentPrice.toLocaleString()}) دارد (بیش از ۱۵٪). لطفاً قیمت را بررسی کنید.`, 'error');
+                        return;
+                    }
+                }
+
+                // 2. Risk:Reward ratio checks
+                const riskDist = Math.abs(avgEntry - sl);
+                const rewardDist = Math.abs(tp - avgEntry);
+                
+                if (riskDist > 0) {
+                    const rr = rewardDist / riskDist;
+                    
+                    if (rr > 5.0) {
+                        e.preventDefault();
+                        modernAlert(`نسبت سود به ضرر (R:R) این معامله ${rr.toFixed(1)} است که بیش از حد مجاز (5x) می‌باشد. لطفاً حد سود را کاهش دهید.`, 'error');
+                        return;
+                    } else if (rr >= 3.0) {
+                        // Show confirmation modal for 3x - 5x RR
+                        if (!orderForm.dataset.rrConfirmed) {
+                            e.preventDefault();
+                            modernConfirm(
+                                'تایید معامله با ریسک بالا',
+                                `نسبت سود به ضرر این معامله ${rr.toFixed(1)} است (بیش از 3x). آیا از ثبت این سفارش اطمینان دارید؟`,
+                                function() {
+                                    orderForm.dataset.rrConfirmed = "true";
+                                    orderForm.submit();
+                                }
+                            );
+                            return;
+                        }
+                    }
+                }
+            });
         }
 
         // --- Initial market price logic ---

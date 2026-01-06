@@ -1245,9 +1245,15 @@
                                 <span class="investor-balance-label">Balance</span>
                                 <span class="investor-balance-value">{{ number_format((float)($investorBalances[$investor->id] ?? 0), 2) }} USDT</span>
                             </div>
+                            @if($investor->investment_limit)
+                            <div class="investor-balance-pill" dir="ltr" style="margin-top: 4px; border-color: rgba(99, 102, 241, 0.3);">
+                                <span class="investor-balance-label" style="color: rgba(165, 180, 252, 0.9);">Limit</span>
+                                <span class="investor-balance-value" style="color: #c7d2fe;">{{ number_format($investor->investment_limit, 2) }} USDT</span>
+                            </div>
+                            @endif
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
-                            <button type="button" class="investor-edit-btn" onclick="openInvestorEditModal({{ $investor->id }}, @js($investor->name), @js($investor->real_email))" title="ویرایش" aria-label="ویرایش">
+                            <button type="button" class="investor-edit-btn" onclick="openInvestorEditModal({{ $investor->id }}, @js($investor->name), @js($investor->real_email), @js($investor->investment_limit))" title="ویرایش" aria-label="ویرایش">
                                 <i class="fas fa-user-pen"></i>
                             </button>
                             <form action="{{ route('profile.investors.destroy', $investor->id) }}" method="POST" class="modern-confirm-form" data-title="حذف سرمایه‌گذار" data-message="آیا از حذف این سرمایه‌گذار اطمینان دارید؟">
@@ -1291,6 +1297,11 @@
                                     <label class="form-label">رمز عبور</label>
                                     <input type="password" name="password" class="form-control" placeholder="********" required minlength="8">
                                 </div>
+                                <div class="form-group">
+                                    <label class="form-label">حداکثر سرمایه‌گذاری (USDT)</label>
+                                    <input type="number" name="investment_limit" class="form-control" placeholder="مثلاً: 1000" min="0" step="0.01">
+                                    <small style="color: #888; font-size: 0.8em; margin-top: 4px; display: block;">خالی گذاشتن به معنای عدم محدودیت است.</small>
+                                </div>
                                 <button type="submit" class="btn-submit">
                                     <span class="btn-text">
                                         <i class="fas fa-check"></i>
@@ -1329,6 +1340,11 @@
                                 <div class="form-group">
                                     <label class="form-label">رمز عبور سرمایه‌گذار جدید (اختیاری)</label>
                                     <input type="password" name="password" class="form-control" placeholder="********" minlength="8">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">حداکثر سرمایه‌گذاری (USDT)</label>
+                                    <input type="number" name="investment_limit" class="form-control" id="investorEditLimit" placeholder="مثلاً: 1000" min="0" step="0.01">
+                                    <small style="color: #888; font-size: 0.8em; margin-top: 4px; display: block;">خالی گذاشتن به معنای عدم محدودیت است.</small>
                                 </div>
                                 <button type="submit" class="btn-submit">
                                     <span class="btn-text">
@@ -1570,15 +1586,17 @@
             setTimeout(function() { modal.style.display = 'none'; }, 300);
         }
 
-        function openInvestorEditModal(id, name, email) {
+        function openInvestorEditModal(id, name, email, limit) {
             const modal = document.getElementById('investorEditModal');
             const form = document.getElementById('investorEditForm');
             const nameInput = document.getElementById('investorEditName');
             const emailInput = document.getElementById('investorEditEmail');
-            if (!modal || !form || !nameInput || !emailInput) return;
+            const limitInput = document.getElementById('investorEditLimit');
+            if (!modal || !form || !nameInput || !emailInput || !limitInput) return;
 
             nameInput.value = name || '';
             emailInput.value = email || '';
+            limitInput.value = limit || '';
             form.action = `{{ url('/profile/investors') }}/${id}`;
 
             if (modal.parentElement !== document.body) {

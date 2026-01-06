@@ -372,6 +372,7 @@
 
     <div class="stats-grid">
         <!-- Row 1: PNL -->
+        @if(!auth()->user()?->isInvestor())
         <div class="stat-card">
             <h4>کل سود/ضرر</h4>
             <p class="{{ $totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">${{ number_format($totalPnl, 2) }}</p>
@@ -392,6 +393,7 @@
             <h4>بزرگترین ضرر</h4>
             <p class="pnl-negative" style="direction:ltr">${{ number_format($biggestLoss, 2) }}</p>
         </div>
+        @endif
         <div class="stat-card">
             <h4>کل سود/ضرر ٪</h4>
             <p class="{{ $totalPnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative' }}" style="direction:ltr">{{ number_format($totalPnlPercent, 2) }}%</p>
@@ -404,10 +406,12 @@
             <h4>کل ضرر ٪</h4>
             <p class="pnl-negative" style="direction:ltr">{{ number_format($totalLossPercent, 2) }}%</p>
         </div>
+        @if(!auth()->user()?->isInvestor())
         <div class="stat-card">
             <h4>رتبه شما (دلاری)</h4>
             <p>{{ $pnlRank ?? 'N/A' }}</p>
         </div>
+        @endif
         <div class="stat-card">
             <h4>رتبه شما (درصد)</h4>
             <p>{{ $pnlPercentRank ?? 'N/A' }}</p>
@@ -434,12 +438,14 @@
         </div>
     </div>
 
+    @if(!auth()->user()?->isInvestor())
     <div class="chart-container">
         <div id="pnlChart"></div>
     </div>
     <div class="chart-container">
         <div id="cumulativePnlChart"></div>
     </div>
+    @endif
      <div class="chart-container">
         <div id="cumulativePnlPercentChart"></div>
     </div>
@@ -613,6 +619,7 @@
         }
         // Also initialize after DOM ready
         updateStartBtn();
+        @if(!auth()->user()?->isInvestor())
         // PnL Per Trade Chart
         var pnlOptions = {
             chart: {
@@ -632,13 +639,13 @@
             }],
             title: {
                 text: 'سود/زیان بر حسب معامعه',
-                align: 'left',
+                align: 'left', 
                 style: {
                     color: '#fff'
                 }
             },
             xaxis: {
-                type: 'category',
+                type: 'category', 
                 labels: {
                     show: false // Hide x-axis labels to avoid clutter
                 }
@@ -742,7 +749,7 @@
                 width: 2
             },
             fill: {
-                type: 'gradient',
+                type: 'gradient', 
                 gradient: {
                     shadeIntensity: 1,
                     opacityFrom: 0.7,
@@ -767,6 +774,7 @@
 
         var cumulativePnlChart = new ApexCharts(document.querySelector("#cumulativePnlChart"), cumulativePnlOptions);
         cumulativePnlChart.render();
+        @endif
 
         // Prepare cumulative percent series as datetime (client-side compounding from per-trade percent)
         var perTradePercentRaw = {!! json_encode($perTradePercentSeries) !!};

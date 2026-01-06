@@ -38,6 +38,7 @@ class User extends Authenticatable
         'future_strict_mode_activated_at',
         'selected_market',
         'parent_id',
+        'investment_limit',
     ];
 
     /**

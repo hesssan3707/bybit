@@ -106,18 +106,32 @@ class ProfileController extends Controller
                     }
 
                 if ($equityNumeric !== null || $walletNumeric !== null) {
-                    $investorTotal = (float) (DB::table('users')
-                        ->join('investor_wallets', 'users.id', '=', 'investor_wallets.investor_user_id')
-                        ->where('users.parent_id', $user->id)
-                        ->where('users.role', 'investor')
-                        ->where('investor_wallets.currency', 'USDT')
-                        ->sum('investor_wallets.balance') ?? 0);
+                    // For traders, we subtract total investor balances to show only their own share
+                    // For investors, we will handle it below to show ONLY their specific wallet balance
+                    if (!$user->isInvestor()) {
+                        $investorTotal = (float) (DB::table('users')
+                            ->join('investor_wallets', 'users.id', '=', 'investor_wallets.investor_user_id')
+                            ->where('users.parent_id', $user->id)
+                            ->where('users.role', 'investor')
+                            ->where('investor_wallets.currency', 'USDT')
+                            ->sum('investor_wallets.balance') ?? 0);
 
-                    if ($equityNumeric !== null) {
-                        $equityNumeric = max(0.0, $equityNumeric - $investorTotal);
-                    }
-                    if ($walletNumeric !== null) {
-                        $walletNumeric = max(0.0, $walletNumeric - $investorTotal);
+                        if ($equityNumeric !== null) {
+                            $equityNumeric = max(0.0, $equityNumeric - $investorTotal);
+                        }
+                        if ($walletNumeric !== null) {
+                            $walletNumeric = max(0.0, $walletNumeric - $investorTotal);
+                        }
+                    } else {
+                        // If user is investor, show ONLY their own balance from investor_wallets
+                        $myBalance = (float) (DB::table('investor_wallets')
+                            ->where('investor_user_id', $user->id)
+                            ->where('currency', 'USDT')
+                            ->value('balance') ?? 0);
+                        
+                        // We override the exchange balances with the investor's virtual balance
+                        $equityNumeric = $myBalance;
+                        $walletNumeric = $myBalance;
                     }
 
                     if ($equityNumeric !== null) {
@@ -171,12 +185,15 @@ class ProfileController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
             'password' => 'required|string|min:8',
+            'investment_limit' => 'nullable|numeric|min:0',
         ], [
             'name.required' => 'نام الزامی است.',
             'email.required' => 'ایمیل الزامی است.',
             'email.email' => 'ایمیل نامعتبر است.',
             'password.required' => 'رمز عبور الزامی است.',
             'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+            'investment_limit.numeric' => 'محدودیت سرمایه‌گذاری باید عدد باشد.',
+            'investment_limit.min' => 'محدودیت سرمایه‌گذاری نمی‌تواند منفی باشد.',
         ]);
 
         $realEmail = strtolower(trim($request->email));
@@ -207,6 +224,7 @@ class ProfileController extends Controller
             'is_active' => true,
             'activated_at' => now(),
             'email_verified_at' => now(),
+            'investment_limit' => $request->investment_limit,
         ]);
 
         DB::table('investor_wallets')->updateOrInsert(
@@ -232,14 +250,28 @@ class ProfileController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
             'password' => 'nullable|string|min:8',
+            'investment_limit' => 'nullable|numeric|min:0',
         ], [
             'name.required' => 'نام الزامی است.',
             'email.required' => 'ایمیل الزامی است.',
             'email.email' => 'ایمیل نامعتبر است.',
             'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+            'investment_limit.numeric' => 'محدودیت سرمایه‌گذاری باید عدد باشد.',
+            'investment_limit.min' => 'محدودیت سرمایه‌گذاری نمی‌تواند منفی باشد.',
         ]);
 
         $investor = $user->investors()->findOrFail($id);
+
+        if ($request->filled('investment_limit')) {
+            $currentBalance = DB::table('investor_wallets')
+                ->where('investor_user_id', $investor->id)
+                ->where('currency', 'USDT')
+                ->value('balance') ?? 0;
+
+            if ($request->investment_limit < $currentBalance) {
+                return redirect()->back()->with('error', 'محدودیت سرمایه‌گذاری نمی‌تواند کمتر از موجودی فعلی سرمایه‌گذار (' . number_format($currentBalance, 2) . ' USDT) باشد.');
+            }
+        }
 
         $realEmail = strtolower(trim($request->email));
         $realEmail = preg_replace('/^investor\s*-\s*/i', '', $realEmail);
@@ -263,6 +295,7 @@ class ProfileController extends Controller
             'name' => $request->name,
             'email' => $investorEmail,
             'username' => $investorEmail,
+            'investment_limit' => $request->investment_limit,
         ];
 
         if ($request->filled('password')) {

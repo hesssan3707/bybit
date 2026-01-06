@@ -278,10 +278,18 @@ trait ParsesExchangeErrors
         if (str_contains($lowerMessage, 'timestamp') || str_contains($lowerMessage, 'time')) {
             return "خطا در زمان‌بندی درخواست. لطفاً ساعت سیستم خود را تنظیم کنید.";
         }
-        if ((str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'mode')) || 
-            (str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'side'))) {
+        
+        // Refined Hedge Mode detection to avoid false positives on price/param errors
+        // Most price/param errors in Bybit are 10001 with specific messages, or 1004xx in BingX.
+        // We only trigger hedge mode error if keywords "position" AND "mode"/"side" are both present
+        // AND it doesn't look like a simple parameter error.
+        if (((str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'mode')) || 
+             (str_contains($lowerMessage, 'position') && str_contains($lowerMessage, 'side'))) &&
+            !str_contains($lowerMessage, 'parameter') && 
+            !str_contains($lowerMessage, 'price')) {
             return "خطا در تنظیمات حالت معاملاتی. لطفاً حالت معاملاتی(hedge mode) صرافی خود را بررسی کنید.";
         }
+
         if (str_contains($lowerMessage, 'invalid symbol')) {
             return "جفت ارز انتخاب شده معتبر نیست. لطفاً جفت ارز صحیح را انتخاب کنید.";
         }
@@ -289,7 +297,7 @@ trait ParsesExchangeErrors
             return "سفارش یافت نشد. احتمالاً سفارش قبلاً اجرا یا لغو شده است.";
         }
         
-        // Return a generic but helpful message
-        return "خطا در ایجاد سفارش: " . $errorMessage;
+        // Generic fallback error as requested
+        return "خطا در پردازش درخواست صرافی. لطفاً پارامترهای سفارش (قیمت ورود، حد ضرر و حد سود) را بررسی کنید و دوباره تلاش کنید. (خطا: " . $errorMessage . ")";
     }
 }

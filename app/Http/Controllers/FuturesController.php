@@ -1522,7 +1522,7 @@ class FuturesController extends Controller
                 $trade->save();
             }
 
-            // Manual-close ban (close-only) only in strict mode
+            // Manual-close ban (close-only) only in strict mode (expires end of week)
             try {
                 if ($user->future_strict_mode) {
                     $isDemo = (bool)($currentExchange?->is_demo_active ?? false);
@@ -1532,13 +1532,17 @@ class FuturesController extends Controller
                         ->where('ban_type', 'manual_close')
                         ->exists();
                     if (!$hasActive) {
+                        $now = \Carbon\Carbon::now(config('app.timezone'));
+                        $endOfWeek = $now->copy()
+                            ->startOfWeek(\Carbon\Carbon::MONDAY)
+                            ->endOfWeek(\Carbon\Carbon::SUNDAY);
                         \App\Models\UserBan::create([
                             'user_id' => $user->id,
                             'is_demo' => $isDemo,
                             'trade_id' => $trade?->id,
                             'ban_type' => 'manual_close',
-                            'starts_at' => now(),
-                            'ends_at' => now()->addDays(7),
+                            'starts_at' => $now,
+                            'ends_at' => $endOfWeek,
                         ]);
                     }
                 }
@@ -1640,16 +1644,20 @@ class FuturesController extends Controller
                 }
             }
 
-            // Single manual_close ban (7 days) in strict mode
+            // Single manual_close ban in strict mode (expires end of week)
             try {
                 if ($user->future_strict_mode) {
+                    $now = \Carbon\Carbon::now(config('app.timezone'));
+                    $endOfWeek = $now->copy()
+                        ->startOfWeek(\Carbon\Carbon::MONDAY)
+                        ->endOfWeek(\Carbon\Carbon::SUNDAY);
                     UserBan::create([
                         'user_id' => $user->id,
                         'is_demo' => $isDemo,
                         'trade_id' => null,
                         'ban_type' => 'manual_close',
-                        'starts_at' => now(),
-                        'ends_at' => now()->addDays(7),
+                        'starts_at' => $now,
+                        'ends_at' => $endOfWeek,
                     ]);
                 }
             } catch (\Throwable $e) {}
