@@ -37,6 +37,12 @@ class UserExchange extends Model
         'futures_access',
         'ip_access',
         'validation_message',
+        'demo_validation_results',
+        'demo_last_validation_at',
+        'demo_spot_access',
+        'demo_futures_access',
+        'demo_ip_access',
+        'demo_validation_message',
     ];
 
     protected $casts = [
@@ -51,6 +57,11 @@ class UserExchange extends Model
         'spot_access' => 'boolean',
         'futures_access' => 'boolean',
         'ip_access' => 'boolean',
+        'demo_last_validation_at' => 'datetime',
+        'demo_validation_results' => 'array',
+        'demo_spot_access' => 'boolean',
+        'demo_futures_access' => 'boolean',
+        'demo_ip_access' => 'boolean',
     ];
 
     protected $hidden = [
@@ -445,7 +456,7 @@ class UserExchange extends Model
     /**
      * Update validation results for this exchange
      */
-    public function updateValidationResults(array $validationData)
+    public function updateValidationResults(array $validationData, bool $isDemo = false)
     {
         $spotAccess = $validationData['spot']['success'] ?? null;
         $futuresAccess = $validationData['futures']['success'] ?? null;
@@ -485,6 +496,17 @@ class UserExchange extends Model
                 $spotAccess = true;
                 $futuresAccess = true;
             }
+        }
+
+        if ($isDemo) {
+            return $this->update([
+                'demo_validation_results' => $validationData,
+                'demo_last_validation_at' => now(),
+                'demo_spot_access' => $spotAccess,
+                'demo_futures_access' => $futuresAccess,
+                'demo_ip_access' => $ipAccess,
+                'demo_validation_message' => $this->generateValidationMessage($validationData),
+            ]);
         }
 
         return $this->update([
@@ -534,45 +556,51 @@ class UserExchange extends Model
     /**
      * Check if validation results are recent (within last 24 hours)
      */
-    public function hasRecentValidation()
+    public function hasRecentValidation(?bool $isDemo = null)
     {
-        return $this->last_validation_at &&
-               $this->last_validation_at->isAfter(now()->subHours(24));
+        $accessState = $this->getAccessState($isDemo);
+        $last = $accessState['last_validation_at'];
+
+        return $last && $last->isAfter(now()->subHours(24));
     }
 
     /**
      * Get validation status summary (returns string for view compatibility)
      */
-    public function getValidationSummary()
+    public function getValidationSummary(?bool $isDemo = null)
     {
-        if (!$this->last_validation_at) {
+        $accessState = $this->getAccessState($isDemo);
+
+        if (!$accessState['last_validation_at']) {
             return 'هنوز اعتبارسنجی نشده';
         }
 
-        if (!$this->ip_access) {
+        if (!$accessState['ip_access']) {
             return 'آدرس IP مسدود';
         }
 
-        $hasAnyAccess = $this->spot_access || $this->futures_access;
+        $hasAnyAccess = $accessState['spot_access'] || $accessState['futures_access'];
 
         if (!$hasAnyAccess) {
             return 'هیچ دسترسی معاملاتی ندارد';
         }
 
-        if ($this->spot_access && $this->futures_access) {
+        if ($accessState['spot_access'] && $accessState['futures_access']) {
             return 'دسترسی کامل';
         }
 
-        $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
+        $limitedType = $accessState['spot_access'] ? 'فقط اسپات' : 'فقط آتی';
         return "دسترسی محدود ({$limitedType})";
     }
 
     /**
      * Get detailed validation status with icon and class (for admin panel)
      */
-    public function getValidationDetails()
+    public function getValidationDetails(?bool $isDemo = null)
     {
-        if (!$this->last_validation_at) {
+        $accessState = $this->getAccessState($isDemo);
+
+        if (!$accessState['last_validation_at']) {
             return [
                 'status' => 'not_validated',
                 'message' => 'هنوز اعتبارسنجی نشده',
@@ -581,7 +609,7 @@ class UserExchange extends Model
             ];
         }
 
-        if (!$this->ip_access) {
+        if (!$accessState['ip_access']) {
             return [
                 'status' => 'ip_blocked',
                 'message' => 'آدرس IP مسدود',
@@ -590,7 +618,7 @@ class UserExchange extends Model
             ];
         }
 
-        $hasAnyAccess = $this->spot_access || $this->futures_access;
+        $hasAnyAccess = $accessState['spot_access'] || $accessState['futures_access'];
 
         if (!$hasAnyAccess) {
             return [
@@ -601,7 +629,7 @@ class UserExchange extends Model
             ];
         }
 
-        if ($this->spot_access && $this->futures_access) {
+        if ($accessState['spot_access'] && $accessState['futures_access']) {
             return [
                 'status' => 'full_access',
                 'message' => 'دسترسی کامل',
@@ -610,7 +638,7 @@ class UserExchange extends Model
             ];
         }
 
-        $limitedType = $this->spot_access ? 'فقط اسپات' : 'فقط آتی';
+        $limitedType = $accessState['spot_access'] ? 'فقط اسپات' : 'فقط آتی';
         return [
             'status' => 'limited_access',
             'message' => "دسترسی محدود ({$limitedType})",
@@ -622,17 +650,46 @@ class UserExchange extends Model
     /**
      * Check if user can access spot trading
      */
-    public function canAccessSpot()
+    public function canAccessSpot(?bool $isDemo = null)
     {
-        return $this->is_active && $this->ip_access && $this->spot_access;
+        $accessState = $this->getAccessState($isDemo);
+        return $this->is_active && $accessState['ip_access'] && $accessState['spot_access'];
     }
 
     /**
      * Check if user can access futures trading
      */
-    public function canAccessFutures()
+    public function canAccessFutures(?bool $isDemo = null)
     {
-        return $this->is_active && $this->ip_access && $this->futures_access;
+        $accessState = $this->getAccessState($isDemo);
+        return $this->is_active && $accessState['ip_access'] && $accessState['futures_access'];
+    }
+
+    public function getAccessState(?bool $isDemo = null): array
+    {
+        $useDemo = $isDemo ?? (bool) $this->is_demo_active;
+
+        if ($useDemo) {
+            return [
+                'is_demo' => true,
+                'validation_results' => $this->demo_validation_results,
+                'last_validation_at' => $this->demo_last_validation_at,
+                'spot_access' => $this->demo_spot_access,
+                'futures_access' => $this->demo_futures_access,
+                'ip_access' => $this->demo_ip_access,
+                'validation_message' => $this->demo_validation_message,
+            ];
+        }
+
+        return [
+            'is_demo' => false,
+            'validation_results' => $this->validation_results,
+            'last_validation_at' => $this->last_validation_at,
+            'spot_access' => $this->spot_access,
+            'futures_access' => $this->futures_access,
+            'ip_access' => $this->ip_access,
+            'validation_message' => $this->validation_message,
+        ];
     }
 
     /**

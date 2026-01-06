@@ -27,15 +27,16 @@
     @elseif($restrictionReason === 'insufficient_access')
         @php
             $currentExchange = $exchangeAccess['current_exchange'] ?? null;
+            $accessState = $currentExchange ? $currentExchange->getAccessState() : null;
             // Detect previously approved exchange with now-invalid/expired API access
             $isExpiredInvalid = false;
             if ($currentExchange) {
                 try {
                     $statusApproved = ($currentExchange->status === 'approved');
                     $recentlyValidated = method_exists($currentExchange, 'hasRecentValidation') ? $currentExchange->hasRecentValidation() : (bool)$currentExchange->last_validation_at;
-                    $spotColumn = (bool)$currentExchange->spot_access;
-                    $futuresColumn = (bool)$currentExchange->futures_access;
-                    $ipOk = $currentExchange->ip_access !== false; // treat null as unknown/ok
+                    $spotColumn = (bool) ($accessState['spot_access'] ?? null);
+                    $futuresColumn = (bool) ($accessState['futures_access'] ?? null);
+                    $ipOk = ($accessState['ip_access'] ?? null) !== false; // treat null as unknown/ok
                     $isExpiredInvalid = $statusApproved && $recentlyValidated && $ipOk && (!$spotColumn || !$futuresColumn);
                 } catch (\Throwable $e) {
                     $isExpiredInvalid = false;
@@ -122,8 +123,9 @@
 @if($exchangeAccess && $exchangeAccess['current_exchange'])
     @php
         $currentExchange = $exchangeAccess['current_exchange'];
-        $lastValidation = $currentExchange->last_validation_at;
-        $validationMessage = $currentExchange->validation_message;
+        $accessState = $currentExchange->getAccessState();
+        $lastValidation = $accessState['last_validation_at'] ?? null;
+        $validationMessage = $accessState['validation_message'] ?? null;
 
         $isRecentValidation = $lastValidation && $lastValidation->diffInMinutes(now()) <= 60;
         $hasLimitationMessage = $validationMessage && str_contains(strtolower($validationMessage), 'limitation');

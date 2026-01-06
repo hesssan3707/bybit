@@ -72,7 +72,7 @@ class DemoSpotOrderLifecycleManager extends Command
 
         // Get all user exchanges with demo API keys
         $userExchanges = UserExchange::where('user_id', $user->id)
-            ->where('spot_access', true)
+            ->where('demo_spot_access', true)
             ->whereNotNull('demo_api_key')
             ->whereNotNull('demo_api_secret')
             ->get();

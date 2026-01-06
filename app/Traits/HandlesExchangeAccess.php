@@ -50,7 +50,7 @@ trait HandlesExchangeAccess
     private function isAccessErrorBybit(string $errorMessage, int $errorCode): bool
     {
         $accessErrorCodes = [10003, 10004, 10005, 10006, 10018, 10027, 170124, 170130, 170131, 170132, 170134, 170135, 170136, 170137, 170139, 170213];
-        $accessErrorMessages = ['permission denied', 'invalid api key', 'no permission', 'insufficient permission', 'api key restrictions', 'not authorized', 'forbidden'];
+        $accessErrorMessages = ['permission denied', 'invalid api key', 'no permission', 'insufficient permission', 'api key restrictions', 'not authorized', 'forbidden', 'api secret key expired', 'secret key expired', 'api key expired', 'key expired'];
         
         if (in_array($errorCode, $accessErrorCodes)) {
             return true;
@@ -71,7 +71,7 @@ trait HandlesExchangeAccess
     private function isAccessErrorBinance(string $errorMessage, int $errorCode): bool
     {
         $accessErrorCodes = [-2014, -2015, -1022, -1021];
-        $accessErrorMessages = ['api key format invalid', 'invalid api-key', 'signature for this request is not valid', 'timestamp for this request', 'insufficient permission'];
+        $accessErrorMessages = ['api key format invalid', 'invalid api-key', 'signature for this request is not valid', 'timestamp for this request', 'insufficient permission', 'api secret key expired', 'secret key expired', 'api key expired', 'key expired'];
         
         if (in_array($errorCode, $accessErrorCodes)) {
             return true;
@@ -92,7 +92,7 @@ trait HandlesExchangeAccess
     private function isAccessErrorBingX(string $errorMessage, int $errorCode): bool
     {
         $accessErrorCodes = [100001, 100002, 100403];
-        $accessErrorMessages = ['invalid api key', 'signature verification failed', 'insufficient permission', 'access denied'];
+        $accessErrorMessages = ['invalid api key', 'signature verification failed', 'insufficient permission', 'access denied', 'api secret key expired', 'secret key expired', 'api key expired', 'key expired'];
         
         if (in_array($errorCode, $accessErrorCodes)) {
             return true;
@@ -112,9 +112,11 @@ trait HandlesExchangeAccess
      */
     private function updateAccessValidationFromError(UserExchange $userExchange, string $errorMessage, string $operationType)
     {
+        $prefix = $userExchange->is_demo_active ? 'demo_' : '';
+
         $updateData = [
-            'last_validation_at' => now(),
-            'validation_message' => "Access limitation detected during {$operationType}: " . substr($errorMessage, 0, 255)
+            "{$prefix}last_validation_at" => now(),
+            "{$prefix}validation_message" => "Access limitation detected during {$operationType}: " . substr($errorMessage, 0, 255)
         ];
         
         // Determine which access type was affected based on operation type
@@ -122,25 +124,26 @@ trait HandlesExchangeAccess
             case 'spot':
             case 'spot_balance':
             case 'spot_order':
-                $updateData['spot_access'] = false;
+                $updateData["{$prefix}spot_access"] = false;
                 break;
                 
             case 'futures':
             case 'futures_balance':
             case 'futures_order':
             case 'futures_position':
-                $updateData['futures_access'] = false;
+                $updateData["{$prefix}futures_access"] = false;
                 break;
                 
             default:
                 // If we can't determine the specific type, mark both as potentially limited
-                $updateData['spot_access'] = false;
-                $updateData['futures_access'] = false;
+                $updateData["{$prefix}spot_access"] = false;
+                $updateData["{$prefix}futures_access"] = false;
                 break;
         }
         
         // Update validation results with the new limitation
-        $validationResults = $userExchange->validation_results ?? [];
+        $validationResultsKey = "{$prefix}validation_results";
+        $validationResults = $userExchange->{$validationResultsKey} ?? [];
         $validationResults['dynamic_check'] = [
             'timestamp' => now()->toISOString(),
             'operation' => $operationType,
@@ -148,7 +151,7 @@ trait HandlesExchangeAccess
             'error_message' => $errorMessage,
             'access_updated' => true
         ];
-        $updateData['validation_results'] = $validationResults;
+        $updateData[$validationResultsKey] = $validationResults;
         
         $userExchange->update($updateData);
         
@@ -167,14 +170,18 @@ trait HandlesExchangeAccess
     protected function validateAndUpdateApiAccess(UserExchange $userExchange): array
     {
         try {
+            $isDemo = (bool) $userExchange->is_demo_active;
+            $credentials = $userExchange->getApiCredentials($isDemo ? 'demo' : 'real');
+
             $exchangeService = ExchangeFactory::create(
                 $userExchange->exchange_name,
-                $userExchange->api_key,
-                $userExchange->api_secret
+                $credentials['api_key'],
+                $credentials['api_secret'],
+                $credentials['is_demo']
             );
             
             $validation = $exchangeService->validateAPIAccess();
-            $userExchange->updateValidationResults($validation);
+            $userExchange->updateValidationResults($validation, $isDemo);
             
             return $validation;
             
@@ -186,12 +193,13 @@ trait HandlesExchangeAccess
             ]);
             
             // Mark as validation failed
+            $prefix = $userExchange->is_demo_active ? 'demo_' : '';
             $userExchange->update([
-                'last_validation_at' => now(),
-                'validation_message' => 'Validation failed: ' . substr($e->getMessage(), 0, 255),
-                'spot_access' => false,
-                'futures_access' => false,
-                'ip_access' => false
+                "{$prefix}last_validation_at" => now(),
+                "{$prefix}validation_message" => 'Validation failed: ' . substr($e->getMessage(), 0, 255),
+                "{$prefix}spot_access" => false,
+                "{$prefix}futures_access" => false,
+                "{$prefix}ip_access" => false
             ]);
             
             return [

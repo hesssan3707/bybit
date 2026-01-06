@@ -51,8 +51,8 @@ class DemoValidateActiveExchanges extends Command
         // If not forcing, only validate exchanges that haven't been validated recently
         if (!$force) {
             $query->where(function($q) {
-                $q->whereNull('last_validation_at')
-                  ->orWhere('last_validation_at', '<', now()->subHours(24));
+                $q->whereNull('demo_last_validation_at')
+                  ->orWhere('demo_last_validation_at', '<', now()->subHours(24));
             });
         }
         
@@ -80,9 +80,9 @@ class DemoValidateActiveExchanges extends Command
                     'status' => 'success',
                     'exchange' => $exchange->exchange_display_name,
                     'user' => $exchange->user->email,
-                    'spot_access' => $exchange->fresh()->spot_access ? 'Yes' : 'No',
-                    'futures_access' => $exchange->fresh()->futures_access ? 'Yes' : 'No',
-                    'ip_access' => $exchange->fresh()->ip_access ? 'Yes' : 'No'
+                    'spot_access' => $exchange->fresh()->demo_spot_access ? 'Yes' : 'No',
+                    'futures_access' => $exchange->fresh()->demo_futures_access ? 'Yes' : 'No',
+                    'ip_access' => $exchange->fresh()->demo_ip_access ? 'Yes' : 'No'
                 ];
             } catch (\Exception $e) {
                 $failureCount++;
@@ -179,10 +179,10 @@ class DemoValidateActiveExchanges extends Command
         }
         
         // Update validation results
-        $exchange->updateValidationResults($validation);
+        $exchange->updateValidationResults($validation, true);
         
         // Refresh and show final access status
         $exchange->refresh();
-        $this->line("  Final demo access: Spot={$exchange->spot_access}, Futures={$exchange->futures_access}, IP={$exchange->ip_access}");
+        $this->line("  Final demo access: Spot={$exchange->demo_spot_access}, Futures={$exchange->demo_futures_access}, IP={$exchange->demo_ip_access}");
     }
 }

@@ -64,7 +64,7 @@ class DemoFuturesOrchestrator extends Command
         $this->info("پردازش کاربر (دمو): {$user->email}");
 
         $exchanges = UserExchange::where('user_id', $user->id)
-            ->where('futures_access', true)
+            ->where('demo_futures_access', true)
             ->whereNotNull('demo_api_key')
             ->whereNotNull('demo_api_secret')
             ->get();
