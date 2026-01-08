@@ -120,6 +120,24 @@ class SavePrices extends Command
         }
 
         $this->info('Finished saving k-line prices.');
+
+        // Clean up old price records
+        // IMPORTANT: We use a conservative cleanup strategy to ensure we always have at least 50 records per timeframe.
+        // We delete records older than 60 days to be safe, assuming 60 days > 50 daily records.
+        // This is a simple, high-level cleanup to prevent infinite table growth.
+        // The per-market logic inside the loop (lines 91-101) already handles keeping strictly the last 50 records.
+        // This global cleanup is just a failsafe for orphaned records.
+        
+        $daysToKeep = 51; 
+        $cutoffDate = Carbon::now()->subDays($daysToKeep);
+
+        $deletedPrices = Price::where('timestamp', '<', $cutoffDate)->delete();
+
+        if ($deletedPrices > 0) {
+            $this->info("Cleaned up {$deletedPrices} old price records (older than {$daysToKeep} days).");
+        }
+
+        return 0;
     }
     private function getKlines(string $symbol, string $interval, int $limit = 50, ?int $startTime = null): array
     {

@@ -94,9 +94,35 @@ class PriceController extends Controller
                 if ($label === 'latest') {
                     $priceRecord = $query->orderBy('timestamp', 'desc')->first();
                 } else {
+                    // Find the closest record BEFORE or AT the target time
                     $priceRecord = $query->where('timestamp', '<=', $time)
                         ->orderBy('timestamp', 'desc')
                         ->first();
+                    
+                    // Validation: Check if the found record is "close enough" to the target time
+                    // If the gap is too large, it means we don't have accurate data for that specific time point.
+                    // For example, if we want 4h ago, but the closest record is from 2 days ago, we should return null.
+                    
+                    if ($priceRecord) {
+                        $recordTime = Carbon::parse($priceRecord->timestamp);
+                        $diffInMinutes = $recordTime->diffInMinutes($time);
+                        
+                        // Define tolerance threshold based on timeframe
+                        // 15m ago -> tolerance 5 mins
+                        // 1h ago -> tolerance 10 mins
+                        // 4h ago -> tolerance 30 mins
+                        // 1d ago -> tolerance 2 hours
+                        
+                        $tolerance = 0;
+                        if ($label === '15m_ago') $tolerance = 10;
+                        elseif ($label === '1h_ago') $tolerance = 20;
+                        elseif ($label === '4h_ago') $tolerance = 60; // 1 hour tolerance
+                        elseif ($label === '1d_ago') $tolerance = 180; // 3 hours tolerance
+                        
+                        if ($diffInMinutes > $tolerance) {
+                            $priceRecord = null; // Discard invalid/stale data
+                        }
+                    }
                 }
 
                 $currencyData['prices'][$label] = $priceRecord ? (float) $priceRecord->price : null;
