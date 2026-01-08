@@ -885,8 +885,6 @@
 
         // --- Initial market price logic ---
         const marketPrice = '{{ $marketPrice ?? '' }}';
-        const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
-        const selectedMarket = '{{ $selectedMarket ?? '' }}';
 
         // For strict mode, use server-provided price
         if (isStrictMode && marketPrice && marketPrice !== '0') {
