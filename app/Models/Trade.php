@@ -25,6 +25,7 @@ class Trade extends Model
         'order_id',
         'closed_at',
         'synchronized',
+        'closed_by_user',
     ];
 
     protected $casts = [

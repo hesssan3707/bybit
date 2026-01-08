@@ -1605,6 +1605,13 @@ class FuturesController extends Controller
         try {
             DB::beginTransaction();
             
+            // Mark all open trades as manually closed by user to prevent false 3-day bans
+            if ($currentExchange) {
+                \App\Models\Trade::where('user_exchange_id', $currentExchange->id)
+                    ->whereNull('closed_at')
+                    ->update(['closed_by_user' => 1]);
+            }
+
             $exchangeService = $this->getExchangeService();
             $positionsRaw = $exchangeService->getPositions();
 
