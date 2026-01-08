@@ -1671,7 +1671,7 @@
 
                 try {
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                    const resp = await fetch(`{{ route('profile.update-name') }}`, {
+                    const resp = await fetch(`{{ route('profile.name.update') }}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

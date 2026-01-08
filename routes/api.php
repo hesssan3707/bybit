@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\Api\V1\ExchangeController;
 use App\Http\Controllers\Api\V1\FuturesController;
 use App\Http\Controllers\Api\V1\MarketController;
+use App\Http\Controllers\Api\V1\PriceController;
 use App\Http\Controllers\Api\V1\SpotTradingController;
 use App\Http\Controllers\Api\V1\WalletBalanceController;
 use App\Http\Controllers\Api\V1\PeriodController as ApiPeriodController;
@@ -85,6 +86,9 @@ Route::middleware(['api.auth', 'restrict.investor'])->group(function () {
 
         // Market
         Route::post('/best-price', [MarketController::class, 'getBestPrice'])->name('api.v1.best-price');
+        
+        // Prices Service
+        Route::get('/prices', [PriceController::class, 'index'])->name('api.v1.prices.index');
     });
 });
 
