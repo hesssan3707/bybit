@@ -196,6 +196,19 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's investor settings
+     */
+    public function investorSettings()
+    {
+        return $this->hasOne(InvestorSetting::class);
+    }
+
+    public function getInvestmentLimitAttribute()
+    {
+        return $this->investorSettings->investment_limit ?? null;
+    }
+
+    /**
      * Get the user's default/current exchange
      */
     public function defaultExchange()

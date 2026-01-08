@@ -18,6 +18,7 @@ use App\Http\Controllers\WalletBalanceController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\Admin\TicketController as AdminTicketController;
 use App\Http\Controllers\CompanyExchangeRequestController;
+use App\Http\Controllers\InvestorDashboardController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -100,7 +101,15 @@ Route::middleware(['auth', 'restrict.investor'])->group(function () {
     Route::post('/profile/watchers', [ProfileController::class, 'storeWatcher'])->name('profile.watchers.store');
     Route::post('/profile/watchers/{id}', [ProfileController::class, 'updateWatcher'])->name('profile.watchers.update');
     Route::delete('/profile/watchers/{id}', [ProfileController::class, 'deleteWatcher'])->name('profile.watchers.destroy');
-    Route::post('/profile/update-name', [ProfileController::class, 'updateName'])->name('profile.update-name');
+    Route::post('/profile/name', [ProfileController::class, 'updateName'])->name('profile.name.update');
+
+    // Investor Dashboard Routes
+    Route::prefix('investor')->name('investor.')->group(function () {
+        Route::get('/dashboard', [InvestorDashboardController::class, 'index'])->name('dashboard');
+        Route::post('/settings', [InvestorDashboardController::class, 'updateSettings'])->name('settings.update');
+        Route::post('/deposit', [InvestorDashboardController::class, 'deposit'])->name('deposit');
+        Route::post('/withdraw', [InvestorDashboardController::class, 'withdraw'])->name('withdraw');
+    });
 
     Route::prefix('strategies')->name('strategies.')->group(function () {
         Route::get('/macd', [MACDStrategyController::class, 'index'])->name('macd');

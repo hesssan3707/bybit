@@ -1176,6 +1176,12 @@
                     <i class="fas fa-key"></i>
                     <span>تغییر رمز عبور</span>
                 </a>
+                @if($user->isInvestor())
+                    <a href="{{ route('investor.dashboard') }}" class="profile-action-btn">
+                        <i class="fas fa-chart-line"></i>
+                        <span>داشبورد سرمایه‌گذار</span>
+                    </a>
+                @endif
                 @if(!$user->isInvestor())
                     <a href="{{ route('account-settings.index') }}" class="profile-action-btn">
                         <i class="fas fa-cog"></i>

@@ -151,7 +151,7 @@ class ProfileController extends Controller
         // Load all active exchanges for switching
         $activeExchanges = $user->activeExchanges()->get();
         
-        $investors = $user->investors()->get();
+        $investors = $user->investors()->with('investorSettings')->get();
         $investorBalances = [];
         if (!$user->isInvestor() && $investors->isNotEmpty()) {
             $investorBalances = DB::table('investor_wallets')
@@ -228,6 +228,9 @@ class ProfileController extends Controller
             'is_active' => true,
             'activated_at' => now(),
             'email_verified_at' => now(),
+        ]);
+
+        $investor->investorSettings()->create([
             'investment_limit' => $request->investment_limit,
         ]);
 
@@ -299,7 +302,6 @@ class ProfileController extends Controller
             'name' => $request->name,
             'email' => $investorEmail,
             'username' => $investorEmail,
-            'investment_limit' => $request->investment_limit,
         ];
 
         if ($request->filled('password')) {
@@ -307,6 +309,11 @@ class ProfileController extends Controller
         }
 
         $investor->update($update);
+
+        $investor->investorSettings()->updateOrCreate(
+            ['user_id' => $investor->id],
+            ['investment_limit' => $request->investment_limit]
+        );
 
         return redirect()->back()->with('success', 'اطلاعات سرمایه‌گذار با موفقیت به‌روزرسانی شد.');
     }
