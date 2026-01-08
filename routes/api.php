@@ -29,6 +29,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [ApiAuthController::class, 'register'])->name('api.auth.register');
 });
 
+// Public API routes
+Route::prefix('v1')->group(function() {
+    // Prices Service (Public)
+    Route::get('/prices', [PriceController::class, 'index'])->name('api.v1.prices.index');
+});
+
 // Test connection route (requires authentication)
 Route::middleware(['api.auth'])->group(function () {
     Route::post('/test-connection', [\App\Http\Controllers\ExchangeController::class, 'testConnectionApi'])->name('api.test-connection');
@@ -86,9 +92,6 @@ Route::middleware(['api.auth', 'restrict.investor'])->group(function () {
 
         // Market
         Route::post('/best-price', [MarketController::class, 'getBestPrice'])->name('api.v1.best-price');
-        
-        // Prices Service
-        Route::get('/prices', [PriceController::class, 'index'])->name('api.v1.prices.index');
     });
 });
 
