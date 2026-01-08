@@ -13,6 +13,14 @@ class ExchangeController extends Controller
     public function index()
     {
         $exchanges = UserExchange::forUser(auth()->id())->get();
+        
+        // Hide sensitive fields for investors
+        if (auth()->user()->isInvestor()) {
+            $exchanges->each(function($exchange) {
+                $exchange->makeHidden(['api_key', 'api_secret', 'demo_api_key', 'demo_api_secret', 'password']);
+            });
+        }
+        
         return response()->json(['success' => true, 'data' => $exchanges]);
     }
 

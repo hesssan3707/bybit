@@ -62,7 +62,20 @@ class UserExchange extends Model
         'demo_spot_access' => 'boolean',
         'demo_futures_access' => 'boolean',
         'demo_ip_access' => 'boolean',
+        'demo_validation_message' => 'string',
     ];
+
+    /**
+     * Get is_demo_active attribute.
+     * Force false for investors.
+     */
+    public function getIsDemoActiveAttribute($value)
+    {
+        if (auth()->check() && auth()->user()->isInvestor()) {
+            return false;
+        }
+        return (bool) $value;
+    }
 
     protected $hidden = [
         'api_key',

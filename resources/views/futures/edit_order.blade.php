@@ -89,48 +89,50 @@
                 <div class="alert alert-success">{{ session('success') }}</div>
             @endif
 
-            @if(isset($activeBan) && $activeBan)
-                @php
-                    $sec = isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0;
-                    $days = intdiv($sec, 86400);
-                    $hrs = intdiv($sec % 86400, 3600);
-                    $mins = intdiv($sec % 3600, 60);
-                    $initialCountdownText = $days > 0
-                        ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
-                        : sprintf('%02d : %02d', $hrs, $mins);
-                    $banRemainingFa = ($days > 0 ? ($days . ' روز') . ' و ' : '') . ($hrs . ' ساعت') . ' و ' . ($mins . ' دقیقه');
-                @endphp
-                <div class="alert alert-warning" id="ban-alert">
-                    مدیریت ریسک فعال است. لطفاً تا
-                    <span id="ban-countdown">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
-                    دیگر (حدود {{ $banRemainingFa }}) برای ثبت سفارش صبر کنید.
-                </div>
-            @endif
+            @if(!auth()->user()?->isInvestor())
+                @if(isset($activeBan) && $activeBan)
+                    @php
+                        $sec = isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0;
+                        $days = intdiv($sec, 86400);
+                        $hrs = intdiv($sec % 86400, 3600);
+                        $mins = intdiv($sec % 3600, 60);
+                        $initialCountdownText = $days > 0
+                            ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
+                            : sprintf('%02d : %02d', $hrs, $mins);
+                        $banRemainingFa = ($days > 0 ? ($days . ' روز') . ' و ' : '') . ($hrs . ' ساعت') . ' و ' . ($mins . ' دقیقه');
+                    @endphp
+                    <div class="alert alert-warning" id="ban-alert">
+                        مدیریت ریسک فعال است. لطفاً تا
+                        <span id="ban-countdown">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
+                        دیگر (حدود {{ $banRemainingFa }}) برای ثبت سفارش صبر کنید.
+                    </div>
+                @endif
 
-            @if($errors->any())
-                <div class="alert alert-danger">
-                    @php $hedgeHintDetected = false; @endphp
-                    @foreach ($errors->all() as $error)
-                        <p>{{ $error }}</p>
-                        @php
-                            $msgLower = strtolower($error);
-                            $hedgeKeywords = [
-                                'حالت معاملاتی','حالت موقعیت','دوطرفه','یک‌طرفه','یک طرفه','hedge','one-way','position mode','position side does not match','positionidx','idx not match'
-                            ];
-                            foreach ($hedgeKeywords as $kw) {
-                                if (strpos($msgLower, strtolower($kw)) !== false || strpos($error, $kw) !== false) { $hedgeHintDetected = true; break; }
-                            }
-                        @endphp
-                    @endforeach
-                    @php $exchangeAccess = request()->attributes->get('exchange_access'); @endphp
-                    @if(!empty($exchangeAccess['current_exchange']) && $hedgeHintDetected)
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-sm btn-primary" id="enable-hedge-btn" data-exchange-id="{{ $exchangeAccess['current_exchange']->id }}">
-                                تغییر حالت به Hedge
-                            </button>
-                        </div>
-                    @endif
-                </div>
+                @if($errors->any())
+                    <div class="alert alert-danger">
+                        @php $hedgeHintDetected = false; @endphp
+                        @foreach ($errors->all() as $error)
+                            <p>{{ $error }}</p>
+                            @php
+                                $msgLower = strtolower($error);
+                                $hedgeKeywords = [
+                                    'حالت معاملاتی','حالت موقعیت','دوطرفه','یک‌طرفه','یک طرفه','hedge','one-way','position mode','position side does not match','positionidx','idx not match'
+                                ];
+                                foreach ($hedgeKeywords as $kw) {
+                                    if (strpos($msgLower, strtolower($kw)) !== false || strpos($error, $kw) !== false) { $hedgeHintDetected = true; break; }
+                                }
+                            @endphp
+                        @endforeach
+                        @php $exchangeAccess = request()->attributes->get('exchange_access'); @endphp
+                        @if(!empty($exchangeAccess['current_exchange']) && $hedgeHintDetected)
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-primary" id="enable-hedge-btn" data-exchange-id="{{ $exchangeAccess['current_exchange']->id }}">
+                                    تغییر حالت به Hedge
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+                @endif
             @endif
 
             <form action="{{ route('futures.order.update', $order->id) }}" method="POST" id="order-form">

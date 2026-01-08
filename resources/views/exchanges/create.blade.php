@@ -254,6 +254,7 @@
         </a>
         <h2 style="text-align: center; margin-bottom: 30px;">درخواست فعال‌سازی صرافی جدید</h2>
 
+        @if(!auth()->user()?->isInvestor())
         <!-- تب‌های انتخاب نوع درخواست -->
         <div class="request-switch">
 <button type="button" class="request-switch__btn active" id="switch-own" onclick="switchTab('own')">درخواست اتصال صرافی شخصی</button>
@@ -268,17 +269,19 @@
             </div>
         @endif
 
+        @if(!auth()->user()?->isInvestor())
         <!-- هشدار اختصاصی برای تب اتصال با کلیدهای خود -->
         <div id="own-warning" class="warning-box" style="display:block;">
-            <h4>⚠️ نکات مهم:</h4>
+            <h4>⚠️ نکات مهم قبل از ارسال درخواست:</h4>
             <ul>
-                <li>API Key و Secret شما به صورت امن و رمزگذاری شده ذخیره می‌شود</li>
-                <li>درخواست شما نیاز به تأیید مدیر سیستم دارد</li>
-                <li>حتماً API Key دارای مجوزهای معاملات اسپات و فیوچرز باشد</li>
-                <li>از IP WhiteList استفاده نکنید یا آدرس سرور را اضافه کنید</li>
+                <li>دقت کنید که API Key حتماً دارای دسترسی‌های لازم (Futures/Spot) باشد</li>
+                <li>برای امنیت بیشتر، حتماً IP های سرور را در پنل صرافی خود محدود کنید</li>
+                <li>تأیید صرافی توسط مدیر ممکن است تا ۲۴ ساعت زمان ببرد</li>
+                <li>اطلاعات شما به صورت کاملاً امن و رمزگذاری شده ذخیره می‌شود</li>
                 <li>شما می‌توانید اطلاعات حساب دمو یا واقعی یا هر دو را وارد کنید</li>
             </ul>
         </div>
+        @endif
 
         <!-- فرم اتصال با کلیدهای خود -->
         <form id="own-form" method="POST" action="{{ route('exchanges.store') }}">
@@ -461,6 +464,11 @@
                 ارسال درخواست ایجاد صرافی
             </button>
         </form>
+        @else
+            <div class="alert alert-error">
+                کاربر سرمایه‌گذار اجازه افزودن صرافی را ندارد.
+            </div>
+        @endif
     </div>
 </div>
 

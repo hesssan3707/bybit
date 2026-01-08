@@ -136,6 +136,9 @@ class Trade extends Model
      */
     public function scopeAccountType($query, $isDemo)
     {
+        if (auth()->check() && auth()->user()->isInvestor()) {
+            return $query->where('is_demo', false);
+        }
         return $query->where('is_demo', $isDemo);
     }
 }

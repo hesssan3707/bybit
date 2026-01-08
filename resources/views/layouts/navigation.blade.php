@@ -207,19 +207,19 @@
             </div>
         </div>
 
-        <!-- Spot Trading Menu -->
-        <div style="display: inline-block; position: relative; margin: 0 15px;">
-            <a href="#" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
-            <div id="spotMenu" class="dropdown-list">
-                <a href="{{ route('spot.orders.view') }}">سفارش‌های اسپات</a>
-                @if(!auth()->user()?->isInvestor())
+        @if(!auth()->user()?->isInvestor())
+            <!-- Spot Trading Menu -->
+            <div style="display: inline-block; position: relative; margin: 0 15px;">
+                <a href="#" onclick="toggleSpotMenu(event)">معاملات اسپات ▼</a>
+                <div id="spotMenu" class="dropdown-list">
+                    <a href="{{ route('spot.orders.view') }}">سفارش‌های اسپات</a>
                     <a href="{{ route('spot.order.create.view') }}">سفارش اسپات جدید</a>
-                @endif
+                </div>
             </div>
-        </div>
 
-        <!-- API Documentation Link -->
-        <a href="{{ route('api.documentation') }}" style="margin: 0 15px; color: #667eea; font-weight: 600;" title="مستندات API">API مستندات</a>
+            <!-- API Documentation Link -->
+            <a href="{{ route('api.documentation') }}" style="margin: 0 15px; color: #667eea; font-weight: 600;" title="مستندات API">API مستندات</a>
+        @endif
 
         @if(auth()->user()?->isAdmin())
         <!-- Admin Menu (only for admin users) -->
@@ -251,7 +251,9 @@
     <a href="{{ route('futures.journal') }}">ژورنال</a>
     <a href="{{ route('strategies.macd') }}">استراتژی MACD</a>
     <a href="{{ route('strategies.funding') }}">تحلیل فاندینگ و اوپن اینترست</a>
-    <a href="{{ route('api.documentation') }}">مستندات</a>
+    @if(!auth()->user()?->isInvestor())
+        <a href="{{ route('api.documentation') }}">مستندات</a>
+    @endif
 </div>
 <nav class="mobile-footer-nav">
     @if(!auth()->user()?->isInvestor())
@@ -264,16 +266,16 @@
             </span>
             <span>جدید</span>
         </a>
+        <a href="{{ route('spot.orders.view') }}">
+            <span class="icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10" cy="12" r="5"></circle>
+                    <circle cx="15" cy="10" r="5"></circle>
+                </svg>
+            </span>
+            <span>اسپات</span>
+        </a>
     @endif
-    <a href="{{ route('spot.orders.view') }}">
-        <span class="icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="10" cy="12" r="5"></circle>
-                <circle cx="15" cy="10" r="5"></circle>
-            </svg>
-        </span>
-        <span>اسپات</span>
-    </a>
     <a href="{{ route('balance') }}">
         <span class="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">

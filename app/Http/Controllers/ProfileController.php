@@ -177,6 +177,10 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
+        if (!$user->hasRealAccount()) {
+            return redirect()->back()->with('error', 'برای افزودن سرمایه‌گذار، ابتدا باید یک حساب واقعی (Real) متصل و فعال داشته باشید.');
+        }
+
         if ($user->investors()->count() >= 3) {
             return redirect()->back()->with('error', 'شما حداکثر می‌توانید ۳ کاربر سرمایه‌گذار داشته باشید.');
         }

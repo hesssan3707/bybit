@@ -23,6 +23,14 @@ class FuturesController extends Controller
     private function resolveCapitalUSD(ExchangeApiServiceInterface $exchangeService): float
     {
         try {
+            $user = auth()->user();
+            if ($user && $user->isInvestor()) {
+                return (float) (\Illuminate\Support\Facades\DB::table('investor_wallets')
+                    ->where('investor_user_id', $user->id)
+                    ->where('currency', 'USDT')
+                    ->value('balance') ?? 0);
+            }
+
             $exchangeName = strtolower(method_exists($exchangeService, 'getExchangeName') ? $exchangeService->getExchangeName() : '');
 
             if ($exchangeName === 'binance') {

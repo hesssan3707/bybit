@@ -174,8 +174,16 @@ class User extends Authenticatable
     public function activeExchanges()
     {
         $localKey = $this->isInvestor() ? 'parent_id' : 'id';
-        return $this->hasMany(UserExchange::class, 'user_id', $localKey)
+        $query = $this->hasMany(UserExchange::class, 'user_id', $localKey)
             ->active();
+
+        if ($this->isInvestor()) {
+            $query->whereNotNull('api_key')
+                ->where('api_key', '!=', '')
+                ->where('status', 'approved');
+        }
+
+        return $query;
     }
 
     /**
@@ -193,10 +201,16 @@ class User extends Authenticatable
     public function defaultExchange()
     {
         $localKey = $this->isInvestor() ? 'parent_id' : 'id';
-        return $this->hasOne(UserExchange::class, 'user_id', $localKey)
+        $query = $this->hasOne(UserExchange::class, 'user_id', $localKey)
             ->where('is_default', true)
             ->where('is_active', true)
             ->where('status', 'approved');
+
+        if ($this->isInvestor()) {
+            $query->whereNotNull('api_key')->where('api_key', '!=', '');
+        }
+
+        return $query;
     }
 
     /**
@@ -291,6 +305,18 @@ class User extends Authenticatable
         }
 
         return self::where('email', $input)->first();
+    }
+
+    /**
+     * Check if user has at least one active real (non-demo) exchange account
+     */
+    public function hasRealAccount()
+    {
+        return $this->activeExchanges()
+            ->whereNotNull('api_key')
+            ->where('api_key', '!=', '')
+            ->where('status', 'approved')
+            ->exists();
     }
 
     /**
@@ -476,10 +502,19 @@ class User extends Authenticatable
      */
     public function getCurrentExchange()
     {
+        $exchange = null;
         if ($this->isInvestor() && $this->current_exchange_id) {
-            return $this->currentExchange;
+            $exchange = $this->currentExchange;
+        } else {
+            $exchange = $this->defaultExchange;
         }
-        return $this->defaultExchange;
+
+        // If user is investor, force real account viewing
+        if ($exchange && $this->isInvestor()) {
+            $exchange->is_demo_active = false;
+        }
+
+        return $exchange;
     }
 
     /**

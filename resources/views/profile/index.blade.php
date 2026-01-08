@@ -1205,7 +1205,7 @@
             </div>
         </div>
 
-        @if(!$user->isInvestor())
+        @if(!$user->isInvestor() && $user->hasRealAccount())
         <!-- Investors Management Section -->
         <div class="investors-section">
             <div class="section-header">
@@ -1400,23 +1400,21 @@
                 </div>
             </div>
         @else
-            <div class="no-exchange-card">
-                <div class="no-exchange-icon">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div class="no-exchange-content">
-                    <h3>صرافی فعالی ندارید</h3>
-                    @if($user->isInvestor())
-                        <p>برای نمایش اطلاعات، ابتدا باید برای حساب اصلی یک صرافی فعال باشد</p>
-                    @else
+            @if(!auth()->user()?->isInvestor())
+                <div class="no-exchange-card">
+                    <div class="no-exchange-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="no-exchange-content">
+                        <h3>صرافی فعالی ندارید</h3>
                         <p>برای شروع معاملات، ابتدا یک صرافی اضافه کنید</p>
                         <a href="{{ route('exchanges.create') }}" class="add-exchange-btn">
                             <i class="fas fa-plus"></i>
                             افزودن صرافی
                         </a>
-                    @endif
+                    </div>
                 </div>
-            </div>
+            @endif
         @endif
 
         <!-- Exchange Management Section -->
@@ -1439,7 +1437,9 @@
                             </div>
                             <div class="exchange-info">
                                 <h4>{{ $currentExchange->exchange_display_name }}</h4>
-                                <p class="exchange-api">API Key: {{ $currentExchange->masked_api_key }}</p>
+                                @if(!auth()->user()?->isInvestor())
+                                    <p class="exchange-api">API Key: {{ $currentExchange->masked_api_key }}</p>
+                                @endif
                                 <div class="exchange-status-indicator">
                                     <i class="fas fa-check-circle"></i>
                                     <span>صرافی پیش‌فرض شما</span>
@@ -1463,7 +1463,9 @@
                                 </div>
                                 <div class="exchange-card-body">
                                     <h4>{{ $exchange->exchange_display_name }}</h4>
-                                    <p class="exchange-api">{{ $exchange->masked_api_key }}</p>
+                                    @if(!auth()->user()?->isInvestor())
+                                        <p class="exchange-api">{{ $exchange->masked_api_key }}</p>
+                                    @endif
                                     <div class="exchange-action">
                                         @if($exchange->is_default)
                                             <span class="current-label">

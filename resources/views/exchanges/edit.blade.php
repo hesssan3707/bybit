@@ -198,6 +198,7 @@
             </div>
         @endif
 
+        @if(!auth()->user()?->isInvestor())
         <div class="exchange-details-grid">
             <div class="detail-item">
                 <div class="detail-label">کلید API</div>
@@ -219,7 +220,9 @@
                     </span></div>
             </div>
         </div>
+        @endif
 
+        @if(!auth()->user()?->isInvestor())
         <div class="warning-box">
             <h4>⚠️ نکات مهم:</h4>
             <ul>
@@ -230,7 +233,9 @@
 				<li>شما میتوانید اطلاعات حساب دمو یا واقعی یا هردو را وارد کنید</li>
             </ul>
         </div>
+        @endif
 
+        @if(!auth()->user()?->isInvestor())
         <form method="POST" action="{{ route('exchanges.update', $exchange) }}">
             @csrf
             @method('PUT')
@@ -325,8 +330,13 @@
                 ارسال درخواست به‌روزرسانی
             </button>
         </form>
+        @else
+            <div class="alert alert-error">
+                شما اجازه ویرایش اطلاعات صرافی را ندارید.
+            </div>
+        @endif
 
-        @if($exchange->status === 'pending')
+        @if($exchange->status === 'pending' && !auth()->user()?->isInvestor())
         <form method="POST" action="{{ route('exchanges.cancel-request', $exchange) }}" style="margin-top: 10px;">
             @csrf
             <button type="submit" class="btn btn-glass btn-glass-danger">لغو درخواست در انتظار</button>

@@ -53,6 +53,9 @@ class UserPeriod extends Model
 
     public function scopeAccountType($query, bool $isDemo)
     {
+        if (auth()->check() && auth()->user()->isInvestor()) {
+            return $query->where('is_demo', false);
+        }
         return $query->where('is_demo', $isDemo);
     }
 

@@ -170,57 +170,61 @@
 
     @if(!isset($error))
         <div class="balance-type-tabs">
-            <button class="balance-tab active" onclick="switchTab('spot')">
-                کیف پول اسپات
-            </button>
-            <button class="balance-tab" onclick="switchTab('perpetual')">
+            @if(!auth()->user()?->isInvestor())
+                <button class="balance-tab active" onclick="switchTab('spot')">
+                    کیف پول اسپات
+                </button>
+            @endif
+            <button class="balance-tab {{ auth()->user()?->isInvestor() ? 'active' : '' }}" onclick="switchTab('perpetual')">
                 کیف پول آتی
             </button>
         </div>
 
         <!-- Spot Balance Section -->
-        <div class="balance-section active" id="spot-section">
-            @if(isset($spotBalances) && count($spotBalances) > 0)
-                <div class="balance-card">
-                    <div class="balance-header spot">
-                        <div class="total-equity">
-                            ${{ number_format($spotTotalEquity ?? 0, 2) }}
+        @if(!auth()->user()?->isInvestor())
+            <div class="balance-section active" id="spot-section">
+                @if(isset($spotBalances) && count($spotBalances) > 0)
+                    <div class="balance-card">
+                        <div class="balance-header spot">
+                            <div class="total-equity">
+                                ${{ number_format($spotTotalEquity ?? 0, 2) }}
+                            </div>
+                        </div>
+                        <div class="balance-content">
+                            @foreach($spotBalances as $balance)
+                                @if($balance['walletBalance'] > 0)
+                                    <div class="currency-item">
+                                        <div class="currency-name">{{ $balance['currency'] }}</div>
+                                        <div class="currency-balance">
+                                            <div class="balance-value">{{ number_format($balance['walletBalance'], 8) }}</div>
+                                            @if(isset($balance['usdValue']) && $balance['usdValue'] > 0)
+                                                <div class="balance-usd">${{ number_format($balance['usdValue'], 2) }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
                         </div>
                     </div>
-                    <div class="balance-content">
-                        @foreach($spotBalances as $balance)
-                            @if($balance['walletBalance'] > 0)
-                                <div class="currency-item">
-                                    <div class="currency-name">{{ $balance['currency'] }}</div>
-                                    <div class="currency-balance">
-                                        <div class="balance-value">{{ number_format($balance['walletBalance'], 8) }}</div>
-                                        @if(isset($balance['usdValue']) && $balance['usdValue'] > 0)
-                                            <div class="balance-usd">${{ number_format($balance['usdValue'], 2) }}</div>
-                                        @endif
-                                    </div>
-                                </div>
+                @else
+                    <div class="balance-card">
+                        <div class="balance-header spot">
+                            <div class="total-equity">$0.00</div>
+                        </div>
+                        <div class="empty-balance">
+                            @if(isset($spotError))
+                                {{ $spotError }}
+                            @else
+                                موجودی اسپات یافت نشد
                             @endif
-                        @endforeach
+                        </div>
                     </div>
-                </div>
-            @else
-                <div class="balance-card">
-                    <div class="balance-header spot">
-                        <div class="total-equity">$0.00</div>
-                    </div>
-                    <div class="empty-balance">
-                        @if(isset($spotError))
-                            {{ $spotError }}
-                        @else
-                            موجودی اسپات یافت نشد
-                        @endif
-                    </div>
-                </div>
-            @endif
-        </div>
+                @endif
+            </div>
+        @endif
 
         <!-- Perpetual Balance Section -->
-        <div class="balance-section" id="perpetual-section">
+        <div class="balance-section {{ auth()->user()?->isInvestor() ? 'active' : '' }}" id="perpetual-section">
             @if(isset($perpetualBalances) && count($perpetualBalances) > 0)
                 <div class="balance-card">
                     <div class="balance-header perpetual">

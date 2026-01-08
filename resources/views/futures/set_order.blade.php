@@ -382,66 +382,68 @@
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    @if(isset($marketRiskLevel) && $marketRiskLevel === 'critical' && $marketRiskMessage)
-        <div class="alert alert-warning">
-            {{ $marketRiskMessage }}
-        </div>
-    @endif
+    @if(!auth()->user()?->isInvestor())
+        @if(isset($marketRiskLevel) && $marketRiskLevel === 'critical' && $marketRiskMessage)
+            <div class="alert alert-warning">
+                {{ $marketRiskMessage }}
+            </div>
+        @endif
 
-    @if(isset($activeBan) && $activeBan)
-        @php
-            $sec = isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0;
-            $days = intdiv($sec, 86400);
-            $hrs = intdiv($sec % 86400, 3600);
-            $mins = intdiv($sec % 3600, 60);
-            $initialCountdownText = $days > 0
-                ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
-                : sprintf('%02d : %02d', $hrs, $mins);
-        @endphp
-        <div class="alert alert-warning" id="ban-alert">
-            {{ $banMessage ?? 'مدیریت ریسک فعال است.' }}
-            <span id="ban-countdown" dir="ltr">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
-        </div>
-    @endif
+        @if(isset($activeBan) && $activeBan)
+            @php
+                $sec = isset($banRemainingSeconds) ? (int)$banRemainingSeconds : 0;
+                $days = intdiv($sec, 86400);
+                $hrs = intdiv($sec % 86400, 3600);
+                $mins = intdiv($sec % 3600, 60);
+                $initialCountdownText = $days > 0
+                    ? sprintf('%d : %02d : %02d', $days, $hrs, $mins)
+                    : sprintf('%02d : %02d', $hrs, $mins);
+            @endphp
+            <div class="alert alert-warning" id="ban-alert">
+                {{ $banMessage ?? 'مدیریت ریسک فعال است.' }}
+                <span id="ban-countdown" dir="ltr">{{ $sec > 0 ? $initialCountdownText : '' }}</span>
+            </div>
+        @endif
 
-    @if($errors->any())
-        <div class="alert alert-danger">
-            @php $hedgeHintDetected = false; @endphp
-            @foreach ($errors->all() as $error)
-                <p>{{ $error }}</p>
-                @php
-                    // Broaden detection for position mode related errors (Persian & English variants)
-                    $msgLower = strtolower($error);
-                    $hedgeKeywords = [
-                        'حالت معاملاتی',
-                        'حالت موقعیت',
-                        'دوطرفه',
-                        'یک‌طرفه',
-                        'یک طرفه', // alternate typing
-                        'hedge',
-                        'one-way',
-                        'position mode',
-                        'position side does not match',
-                        'positionidx',
-                        'idx not match'
-                    ];
-                    foreach ($hedgeKeywords as $kw) {
-                        if (strpos($msgLower, strtolower($kw)) !== false || strpos($error, $kw) !== false) {
-                            $hedgeHintDetected = true;
-                            break;
+        @if($errors->any())
+            <div class="alert alert-danger">
+                @php $hedgeHintDetected = false; @endphp
+                @foreach ($errors->all() as $error)
+                    <p>{{ $error }}</p>
+                    @php
+                        // Broaden detection for position mode related errors (Persian & English variants)
+                        $msgLower = strtolower($error);
+                        $hedgeKeywords = [
+                            'حالت معاملاتی',
+                            'حالت موقعیت',
+                            'دوطرفه',
+                            'یک‌طرفه',
+                            'یک طرفه', // alternate typing
+                            'hedge',
+                            'one-way',
+                            'position mode',
+                            'position side does not match',
+                            'positionidx',
+                            'idx not match'
+                        ];
+                        foreach ($hedgeKeywords as $kw) {
+                            if (strpos($msgLower, strtolower($kw)) !== false || strpos($error, $kw) !== false) {
+                                $hedgeHintDetected = true;
+                                break;
+                            }
                         }
-                    }
-                @endphp
-            @endforeach
-            @php $exchangeAccess = request()->attributes->get('exchange_access'); @endphp
-            @if(!empty($exchangeAccess['current_exchange']) && $hedgeHintDetected)
-                <div class="mt-2">
-                    <button type="button" class="btn btn-sm btn-primary" id="enable-hedge-btn" data-exchange-id="{{ $exchangeAccess['current_exchange']->id }}">
-                        تغییر حالت به Hedge
-                    </button>
-                </div>
-            @endif
-        </div>
+                    @endphp
+                @endforeach
+                @php $exchangeAccess = request()->attributes->get('exchange_access'); @endphp
+                @if(!empty($exchangeAccess['current_exchange']) && $hedgeHintDetected)
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-primary" id="enable-hedge-btn" data-exchange-id="{{ $exchangeAccess['current_exchange']->id }}">
+                            تغییر حالت به Hedge
+                        </button>
+                    </div>
+                @endif
+            </div>
+        @endif
     @endif
 
     @if(isset($user) && $user->future_strict_mode)

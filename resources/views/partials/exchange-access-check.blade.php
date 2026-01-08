@@ -6,7 +6,13 @@
     $accessRestricted = request()->attributes->get('access_restricted', false);
     $restrictionReason = request()->attributes->get('restriction_reason');
     $requiredAccess = request()->attributes->get('required_access', 'any');
+    $user = auth()->user();
 @endphp
+
+{{-- Do not show investors any warnings related to exchange access, exchange expiration, or missing exchanges. --}}
+@if($user && $user->isInvestor())
+    @php return; @endphp
+@endif
 
 {{-- Check for access restrictions based on middleware --}}
 @if($accessRestricted)

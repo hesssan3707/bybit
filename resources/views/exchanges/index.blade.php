@@ -343,11 +343,13 @@
         </div>
     @endif
 
-    <div style="margin-bottom: 20px; text-align: center;">
-        <a href="{{ route('exchanges.create') }}" class="btn btn-primary">
-            + افزودن صرافی جدید
-        </a>
-    </div>
+    @if(!auth()->user()?->isInvestor())
+        <div style="margin-bottom: 20px; text-align: center;">
+            <a href="{{ route('exchanges.create') }}" class="btn btn-primary">
+                + افزودن صرافی جدید
+            </a>
+        </div>
+    @endif
 
     @if(isset($companyRequests) && $companyRequests->count() > 0)
         @foreach($companyRequests as $req)
@@ -403,7 +405,7 @@
                                     <i class="fas fa-eye"></i> مشاهده صرافی اختصاص‌یافته
                                 </a>
                             @endif
-                            @if($req->status === 'pending')
+                            @if($req->status === 'pending' && !auth()->user()?->isInvestor())
                                 <form method="POST" action="{{ route('exchanges.company-request.withdraw', $req) }}" style="display:inline;">
                                     @csrf
                                     <button type="submit" class="btn btn-glass btn-glass-danger" style="width:auto;">
@@ -411,7 +413,7 @@
                                     </button>
                                 </form>
                             @endif
-                            @if($req->status === 'rejected')
+                            @if($req->status === 'rejected' && !auth()->user()?->isInvestor())
                                 <form method="POST" action="{{ route('exchanges.company-request.destroy', $req) }}" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
@@ -463,7 +465,7 @@
                                 @if($exchange->is_default)
                                     <span class="status-badge default-badge">پیش‌فرض</span>
                                 @endif
-                                @if($exchange->is_active && ($exchange->demo_api_key || $exchange->api_key))
+                                @if(!auth()->user()?->isInvestor() && $exchange->is_active && ($exchange->demo_api_key || $exchange->api_key))
                                     <div style="margin-top: 10px;">
                                         <div class="mode-switch">
                                             <label class="switch">
@@ -499,10 +501,14 @@
 
                 <div class="exchange-details">
                     <div class="exchange-details-grid">
-                        <div class="detail-item">
-                            <div class="detail-label">کلید API</div>
-                            <div class="detail-value">{{ $exchange->masked_api_key }}</div>
-                        </div>
+                        @if(!auth()->user()?->isInvestor())
+                            <div class="detail-item">
+                                <div class="detail-label">کلید API</div>
+                                <div class="detail-value">
+                                    {{ $exchange->masked_api_key }}
+                                </div>
+                            </div>
+                        @endif
                         <div class="detail-item">
                             <div class="detail-label">تاریخ درخواست</div>
                             <div class="detail-value">{{ $exchange->activation_requested_at ? $exchange->activation_requested_at->format('Y-m-d H:i') : '-' }}</div>
@@ -528,26 +534,28 @@
                     @endif
                     <div class="exchange-actions">
                         <div class="action-buttons">
-                            @if($exchange->is_active || $exchange->status === 'rejected')
-                                <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
-                                    <i class="fas fa-edit"></i> ویرایش اطلاعات
-                                </a>
-                            @endif
-                            
-                            @if(!empty($exchange->api_key) && !empty($exchange->api_secret))
-                                <button onclick="testRealConnection({{ $exchange->id }})" class="btn btn-success" id="test-real-btn-{{ $exchange->id }}">
-                                    <i class="fas fa-plug"></i> تست اتصال حساب واقعی
-                                </button>
-                            @endif
-                            
-                            @if(!empty($exchange->demo_api_key) && !empty($exchange->demo_api_secret))
-                                <button onclick="testDemoConnection({{ $exchange->id }})" class="btn btn-info" id="test-demo-btn-{{ $exchange->id }}">
-                                    <i class="fas fa-vial"></i> تست اتصال حساب دمو
-                                </button>
+                            @if(!auth()->user()?->isInvestor())
+                                @if($exchange->is_active || $exchange->status === 'rejected')
+                                    <a href="{{ route('exchanges.edit', $exchange) }}" class="btn btn-warning">
+                                        <i class="fas fa-edit"></i> ویرایش اطلاعات
+                                    </a>
+                                @endif
+                                
+                                @if(!empty($exchange->api_key) && !empty($exchange->api_secret))
+                                    <button onclick="testRealConnection({{ $exchange->id }})" class="btn btn-success" id="test-real-btn-{{ $exchange->id }}">
+                                        <i class="fas fa-plug"></i> تست اتصال حساب واقعی
+                                    </button>
+                                @endif
+                                
+                                @if(!empty($exchange->demo_api_key) && !empty($exchange->demo_api_secret))
+                                    <button onclick="testDemoConnection({{ $exchange->id }})" class="btn btn-info" id="test-demo-btn-{{ $exchange->id }}">
+                                        <i class="fas fa-vial"></i> تست اتصال حساب دمو
+                                    </button>
+                                @endif
                             @endif
                         </div>
                         
-                        @if($exchange->status === 'pending')
+                        @if($exchange->status === 'pending' && !auth()->user()?->isInvestor())
                             <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>
                             <form method="POST" action="{{ route('exchanges.cancel-request', $exchange) }}" style="margin-top: 8px;">
                                 @csrf
@@ -555,6 +563,8 @@
                                     <i class="fas fa-times"></i> لغو درخواست
                                 </button>
                             </form>
+                        @elseif($exchange->status === 'pending')
+                            <span style="color: #aea6a6; font-style: italic;">در انتظار بررسی مدیر...</span>
                         @endif
                     </div>
                 </div>

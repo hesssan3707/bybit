@@ -34,7 +34,7 @@ Route::middleware(['api.auth'])->group(function () {
 });
 
 // Protected routes (require authentication)
-Route::middleware(['api.auth'])->group(function () {
+Route::middleware(['api.auth', 'restrict.investor'])->group(function () {
     // Auth routes for authenticated users
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [ApiAuthController::class, 'logout'])->name('api.auth.logout');

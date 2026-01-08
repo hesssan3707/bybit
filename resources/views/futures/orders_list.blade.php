@@ -199,12 +199,14 @@
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
-    @if($errors->any())
-        <div class="alert alert-danger">
-            @foreach ($errors->all() as $error)
-                <p>{{ $error }}</p>
-            @endforeach
-        </div>
+    @if(!auth()->user()?->isInvestor())
+        @if($errors->any())
+            <div class="alert alert-danger">
+                @foreach ($errors->all() as $error)
+                    <p>{{ $error }}</p>
+                @endforeach
+            </div>
+        @endif
     @endif
 
     @include('partials.mobile-tabs-futures')
@@ -250,8 +252,8 @@
                         <td data-label="وضعیت">{{ $order->status }}</td>
                         <td data-label="عملیات">
                             @if($order->status === 'pending')
-                                <a href="{{ route('futures.order.edit', $order) }}" class="edit-btn" style="margin-left:8px">ویرایش</a>
                                 @if(!auth()->user()?->isInvestor())
+                                    <a href="{{ route('futures.order.edit', $order) }}" class="edit-btn" style="margin-left:8px">ویرایش</a>
                                     <form action="{{ route('futures.orders.destroy', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="لغو سفارش آتی" data-message="آیا از لغو این سفارش مطمئن هستید؟">
                                         @csrf
                                         @method('DELETE')
@@ -290,7 +292,7 @@
                                 @php
                                     $canResend = $order->closed_at && now()->diffInMinutes($order->closed_at) <= 30;
                                 @endphp
-                                @if($canResend)
+                                @if($canResend && !auth()->user()?->isInvestor())
                                     <form action="{{ route('futures.orders.resend', $order) }}" method="POST" style="display:inline;" class="modern-confirm-form" data-title="ارسال مجدد سفارش" data-message="آیا از ارسال مجدد این سفارش مطمئن هستید؟">
                                         @csrf
                                         <button type="submit" class="edit-btn" style="margin-left:8px">ارسال مجدد</button>
