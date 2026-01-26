@@ -617,9 +617,9 @@
                                                             @csrf
                                                             <button type="submit" class="btn-glass btn-glass-primary">تمدید</button>
                                                         </form>
-                                                        <form action="{{ route('account-settings.strict-goals.delete', ['period' => 'weekly']) }}" method="POST" onsubmit="return confirm('آیا از حذف اهداف هفتگی مطمئن هستید؟ برای حذف نباید معامله باز داشته باشید.');">
+                                                        <form id="weeklyDeleteGoalsForm" action="{{ route('account-settings.strict-goals.delete', ['period' => 'weekly']) }}" method="POST">
                                                             @csrf
-                                                            <button type="submit" class="btn-glass btn-glass-danger">حذف اهداف</button>
+                                                            <button type="button" class="btn-glass btn-glass-danger" data-trigger-goal-delete="weeklyDeleteGoalsForm">حذف اهداف</button>
                                                         </form>
                                                     </div>
                                                 @endif
@@ -690,9 +690,9 @@
                                                             @csrf
                                                             <button type="submit" class="btn-glass btn-glass-primary">تمدید</button>
                                                         </form>
-                                                        <form action="{{ route('account-settings.strict-goals.delete', ['period' => 'monthly']) }}" method="POST" onsubmit="return confirm('آیا از حذف اهداف ماهانه مطمئن هستید؟ برای حذف نباید معامله باز داشته باشید.');">
+                                                        <form id="monthlyDeleteGoalsForm" action="{{ route('account-settings.strict-goals.delete', ['period' => 'monthly']) }}" method="POST">
                                                             @csrf
-                                                            <button type="submit" class="btn-glass btn-glass-danger">حذف اهداف</button>
+                                                            <button type="button" class="btn-glass btn-glass-danger" data-trigger-goal-delete="monthlyDeleteGoalsForm">حذف اهداف</button>
                                                         </form>
                                                     </div>
                                                 @endif
@@ -940,6 +940,23 @@
             </div>
         </div>
     </div>
+    <div class="modal" id="goalDeleteConfirmModal" role="dialog" aria-modal="true">
+        <div class="modal__dialog">
+            <div class="modal__header">
+                <h3 class="modal__title">تأیید حذف اهداف</h3>
+                <button type="button" class="btn-glass btn-glass-muted modal__close" id="closeGoalDeleteModalBtn">&times;</button>
+            </div>
+
+            <div class="warning-box">
+                آیا از حذف این اهداف مطمئن هستید؟ برای حذف، نباید معامله باز داشته باشید. پس از حذف می‌توانید اهداف جدید ثبت کنید.
+            </div>
+
+            <div class="button-row">
+                <button type="button" class="btn-glass btn-glass-muted" id="cancelGoalDeleteBtn">انصراف</button>
+                <button type="button" class="btn-glass btn-glass-danger" id="confirmGoalDeleteBtn">تأیید و حذف</button>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -1173,6 +1190,48 @@
                             confirmGoalBtn.disabled = true;
                             confirmGoalBtn.textContent = 'در حال ثبت...';
                             goalForm.submit();
+                        }
+                    });
+                }
+
+                const goalDeleteModal = document.getElementById('goalDeleteConfirmModal');
+                const closeGoalDeleteModalBtn = document.getElementById('closeGoalDeleteModalBtn');
+                const cancelGoalDeleteBtn = document.getElementById('cancelGoalDeleteBtn');
+                const confirmGoalDeleteBtn = document.getElementById('confirmGoalDeleteBtn');
+                const goalDeleteTriggers = Array.from(document.querySelectorAll('[data-trigger-goal-delete]'));
+                let activeGoalDeleteForm = null;
+
+                function closeGoalDeleteModal() {
+                    if (goalDeleteModal) goalDeleteModal.classList.remove('is-open');
+                    activeGoalDeleteForm = null;
+                    if (confirmGoalDeleteBtn) {
+                        confirmGoalDeleteBtn.disabled = false;
+                        confirmGoalDeleteBtn.textContent = 'تأیید و حذف';
+                    }
+                }
+
+                goalDeleteTriggers.forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        const formId = btn.getAttribute('data-trigger-goal-delete');
+                        activeGoalDeleteForm = formId ? document.getElementById(formId) : null;
+                        if (goalDeleteModal) goalDeleteModal.classList.add('is-open');
+                    });
+                });
+
+                if (closeGoalDeleteModalBtn) closeGoalDeleteModalBtn.addEventListener('click', closeGoalDeleteModal);
+                if (cancelGoalDeleteBtn) cancelGoalDeleteBtn.addEventListener('click', closeGoalDeleteModal);
+                if (goalDeleteModal) {
+                    goalDeleteModal.addEventListener('click', function (e) {
+                        if (e.target === goalDeleteModal) closeGoalDeleteModal();
+                    });
+                }
+
+                if (confirmGoalDeleteBtn) {
+                    confirmGoalDeleteBtn.addEventListener('click', function () {
+                        if (activeGoalDeleteForm) {
+                            confirmGoalDeleteBtn.disabled = true;
+                            confirmGoalDeleteBtn.textContent = 'در حال حذف...';
+                            activeGoalDeleteForm.submit();
                         }
                     });
                 }

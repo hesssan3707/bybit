@@ -53,6 +53,12 @@ class AccountSettingsController extends Controller
             $updatedSettings['monthly_loss_limit'] ?? null
         );
         UserAccountSetting::setStrictMaxRisk($userId, $computedStrictMaxRisk, $isDemo);
+
+        $strictMaxRisk = UserAccountSetting::getStrictMaxRisk($userId, $isDemo);
+        $defaultRisk = UserAccountSetting::getDefaultRisk($userId, $isDemo);
+        if ($defaultRisk !== null && (float)$defaultRisk > (float)$strictMaxRisk) {
+            UserAccountSetting::setDefaultRisk($userId, (float)$strictMaxRisk, $isDemo);
+        }
     }
 
     /**
@@ -344,12 +350,7 @@ class AccountSettingsController extends Controller
                 }
             }
 
-            $updatedSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
-            $computedStrictMaxRisk = UserAccountSetting::calculateStrictMaxRiskFromGoals(
-                $updatedSettings['weekly_loss_limit'] ?? null,
-                $updatedSettings['monthly_loss_limit'] ?? null
-            );
-            UserAccountSetting::setStrictMaxRisk($user->id, $computedStrictMaxRisk, $isDemo);
+            $this->recomputeStrictMaxRisk((int)$user->id, (bool)$isDemo);
 
             return redirect()->back()->with('success', 'محدودیت‌های جدید با موفقیت اعمال شدند.');
 
