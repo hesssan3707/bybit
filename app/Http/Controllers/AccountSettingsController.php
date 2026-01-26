@@ -6,12 +6,55 @@ use Illuminate\Http\Request;
 use App\Models\UserAccountSetting;
 use App\Models\User;
 use App\Models\UserBan;
+use App\Models\Trade;
 use Illuminate\Support\Facades\Auth;
 use App\Services\BanService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AccountSettingsController extends Controller
 {
+    private function getGoalMeta(int $userId, bool $isDemo, string $period): array
+    {
+        $enabledKey = $period . '_limit_enabled';
+        $row = UserAccountSetting::where('user_id', $userId)
+            ->where('key', $enabledKey)
+            ->where('is_demo', $isDemo)
+            ->first();
+
+        if (!$row || !$row->created_at) {
+            return [
+                'created_at' => null,
+                'unlock_at' => null,
+                'can_modify' => false,
+                'days_remaining' => null,
+            ];
+        }
+
+        $createdAt = $row->created_at;
+        $unlockAt = $createdAt->copy()->addMonths(3);
+        $now = now();
+        $canModify = $now->greaterThanOrEqualTo($unlockAt);
+        $daysRemaining = $canModify ? 0 : max(0, $now->diffInDays($unlockAt));
+
+        return [
+            'created_at' => $createdAt,
+            'unlock_at' => $unlockAt,
+            'can_modify' => $canModify,
+            'days_remaining' => $daysRemaining,
+        ];
+    }
+
+    private function recomputeStrictMaxRisk(int $userId, bool $isDemo): void
+    {
+        $updatedSettings = UserAccountSetting::getUserSettings($userId, $isDemo);
+        $computedStrictMaxRisk = UserAccountSetting::calculateStrictMaxRiskFromGoals(
+            $updatedSettings['weekly_loss_limit'] ?? null,
+            $updatedSettings['monthly_loss_limit'] ?? null
+        );
+        UserAccountSetting::setStrictMaxRisk($userId, $computedStrictMaxRisk, $isDemo);
+    }
+
     /**
      * Display the account settings page
      */
@@ -27,6 +70,7 @@ class AccountSettingsController extends Controller
         $defaultExpirationTime = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
         $minRrRatio = UserAccountSetting::getMinRrRatio($user->id, $isDemo);
         $tvDefaultInterval = UserAccountSetting::getTradingViewDefaultInterval($user->id, $isDemo);
+        $strictMaxRisk = UserAccountSetting::getStrictMaxRisk($user->id, $isDemo);
         
         // Fetch strict limits
         $strictSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
@@ -36,6 +80,9 @@ class AccountSettingsController extends Controller
         $weeklyLossLimit = $strictSettings['weekly_loss_limit'] ?? null;
         $monthlyProfitLimit = $strictSettings['monthly_profit_limit'] ?? null;
         $monthlyLossLimit = $strictSettings['monthly_loss_limit'] ?? null;
+
+        $weeklyGoalMeta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, 'weekly');
+        $monthlyGoalMeta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, 'monthly');
 
         $weeklyPnlPercent = null;
         $monthlyPnlPercent = null;
@@ -77,6 +124,7 @@ class AccountSettingsController extends Controller
             'defaultExpirationTime',
             'defaultFutureOrderSteps',
             'minRrRatio',
+            'strictMaxRisk',
             'isDemo',
             'weeklyLimitEnabled',
             'monthlyLimitEnabled',
@@ -88,7 +136,9 @@ class AccountSettingsController extends Controller
             'monthlyPnlPercent',
             'tvDefaultInterval',
             'selfBanTime',
-            'selfBanPrice'
+            'selfBanPrice',
+            'weeklyGoalMeta',
+            'monthlyGoalMeta'
         ));
     }
 
@@ -178,6 +228,7 @@ class AccountSettingsController extends Controller
             'default_risk' => UserAccountSetting::getDefaultRisk($user->id, $isDemo),
             'default_expiration_time' => UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo),
             'strict_mode' => $user->future_strict_mode,
+            'strict_max_risk' => UserAccountSetting::getStrictMaxRisk($user->id, $isDemo),
         ]);
     }
     /**
@@ -218,21 +269,29 @@ class AccountSettingsController extends Controller
         // Check enabled flags immutability (cannot disable once enabled)
         if (($isSet('weekly_limit_enabled') && $existingSettings['weekly_limit_enabled']) && 
             (isset($request->weekly_limit_enabled) && !$request->boolean('weekly_limit_enabled'))) {
-            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت هفتگی امکان‌پذیر نیست.']);
+            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت هفتگی از این بخش امکان‌پذیر نیست. پس از ۳ ماه می‌توانید آن را حذف کنید.']);
         }
         
         if (($isSet('monthly_limit_enabled') && $existingSettings['monthly_limit_enabled']) && 
             (isset($request->monthly_limit_enabled) && !$request->boolean('monthly_limit_enabled'))) {
-            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت ماهانه امکان‌پذیر نیست.']);
+            return redirect()->back()->withErrors(['msg' => 'غیرفعال کردن محدودیت ماهانه از این بخش امکان‌پذیر نیست. پس از ۳ ماه می‌توانید آن را حذف کنید.']);
         }
 
         // Check values immutability
         // $fields is already defined above
 
+        $weeklyMeta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, 'weekly');
+        $monthlyMeta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, 'monthly');
+
         foreach ($fields as $key => $label) {
             if ($isSet($key) && isset($validated[$key])) {
                 if (abs((float)$validated[$key] - (float)$existingSettings[$key]) > 0.001) {
-                    return redirect()->back()->withErrors(['msg' => "تغییر مقدار {$label} امکان‌پذیر نیست."]);
+                    $meta = str_starts_with($key, 'weekly_') ? $weeklyMeta : (str_starts_with($key, 'monthly_') ? $monthlyMeta : null);
+                    if ($meta && !$meta['can_modify'] && $meta['unlock_at']) {
+                        $unlockFa = $meta['unlock_at']->format('Y/m/d');
+                        return redirect()->back()->withErrors(['msg' => "تغییر مقدار {$label} تا تاریخ {$unlockFa} امکان‌پذیر نیست."]);
+                    }
+                    return redirect()->back()->withErrors(['msg' => "برای تغییر {$label} باید ابتدا هدف را حذف کنید و دوباره ثبت کنید."]);
                 }
             }
         }
@@ -285,10 +344,111 @@ class AccountSettingsController extends Controller
                 }
             }
 
+            $updatedSettings = UserAccountSetting::getUserSettings($user->id, $isDemo);
+            $computedStrictMaxRisk = UserAccountSetting::calculateStrictMaxRiskFromGoals(
+                $updatedSettings['weekly_loss_limit'] ?? null,
+                $updatedSettings['monthly_loss_limit'] ?? null
+            );
+            UserAccountSetting::setStrictMaxRisk($user->id, $computedStrictMaxRisk, $isDemo);
+
             return redirect()->back()->with('success', 'محدودیت‌های جدید با موفقیت اعمال شدند.');
 
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['msg' => 'خطا در ذخیره تنظیمات: ' . $e->getMessage()]);
+        }
+    }
+
+    public function deleteStrictGoals(Request $request, string $period)
+    {
+        $user = Auth::user();
+        if (!$user->future_strict_mode) {
+            return redirect()->back()->withErrors(['msg' => 'حالت سخت‌گیرانه فعال نیست.']);
+        }
+
+        $period = strtolower(trim($period));
+        if (!in_array($period, ['weekly', 'monthly'], true)) {
+            return redirect()->back()->withErrors(['msg' => 'درخواست نامعتبر است.']);
+        }
+
+        $currentExchange = $user->getCurrentExchange();
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+
+        $hasOpenTrades = Trade::forUser($user->id)
+            ->accountType($isDemo)
+            ->whereNull('closed_at')
+            ->exists();
+        if ($hasOpenTrades) {
+            return redirect()->back()->withErrors(['msg' => 'برای حذف اهداف، نباید معامله باز داشته باشید.']);
+        }
+
+        $meta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, $period);
+        if (!$meta['created_at'] || !$meta['unlock_at']) {
+            return redirect()->back()->withErrors(['msg' => 'هدف ثبت نشده است.']);
+        }
+        if (!$meta['can_modify']) {
+            $unlockFa = $meta['unlock_at']->format('Y/m/d');
+            return redirect()->back()->withErrors(['msg' => "امکان حذف این هدف تا تاریخ {$unlockFa} وجود ندارد."]);
+        }
+
+        $keys = $period === 'weekly'
+            ? ['weekly_limit_enabled', 'weekly_profit_limit', 'weekly_loss_limit']
+            : ['monthly_limit_enabled', 'monthly_profit_limit', 'monthly_loss_limit'];
+
+        try {
+            DB::transaction(function () use ($user, $isDemo, $keys) {
+                UserAccountSetting::where('user_id', $user->id)
+                    ->where('is_demo', $isDemo)
+                    ->whereIn('key', $keys)
+                    ->delete();
+            });
+
+            $this->recomputeStrictMaxRisk((int)$user->id, (bool)$isDemo);
+
+            return redirect()->back()->with('success', 'اهداف با موفقیت حذف شدند.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['msg' => 'خطا در حذف اهداف: ' . $e->getMessage()]);
+        }
+    }
+
+    public function renewStrictGoals(Request $request, string $period)
+    {
+        $user = Auth::user();
+        if (!$user->future_strict_mode) {
+            return redirect()->back()->withErrors(['msg' => 'حالت سخت‌گیرانه فعال نیست.']);
+        }
+
+        $period = strtolower(trim($period));
+        if (!in_array($period, ['weekly', 'monthly'], true)) {
+            return redirect()->back()->withErrors(['msg' => 'درخواست نامعتبر است.']);
+        }
+
+        $currentExchange = $user->getCurrentExchange();
+        $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+
+        $meta = $this->getGoalMeta((int)$user->id, (bool)$isDemo, $period);
+        if (!$meta['created_at'] || !$meta['unlock_at']) {
+            return redirect()->back()->withErrors(['msg' => 'هدف ثبت نشده است.']);
+        }
+        if (!$meta['can_modify']) {
+            $unlockFa = $meta['unlock_at']->format('Y/m/d');
+            return redirect()->back()->withErrors(['msg' => "امکان تمدید این هدف تا تاریخ {$unlockFa} وجود ندارد."]);
+        }
+
+        $keys = $period === 'weekly'
+            ? ['weekly_limit_enabled', 'weekly_profit_limit', 'weekly_loss_limit']
+            : ['monthly_limit_enabled', 'monthly_profit_limit', 'monthly_loss_limit'];
+
+        $now = now();
+
+        try {
+            UserAccountSetting::where('user_id', $user->id)
+                ->where('is_demo', $isDemo)
+                ->whereIn('key', $keys)
+                ->update(['created_at' => $now, 'updated_at' => $now]);
+
+            return redirect()->back()->with('success', 'اهداف با موفقیت تمدید شدند.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['msg' => 'خطا در تمدید اهداف: ' . $e->getMessage()]);
         }
     }
 

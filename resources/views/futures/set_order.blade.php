@@ -596,9 +596,9 @@
 
             <div class="form-group" style="flex: 1;">
                 <label for="risk_percentage">
-                    درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪)@endif:
+                    درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر {{ rtrim(rtrim(number_format((float)($strictMaxRisk ?? 10), 2, '.', ''), '0'), '.') }}٪)@endif:
                 </label>
-                <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', $defaultRisk ?? 10) }}" required>
+                <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? ($strictMaxRisk ?? 10) : '100' }}" step="0.1" value="{{ old('risk_percentage', $defaultRisk ?? 10) }}" required>
                 @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
             </div>
         </div>
@@ -824,6 +824,7 @@
         }
 
         const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
+        const strictMaxRisk = parseFloat('{{ $strictMaxRisk ?? 10 }}') || 10;
         const selectedMarket = '{{ $selectedMarket ?? '' }}';
 
         if (isStrictMode && '{{ $marketPrice ?? '' }}' !== '') {
@@ -835,6 +836,14 @@
         
         if (orderForm) {
             orderForm.addEventListener('submit', function(e) {
+                const riskPercentageInput = document.getElementById('risk_percentage');
+                const riskPercentage = parseFloat(riskPercentageInput ? (riskPercentageInput.value || '0') : '0');
+                if (isStrictMode && riskPercentage > strictMaxRisk) {
+                    e.preventDefault();
+                    modernAlert(`در حالت سخت‌گیرانه، حداکثر ریسک مجاز ${strictMaxRisk}٪ است.`, 'error');
+                    return;
+                }
+
                 const entry1 = parseFloat(entry1Input.value);
                 const entry2 = parseFloat(entry2Input.value) || entry1;
                 const sl = parseFloat(document.getElementById('sl').value);

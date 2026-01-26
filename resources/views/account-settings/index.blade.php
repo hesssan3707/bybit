@@ -465,7 +465,7 @@
                                                 class="form-control"
                                                 value="{{ $defaultRisk }}"
                                                 min="1"
-                                                max="{{ $strictModeActive ? '10' : '80' }}"
+                                                max="{{ $strictModeActive ? $strictMaxRisk : '80' }}"
                                                 step="0.01"
                                                 inputmode="decimal"
                                                 placeholder="مثال: 2.5"
@@ -473,7 +473,7 @@
                                             <span class="input-suffix">%</span>
                                         </div>
                                         @if($strictModeActive)
-                                            <div class="muted">در حالت سخت‌گیرانه حداکثر 10 درصد مجاز است</div>
+                                            <div class="muted">در حالت سخت‌گیرانه حداکثر {{ rtrim(rtrim(number_format((float)$strictMaxRisk, 2, '.', ''), '0'), '.') }} درصد مجاز است</div>
                                         @endif
                                     </div>
 
@@ -550,7 +550,7 @@
                                         <li>تنها از طریق این سیستم می‌توانید سفارش جدید ثبت کنید</li>
                                         <li>در صورت بستن سفارش فعال خارج از نقاط حدضرر/حدسود، تا 3 روز امکان ثبت سفارش ندارید</li>
                                         <li>پس از بستن سفارش فعال به صورت دستی، تا اخر هفته امکان بستن مجدد دستی ندارید</li>
-                                        <li>حداکثر ریسک هر پوزیشن 10 درصد است</li>
+                                        <li>حداکثر ریسک هر پوزیشن {{ rtrim(rtrim(number_format((float)$strictMaxRisk, 2, '.', ''), '0'), '.') }} درصد است</li>
                                         <li>پس از هر ضرر، تا 1 ساعت امکان ثبت سفارش ندارید</li>
                                         <li>اگر دو بار متوالی ضرر کنید، تا 24 ساعت امکان ثبت سفارش ندارید</li>
                                         <li>تنها در بازار انتخابی قابلیت معامله دارید</li>
@@ -580,8 +580,24 @@
                                                     $weeklyPnl = isset($weeklyPnlPercent) ? (float)$weeklyPnlPercent : 0.0;
                                                     $weeklyProfitFill = ($weeklyPnl > 0 && $weeklyProfitLimit > 0) ? max(0, min(100, ($weeklyPnl / $weeklyProfitLimit) * 100)) : 0.0;
                                                     $weeklyLossFill = ($weeklyPnl < 0 && $weeklyLossLimit > 0) ? max(0, min(100, (abs($weeklyPnl) / $weeklyLossLimit) * 100)) : 0.0;
+                                                    $weeklyCreatedAt = $weeklyGoalMeta['created_at'] ?? null;
+                                                    $weeklyUnlockAt = $weeklyGoalMeta['unlock_at'] ?? null;
+                                                    $weeklyCanModify = (bool)($weeklyGoalMeta['can_modify'] ?? false);
+                                                    $weeklyDaysRemaining = $weeklyGoalMeta['days_remaining'] ?? null;
                                                 @endphp
-                                                <div class="muted">ثبت شده و غیرقابل تغییر</div>
+                                                @if($weeklyCreatedAt)
+                                                    <div class="muted">تاریخ ثبت: {{ $weeklyCreatedAt->format('Y/m/d') }}</div>
+                                                @endif
+                                                @if($weeklyUnlockAt)
+                                                    @if($weeklyCanModify)
+                                                        <div class="muted" style="margin-top:6px;">اکنون می‌توانید اهداف را حذف کنید و دوباره ثبت کنید یا تمدید کنید.</div>
+                                                    @else
+                                                        <div class="muted" style="margin-top:6px;">این اهداف تا تاریخ {{ $weeklyUnlockAt->format('Y/m/d') }} غیرقابل تغییر هستند.</div>
+                                                        @if($weeklyDaysRemaining !== null)
+                                                            <div class="muted" style="margin-top:4px;">زمان باقی‌مانده: {{ $weeklyDaysRemaining }} روز</div>
+                                                        @endif
+                                                    @endif
+                                                @endif
                                                 <div class="progress-row">
                                                     <div class="progress-box">
                                                         <div class="progress-title"><span>هدف سود</span><span>+{{ number_format($weeklyProfitLimit, 0) }}%</span></div>
@@ -595,9 +611,21 @@
                                                     </div>
                                                 </div>
                                                 <div class="muted" style="margin-top:8px;">با رسیدن به هر یک از اهداف، معاملات تا پایان هفته قفل می‌شود.</div>
+                                                @if($weeklyCanModify)
+                                                    <div class="button-row" style="margin-top:12px;">
+                                                        <form action="{{ route('account-settings.strict-goals.renew', ['period' => 'weekly']) }}" method="POST">
+                                                            @csrf
+                                                            <button type="submit" class="btn-glass btn-glass-primary">تمدید</button>
+                                                        </form>
+                                                        <form action="{{ route('account-settings.strict-goals.delete', ['period' => 'weekly']) }}" method="POST" onsubmit="return confirm('آیا از حذف اهداف هفتگی مطمئن هستید؟ برای حذف نباید معامله باز داشته باشید.');">
+                                                            @csrf
+                                                            <button type="submit" class="btn-glass btn-glass-danger">حذف اهداف</button>
+                                                        </form>
+                                                    </div>
+                                                @endif
                                             @else
                                                 <div class="warning-box">
-                                                    با رسیدن به هر یک از اهداف، معاملات تا پایان هفته قفل می‌شود. این تنظیم پس از ثبت غیرقابل تغییر است.
+                                                    با رسیدن به هر یک از اهداف، معاملات تا پایان هفته قفل می‌شود. این اهداف تا ۳ ماه پس از ثبت غیرقابل تغییر هستند و پس از آن امکان حذف و ثبت مجدد خواهید داشت.
                                                 </div>
                                                 <div class="form-group">
                                                     <label>
@@ -625,8 +653,24 @@
                                                     $monthlyPnl = isset($monthlyPnlPercent) ? (float)$monthlyPnlPercent : 0.0;
                                                     $monthlyProfitFill = ($monthlyPnl > 0 && $monthlyProfitLimit > 0) ? max(0, min(100, ($monthlyPnl / $monthlyProfitLimit) * 100)) : 0.0;
                                                     $monthlyLossFill = ($monthlyPnl < 0 && $monthlyLossLimit > 0) ? max(0, min(100, (abs($monthlyPnl) / $monthlyLossLimit) * 100)) : 0.0;
+                                                    $monthlyCreatedAt = $monthlyGoalMeta['created_at'] ?? null;
+                                                    $monthlyUnlockAt = $monthlyGoalMeta['unlock_at'] ?? null;
+                                                    $monthlyCanModify = (bool)($monthlyGoalMeta['can_modify'] ?? false);
+                                                    $monthlyDaysRemaining = $monthlyGoalMeta['days_remaining'] ?? null;
                                                 @endphp
-                                                <div class="muted">ثبت شده و غیرقابل تغییر</div>
+                                                @if($monthlyCreatedAt)
+                                                    <div class="muted">تاریخ ثبت: {{ $monthlyCreatedAt->format('Y/m/d') }}</div>
+                                                @endif
+                                                @if($monthlyUnlockAt)
+                                                    @if($monthlyCanModify)
+                                                        <div class="muted" style="margin-top:6px;">اکنون می‌توانید اهداف را حذف کنید و دوباره ثبت کنید یا تمدید کنید.</div>
+                                                    @else
+                                                        <div class="muted" style="margin-top:6px;">این اهداف تا تاریخ {{ $monthlyUnlockAt->format('Y/m/d') }} غیرقابل تغییر هستند.</div>
+                                                        @if($monthlyDaysRemaining !== null)
+                                                            <div class="muted" style="margin-top:4px;">زمان باقی‌مانده: {{ $monthlyDaysRemaining }} روز</div>
+                                                        @endif
+                                                    @endif
+                                                @endif
                                                 <div class="progress-row">
                                                     <div class="progress-box">
                                                         <div class="progress-title"><span>هدف سود</span><span>+{{ number_format($monthlyProfitLimit, 0) }}%</span></div>
@@ -640,9 +684,21 @@
                                                     </div>
                                                 </div>
                                                 <div class="muted" style="margin-top:8px;">با رسیدن به هر یک از اهداف، معاملات تا پایان ماه قفل می‌شود.</div>
+                                                @if($monthlyCanModify)
+                                                    <div class="button-row" style="margin-top:12px;">
+                                                        <form action="{{ route('account-settings.strict-goals.renew', ['period' => 'monthly']) }}" method="POST">
+                                                            @csrf
+                                                            <button type="submit" class="btn-glass btn-glass-primary">تمدید</button>
+                                                        </form>
+                                                        <form action="{{ route('account-settings.strict-goals.delete', ['period' => 'monthly']) }}" method="POST" onsubmit="return confirm('آیا از حذف اهداف ماهانه مطمئن هستید؟ برای حذف نباید معامله باز داشته باشید.');">
+                                                            @csrf
+                                                            <button type="submit" class="btn-glass btn-glass-danger">حذف اهداف</button>
+                                                        </form>
+                                                    </div>
+                                                @endif
                                             @else
                                                 <div class="warning-box">
-                                                    با رسیدن به هر یک از اهداف، معاملات تا پایان ماه قفل می‌شود. این تنظیم پس از ثبت غیرقابل تغییر است.
+                                                    با رسیدن به هر یک از اهداف، معاملات تا پایان ماه قفل می‌شود. این اهداف تا ۳ ماه پس از ثبت غیرقابل تغییر هستند و پس از آن امکان حذف و ثبت مجدد خواهید داشت.
                                                 </div>
                                                 <div class="form-group">
                                                     <label>
@@ -875,7 +931,7 @@
             </div>
 
             <div class="warning-box">
-                ایا از ثبت این اهداف اطمینان دارید؟این عملیات پس از تایید غیر قابل بازگشت خواهد بود و با رسیدن به هرکدام از اهداف ،معاملات شما تا اخر آن دوره قفل خواهد شد.
+                آیا از ثبت این اهداف اطمینان دارید؟ این اهداف تا ۳ ماه پس از ثبت غیرقابل تغییر هستند و با رسیدن به هرکدام از اهداف، معاملات شما تا پایان آن دوره قفل خواهد شد.
             </div>
 
             <div class="button-row">
@@ -1124,12 +1180,13 @@
                 const isStrictActive = {{ $strictModeActive ? 'true' : 'false' }};
                  if (isStrictActive) {
                     const riskInput = document.getElementById('default_risk');
+                    const strictMaxRisk = parseFloat('{{ $strictMaxRisk ?? 10 }}') || 10;
                     if (riskInput) {
-                        riskInput.max = '10';
+                        riskInput.max = String(strictMaxRisk);
                         riskInput.addEventListener('input', function () {
                             const value = parseFloat(riskInput.value || '0');
-                            if (value > 10) {
-                                riskInput.setCustomValidity('در حالت سخت‌گیرانه حداکثر ۱۰ درصد مجاز است');
+                            if (value > strictMaxRisk) {
+                                riskInput.setCustomValidity('در حالت سخت‌گیرانه حداکثر ' + strictMaxRisk + ' درصد مجاز است');
                             } else {
                                 riskInput.setCustomValidity('');
                             }

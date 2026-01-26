@@ -111,6 +111,76 @@ class UserAccountSetting extends Model
         return static::getUserSetting($userId, 'default_risk', null, $isDemo);
     }
 
+    public static function getStrictMaxRisk($userId, $isDemo = false)
+    {
+        $val = static::getUserSetting($userId, 'strict_max_risk', 10, $isDemo);
+        $val = (float)$val;
+        if (!is_finite($val) || $val <= 0) {
+            return 10.0;
+        }
+        return min($val, 10.0);
+    }
+
+    public static function setStrictMaxRisk($userId, $risk, $isDemo = false)
+    {
+        $risk = (float)$risk;
+        if (!is_finite($risk) || $risk <= 0) {
+            $risk = 10.0;
+        }
+        $risk = min($risk, 10.0);
+        return static::setUserSetting($userId, 'strict_max_risk', $risk, 'decimal', $isDemo);
+    }
+
+    public static function calculateStrictMaxRiskFromGoals($weeklyLossLimit, $monthlyLossLimit)
+    {
+        $weeklyLossLimit = ($weeklyLossLimit !== null) ? (float)$weeklyLossLimit : null;
+        $monthlyLossLimit = ($monthlyLossLimit !== null) ? (float)$monthlyLossLimit : null;
+
+        $weeklyMax = null;
+        if ($weeklyLossLimit !== null && is_finite($weeklyLossLimit) && $weeklyLossLimit > 0) {
+            if ($weeklyLossLimit <= 3) {
+                $weeklyMax = $weeklyLossLimit;
+            } elseif ($weeklyLossLimit < 5) {
+                $weeklyMax = 3.0;
+            } elseif ($weeklyLossLimit < 10) {
+                $weeklyMax = 5.0;
+            } elseif ($weeklyLossLimit < 15) {
+                $weeklyMax = 8.0;
+            } else {
+                $weeklyMax = 10.0;
+            }
+        }
+
+        $monthlyMax = null;
+        if ($monthlyLossLimit !== null && is_finite($monthlyLossLimit) && $monthlyLossLimit > 0) {
+            if ($monthlyLossLimit < 5) {
+                $monthlyMax = 2.0;
+            } elseif ($monthlyLossLimit < 10) {
+                $monthlyMax = 4.0;
+            } elseif ($monthlyLossLimit < 15) {
+                $monthlyMax = 6.0;
+            } elseif ($monthlyLossLimit < 20) {
+                $monthlyMax = 8.0;
+            } else {
+                $monthlyMax = 10.0;
+            }
+        }
+
+        if ($weeklyMax !== null && $monthlyMax !== null) {
+            return min($weeklyMax, $monthlyMax);
+        }
+
+        if ($weeklyMax !== null) {
+            return $weeklyMax;
+        }
+
+        if ($monthlyMax !== null) {
+            return $monthlyMax;
+        }
+
+        return 10.0;
+    }
+
     /**
      * Get default future order steps setting for user
      */
@@ -153,8 +223,11 @@ class UserAccountSetting extends Model
             $user = User::find($userId);
 
             // Validate risk percentage in strict mode
-            if ($user && $user->future_strict_mode && $risk > 10) {
-                throw new \InvalidArgumentException('در حالت سخت‌گیرانه نمی‌توانید ریسک بیش از ۱۰ درصد تنظیم کنید.');
+            if ($user && $user->future_strict_mode) {
+                $maxRisk = static::getStrictMaxRisk($userId, $isDemo);
+                if ((float)$risk > (float)$maxRisk) {
+                    throw new \InvalidArgumentException("در حالت سخت‌گیرانه نمی‌توانید ریسک بیش از {$maxRisk} درصد تنظیم کنید.");
+                }
             }
         }
 

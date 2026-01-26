@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Trade;
+use App\Models\UserAccountSetting;
 use App\Services\Exchanges\ExchangeFactory;
 use App\Services\Exchanges\ExchangeApiServiceInterface;
 use Illuminate\Http\Request;
@@ -123,8 +124,24 @@ class FuturesController extends Controller
         }
 
         try {
-            $exchangeService = $this->getExchangeService();
             $user = auth()->user();
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'User not authenticated'], 401);
+            }
+
+            $exchangeService = $this->getExchangeService();
+
+            if (($user->future_strict_mode ?? false)) {
+                $currentExchange = $user->getCurrentExchange();
+                $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+                $strictMaxRisk = UserAccountSetting::getStrictMaxRisk($user->id, $isDemo);
+                if ((float)$validated['risk_percentage'] > (float)$strictMaxRisk) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "در حالت سخت‌گیرانه، حداکثر ریسک مجاز {$strictMaxRisk}٪ است.",
+                    ], 422);
+                }
+            }
 
             $symbol = $validated['symbol'];
             $entry1 = (float) $validated['entry1'];

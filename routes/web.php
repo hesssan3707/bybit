@@ -130,6 +130,8 @@ Route::middleware(['auth', 'restrict.investor'])->group(function () {
         Route::post('/update', [AccountSettingsController::class, 'update'])->name('update');
         Route::get('/settings', [AccountSettingsController::class, 'getSettings'])->name('settings');
         Route::post('/update-strict-limits', [AccountSettingsController::class, 'updateStrictLimits'])->name('update-strict-limits');
+        Route::post('/strict-goals/{period}/delete', [AccountSettingsController::class, 'deleteStrictGoals'])->name('strict-goals.delete');
+        Route::post('/strict-goals/{period}/renew', [AccountSettingsController::class, 'renewStrictGoals'])->name('strict-goals.renew');
         Route::post('/self-ban', [AccountSettingsController::class, 'updateSelfBan'])->name('self-ban');
     });
 

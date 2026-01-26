@@ -335,6 +335,7 @@ class FuturesController extends Controller
         $defaultFutureOrderSteps = UserAccountSetting::getDefaultFutureOrderSteps($user->id, $isDemo);
         $defaultExpirationMinutes = UserAccountSetting::getDefaultExpirationTime($user->id, $isDemo);
         $tvDefaultInterval = UserAccountSetting::getTradingViewDefaultInterval($user->id, $isDemo);
+        $strictMaxRisk = $user->future_strict_mode ? UserAccountSetting::getStrictMaxRisk($user->id, $isDemo) : null;
 
         $weeklyProfitLimit = null;
         $weeklyLossLimit = null;
@@ -364,11 +365,10 @@ class FuturesController extends Controller
             }
         }
 
-        // Apply strict mode limitations for risk only
         if ($user->future_strict_mode) {
-            // In strict mode, limit risk to 10% if user's default is higher
+            $defaultRisk = $defaultRisk ?? $strictMaxRisk;
             if ($defaultRisk !== null) {
-                $defaultRisk = min($defaultRisk, 10);
+                $defaultRisk = min((float)$defaultRisk, (float)$strictMaxRisk);
             }
         }
 
@@ -453,6 +453,7 @@ class FuturesController extends Controller
             'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
             'defaultExpiration' => $defaultExpirationMinutes,
             'defaultRisk' => $defaultRisk,
+            'strictMaxRisk' => $strictMaxRisk,
             'currentSymbol' => $symbol, // Pass the current symbol for proper price display
             'activeBan' => $activeBan,
             'banRemainingSeconds' => $banRemainingSeconds,
@@ -542,9 +543,9 @@ class FuturesController extends Controller
             $defaultRisk = \App\Models\UserAccountSetting::getDefaultRisk($user->id, (bool)$order->is_demo) ?? 10;
         }
 
-        // Apply strict mode cap
-        if ($user->future_strict_mode) {
-            $defaultRisk = min($defaultRisk, 10);
+        $strictMaxRisk = $user->future_strict_mode ? \App\Models\UserAccountSetting::getStrictMaxRisk($user->id, (bool)$order->is_demo) : null;
+        if ($user->future_strict_mode && $defaultRisk !== null) {
+            $defaultRisk = min((float)$defaultRisk, (float)$strictMaxRisk);
         }
         
         // Get user defaults (to mirror create page behavior in UI)
@@ -596,6 +597,7 @@ class FuturesController extends Controller
             'defaultFutureOrderSteps' => $defaultFutureOrderSteps,
             'defaultExpiration' => $defaultExpirationMinutes,
             'defaultRisk' => $defaultRisk,
+            'strictMaxRisk' => $strictMaxRisk,
             'activeBan' => $activeBan,
             'banRemainingSeconds' => $banRemainingSeconds,
             'tvDefaultInterval' => $tvDefaultInterval,
@@ -672,8 +674,13 @@ class FuturesController extends Controller
             }
             // Apply strict mode risk percentage cap (only in strict mode)
             if ($user->future_strict_mode) {
-                // Cap risk percentage to 10% in strict mode
-                $riskPercentage = min((float)$validated['risk_percentage'], 10.0);
+                $currentExchange = $user->getCurrentExchange();
+                $isDemo = $currentExchange ? (bool)$currentExchange->is_demo_active : false;
+                $strictMaxRisk = \App\Models\UserAccountSetting::getStrictMaxRisk($user->id, $isDemo);
+                if ((float)$validated['risk_percentage'] > (float)$strictMaxRisk) {
+                    throw new \Exception("در حالت سخت‌گیرانه، حداکثر ریسک مجاز {$strictMaxRisk}٪ است.");
+                }
+                $riskPercentage = (float)$validated['risk_percentage'];
             } else {
                 // Allow higher risk percentage in non-strict mode
                 $riskPercentage = (float)$validated['risk_percentage'];
@@ -1015,6 +1022,13 @@ class FuturesController extends Controller
             // Strict mode: keep symbol unchanged; only validate if user's selected market conflicts
             if ($user->future_strict_mode && $user->selected_market) {
                 // We do not change symbol during edit; if mismatch exists, allow edit but keep symbol as-is
+            }
+
+            if ($user->future_strict_mode && isset($validated['risk_percentage']) && $validated['risk_percentage'] !== null) {
+                $strictMaxRisk = \App\Models\UserAccountSetting::getStrictMaxRisk($user->id, (bool)$order->is_demo);
+                if ((float)$validated['risk_percentage'] > (float)$strictMaxRisk) {
+                    throw new \Exception("در حالت سخت‌گیرانه، حداکثر ریسک مجاز {$strictMaxRisk}٪ است.");
+                }
             }
 
             // Ensure leverage is optimized before updating order

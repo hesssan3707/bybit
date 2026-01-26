@@ -199,9 +199,9 @@
 
                     <div class="form-group" style="flex: 1;">
                         <label for="risk_percentage">
-                            درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر ۱۰٪)@endif:
+                            درصد ریسک @if(isset($user) && $user->future_strict_mode)(حداکثر {{ rtrim(rtrim(number_format((float)($strictMaxRisk ?? 10), 2, '.', ''), '0'), '.') }}٪)@endif:
                         </label>
-                        <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? '10' : '100' }}" step="0.1" value="{{ old('risk_percentage', $prefill['risk_percentage']) }}" required>
+                        <input id="risk_percentage" type="number" name="risk_percentage" min="0.1" max="{{ isset($user) && $user->future_strict_mode ? ($strictMaxRisk ?? 10) : '100' }}" step="0.1" value="{{ old('risk_percentage', $prefill['risk_percentage']) }}" required>
                         @error('risk_percentage') <span class="invalid-feedback">{{ $message }}</span> @enderror
                     </div>
                 </div>
@@ -301,9 +301,22 @@
 
         const marketPrice = '{{ $marketPrice ?? '' }}';
         const isStrictMode = {{ isset($user) && $user->future_strict_mode ? 'true' : 'false' }};
+        const strictMaxRisk = parseFloat('{{ $strictMaxRisk ?? 10 }}') || 10;
         const selectedMarket = '{{ $selectedMarket ?? '' }}';
         if (isStrictMode && marketPrice && marketPrice !== '0') { if (entry1Input.value === '') { entry1Input.value = marketPrice; if (isChained) { entry2Input.value = marketPrice; } } }
         else if (!isStrictMode && symbolSelect) { const defaultSymbol = symbolSelect.value; if (defaultSymbol && entry1Input.value === '') { fetchMarketPrice(defaultSymbol); } }
+
+        const orderForm = document.getElementById('order-form');
+        if (orderForm) {
+            orderForm.addEventListener('submit', function (e) {
+                const riskInput = document.getElementById('risk_percentage');
+                const riskPercentage = parseFloat(riskInput ? (riskInput.value || '0') : '0');
+                if (isStrictMode && riskPercentage > strictMaxRisk) {
+                    e.preventDefault();
+                    modernAlert(`در حالت سخت‌گیرانه، حداکثر ریسک مجاز ${strictMaxRisk}٪ است.`, 'error');
+                }
+            });
+        }
 
         (function() {
             var countdownEl = document.getElementById('ban-countdown');
