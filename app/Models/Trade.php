@@ -26,6 +26,7 @@ class Trade extends Model
         'closed_at',
         'synchronized',
         'closed_by_user',
+        'multi_step_order_ids',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Trade extends Model
         'pnl' => 'decimal:10',
         'closed_at' => 'datetime',
         'synchronized' => 'integer',
+        'multi_step_order_ids' => 'array',
     ];
 
     /**
@@ -67,6 +69,14 @@ class Trade extends Model
     public function bans()
     {
         return $this->hasMany(UserBan::class, 'trade_id');
+    }
+
+    /**
+     * Check if this trade is from a multi-step order
+     */
+    public function isMultiStepTrade(): bool
+    {
+        return !empty($this->multi_step_order_ids);
     }
 
     /**

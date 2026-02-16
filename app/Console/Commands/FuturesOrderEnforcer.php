@@ -236,6 +236,9 @@ class FuturesOrderEnforcer extends Command
             ->get();
 
         foreach ($openTrades as $dbTrade) {
+            // Skip multi-step trades - handled separately with syncMultiStepTrades
+            if ($dbTrade->isMultiStepTrade()) { continue; }
+
             // Find corresponding position on exchange by symbol and side
             $matchingPosition = null;
             foreach ($exchangePositions as $position) {
@@ -310,7 +313,53 @@ class FuturesOrderEnforcer extends Command
                 $this->info("    به‌روزرسانی موقعیت با اختلاف جزئی: {$dbTrade->symbol} (همسان‌سازی با صرافی؛ مبنا سفارش اصلی)");
             }
         }
+
+        // Sync multi-step trades from exchange (trust exchange as source of truth)
+        $this->syncMultiStepTrades($userExchange, $symbol, $exchangePositions, $openTrades);
     }
+
+    /**
+     * Sync multi-step trades with exchange positions (exchange is source of truth)
+     * Multi-step trades should match exchange position qty and avg_entry_price directly
+     */
+    private function syncMultiStepTrades(UserExchange $userExchange, string $symbol, array $exchangePositions, $openTrades): void
+    {
+        $multiStepTrades = $openTrades->filter(fn($t) => $t->isMultiStepTrade());
+        if ($multiStepTrades->isEmpty()) { return; }
+
+        foreach ($multiStepTrades as $dbTrade) {
+            // Find matching position on exchange
+            $matchingPosition = null;
+            foreach ($exchangePositions as $position) {
+                if (($position['symbol'] ?? null) === $dbTrade->symbol &&
+                    strtolower($position['side'] ?? '') === strtolower($dbTrade->side) &&
+                    (float)($position['size'] ?? 0) > 0) {
+                    $matchingPosition = $position;
+                    break;
+                }
+            }
+
+            if (!$matchingPosition) {
+                // Position closed on exchange - mark trade as closed
+                $dbTrade->closed_at = now();
+                $dbTrade->save();
+                $this->info("    معامله چند پله‌ای بسته شد (موقعیت صرافی یافت نشد): {$dbTrade->symbol}");
+                continue;
+            }
+
+            // Sync qty and avg_entry_price from exchange (exchange is source of truth)
+            $exchangeSize = (float)($matchingPosition['size'] ?? 0);
+            $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
+
+            if ((float)$dbTrade->qty !== $exchangeSize || (float)$dbTrade->avg_entry_price !== $exchangePrice) {
+                $dbTrade->qty = $exchangeSize;
+                $dbTrade->avg_entry_price = $exchangePrice;
+                $dbTrade->save();
+                $this->info("    همگام‌سازی معامله چند پله‌ای با صرافی: {$dbTrade->symbol} (qty={$exchangeSize}, avg={$exchangePrice})");
+            }
+        }
+    }
+
 
     /**
      * Check for foreign orders on exchange that are not in our system

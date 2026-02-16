@@ -237,33 +237,39 @@ class DemoFuturesLifecycleManager extends Command
                         $avgPrice = $this->extractAveragePrice($exchangeOrder, $userExchange->exchange_name);
 
                         if ($symbol && $side && $qty !== null && $avgPrice !== null) {
-                            $existingOpen = Trade::where('user_exchange_id', $userExchange->id)
-                                ->where('is_demo', true)
-                                ->where('order_id', $order->order_id)
-                                ->whereNull('closed_at')
-                                ->first();
-
-                            if ($existingOpen) {
-                                $existingOpen->qty = (float) $qty;
-                                $existingOpen->avg_entry_price = (float) $avgPrice;
-                                $existingOpen->save();
-                                $this->info("[Demo] معامله باز برای سفارش {$orderId} به‌روزرسانی شد");
+                            // Check if this is a multi-step order (steps > 1)
+                            if ($order->steps > 1) {
+                                $this->handleMultiStepOrderFill($userExchange, $order, $symbol, $side, (float)$qty, (float)$avgPrice);
                             } else {
-                                Trade::create([
-                                    'user_exchange_id' => $userExchange->id,
-                                    'is_demo' => true,
-                                    'symbol' => $symbol,
-                                    'side' => $side,
-                                    'order_type' => 'Market',
-                                    'leverage' => 1.0,
-                                    'qty' => (float) $qty,
-                                    'avg_entry_price' => (float) $avgPrice,
-                                    'avg_exit_price' => 0,
-                                    'pnl' => 0,
-                                    'order_id' => $order->order_id,
-                                    'closed_at' => null,
-                                ]);
-                                $this->info("[Demo] معامله باز برای سفارش {$orderId} ثبت شد");
+                                // Single-step order: original logic
+                                $existingOpen = Trade::where('user_exchange_id', $userExchange->id)
+                                    ->where('is_demo', true)
+                                    ->where('order_id', $order->order_id)
+                                    ->whereNull('closed_at')
+                                    ->first();
+
+                                if ($existingOpen) {
+                                    $existingOpen->qty = (float) $qty;
+                                    $existingOpen->avg_entry_price = (float) $avgPrice;
+                                    $existingOpen->save();
+                                    $this->info("[Demo] معامله باز برای سفارش {$orderId} به‌روزرسانی شد");
+                                } else {
+                                    Trade::create([
+                                        'user_exchange_id' => $userExchange->id,
+                                        'is_demo' => true,
+                                        'symbol' => $symbol,
+                                        'side' => strtolower($side),
+                                        'order_type' => 'Market',
+                                        'leverage' => 1.0,
+                                        'qty' => (float) $qty,
+                                        'avg_entry_price' => (float) $avgPrice,
+                                        'avg_exit_price' => 0,
+                                        'pnl' => 0,
+                                        'order_id' => $order->order_id,
+                                        'closed_at' => null,
+                                    ]);
+                                    $this->info("[Demo] معامله باز برای سفارش {$orderId} ثبت شد");
+                                }
                             }
                         }
                     }
@@ -274,6 +280,56 @@ class DemoFuturesLifecycleManager extends Command
             return;
         }
     }
+
+    /**
+     * Handle multi-step order fill by merging into existing trade or creating new one
+     */
+    private function handleMultiStepOrderFill(UserExchange $userExchange, Order $order, string $symbol, string $side, float $qty, float $avgPrice): void
+    {
+        $existingTrade = Trade::where('user_exchange_id', $userExchange->id)
+            ->where('is_demo', true)
+            ->where('symbol', $symbol)
+            ->where('side', strtolower($side))
+            ->whereNull('closed_at')
+            ->whereNotNull('multi_step_order_ids')
+            ->first();
+
+        if ($existingTrade) {
+            $oldQty = (float)$existingTrade->qty;
+            $oldAvgPrice = (float)$existingTrade->avg_entry_price;
+            $newTotalQty = $oldQty + $qty;
+            $newAvgPrice = (($oldQty * $oldAvgPrice) + ($qty * $avgPrice)) / $newTotalQty;
+
+            $existingTrade->qty = $newTotalQty;
+            $existingTrade->avg_entry_price = $newAvgPrice;
+
+            $orderIds = $existingTrade->multi_step_order_ids ?? [];
+            if (!in_array($order->order_id, $orderIds)) {
+                $orderIds[] = $order->order_id;
+                $existingTrade->multi_step_order_ids = $orderIds;
+            }
+            $existingTrade->save();
+            $this->info("[Demo] معامله چند پله‌ای به‌روزرسانی شد: {$symbol} (qty={$newTotalQty}, avg={$newAvgPrice})");
+        } else {
+            Trade::create([
+                'user_exchange_id' => $userExchange->id,
+                'is_demo' => true,
+                'symbol' => $symbol,
+                'side' => strtolower($side),
+                'order_type' => 'Market',
+                'leverage' => 1.0,
+                'qty' => $qty,
+                'avg_entry_price' => $avgPrice,
+                'avg_exit_price' => 0,
+                'pnl' => 0,
+                'order_id' => $order->order_id,
+                'multi_step_order_ids' => [$order->order_id],
+                'closed_at' => null,
+            ]);
+            $this->info("[Demo] معامله چند پله‌ای جدید ثبت شد: {$symbol} (qty={$qty})");
+        }
+    }
+
 
     private function syncPnlRecords($exchangeService, UserExchange $userExchange)
     {

@@ -361,6 +361,9 @@ class DemoFuturesOrchestrator extends Command
             ->get();
 
         foreach ($openTrades as $dbTrade) {
+            // Skip multi-step trades - handled separately with syncMultiStepTrades
+            if ($dbTrade->isMultiStepTrade()) { continue; }
+
             $matchingPosition = null;
             foreach ($positionsAll as $position) {
                 if (($position['symbol'] ?? null) === $dbTrade->symbol &&
@@ -419,6 +422,47 @@ class DemoFuturesOrchestrator extends Command
                 $dbTrade->avg_entry_price = $exchangePrice;
                 $dbTrade->save();
                 $this->info("    به‌روزرسانی موقعیت دمو با اختلاف جزئی: {$dbTrade->symbol}");
+            }
+        }
+
+        // Sync multi-step trades from exchange (trust exchange as source of truth)
+        $this->syncMultiStepTrades($ue, $symbol, $positionsAll, $openTrades);
+    }
+
+    /**
+     * Sync multi-step trades with exchange positions (exchange is source of truth)
+     */
+    private function syncMultiStepTrades(UserExchange $ue, string $symbol, array $positionsAll, $openTrades): void
+    {
+        $multiStepTrades = $openTrades->filter(fn($t) => $t->isMultiStepTrade());
+        if ($multiStepTrades->isEmpty()) { return; }
+
+        foreach ($multiStepTrades as $dbTrade) {
+            $matchingPosition = null;
+            foreach ($positionsAll as $position) {
+                if (($position['symbol'] ?? null) === $dbTrade->symbol &&
+                    strtolower($position['side'] ?? '') === strtolower($dbTrade->side) &&
+                    (float)($position['size'] ?? 0) > 0) {
+                    $matchingPosition = $position;
+                    break;
+                }
+            }
+
+            if (!$matchingPosition) {
+                $dbTrade->closed_at = now();
+                $dbTrade->save();
+                $this->info("    معامله چند پله‌ای دمو بسته شد (موقعیت صرافی یافت نشد): {$dbTrade->symbol}");
+                continue;
+            }
+
+            $exchangeSize = (float)($matchingPosition['size'] ?? 0);
+            $exchangePrice = (float)($matchingPosition['avgPrice'] ?? 0);
+
+            if ((float)$dbTrade->qty !== $exchangeSize || (float)$dbTrade->avg_entry_price !== $exchangePrice) {
+                $dbTrade->qty = $exchangeSize;
+                $dbTrade->avg_entry_price = $exchangePrice;
+                $dbTrade->save();
+                $this->info("    همگام‌سازی معامله چند پله‌ای دمو با صرافی: {$dbTrade->symbol} (qty={$exchangeSize}, avg={$exchangePrice})");
             }
         }
     }
@@ -847,37 +891,92 @@ return $val;
                         $qty = $this->extractFilledQuantity($exchangeOrder, $ue->exchange_name);
                         $avgPrice = $this->extractAveragePrice($exchangeOrder, $ue->exchange_name);
                         if ($symbol && $side && $qty !== null && $avgPrice !== null) {
-                            $existingOpen = Trade::where('user_exchange_id', $ue->id)
-                                ->where('is_demo', true) // DEMO
-                                ->where('order_id', $order->order_id)
-                                ->whereNull('closed_at')
-                                ->first();
-                            if ($existingOpen) {
-                                $existingOpen->qty = (float) $qty;
-                                $existingOpen->avg_entry_price = (float) $avgPrice;
-                                $existingOpen->save();
-                                $this->info("معامله باز دمو برای سفارش {$orderId} به‌روزرسانی شد");
+                            // Check if this is a multi-step order (steps > 1)
+                            if ($order->steps > 1) {
+                                $this->handleMultiStepOrderFill($ue, $order, $symbol, $side, (float)$qty, (float)$avgPrice);
                             } else {
-                                Trade::create([
-                                    'user_exchange_id' => $ue->id,
-                                    'is_demo' => true, // DEMO
-                                    'symbol' => $symbol,
-                                    'side' => $side,
-                                    'order_type' => 'Market',
-                                    'leverage' => 1.0,
-                                    'qty' => (float) $qty,
-                                    'avg_entry_price' => (float) $avgPrice,
-                                    'avg_exit_price' => 0,
-                                    'pnl' => 0,
-                                    'order_id' => $order->order_id,
-                                    'closed_at' => null,
-                                ]);
-                                $this->info("معامله باز دمو برای سفارش {$orderId} ثبت شد");
+                                // Single-step order: original logic
+                                $existingOpen = Trade::where('user_exchange_id', $ue->id)
+                                    ->where('is_demo', true) // DEMO
+                                    ->where('order_id', $order->order_id)
+                                    ->whereNull('closed_at')
+                                    ->first();
+                                if ($existingOpen) {
+                                    $existingOpen->qty = (float) $qty;
+                                    $existingOpen->avg_entry_price = (float) $avgPrice;
+                                    $existingOpen->save();
+                                    $this->info("معامله باز دمو برای سفارش {$orderId} به‌روزرسانی شد");
+                                } else {
+                                    Trade::create([
+                                        'user_exchange_id' => $ue->id,
+                                        'is_demo' => true, // DEMO
+                                        'symbol' => $symbol,
+                                        'side' => strtolower($side),
+                                        'order_type' => 'Market',
+                                        'leverage' => 1.0,
+                                        'qty' => (float) $qty,
+                                        'avg_entry_price' => (float) $avgPrice,
+                                        'avg_exit_price' => 0,
+                                        'pnl' => 0,
+                                        'order_id' => $order->order_id,
+                                        'closed_at' => null,
+                                    ]);
+                                    $this->info("معامله باز دمو برای سفارش {$orderId} ثبت شد");
+                                }
                             }
                         }
                     }
                 }
             });
+        }
+    }
+
+    /**
+     * Handle multi-step order fill by merging into existing trade or creating new one
+     */
+    private function handleMultiStepOrderFill(UserExchange $ue, Order $order, string $symbol, string $side, float $qty, float $avgPrice): void
+    {
+        $existingTrade = Trade::where('user_exchange_id', $ue->id)
+            ->where('is_demo', true) // DEMO
+            ->where('symbol', $symbol)
+            ->where('side', strtolower($side))
+            ->whereNull('closed_at')
+            ->whereNotNull('multi_step_order_ids')
+            ->first();
+
+        if ($existingTrade) {
+            $oldQty = (float)$existingTrade->qty;
+            $oldAvgPrice = (float)$existingTrade->avg_entry_price;
+            $newTotalQty = $oldQty + $qty;
+            $newAvgPrice = (($oldQty * $oldAvgPrice) + ($qty * $avgPrice)) / $newTotalQty;
+
+            $existingTrade->qty = $newTotalQty;
+            $existingTrade->avg_entry_price = $newAvgPrice;
+
+            $orderIds = $existingTrade->multi_step_order_ids ?? [];
+            if (!in_array($order->order_id, $orderIds)) {
+                $orderIds[] = $order->order_id;
+                $existingTrade->multi_step_order_ids = $orderIds;
+            }
+            $existingTrade->save();
+            $this->info("معامله چند پله‌ای دمو به‌روزرسانی شد: {$symbol} (qty={$newTotalQty}, avg={$newAvgPrice})");
+        } else {
+            Trade::create([
+                'user_exchange_id' => $ue->id,
+                'is_demo' => true, // DEMO
+                'symbol' => $symbol,
+                'side' => strtolower($side),
+                'order_type' => 'Market',
+                'leverage' => 1.0,
+                'qty' => $qty,
+                'avg_entry_price' => $avgPrice,
+                'avg_exit_price' => 0,
+                'pnl' => 0,
+                'order_id' => $order->order_id,
+                'multi_step_order_ids' => [$order->order_id],
+                'closed_at' => null,
+            ]);
+            $this->info("معامله چند پله‌ای دمو جدید ثبت شد: {$symbol} (qty={$qty})");
         }
     }
 
